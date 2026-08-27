@@ -1,8 +1,8 @@
 import { defineConfig } from "drizzle-kit";
 
-const connectionString = process.env.SUPABASE_DATABASE_URL;
-if (!connectionString) {
-  throw new Error("SUPABASE_DATABASE_URL is required to run PostgreSQL Drizzle commands");
+const connectionString = process.env.SUPABASE_DATABASE_URL ?? process.env.DATABASE_URL;
+if (!connectionString || !/^postgres(?:ql)?:\/\//i.test(connectionString)) {
+  throw new Error("A PostgreSQL SUPABASE_DATABASE_URL or DATABASE_URL is required to run Drizzle commands");
 }
 
 export default defineConfig({

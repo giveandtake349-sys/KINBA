@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import {
   blocks,
   connections,
@@ -11,17 +12,32 @@ import {
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { resolvePostgresDatabaseUrl } from "./databaseConfig";
 import { scoreSignalPair } from "./nivoMatching";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _pool: Pool | null = null;
 
 export async function getDb() {
-  if (!_db && process.env.SUPABASE_DATABASE_URL) {
+  if (!_db) {
+    const connectionString = resolvePostgresDatabaseUrl();
+    if (!connectionString) {
+      console.error("[Database] PostgreSQL is not configured. Set SUPABASE_DATABASE_URL or a PostgreSQL DATABASE_URL.");
+      return null;
+    }
     try {
-      _db = drizzle(process.env.SUPABASE_DATABASE_URL!);
+      _pool = new Pool({
+        connectionString,
+        ssl: { rejectUnauthorized: false },
+        max: 5,
+        idleTimeoutMillis: 30_000,
+        connectionTimeoutMillis: 10_000,
+      });
+      _db = drizzle({ client: _pool });
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
+      _pool = null;
     }
   }
   return _db;
@@ -30,7 +46,7 @@ export async function getDb() {
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
   const db = await getDb();
-  if (!db) return;
+  if (!db) throw new Error("NIVO PostgreSQL database is unavailable. Configure SUPABASE_DATABASE_URL or a PostgreSQL DATABASE_URL.");
   const values: InsertUser = { openId: user.openId, lastSignedIn: user.lastSignedIn ?? new Date() };
   const updateSet: Partial<InsertUser> = { lastSignedIn: values.lastSignedIn };
   (["name", "email", "loginMethod"] as const).forEach((field) => {

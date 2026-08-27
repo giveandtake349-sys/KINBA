@@ -49,3 +49,15 @@
 - [x] Fix the production build issue without exposing database credentials or weakening the Supabase configuration.
 - [x] Validate a clean install, type checks, tests, and production build before pushing the fix to GitHub main.
 - [x] Push the verified Render build fix to giveandtake349-sys/Nivo0.2 `main` and confirm the remote commit.
+- [x] Add visible success notifications after real signal creation and connection-request submission.
+- [x] Re-run the Supabase PostgreSQL schema synchronization and verify all NIVO application tables exist.
+- [x] Validate the notification flows, type checks, tests, and production build without introducing mock states.
+- [ ] Verify the publish-signal and connection-request success toasts with an authenticated member action in the live NIVO interface.
+- [ ] Create a clearly labelled test-only profile and signal through the user’s authenticated NIVO account, then confirm their UI and database visibility.
+- [ ] Create the authorised test profile and test signal after the confirmed browser sign-in, then verify the toast and Supabase records.
+- [ ] Verify the Render POST/PUT mutation diagnosis against live Render logs or production responses after deployment.
+- [x] Fix the mutation backend’s PostgreSQL connection, environment validation, CORS, and request handling without exposing credentials.
+- [ ] Validate profile update and signal publishing against the production-compatible server, then push the verified fix to GitHub main.
+- [x] Audit and harden production handling for NIVO profile, signal, and connection mutations without Render dashboard access.
+- [x] Add regression tests for PostgreSQL mutation return values and request error handling, then validate a clean production build.
+- [ ] Push the verified NIVO API hardening update to giveandtake349-sys/Nivo0.2 `main`.
