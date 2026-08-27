@@ -1,0 +1,26 @@
+# NIVO Functional MVP Checklist
+
+- [x] Upgrade the project to persistent authentication and data storage.
+- [x] Define and migrate tables for profiles, signals, connection requests, messages, and blocks.
+- [x] Implement secure typed application procedures for every functional path.
+- [x] Build real discovery browsing and filtering backed by persisted signals.
+- [x] Build real profile viewing and editing flows.
+- [x] Build connection-request creation, acceptance, and rejection flows.
+- [x] Build private conversation listing and message send/read flows.
+- [x] Implement report and block actions with enforceable visibility rules.
+- [x] Wire navigation and buttons to live routes and transactional UI states.
+- [x] Test success, empty, validation, and error paths on desktop and mobile.
+- [ ] Add URL-based routes for discovery, profiles, connections, and private conversations.
+- [ ] Add public member profile views with live signals, accepted-connections count, and trust indicators.
+- [ ] Run authenticated browser validation for creating signals, profile saving, connection decisions, messaging, reporting, and blocking on desktop and mobile.
+- [ ] Locate and place the exact supplied NIVO logo asset in the appropriate public asset location.
+- [ ] Create repository documentation covering setup, environment variables, development, validation, and deployment.
+- [ ] Add a safe `.env.example` and verify no secrets are included in version control.
+- [ ] Configure the requested GitHub remote and inspect existing remote content before publishing.
+- [ ] Commit the complete NIVO codebase to the `main` branch and push it to GitHub.
+- [ ] Verify the GitHub remote, commit, branch contents, and clean install/run instructions.
+- [x] Review and test local Discover, Profile, and Connection interactions without changing production data.
+- [ ] Test the actual Connect button and pending connection state with authenticated accounts.
+- [ ] Test signed-in profile saving and opening public member profiles from Discover and Connections.
+- [ ] Record authenticated browser results for connection decisions, messaging, reporting, and blocking.
+- [ ] Push the current NIVO project to giveandtake349-sys/NIVO on the main branch and verify the remote commit.

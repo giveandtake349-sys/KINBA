@@ -1,6 +1,6 @@
-// NIVO Signal Noir: global application shell; dark, calm, human-first, and centered on the I NEED ↔ I CAN loop.
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
@@ -11,7 +11,15 @@ export default function App() {
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster theme="dark" />
-          <Home />
+          <Switch>
+            <Route path="/" component={Home} />
+            <Route path="/discover" component={Home} />
+            <Route path="/connections" component={Home} />
+            <Route path="/profile" component={Home} />
+            <Route path="/members/:id" component={Home} />
+            <Route path="/chat/:id" component={Home} />
+            <Route component={Home} />
+          </Switch>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

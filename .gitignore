@@ -13,6 +13,7 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+!.env.example
 
 # IDE and editor files
 .vscode/
@@ -44,6 +45,7 @@ pids
 *.pid
 *.seed
 *.pid.lock
+*.bak
 
 # Coverage directory used by tools like istanbul
 coverage/
