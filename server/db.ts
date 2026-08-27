@@ -11,6 +11,7 @@ import {
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { scoreSignalPair } from "./nivoMatching";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -114,7 +115,7 @@ export async function areUsersBlocked(firstUserId: number, secondUserId: number)
   return rows.length > 0;
 }
 
-export async function listSignals(input: { type?: "need" | "can"; category?: string; viewerId?: number }) {
+export async function listSignals(input: { type?: "need" | "can"; category?: string; search?: string; viewerId?: number }) {
   const db = await getDb();
   if (!db) return [];
   const conditions = [eq(signals.status, "active")];
@@ -125,7 +126,12 @@ export async function listSignals(input: { type?: "need" | "can"; category?: str
     .innerJoin(users, eq(signals.userId, users.id))
     .leftJoin(profiles, eq(signals.userId, profiles.userId))
     .where(and(...conditions)).orderBy(desc(signals.createdAt)).limit(60);
-  return rows.filter((row) => !blockedIds.has(row.signal.userId)).map((row) => ({
+  const normalizedSearch = input.search?.trim().toLocaleLowerCase();
+  return rows.filter((row) => {
+    if (blockedIds.has(row.signal.userId)) return false;
+    if (!normalizedSearch) return true;
+    return `${row.signal.title} ${row.signal.description} ${row.signal.category} ${row.signal.language} ${row.signal.location ?? ""}`.toLocaleLowerCase().includes(normalizedSearch);
+  }).map((row) => ({
     ...row.signal,
     owner: { id: row.user.id, name: row.user.name, country: row.profile?.country ?? null, languages: row.profile?.languages ?? "[]", photoUrl: row.profile?.photoUrl ?? null, phoneVerified: Boolean(row.profile?.phoneVerified) },
   }));
@@ -149,6 +155,52 @@ export async function listOwnSignals(userId: number) {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(signals).where(eq(signals.userId, userId)).orderBy(desc(signals.createdAt));
+}
+
+export async function listMatches(userId: number, search?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [ownSignals, blockedIds, candidates] = await Promise.all([
+    db.select().from(signals).where(and(eq(signals.userId, userId), eq(signals.status, "active"))).orderBy(desc(signals.createdAt)),
+    getBlockedIds(userId),
+    db.select({ signal: signals, user: users, profile: profiles }).from(signals)
+      .innerJoin(users, eq(signals.userId, users.id))
+      .leftJoin(profiles, eq(signals.userId, profiles.userId))
+      .where(eq(signals.status, "active")).orderBy(desc(signals.createdAt)).limit(240),
+  ]);
+  if (!ownSignals.length) return [];
+
+  const normalizedSearch = search?.trim().toLocaleLowerCase();
+  const bestBySignalId = new Map<number, {
+    id: number; type: "need" | "can"; title: string; description: string; category: string; language: string; location: string | null;
+    matchScore: number; matchedWith: "need" | "can"; owner: { id: number; name: string | null; country: string | null; photoUrl: string | null; phoneVerified: boolean };
+  }>();
+
+  for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
+    const candidate = candidates[candidateIndex];
+    if (candidate.signal.userId === userId || blockedIds.has(candidate.signal.userId)) continue;
+    if (normalizedSearch && !`${candidate.signal.title} ${candidate.signal.description} ${candidate.signal.category}`.toLocaleLowerCase().includes(normalizedSearch)) continue;
+    for (let ownIndex = 0; ownIndex < ownSignals.length; ownIndex += 1) {
+      const ownSignal = ownSignals[ownIndex];
+      const score = scoreSignalPair(ownSignal, candidate.signal);
+      if (score < 55) continue;
+      const existing = bestBySignalId.get(candidate.signal.id);
+      if (existing && existing.matchScore >= score) continue;
+      bestBySignalId.set(candidate.signal.id, {
+        id: candidate.signal.id,
+        type: candidate.signal.type,
+        title: candidate.signal.title,
+        description: candidate.signal.description,
+        category: candidate.signal.category,
+        language: candidate.signal.language,
+        location: candidate.signal.location,
+        matchScore: score,
+        matchedWith: ownSignal.type,
+        owner: { id: candidate.user.id, name: candidate.user.name, country: candidate.profile?.country ?? null, photoUrl: candidate.profile?.photoUrl ?? null, phoneVerified: Boolean(candidate.profile?.phoneVerified) },
+      });
+    }
+  }
+  return Array.from(bestBySignalId.values()).sort((first, second) => second.matchScore - first.matchScore).slice(0, 24);
 }
 
 export async function createConnection(userId: number, input: { recipientId: number; signalId: number | null; note: string }) {

@@ -10,11 +10,11 @@
 - [x] Implement report and block actions with enforceable visibility rules.
 - [x] Wire navigation and buttons to live routes and transactional UI states.
 - [x] Test success, empty, validation, and error paths on desktop and mobile.
-- [ ] Add URL-based routes for discovery, profiles, connections, and private conversations.
-- [ ] Add public member profile views with live signals, accepted-connections count, and trust indicators.
+- [x] Add URL-based routes for discovery, profiles, connections, and private conversations.
+- [x] Add public member profile views with live signals, accepted-connections count, and trust indicators.
 - [ ] Run authenticated browser validation for creating signals, profile saving, connection decisions, messaging, reporting, and blocking on desktop and mobile.
 - [ ] Locate and place the exact supplied NIVO logo asset in the appropriate public asset location.
-- [ ] Create repository documentation covering setup, environment variables, development, validation, and deployment.
+- [x] Create repository documentation covering setup, environment variables, development, validation, and deployment.
 - [ ] Add a safe `.env.example` and verify no secrets are included in version control.
 - [ ] Configure the requested GitHub remote and inspect existing remote content before publishing.
 - [ ] Commit the complete NIVO codebase to the `main` branch and push it to GitHub.
@@ -24,3 +24,16 @@
 - [ ] Test signed-in profile saving and opening public member profiles from Discover and Connections.
 - [ ] Record authenticated browser results for connection decisions, messaging, reporting, and blocking.
 - [ ] Push the current NIVO project to giveandtake349-sys/NIVO on the main branch and verify the remote commit.
+- [x] Replace every remaining prototype alert, static state, and placeholder action with a persistent NIVO operation or remove it.
+- [ ] Add an active sign-in/OTP entry flow and update the header immediately after authentication completes.
+- [x] Implement functional need and capability publishing with authenticated ownership and dynamic feed refresh.
+- [x] Add live discovery filtering and category/keyword match scoring from persisted signals.
+- [x] Complete request, pending, acceptance, decline, cancellation, and accepted-message states for connections.
+- [x] Implement persistent private messages with immediate UI updates for the current conversation.
+- [x] Add functional block actions to member and signal surfaces and enforce exclusions on discovery and matching.
+- [ ] Test every visible NIVO button for a database-backed outcome, validation response, or truthful unavailable state.
+- [x] Finish and validate persisted matching results, keyword search, and live Connect-to-Pending state updates.
+- [x] Replace native static confirmation prompts with in-app database-backed block and report confirmation flows.
+- [x] Generate and apply the reviewed migration for the matching feature through the managed database workflow (no schema change required).
+- [ ] Commit and push the verified all-functional NIVO update to GitHub `main`.
+- [x] Push the verified NIVO functional update to giveandtake349-sys/Nivo0.2 on the main branch and verify the remote commit.

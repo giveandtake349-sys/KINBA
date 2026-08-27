@@ -7,7 +7,7 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
   areUsersBlocked, blockUser, createConnection, createMessage, createReport, createSignal,
   ensureProfile, getConnectionForParticipant, getOwnProfile, getPublicProfile, getUserById, listConnections,
-  getSignalById, listMessages, listOwnSignals, listSignals, setConnectionStatus, updateProfile,
+  getSignalById, listMatches, listMessages, listOwnSignals, listSignals, setConnectionStatus, updateProfile,
 } from "./db";
 import { connectionRequestInput, isAcceptedParticipant, profileInput, reportInput, signalInput } from "./nivoValidation";
 
@@ -36,9 +36,12 @@ export const appRouter = router({
     update: protectedProcedure.input(profileInput).mutation(({ ctx, input }) => updateProfile(ctx.user.id, input)),
   }),
   signals: router({
-    list: publicProcedure.input(z.object({ type: z.enum(["need", "can"]).optional(), category: z.string().trim().min(2).max(64).optional() }).optional()).query(({ ctx, input }) => listSignals({ ...input, viewerId: ctx.user?.id })),
+    list: publicProcedure.input(z.object({ type: z.enum(["need", "can"]).optional(), category: z.string().trim().min(2).max(64).optional(), search: z.string().trim().min(2).max(100).optional() }).optional()).query(({ ctx, input }) => listSignals({ ...input, viewerId: ctx.user?.id })),
     mine: protectedProcedure.query(({ ctx }) => listOwnSignals(ctx.user.id)),
     create: protectedProcedure.input(signalInput).mutation(({ ctx, input }) => createSignal(ctx.user.id, input)),
+  }),
+  matches: router({
+    list: protectedProcedure.input(z.object({ search: z.string().trim().min(2).max(100).optional() }).optional()).query(({ ctx, input }) => listMatches(ctx.user.id, input?.search)),
   }),
   connections: router({
     list: protectedProcedure.query(({ ctx }) => listConnections(ctx.user.id)),
@@ -81,11 +84,12 @@ export const appRouter = router({
       if (await areUsersBlocked(connection.requesterId, connection.recipientId)) throw new TRPCError({ code: "FORBIDDEN", message: "This conversation is no longer available." });
       return listMessages(input.id);
     }),
-    send: protectedProcedure.input(z.object({ connectionId: z.number().int().positive(), body: z.string().trim().min(1).max(4000) })).mutation(async ({ ctx, input }) => {
+    send: protectedProcedure.input(z.object({ connectionId: z.number().int().positive(), body: z.string().trim().min(1).max(4000), clientMessageId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const connection = await getConnectionForParticipant(input.connectionId, ctx.user.id);
       if (!connection || !isAcceptedParticipant(connection, ctx.user.id)) throw new TRPCError({ code: "FORBIDDEN", message: "Messaging is available after the connection is accepted." });
       if (await areUsersBlocked(connection.requesterId, connection.recipientId)) throw new TRPCError({ code: "FORBIDDEN", message: "This conversation is no longer available." });
-      return createMessage(input.connectionId, ctx.user.id, input.body);
+      const message = await createMessage(input.connectionId, ctx.user.id, input.body);
+      return { ...message, clientMessageId: input.clientMessageId };
     }),
   }),
   trust: router({

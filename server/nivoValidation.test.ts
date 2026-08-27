@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { connectionRequestInput, isAcceptedParticipant, signalInput } from "./nivoValidation";
+import { scoreSignalPair } from "./nivoMatching";
 
 describe("NIVO input contracts", () => {
   it("accepts a valid connection request and rejects an empty note", () => {
@@ -16,5 +17,21 @@ describe("NIVO input contracts", () => {
     expect(isAcceptedParticipant({ requesterId: 1, recipientId: 2, status: "accepted" }, 2)).toBe(true);
     expect(isAcceptedParticipant({ requesterId: 1, recipientId: 2, status: "pending" }, 2)).toBe(false);
     expect(isAcceptedParticipant({ requesterId: 1, recipientId: 2, status: "accepted" }, 3)).toBe(false);
+  });
+});
+
+describe("NIVO match scoring", () => {
+  it("scores an exact NEED/CAN category pairing at 85% or above", () => {
+    expect(scoreSignalPair(
+      { type: "need", category: "Design", title: "Need a brand designer", description: "Help with identity and visual direction" },
+      { type: "can", category: "Design", title: "I offer product design", description: "Brand and visual systems" },
+    )).toBeGreaterThanOrEqual(85);
+  });
+
+  it("returns no match for two signals of the same type", () => {
+    expect(scoreSignalPair(
+      { type: "need", category: "Design", title: "Need a brand designer", description: "Help with identity" },
+      { type: "need", category: "Design", title: "Need a product designer", description: "Help with interface" },
+    )).toBe(0);
   });
 });
