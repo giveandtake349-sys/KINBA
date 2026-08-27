@@ -60,4 +60,4 @@
 - [ ] Validate profile update and signal publishing against the production-compatible server, then push the verified fix to GitHub main.
 - [x] Audit and harden production handling for NIVO profile, signal, and connection mutations without Render dashboard access.
 - [x] Add regression tests for PostgreSQL mutation return values and request error handling, then validate a clean production build.
-- [ ] Push the verified NIVO API hardening update to giveandtake349-sys/Nivo0.2 `main`.
+- [x] Push the verified NIVO API hardening update to giveandtake349-sys/Nivo0.2 `main`.
