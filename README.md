@@ -16,7 +16,7 @@ NIVO is a mobile-first human matching platform organized around a simple product
 
 ## Stack
 
-The project uses **React 19**, **TypeScript**, **Vite**, **Tailwind CSS**, **Express**, **tRPC**, **Drizzle ORM**, and **MySQL/TiDB**. The client uses URL-based screens for `/`, `/discover`, `/connections`, `/profile`, `/members/:id`, and `/chat/:id`.
+The project uses **React 19**, **TypeScript**, **Vite**, **Tailwind CSS**, **Express**, **tRPC**, **Drizzle ORM**, and **PostgreSQL on Supabase**. The client uses URL-based screens for `/`, `/discover`, `/connections`, `/profile`, `/members/:id`, and `/chat/:id`.
 
 ## NIVO logo
 
@@ -36,7 +36,7 @@ Copy the environment template and provide values only through your deployment pl
 cp .env.example .env.local
 ```
 
-Generate and apply database migrations in a development environment with an available database:
+Apply the approved schema to a development Supabase PostgreSQL database:
 
 ```bash
 pnpm db:push
@@ -54,7 +54,7 @@ The managed Manus environment injects these values automatically. External deplo
 
 | Variable | Purpose |
 |---|---|
-| `DATABASE_URL` | MySQL/TiDB connection string used by Drizzle. |
+| `SUPABASE_DATABASE_URL` | Server-side Supabase PostgreSQL Session Pooler connection used by Drizzle. |
 | `JWT_SECRET` | Cookie/session signing secret. |
 | `VITE_APP_ID` | OAuth application identifier. |
 | `VITE_OAUTH_PORTAL_URL` | OAuth portal base URL used by the client sign-in flow. |
@@ -72,7 +72,7 @@ The managed Manus environment injects these values automatically. External deplo
 | `pnpm check` | Run TypeScript validation. |
 | `pnpm test` | Run the Vitest suite. |
 | `pnpm build` | Generate the production client and server bundles. |
-| `pnpm db:push` | Generate and apply Drizzle migrations. |
+| `pnpm db:push` | Compare the Drizzle PostgreSQL schema with Supabase and apply approved non-destructive changes. |
 
 ## Validation
 
@@ -90,7 +90,7 @@ The project does not seed fake members, reviews, or signals. Test real account w
 
 For the managed Manus environment, configure production secrets through the project settings, create a checkpoint, and use the **Publish** control. The platform builds with `pnpm build` and starts the resulting server with `pnpm start`.
 
-For another host, provision a managed MySQL/TiDB database, supply all required environment variables, run the migration command once against the target database, and deploy the Node application. Do not use placeholder secrets in any public or production environment.
+For another host, provision a PostgreSQL database compatible with Supabase, supply `SUPABASE_DATABASE_URL` and the required authentication environment variables, run the migration command once against the target database, and deploy the Node application. Do not use placeholder secrets in any public or production environment.
 
 ## Repository hygiene
 

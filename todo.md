@@ -37,3 +37,11 @@
 - [x] Generate and apply the reviewed migration for the matching feature through the managed database workflow (no schema change required).
 - [ ] Commit and push the verified all-functional NIVO update to GitHub `main`.
 - [x] Push the verified NIVO functional update to giveandtake349-sys/Nivo0.2 on the main branch and verify the remote commit.
+- [x] Review the current NIVO schema and apply only an approved managed database migration.
+- [x] Convert NIVO’s Drizzle schema, configuration, and database client from MySQL to PostgreSQL.
+- [x] Configure the Supabase PostgreSQL connection securely without committing credentials.
+- [x] Review and apply the generated PostgreSQL schema changes to Supabase.
+- [x] Validate NIVO’s PostgreSQL queries, type safety, tests, and production build.
+- [ ] Push the verified PostgreSQL conversion to giveandtake349-sys/Nivo0.2 on `main`.
+- [x] Validate the confirmed Supabase Session Pooler connection and complete the PostgreSQL conversion, migration, and GitHub delivery.
+- [x] Validate the renewed Supabase Session Pooler credential before beginning the PostgreSQL schema conversion.

@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, or } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/node-postgres";
 import {
   blocks,
   connections,
@@ -16,9 +16,9 @@ import { scoreSignalPair } from "./nivoMatching";
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+  if (!_db && process.env.SUPABASE_DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _db = drizzle(process.env.SUPABASE_DATABASE_URL!);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -32,7 +32,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   const db = await getDb();
   if (!db) return;
   const values: InsertUser = { openId: user.openId, lastSignedIn: user.lastSignedIn ?? new Date() };
-  const updateSet: Record<string, unknown> = { lastSignedIn: values.lastSignedIn };
+  const updateSet: Partial<InsertUser> = { lastSignedIn: values.lastSignedIn };
   (["name", "email", "loginMethod"] as const).forEach((field) => {
     if (user[field] !== undefined) {
       values[field] = user[field];
@@ -41,7 +41,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   });
   values.role = user.role ?? (user.openId === ENV.ownerOpenId ? "admin" : "user");
   updateSet.role = values.role;
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  await db.insert(users).values(values).onConflictDoUpdate({ target: users.openId, set: updateSet });
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -61,7 +61,7 @@ export async function getUserById(userId: number) {
 export async function ensureProfile(userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  await db.insert(profiles).values({ userId, languages: JSON.stringify([]), skills: JSON.stringify([]), interests: JSON.stringify([]) }).onDuplicateKeyUpdate({ set: { userId } });
+  await db.insert(profiles).values({ userId, languages: JSON.stringify([]), skills: JSON.stringify([]), interests: JSON.stringify([]) }).onConflictDoNothing({ target: profiles.userId });
 }
 
 export async function getOwnProfile(userId: number) {
@@ -140,8 +140,8 @@ export async function listSignals(input: { type?: "need" | "can"; category?: str
 export async function createSignal(userId: number, input: { type: "need" | "can"; title: string; description: string; category: string; language: string; location: string | null }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const result = await db.insert(signals).values({ userId, ...input });
-  return { id: Number(result[0].insertId) };
+  const [created] = await db.insert(signals).values({ userId, ...input }).returning({ id: signals.id });
+  return created;
 }
 
 export async function getSignalById(signalId: number) {
@@ -208,8 +208,8 @@ export async function createConnection(userId: number, input: { recipientId: num
   if (!db) throw new Error("Database unavailable");
   const existing = await db.select().from(connections).where(and(eq(connections.requesterId, userId), eq(connections.recipientId, input.recipientId), eq(connections.status, "pending"))).limit(1);
   if (existing.length) throw new Error("A connection request is already pending for this person.");
-  const result = await db.insert(connections).values({ requesterId: userId, recipientId: input.recipientId, signalId: input.signalId, note: input.note });
-  return { id: Number(result[0].insertId) };
+  const [created] = await db.insert(connections).values({ requesterId: userId, recipientId: input.recipientId, signalId: input.signalId, note: input.note }).returning({ id: connections.id });
+  return created;
 }
 
 export async function getConnectionForParticipant(connectionId: number, userId: number) {
@@ -250,15 +250,15 @@ export async function listMessages(connectionId: number) {
 export async function createMessage(connectionId: number, senderId: number, body: string) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const result = await db.insert(messages).values({ connectionId, senderId, body });
+  const [created] = await db.insert(messages).values({ connectionId, senderId, body }).returning({ id: messages.id });
   await db.update(connections).set({ updatedAt: new Date() }).where(eq(connections.id, connectionId));
-  return { id: Number(result[0].insertId) };
+  return created;
 }
 
 export async function blockUser(blockerId: number, blockedId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  await db.insert(blocks).values({ blockerId, blockedId }).onDuplicateKeyUpdate({ set: { blockerId } });
+  await db.insert(blocks).values({ blockerId, blockedId }).onConflictDoNothing({ target: [blocks.blockerId, blocks.blockedId] });
 }
 
 export async function createReport(reporterId: number, input: { reportedUserId: number; reason: string; details: string | null }) {
