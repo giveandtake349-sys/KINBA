@@ -109,4 +109,13 @@
 - [x] Implement the new layout while preserving Supabase Auth, navigation, signal publishing, discovery, connections, messaging, and safety actions.
 - [x] Visually verify the redesigned NIVO screens at desktop and mobile widths and correct regressions.
 - [x] Run tests, TypeScript checks, production build, and diff validation after the UI redesign.
-- [ ] Checkpoint and push the verified layout update to GitHub `main`.
+- [x] Checkpoint and push the verified layout update to GitHub `main`.
+
+## React/Tailwind Discover and Dashboard replacement
+
+- [x] Replace the existing Discover/Dashboard JSX with the layout structure from `pasted_content.txt` while keeping NIVO’s real data and actions.
+- [x] Preserve Supabase Auth, live signal search/filtering, profile navigation, connection requests, blocking, and signal creation.
+- [x] Do not add the supplied reference image as a static asset.
+- [x] Verify the replacement at desktop and mobile widths and confirm no image asset was added.
+- [x] Run tests, TypeScript checks, production build, and diff validation.
+- [ ] Checkpoint and push the verified replacement to GitHub `main`.
