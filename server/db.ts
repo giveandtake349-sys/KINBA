@@ -153,7 +153,7 @@ export async function listSignals(input: { type?: "need" | "can"; category?: str
   }));
 }
 
-export async function createSignal(userId: number, input: { type: "need" | "can"; title: string; description: string; category: string; language: string; location: string | null }) {
+export async function createSignal(userId: number, input: { type: "need" | "can"; title: string; description: string; category: string; language: string; location: string | null; imageUrl: string | null }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const [created] = await db.insert(signals).values({ userId, ...input }).returning({ id: signals.id });
@@ -188,7 +188,7 @@ export async function listMatches(userId: number, search?: string) {
 
   const normalizedSearch = search?.trim().toLocaleLowerCase();
   const bestBySignalId = new Map<number, {
-    id: number; type: "need" | "can"; title: string; description: string; category: string; language: string; location: string | null;
+    id: number; type: "need" | "can"; title: string; description: string; category: string; language: string; location: string | null; imageUrl: string | null;
     matchScore: number; matchedWith: "need" | "can"; owner: { id: number; name: string | null; country: string | null; photoUrl: string | null; phoneVerified: boolean };
   }>();
 
@@ -210,6 +210,7 @@ export async function listMatches(userId: number, search?: string) {
         category: candidate.signal.category,
         language: candidate.signal.language,
         location: candidate.signal.location,
+        imageUrl: candidate.signal.imageUrl,
         matchScore: score,
         matchedWith: ownSignal.type,
         owner: { id: candidate.user.id, name: candidate.user.name, country: candidate.profile?.country ?? null, photoUrl: candidate.profile?.photoUrl ?? null, phoneVerified: Boolean(candidate.profile?.phoneVerified) },
@@ -263,10 +264,10 @@ export async function listMessages(connectionId: number) {
   return db.select().from(messages).where(eq(messages.connectionId, connectionId)).orderBy(messages.createdAt);
 }
 
-export async function createMessage(connectionId: number, senderId: number, body: string) {
+export async function createMessage(connectionId: number, senderId: number, body: string, imageUrl: string | null) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const [created] = await db.insert(messages).values({ connectionId, senderId, body }).returning({ id: messages.id });
+  const [created] = await db.insert(messages).values({ connectionId, senderId, body, imageUrl }).returning({ id: messages.id });
   await db.update(connections).set({ updatedAt: new Date() }).where(eq(connections.id, connectionId));
   return created;
 }

@@ -43,6 +43,7 @@ export const signals = pgTable("signals", {
   category: varchar("category", { length: 64 }).notNull(),
   language: varchar("language", { length: 64 }).notNull(),
   location: varchar("location", { length: 120 }),
+  imageUrl: varchar("imageUrl", { length: 1024 }),
   status: signalStatus("status").default("active").notNull(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
@@ -64,6 +65,7 @@ export const messages = pgTable("messages", {
   connectionId: integer("connectionId").notNull().references(() => connections.id, { onDelete: "cascade" }),
   senderId: integer("senderId").notNull().references(() => users.id, { onDelete: "cascade" }),
   body: text("body").notNull(),
+  imageUrl: varchar("imageUrl", { length: 1024 }),
   createdAt: createdAt(),
 }, (table) => [index("messages_connection_idx").on(table.connectionId, table.createdAt)]);
 

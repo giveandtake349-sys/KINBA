@@ -78,11 +78,16 @@ export const appRouter = router({
       if (await areUsersBlocked(connection.requesterId, connection.recipientId)) throw new TRPCError({ code: "FORBIDDEN", message: "This conversation is no longer available." });
       return listMessages(input.id);
     }),
-    send: protectedProcedure.input(z.object({ connectionId: z.number().int().positive(), body: z.string().trim().min(1).max(4000), clientMessageId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+    send: protectedProcedure.input(z.object({
+      connectionId: z.number().int().positive(),
+      body: z.string().trim().max(4000),
+      imageUrl: z.string().url().max(1024).nullable().optional(),
+      clientMessageId: z.string().uuid(),
+    }).refine((input) => Boolean(input.body || input.imageUrl), { message: "A message needs text or an image." })).mutation(async ({ ctx, input }) => {
       const connection = await getConnectionForParticipant(input.connectionId, ctx.user.id);
       if (!connection || !isAcceptedParticipant(connection, ctx.user.id)) throw new TRPCError({ code: "FORBIDDEN", message: "Messaging is available after the connection is accepted." });
       if (await areUsersBlocked(connection.requesterId, connection.recipientId)) throw new TRPCError({ code: "FORBIDDEN", message: "This conversation is no longer available." });
-      const message = await createMessage(input.connectionId, ctx.user.id, input.body);
+      const message = await createMessage(input.connectionId, ctx.user.id, input.body, input.imageUrl ?? null);
       return { ...message, clientMessageId: input.clientMessageId };
     }),
   }),

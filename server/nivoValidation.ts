@@ -18,6 +18,7 @@ export const signalInput = z.object({
   category: z.string().trim().min(2).max(64),
   language: z.string().trim().min(2).max(64),
   location: z.string().trim().max(120).nullable(),
+  imageUrl: z.string().url().max(1024).nullable().default(null),
 });
 
 export const connectionRequestInput = z.object({
