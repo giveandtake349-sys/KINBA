@@ -10,11 +10,12 @@ const allowedImageTypes = {
 } as const;
 
 type AllowedImageType = keyof typeof allowedImageTypes;
-type MediaKind = "post" | "chat";
+type MediaKind = "post" | "chat" | "avatar";
 
 const mediaBuckets: Record<MediaKind, string> = {
   post: "post-media",
   chat: "chat-media",
+  avatar: "avatars",
 };
 
 function isAllowedImageType(type: string): type is AllowedImageType {

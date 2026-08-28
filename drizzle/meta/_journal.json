@@ -15,6 +15,13 @@
       "when": 1787946271245,
       "tag": "0001_media_attachments",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787951960000,
+      "tag": "0002_avatar_storage",
+      "breakpoints": true
     }
   ]
 }

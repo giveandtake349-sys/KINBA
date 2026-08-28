@@ -136,3 +136,14 @@ body, .nivo-app, .guest-layout { background-color: #0F172A; }
 .message-image { border: 1px solid rgba(255, 255, 255, .18); border-radius: 9px; display: block; height: auto; margin-bottom: 7px; max-height: 300px; max-width: 100%; object-fit: contain; width: auto; }
 .message-bubble--mine .message-image { border-color: rgba(245, 158, 11, .3); }
 @media (max-width: 520px) { .message-form { padding: 10px; } .message-bubble { max-width: 88%; } .message-image { max-height: 240px; } }
+
+
+.profile-avatar-picker { align-items: center; display: flex; flex-direction: column; gap: 8px; }
+.profile-avatar-upload { background: transparent; border: 0; border-radius: 50%; padding: 0; position: relative; }
+.profile-avatar-upload:focus-visible { outline: 2px solid #F59E0B; outline-offset: 4px; }
+.profile-avatar-upload .avatar { box-shadow: 0 0 0 3px rgba(245, 158, 11, .2); transition: box-shadow .18s var(--line), transform .18s var(--line); }
+.profile-avatar-upload:hover .avatar { box-shadow: 0 0 0 4px rgba(245, 158, 11, .75); transform: translateY(-2px); }
+.avatar-upload-badge { align-items: center; background: #F59E0B; border: 2px solid #1E293B; border-radius: 50%; bottom: -2px; color: #07101d; display: inline-flex; height: 27px; justify-content: center; position: absolute; right: -2px; width: 27px; }
+.upload-photo-button { align-items: center; background: rgba(99, 230, 255, .08); border: 1px solid rgba(99, 230, 255, .3); border-radius: 999px; color: #a9efff; display: inline-flex; font-size: 11px; font-weight: 700; gap: 6px; padding: 8px 11px; }
+.upload-photo-button:hover { background: rgba(99, 230, 255, .16); border-color: rgba(99, 230, 255, .72); }
+.profile-avatar-picker > small { color: #7f8eaf; font-size: 9px; text-align: center; }
