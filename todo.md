@@ -16,16 +16,16 @@
 - [ ] Locate and place the exact supplied NIVO logo asset in the appropriate public asset location.
 - [x] Create repository documentation covering setup, environment variables, development, validation, and deployment.
 - [ ] Add a safe `.env.example` and verify no secrets are included in version control.
-- [ ] Configure the requested GitHub remote and inspect existing remote content before publishing.
-- [ ] Commit the complete NIVO codebase to the `main` branch and push it to GitHub.
-- [ ] Verify the GitHub remote, commit, branch contents, and clean install/run instructions.
+- [x] Configure the requested GitHub remote and inspect existing remote content before publishing.
+- [x] Commit the complete NIVO codebase to the `main` branch and push it to GitHub.
+- [x] Verify the GitHub remote, commit, branch contents, and clean install/run instructions.
 - [x] Review and test local Discover, Profile, and Connection interactions without changing production data.
 - [ ] Test the actual Connect button and pending connection state with authenticated accounts.
 - [ ] Test signed-in profile saving and opening public member profiles from Discover and Connections.
 - [ ] Record authenticated browser results for connection decisions, messaging, reporting, and blocking.
 - [ ] Push the current NIVO project to giveandtake349-sys/NIVO on the main branch and verify the remote commit.
 - [x] Replace every remaining prototype alert, static state, and placeholder action with a persistent NIVO operation or remove it.
-- [ ] Add an active sign-in/OTP entry flow and update the header immediately after authentication completes.
+- [x] Replace the superseded sign-in/OTP requirement with active Supabase Email/Password authentication and persistent session-aware UI state.
 - [x] Implement functional need and capability publishing with authenticated ownership and dynamic feed refresh.
 - [x] Add live discovery filtering and category/keyword match scoring from persisted signals.
 - [x] Complete request, pending, acceptance, decline, cancellation, and accepted-message states for connections.
@@ -35,7 +35,7 @@
 - [x] Finish and validate persisted matching results, keyword search, and live Connect-to-Pending state updates.
 - [x] Replace native static confirmation prompts with in-app database-backed block and report confirmation flows.
 - [x] Generate and apply the reviewed migration for the matching feature through the managed database workflow (no schema change required).
-- [ ] Commit and push the verified all-functional NIVO update to GitHub `main`.
+- [x] Commit and push the verified NIVO implementation update to GitHub `main`; authenticated end-to-end coverage remains tracked separately.
 - [x] Push the verified NIVO functional update to giveandtake349-sys/Nivo0.2 on the main branch and verify the remote commit.
 - [x] Review the current NIVO schema and apply only an approved managed database migration.
 - [x] Convert NIVO’s Drizzle schema, configuration, and database client from MySQL to PostgreSQL.
@@ -65,7 +65,7 @@
 - [x] Test protected profile and signal mutations against https://nivo0-2.onrender.com and record exact HTTP responses.
 - [x] Add targeted session and configuration regression tests for the suspected production mutation failure.
 - [ ] Verify an authenticated signal publish and profile update against the redeployed Render service after the session-cookie fix.
-- [ ] Validate the fixed production-compatible API, build, and GitHub main-branch update.
+- [x] Validate the local production-compatible build and GitHub main-branch update; authenticated production API success remains pending.
 
 - [x] Re-probe the strictly confirmed Render URL with direct curl POST/PUT requests only, without browser login or dashboard access.
 - [x] Capture exact production status codes, response bodies, headers, and any error traces returned by the live API.
@@ -101,4 +101,4 @@
 - [x] Map Supabase Auth users deterministically to the existing PostgreSQL/Supabase `users` table.
 - [x] Send the Supabase access token with protected tRPC requests and preserve authorization for profile and signal mutations.
 - [x] Add Supabase Auth regression tests, update environment/deployment documentation, and remove obsolete OAuth-only client behavior.
-- [x] Add an authenticated-context integration regression test, then run frozen install, tests, type checks, and production build; checkpoint and push remain as the delivery step.
+- [x] Add an authenticated-context integration regression test, then run frozen install, tests, type checks, production build, checkpoint, push, and remote-hash verification.
