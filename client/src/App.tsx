@@ -4,6 +4,7 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { SupabaseAuthProvider } from "./contexts/SupabaseAuthContext";
+import { LanguageProvider } from "./contexts/LanguageContext";
 import Home from "./pages/Home";
 
 export default function App() {
@@ -12,6 +13,7 @@ export default function App() {
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <SupabaseAuthProvider>
+            <LanguageProvider>
             <Toaster theme="dark" />
             <Switch>
             <Route path="/" component={Home} />
@@ -22,6 +24,7 @@ export default function App() {
             <Route path="/chat/:id" component={Home} />
             <Route component={Home} />
             </Switch>
+            </LanguageProvider>
           </SupabaseAuthProvider>
         </TooltipProvider>
       </ThemeProvider>

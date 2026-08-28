@@ -126,4 +126,13 @@
 - [x] Preserve real guest actions for Supabase Auth entry and Discover navigation without adding static image assets.
 - [x] Verify guest and authenticated views at desktop and mobile widths.
 - [x] Run tests, TypeScript checks, production build, and diff validation.
-- [ ] Checkpoint and push the guest landing redesign to GitHub `main`.
+- [x] Checkpoint and push the guest landing redesign to GitHub `main`.
+
+## Reference palette and multilingual UI
+
+- [x] Apply Deep Navy `#0b121e`, Cyan/Aqua `#00E5FF` and `cyan-400`, and Dark Glass `#131c2a` styling consistently across guest, Discover, and Dashboard views; legacy palette audit is clean.
+- [x] Add a persistent top-navigation language selector with English (EN), Bangla (বাংলা · BN), and Hindi (हिंदी · HI).
+- [x] Translate the supported navigation, buttons, headings, search placeholders, filters, badges, and guest/app UI labels for English, Bangla, and Hindi; dynamic user content remains unchanged by design.
+- [x] Verify selector persistence and translation contract, palette consistency, and responsive guest/Discover screens; authenticated Dashboard rendering remains covered by the existing app build path.
+- [x] Run tests, TypeScript checks, production build, and diff validation.
+- [ ] Checkpoint and push the multilingual styling update to GitHub `main`.
