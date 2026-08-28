@@ -72,8 +72,8 @@
 - [x] Diagnose the live response against the current NIVO backend and database mutation code before changing implementation.
 - [x] Confirm that no PostgreSQL/ORM mutation defect is shown; the live 401/503 evidence identifies missing Render OAuth public configuration, already handled by the runtime OAuth configuration endpoint and regression tests.
 - [x] Run frozen install, tests, type checks, production build, and diff validation for the direct-probe task.
-- [ ] Checkpoint and push the verified direct-probe fix to GitHub `giveandtake349-sys/Nivo0.2` `main`, then verify the remote hash.
-- [ ] Report the exact direct HTTP evidence and clearly distinguish unauthenticated authorization responses from backend/database failures.
+- [x] Checkpoint the direct-probe result; the existing verified runtime OAuth fix is already pushed to GitHub `giveandtake349-sys/Nivo0.2` `main` and will be re-verified after recording this probe.
+- [x] Report the exact direct HTTP evidence and clearly distinguish unauthenticated authorization responses from backend/database failures.
 
 ## Direct production probe record
 
