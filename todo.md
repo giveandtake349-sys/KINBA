@@ -136,3 +136,27 @@
 - [x] Verify selector persistence and translation contract, palette consistency, and responsive guest/Discover screens; authenticated Dashboard rendering remains covered by the existing app build path.
 - [x] Run tests, TypeScript checks, production build, and diff validation.
 - [x] Checkpoint and push the multilingual styling update to GitHub `main`.
+
+## Premium Classic Midnight Slate & Gold theme
+
+- [x] Replace the neon cyan palette with Deep Slate `#0F172A`, Slate Glass `#1E293B`, slate-700 borders, warm Gold/Amber `#F59E0B` or `#D4AF37`, white titles, and silver body text.
+- [x] Apply the Premium Classic theme consistently to the guest landing, Discover, Dashboard, navigation, buttons, active tabs, cards, and key badges.
+- [x] Preserve the existing English/Bangla/Hindi selector and all real Supabase/tRPC interactions.
+- [x] Verify guest, Discover, and Dashboard responsive presentation after the theme update.
+- [x] Run tests, TypeScript checks, production build, and diff validation.
+- [x] Checkpoint and push the Premium Classic theme to GitHub `main`.
+
+## Final cyan/sky accent removal
+
+- [x] Audit every file under `client/src` for `#00E5FF`, cyan-* and sky-* color tokens.
+- [x] Replace all remaining cyan/sky accent styling with warm gold `#F59E0B` / amber-500 while preserving contrast and functional states.
+- [x] Run `pnpm build` and restart the managed preview server.
+- [x] Checkpoint, push the verified accent cleanup to GitHub `main`, and confirm the remote revision.
+
+## Final cyan/sky accent removal — completed
+
+- [x] Audit every file under `client/src` for `#00E5FF`, cyan-* and sky-* color tokens.
+- [x] Replace all remaining cyan/sky accent styling with warm gold `#F59E0B` / amber-500 while preserving contrast and functional states.
+- [x] Run `pnpm build` and restart the managed preview server.
+- [x] Capture fresh desktop and mobile guest/Discover visual verification after the final accent replacement.
+- [x] Checkpoint and push the verified accent cleanup to GitHub `main`, confirming the remote revision.
