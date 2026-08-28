@@ -57,9 +57,10 @@ The managed Manus environment injects these values automatically. External deplo
 | `SUPABASE_DATABASE_URL` | Preferred server-side Supabase PostgreSQL Session Pooler connection used by Drizzle. |
 | `DATABASE_URL` | Supported PostgreSQL fallback for hosts such as Render; must begin with `postgres://` or `postgresql://`. |
 | `CORS_ORIGIN` | Optional comma-separated HTTPS origins for a separately hosted frontend. Omit when the NIVO client and API share one Render service. |
+| `CROSS_SITE_SESSION` | Set to `true` only when the browser client is hosted on a different site from the API and needs cross-site session cookies. Leave unset for the normal single-service Render deployment. |
 | `JWT_SECRET` | Cookie/session signing secret. |
 | `VITE_APP_ID` | OAuth application identifier. |
-| `VITE_OAUTH_PORTAL_URL` | OAuth portal base URL used by the client sign-in flow. |
+| `VITE_OAUTH_PORTAL_URL` | OAuth portal base URL used by the client sign-in flow. Required on Render at runtime; NIVO also reads it through `/api/oauth/config` if it was missing when the static client bundle was built. |
 | `OAUTH_SERVER_URL` | OAuth service base URL used by the server. |
 | `OWNER_OPEN_ID` | Project owner identifier used for the owner admin role. |
 | `OWNER_NAME` | Project owner display name. |
@@ -92,7 +93,7 @@ The project does not seed fake members, reviews, or signals. Test real account w
 
 For the managed Manus environment, configure production secrets through the project settings, create a checkpoint, and use the **Publish** control. The platform builds with `pnpm build` and starts the resulting server with `pnpm start`.
 
-For another host, provision a PostgreSQL database compatible with Supabase. On Render, configure either `SUPABASE_DATABASE_URL` (preferred) or a PostgreSQL `DATABASE_URL` using the Supabase **Session Pooler** URL, plus the required authentication environment variables. If your frontend is deployed separately, set `CORS_ORIGIN` to its exact HTTPS URL; otherwise leave it unset and serve the NIVO client and `/api/trpc` from the same Render service. Run the migration command once against the target database and deploy the Node application. Do not use placeholder secrets in any public or production environment.
+For another host, provision a PostgreSQL database compatible with Supabase. On Render, configure either `SUPABASE_DATABASE_URL` (preferred) or a PostgreSQL `DATABASE_URL` using the Supabase **Session Pooler** URL, plus `VITE_APP_ID`, `VITE_OAUTH_PORTAL_URL`, `OAUTH_SERVER_URL`, and `JWT_SECRET`. NIVO reads the public OAuth values at runtime to avoid a static-bundle configuration failure, but Render must still provide both values. If your frontend is deployed separately, set `CORS_ORIGIN` to its exact HTTPS URL and `CROSS_SITE_SESSION=true`; otherwise leave both unset and serve the NIVO client and `/api/trpc` from the same Render service. Run the migration command once against the target database and deploy the Node application. Do not use placeholder secrets in any public or production environment.
 
 ## Repository hygiene
 

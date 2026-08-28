@@ -10,7 +10,36 @@ function getQueryParam(req: Request, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+/**
+ * These values identify the OAuth application and are intentionally public.
+ * Returning them at runtime prevents a static client build from containing
+ * `undefined` when a host injects environment variables only at server start.
+ */
+export function getPublicOAuthConfig(): { appId: string; portalUrl: string } | null {
+  const appId = process.env.VITE_APP_ID?.trim();
+  const portalUrl = process.env.VITE_OAUTH_PORTAL_URL?.trim();
+  if (!appId || !portalUrl) return null;
+
+  try {
+    new URL(portalUrl);
+  } catch {
+    return null;
+  }
+
+  return { appId, portalUrl };
+}
+
 export function registerOAuthRoutes(app: Express) {
+  app.get("/api/oauth/config", (_req: Request, res: Response) => {
+    const config = getPublicOAuthConfig();
+    res.setHeader("Cache-Control", "no-store");
+    if (!config) {
+      res.status(503).json({ error: "OAuth public configuration is unavailable" });
+      return;
+    }
+    res.json(config);
+  });
+
   app.get("/api/oauth/callback", async (req: Request, res: Response) => {
     const code = getQueryParam(req, "code");
     const state = getQueryParam(req, "state");

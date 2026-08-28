@@ -61,3 +61,8 @@
 - [x] Audit and harden production handling for NIVO profile, signal, and connection mutations without Render dashboard access.
 - [x] Add regression tests for PostgreSQL mutation return values and request error handling, then validate a clean production build.
 - [x] Push the verified NIVO API hardening update to giveandtake349-sys/Nivo0.2 `main`.
+- [x] Identify the live NIVO Render service URL and capture the exact HTTP result for a safe signal-mutation API check.
+- [x] Test protected profile and signal mutations against https://nivo0-2.onrender.com and record exact HTTP responses.
+- [x] Add targeted session and configuration regression tests for the suspected production mutation failure.
+- [ ] Verify an authenticated signal publish and profile update against the redeployed Render service after the session-cookie fix.
+- [ ] Validate the fixed production-compatible API, build, and GitHub main-branch update.

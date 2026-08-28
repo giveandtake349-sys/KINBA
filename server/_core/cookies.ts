@@ -42,7 +42,10 @@ export function getSessionCookieOptions(
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req),
+    // Render serves the client and /api/trpc from one HTTPS origin by default.
+    // Lax is dependable for the OAuth redirect and subsequent protected POST
+    // requests. Enable CROSS_SITE_SESSION only for a separately hosted client.
+    sameSite: process.env.CROSS_SITE_SESSION === "true" ? "none" : "lax",
+    secure: isSecureRequest(req) || process.env.CROSS_SITE_SESSION === "true",
   };
 }
