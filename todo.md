@@ -102,3 +102,11 @@
 - [x] Send the Supabase access token with protected tRPC requests and preserve authorization for profile and signal mutations.
 - [x] Add Supabase Auth regression tests, update environment/deployment documentation, and remove obsolete OAuth-only client behavior.
 - [x] Add an authenticated-context integration regression test, then run frozen install, tests, type checks, production build, checkpoint, push, and remote-hash verification.
+
+## Attached layout redesign
+
+- [x] Read `pasted_content.txt` and translate its new layout into concrete responsive NIVO UI requirements.
+- [x] Implement the new layout while preserving Supabase Auth, navigation, signal publishing, discovery, connections, messaging, and safety actions.
+- [x] Visually verify the redesigned NIVO screens at desktop and mobile widths and correct regressions.
+- [x] Run tests, TypeScript checks, production build, and diff validation after the UI redesign.
+- [ ] Checkpoint and push the verified layout update to GitHub `main`.
