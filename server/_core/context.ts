@@ -1,6 +1,8 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
-import { sdk } from "./sdk";
+import { getUserByOpenId, upsertUser } from "../db";
+import { supabaseDisplayName, supabaseOpenId, verifySupabaseAccessToken } from "../supabaseAuth";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -8,21 +10,43 @@ export type TrpcContext = {
   user: User | null;
 };
 
+type ContextDependencies = {
+  verifyAccessToken: typeof verifySupabaseAccessToken;
+  saveUser: typeof upsertUser;
+  findUser: typeof getUserByOpenId;
+};
+
+const defaultDependencies: ContextDependencies = {
+  verifyAccessToken: verifySupabaseAccessToken,
+  saveUser: upsertUser,
+  findUser: getUserByOpenId,
+};
+
 export async function createContext(
-  opts: CreateExpressContextOptions
+  opts: CreateExpressContextOptions,
+  dependencies: ContextDependencies = defaultDependencies,
 ): Promise<TrpcContext> {
   let user: User | null = null;
 
   try {
-    user = await sdk.authenticateRequest(opts.req);
+    const supabaseUser = await dependencies.verifyAccessToken(opts.req);
+    if (supabaseUser) {
+      const openId = supabaseOpenId(supabaseUser.id);
+      await dependencies.saveUser({
+        openId,
+        name: supabaseDisplayName(supabaseUser),
+        email: supabaseUser.email ?? null,
+        loginMethod: "supabase",
+        lastSignedIn: new Date(),
+      });
+      user = (await dependencies.findUser(openId)) ?? null;
+    }
   } catch (error) {
-    // Authentication is optional for public procedures.
+    console.warn("[Supabase Auth] Request authentication failed:", error instanceof Error ? error.message : error);
     user = null;
   }
 
-  return {
-    req: opts.req,
-    res: opts.res,
-    user,
-  };
+  return { req: opts.req, res: opts.res, user };
 }
+
+export type { SupabaseUser };

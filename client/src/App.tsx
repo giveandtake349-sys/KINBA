@@ -3,6 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { SupabaseAuthProvider } from "./contexts/SupabaseAuthContext";
 import Home from "./pages/Home";
 
 export default function App() {
@@ -10,8 +11,9 @@ export default function App() {
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
-          <Toaster theme="dark" />
-          <Switch>
+          <SupabaseAuthProvider>
+            <Toaster theme="dark" />
+            <Switch>
             <Route path="/" component={Home} />
             <Route path="/discover" component={Home} />
             <Route path="/connections" component={Home} />
@@ -19,7 +21,8 @@ export default function App() {
             <Route path="/members/:id" component={Home} />
             <Route path="/chat/:id" component={Home} />
             <Route component={Home} />
-          </Switch>
+            </Switch>
+          </SupabaseAuthProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

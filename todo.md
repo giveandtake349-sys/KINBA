@@ -80,3 +80,25 @@
 - Target: `https://nivo0-2.onrender.com`
 - Browser login/dashboard access: prohibited for this task.
 - Safe requests must not use fabricated session credentials or create persistent test records without a valid authorized session.
+
+## Firebase Authentication migration
+
+- [x] Cancelled by user: Firebase migration superseded before implementation; audit work was redirected to Supabase Auth.
+- [x] Cancelled by user: Firebase secrets request was rejected and replaced with Supabase Auth configuration.
+- [x] Cancelled by user: Firebase frontend implementation was replaced by Supabase Email/Password Auth.
+- [x] Cancelled by user: Firebase Admin verification was replaced by Supabase access-token verification.
+- [x] Cancelled by user: Firebase identity mapping was replaced by Supabase identity mapping.
+- [x] Cancelled by user: Firebase token transport was replaced by Supabase Bearer-token transport.
+- [x] Cancelled by user: Firebase tests/docs were superseded by Supabase Auth tests/docs.
+- [x] Cancelled by user: Firebase delivery was superseded by the Supabase Auth delivery task.
+
+## Supabase Auth migration
+
+- [x] Audit the existing Manus OAuth client, session cookie, callback, tRPC context, and protected procedures.
+- [x] Confirm or securely configure `SUPABASE_URL` and `SUPABASE_ANON_KEY` for browser Auth and server-side token verification; the anon key is public by design and no service-role key reaches client code.
+- [x] Implement Supabase Email/Password sign-up, sign-in, sign-out, and persistent session restoration in the frontend UI.
+- [x] Replace the Manus OAuth-only backend authentication path with verified Supabase Auth access-token handling.
+- [x] Map Supabase Auth users deterministically to the existing PostgreSQL/Supabase `users` table.
+- [x] Send the Supabase access token with protected tRPC requests and preserve authorization for profile and signal mutations.
+- [x] Add Supabase Auth regression tests, update environment/deployment documentation, and remove obsolete OAuth-only client behavior.
+- [x] Add an authenticated-context integration regression test, then run frozen install, tests, type checks, and production build; checkpoint and push remain as the delivery step.
