@@ -135,4 +135,4 @@
 - [x] Translate the supported navigation, buttons, headings, search placeholders, filters, badges, and guest/app UI labels for English, Bangla, and Hindi; dynamic user content remains unchanged by design.
 - [x] Verify selector persistence and translation contract, palette consistency, and responsive guest/Discover screens; authenticated Dashboard rendering remains covered by the existing app build path.
 - [x] Run tests, TypeScript checks, production build, and diff validation.
-- [ ] Checkpoint and push the multilingual styling update to GitHub `main`.
+- [x] Checkpoint and push the multilingual styling update to GitHub `main`.
