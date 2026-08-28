@@ -66,3 +66,17 @@
 - [x] Add targeted session and configuration regression tests for the suspected production mutation failure.
 - [ ] Verify an authenticated signal publish and profile update against the redeployed Render service after the session-cookie fix.
 - [ ] Validate the fixed production-compatible API, build, and GitHub main-branch update.
+
+- [x] Re-probe the strictly confirmed Render URL with direct curl POST/PUT requests only, without browser login or dashboard access.
+- [x] Capture exact production status codes, response bodies, headers, and any error traces returned by the live API.
+- [x] Diagnose the live response against the current NIVO backend and database mutation code before changing implementation.
+- [x] Confirm that no PostgreSQL/ORM mutation defect is shown; the live 401/503 evidence identifies missing Render OAuth public configuration, already handled by the runtime OAuth configuration endpoint and regression tests.
+- [x] Run frozen install, tests, type checks, production build, and diff validation for the direct-probe task.
+- [ ] Checkpoint and push the verified direct-probe fix to GitHub `giveandtake349-sys/Nivo0.2` `main`, then verify the remote hash.
+- [ ] Report the exact direct HTTP evidence and clearly distinguish unauthenticated authorization responses from backend/database failures.
+
+## Direct production probe record
+
+- Target: `https://nivo0-2.onrender.com`
+- Browser login/dashboard access: prohibited for this task.
+- Safe requests must not use fabricated session credentials or create persistent test records without a valid authorized session.
