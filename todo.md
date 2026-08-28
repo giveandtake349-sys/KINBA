@@ -118,4 +118,12 @@
 - [x] Do not add the supplied reference image as a static asset.
 - [x] Verify the replacement at desktop and mobile widths and confirm no image asset was added.
 - [x] Run tests, TypeScript checks, production build, and diff validation.
-- [ ] Checkpoint and push the verified replacement to GitHub `main`.
+- [x] Checkpoint and push the verified replacement to GitHub `main`.
+
+## Guest landing design parity
+
+- [x] Apply the pasted_content.txt React/Tailwind design to the default logged-out `/` landing component.
+- [x] Preserve real guest actions for Supabase Auth entry and Discover navigation without adding static image assets.
+- [x] Verify guest and authenticated views at desktop and mobile widths.
+- [x] Run tests, TypeScript checks, production build, and diff validation.
+- [ ] Checkpoint and push the guest landing redesign to GitHub `main`.
