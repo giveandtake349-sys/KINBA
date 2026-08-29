@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import {
@@ -196,6 +196,7 @@ function shapeVideoRow(row: any) {
     reactionCount: Number(row.reactionCount),
     shareCount: Number(row.shareCount),
     commentCount: Number(row.commentCount),
+    viewCount: Number(row.video.viewCount ?? 0),
     viewerReacted: Boolean(row.viewerReacted),
     viewerShared: Boolean(row.viewerShared),
     owner: {
@@ -254,6 +255,24 @@ export async function listVideos(kind: VideoKind, viewerId?: number) {
   return selectVideos([eq(videos.kind, kind)], viewerId, "recent");
 }
 
+export async function searchVideos(term: string, viewerId?: number) {
+  const db = await getDb();
+  const query = term.trim();
+  if (!db || !query) return [];
+  const pattern = `%${query}%`;
+  return selectVideos(
+    [
+      or(
+        ilike(videos.title, pattern),
+        ilike(videos.description, pattern),
+        ilike(users.name, pattern)
+      ),
+    ],
+    viewerId,
+    "recent"
+  );
+}
+
 export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
   if (tab === "following" && !viewerId) return [];
   const db = await getDb();
@@ -280,6 +299,75 @@ export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
     viewerId,
     tab === "trendy" ? "trendy" : "recent"
   );
+}
+
+export async function listNotifications(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const [reactions, shares, comments, newFollowers] = await Promise.all([
+    db
+      .select({
+        id: videoReactions.id,
+        createdAt: videoReactions.createdAt,
+        actorName: users.name,
+        videoTitle: videos.title,
+      })
+      .from(videoReactions)
+      .innerJoin(videos, eq(videoReactions.videoId, videos.id))
+      .innerJoin(users, eq(videoReactions.userId, users.id))
+      .where(eq(videos.userId, userId))
+      .orderBy(desc(videoReactions.createdAt))
+      .limit(30),
+    db
+      .select({
+        id: videoShares.id,
+        createdAt: videoShares.createdAt,
+        actorName: users.name,
+        videoTitle: videos.title,
+      })
+      .from(videoShares)
+      .innerJoin(videos, eq(videoShares.videoId, videos.id))
+      .innerJoin(users, eq(videoShares.userId, users.id))
+      .where(eq(videos.userId, userId))
+      .orderBy(desc(videoShares.createdAt))
+      .limit(30),
+    db
+      .select({
+        id: videoComments.id,
+        createdAt: videoComments.createdAt,
+        actorName: users.name,
+        videoTitle: videos.title,
+      })
+      .from(videoComments)
+      .innerJoin(videos, eq(videoComments.videoId, videos.id))
+      .innerJoin(users, eq(videoComments.userId, users.id))
+      .where(eq(videos.userId, userId))
+      .orderBy(desc(videoComments.createdAt))
+      .limit(30),
+    db
+      .select({
+        id: follows.id,
+        createdAt: follows.createdAt,
+        actorName: users.name,
+      })
+      .from(follows)
+      .innerJoin(users, eq(follows.followerId, users.id))
+      .where(eq(follows.followedId, userId))
+      .orderBy(desc(follows.createdAt))
+      .limit(30),
+  ]);
+  return [
+    ...reactions.map(item => ({ ...item, kind: "reaction" as const })),
+    ...shares.map(item => ({ ...item, kind: "share" as const })),
+    ...comments.map(item => ({ ...item, kind: "comment" as const })),
+    ...newFollowers.map(item => ({
+      ...item,
+      kind: "follow" as const,
+      videoTitle: null,
+    })),
+  ]
+    .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+    .slice(0, 50);
 }
 
 export async function createVideo(
@@ -342,6 +430,17 @@ async function getVideoEngagement(videoId: number, viewerId: number) {
     viewerReacted: Boolean(counts?.viewerReacted),
     viewerShared: Boolean(counts?.viewerShared),
   };
+}
+
+export async function recordVideoView(videoId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [updated] = await db
+    .update(videos)
+    .set({ viewCount: sql`${videos.viewCount} + 1` })
+    .where(eq(videos.id, videoId))
+    .returning({ viewCount: videos.viewCount });
+  return { viewCount: Number(updated?.viewCount ?? 0) };
 }
 
 export async function listVideoComments(videoId: number) {

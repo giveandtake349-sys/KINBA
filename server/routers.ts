@@ -9,9 +9,12 @@ import {
   getOwnProfile,
   listCommunityAnnouncements,
   listHomeFeed,
+  listNotifications,
   listVideoComments,
+  searchVideos,
   listVideos,
   recordVideoShare,
+  recordVideoView,
   toggleVideoReaction,
 } from "./db";
 import { communityAnnouncementInput, videoInput } from "./mediaValidation";
@@ -31,6 +34,12 @@ export const appRouter = router({
     }),
   }),
   home: router({
+    search: publicProcedure
+      .input(z.object({ term: z.string().trim().max(120) }))
+      .query(({ ctx, input }) => searchVideos(input.term, ctx.user?.id)),
+    notifications: protectedProcedure.query(({ ctx }) =>
+      listNotifications(ctx.user.id)
+    ),
     feed: publicProcedure
       .input(
         z.object({ tab: z.enum(["videos", "trendy", "following", "icons"]) })
@@ -54,6 +63,9 @@ export const appRouter = router({
       .mutation(({ ctx, input }) =>
         recordVideoShare(input.videoId, ctx.user.id)
       ),
+    view: publicProcedure
+      .input(videoIdInput)
+      .mutation(({ input }) => recordVideoView(input.videoId)),
     comments: router({
       list: publicProcedure
         .input(videoIdInput)

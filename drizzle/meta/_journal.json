@@ -64,6 +64,13 @@
       "when": 1788007563905,
       "tag": "0008_add_video_comments",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788009708593,
+      "tag": "0009_mobile_profile_and_views",
+      "breakpoints": true
     }
   ]
 }

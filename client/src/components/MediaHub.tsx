@@ -16,7 +16,9 @@ import {
   Pause,
   Play,
   Share2,
+  Search,
   Upload,
+  UserRound,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -50,6 +52,8 @@ type VideoRecord = {
   width: number;
   height: number;
   sources: VideoSource[];
+  createdAt: Date | string;
+  viewCount: number;
   reactionCount: number;
   commentCount: number;
   shareCount: number;
@@ -110,6 +114,31 @@ function formatDuration(seconds: number) {
   return minutes
     ? `${minutes}:${String(remainder).padStart(2, "0")}`
     : `${seconds}s`;
+}
+function formatCount(value: number) {
+  return new Intl.NumberFormat("en", {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+function relativeTime(value: Date | string) {
+  const seconds = Math.max(
+    0,
+    Math.floor((Date.now() - new Date(value).getTime()) / 1000)
+  );
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  return new Date(value).toLocaleDateString();
+}
+function ownerHandle(name: string | null) {
+  return `@${
+    (name ?? "kinba_creator")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "") || "kinba_creator"
+  }`;
 }
 function notifyError(error: unknown) {
   toast.error(
@@ -189,9 +218,11 @@ function useOptimisticEngagement(video: VideoRecord) {
 function QualityVideoPlayer({
   video,
   vertical = false,
+  onFirstPlay,
 }: {
   video: VideoRecord;
   vertical?: boolean;
+  onFirstPlay?: () => void;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
   const [quality, setQuality] = useState<Quality>("ORIGINAL");
@@ -199,6 +230,7 @@ function QualityVideoPlayer({
   const [muted, setMuted] = useState(true);
   const positionRef = useRef(0);
   const resumeRef = useRef(false);
+  const viewedRef = useRef(false);
   const sourceMap = useMemo(
     () =>
       new Map(video.sources.map(source => [source.quality, source.videoUrl])),
@@ -241,7 +273,13 @@ function QualityVideoPlayer({
         preload="metadata"
         muted={muted}
         onLoadedMetadata={restorePlayback}
-        onPlay={() => setPlaying(true)}
+        onPlay={() => {
+          setPlaying(true);
+          if (!viewedRef.current) {
+            viewedRef.current = true;
+            onFirstPlay?.();
+          }
+        }}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
       />
@@ -403,28 +441,51 @@ function CommentsPanel({ videoId, open }: { videoId: number; open: boolean }) {
 
 function VideoCard({ video }: { video: VideoRecord }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [views, setViews] = useState(video.viewCount);
+  const viewMutation = trpc.videos.view.useMutation();
   const { current, react, share, pending } = useOptimisticEngagement(video);
+  const recordView = () => {
+    if (viewMutation.isPending) return;
+    void viewMutation
+      .mutateAsync({ videoId: video.id })
+      .then(result => setViews(result.viewCount))
+      .catch(() => undefined);
+  };
   return (
     <article className="long-video-card">
-      <QualityVideoPlayer video={video} />
+      <QualityVideoPlayer video={video} onFirstPlay={recordView} />
       <div className="long-video-copy">
         <div className="media-owner">
-          <div>
-            <strong>{video.owner.name ?? "KINBA member"}</strong>
-            <span>
-              {video.owner.isVerified ? (
-                <>
-                  <BadgeCheck size={12} /> Verified {video.owner.accountType}
-                </>
+          <div className="video-owner-identity">
+            <div className="video-owner-avatar">
+              {video.owner.photoUrl ? (
+                <img src={video.owner.photoUrl} alt="" />
               ) : (
-                video.owner.accountType
+                <UserRound size={16} />
               )}
-            </span>
+            </div>
+            <div>
+              <strong>{video.owner.name ?? "KINBA member"}</strong>
+              <span>
+                {ownerHandle(video.owner.name)} ·{" "}
+                {relativeTime(video.createdAt)}{" "}
+                {video.owner.isVerified && (
+                  <>
+                    <BadgeCheck size={12} /> {video.owner.accountType}
+                  </>
+                )}
+              </span>
+            </div>
           </div>
           <span>{formatDuration(video.durationSeconds)}</span>
         </div>
         <h3>{video.title}</h3>
         <p>{video.description}</p>
+        <div className="video-meta-line">
+          <span>{formatCount(views)} views</span>
+          <span>{formatCount(current.reactionCount)} reactions</span>
+          <span>{formatCount(current.commentCount)} comments</span>
+        </div>
         <EngagementActions
           engagement={current}
           onReact={react}
@@ -656,7 +717,13 @@ function FeedSkeleton({ short = false }: { short?: boolean }) {
   );
 }
 
-function HomeFeedPanel({ tab }: { tab: HomeTab }) {
+function HomeFeedPanel({
+  tab,
+  autoOpenUpload = false,
+}: {
+  tab: HomeTab;
+  autoOpenUpload?: boolean;
+}) {
   const auth = useAuth();
   const utils = trpc.useUtils();
   const query = trpc.home.feed.useQuery(
@@ -675,6 +742,9 @@ function HomeFeedPanel({ tab }: { tab: HomeTab }) {
       block: "center",
     });
   };
+  useEffect(() => {
+    if (autoOpenUpload) openUploader();
+  }, [autoOpenUpload]);
   return (
     <section
       className="media-section home-feed-section"
@@ -1011,7 +1081,7 @@ function AnnouncementComposer({ onCreated }: { onCreated: () => void }) {
     </form>
   );
 }
-function CommunityAnnouncements() {
+export function CommunityAnnouncements() {
   const auth = useAuth();
   const profileQuery = trpc.profile.me.useQuery(undefined, {
     enabled: auth.isAuthenticated,
@@ -1103,27 +1173,131 @@ function CommunityAnnouncements() {
     </section>
   );
 }
-export default function MediaHub() {
-  const [activeTab, setActiveTab] = useState<HomeTab>("videos");
+export type FeedSection =
+  | HomeTab
+  | "all"
+  | "shorts"
+  | "announcements"
+  | "publish"
+  | "search"
+  | "notifications"
+  | "settings";
+
+export function SearchFeed() {
+  const [term, setTerm] = useState("");
+  const query = trpc.home.search.useQuery(
+    { term },
+    { enabled: term.trim().length >= 2, refetchOnWindowFocus: false }
+  );
+  const results = (query.data ?? []) as VideoRecord[];
+  return (
+    <section
+      className="media-section search-section"
+      aria-labelledby="search-heading"
+    >
+      <div className="media-section-heading">
+        <div>
+          <p className="eyebrow">Search</p>
+          <h2 id="search-heading">Find your next signal.</h2>
+        </div>
+        <span>Searches published videos</span>
+      </div>
+      <form
+        className="feed-search-form"
+        onSubmit={event => event.preventDefault()}
+      >
+        <Search size={17} />
+        <input
+          value={term}
+          onChange={event => setTerm(event.target.value)}
+          placeholder="Search videos, creators, or topics"
+          aria-label="Search videos, creators, or topics"
+        />
+      </form>
+      {!term.trim() ? (
+        <div className="media-empty">
+          <Search size={18} />
+          <h3>Search the KINBA feed.</h3>
+          <p>Try a creator name, title, or topic.</p>
+        </div>
+      ) : term.trim().length < 2 ? (
+        <div className="media-empty">
+          <p>Enter at least two characters to search.</p>
+        </div>
+      ) : query.isPending ? (
+        <FeedSkeleton />
+      ) : query.isError ? (
+        <div className="media-empty">
+          <h3>Search is temporarily unavailable.</h3>
+          <p>Try again in a moment.</p>
+        </div>
+      ) : results.length ? (
+        <div className="long-video-grid">
+          {results.map(video => (
+            <VideoCard key={video.id} video={video} />
+          ))}
+        </div>
+      ) : (
+        <div className="media-empty">
+          <h3>No videos found.</h3>
+          <p>Try another creator, title, or topic.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+export default function MediaHub({
+  section = "all",
+  onSectionChange,
+}: {
+  section?: FeedSection;
+  onSectionChange?: (section: FeedSection) => void;
+}) {
+  const activeSection =
+    section === "publish" || section === "search" ? "videos" : section;
+  const select = (next: FeedSection) => onSectionChange?.(next);
   return (
     <div className="media-hub">
-      <nav className="home-feed-tabs" aria-label="Home feed tabs">
-        {tabOptions.map(tab => (
+      <nav
+        className="home-feed-tabs"
+        aria-label="Home feed tabs"
+        role="tablist"
+      >
+        {(
+          [
+            ["all", "All Feed"],
+            ["videos", "Videos"],
+            ["shorts", "Shorts"],
+          ] as const
+        ).map(([id, label]) => (
           <button
             type="button"
-            key={tab.id}
-            className={activeTab === tab.id ? "active" : ""}
-            onClick={() => setActiveTab(tab.id)}
-            aria-selected={activeTab === tab.id}
+            key={id}
+            className={activeSection === id ? "active" : ""}
+            onClick={() => select(id)}
+            aria-selected={activeSection === id}
             role="tab"
           >
-            {tab.label}
+            {label}
           </button>
         ))}
       </nav>
-      <HomeFeedPanel tab={activeTab} />
-      <ShortsFeed />
-      <CommunityAnnouncements />
+      {activeSection === "all" ? (
+        <>
+          <ShortsFeed />
+          <HomeFeedPanel tab="videos" autoOpenUpload={section === "publish"} />
+        </>
+      ) : activeSection === "shorts" ? (
+        <ShortsFeed />
+      ) : activeSection === "announcements" ? (
+        <CommunityAnnouncements />
+      ) : (
+        <HomeFeedPanel
+          tab={activeSection as HomeTab}
+          autoOpenUpload={section === "publish"}
+        />
+      )}
     </div>
   );
 }
