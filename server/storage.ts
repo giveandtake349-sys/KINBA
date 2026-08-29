@@ -112,6 +112,47 @@ export async function storageGet(
   return { key, url };
 }
 
+function keyFromStoredUrl(sourceUrl: string) {
+  const config = getR2Config();
+  try {
+    const parsed = new URL(sourceUrl);
+    const base = config.publicBaseUrl
+      ? new URL(`${config.publicBaseUrl.replace(/\/+$/, "")}/`)
+      : null;
+    if (!base || parsed.origin !== base.origin) return null;
+    const basePath = base.pathname.replace(/\/+$/, "");
+    const pathname = decodeURIComponent(parsed.pathname);
+    if (!pathname.startsWith(`${basePath}/`)) return null;
+    return normalizeKey(pathname.slice(basePath.length + 1));
+  } catch {
+    return null;
+  }
+}
+
+export async function storageDownload(sourceUrl: string): Promise<Buffer> {
+  const config = getR2Config();
+  const key = keyFromStoredUrl(sourceUrl);
+  if (key) {
+    try {
+      const object = await getR2Client().send(
+        new GetObjectCommand({ Bucket: config.bucket, Key: key })
+      );
+      if (!object.Body) throw new Error("R2 returned an empty source object.");
+      return Buffer.from(await object.Body.transformToByteArray());
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown R2 error";
+      throw new Error(`Cloudflare R2 source download failed: ${message}`);
+    }
+  }
+
+  const response = await fetch(sourceUrl);
+  if (!response.ok) {
+    throw new Error(`Source video download failed (${response.status}).`);
+  }
+  return Buffer.from(await response.arrayBuffer());
+}
+
 export async function storageGetSignedUrl(relKey: string): Promise<string> {
   const config = getR2Config();
   return getSignedUrl(

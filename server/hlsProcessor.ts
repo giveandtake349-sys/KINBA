@@ -9,7 +9,7 @@ import {
   updateVideoProcessing,
   type VideoSourceInput,
 } from "./db";
-import { storagePut } from "./storage";
+import { storageDownload, storagePut } from "./storage";
 
 const execFileAsync = promisify(execFile);
 const segmentDurationSeconds = 6;
@@ -116,11 +116,7 @@ export async function transcodeVideoToHls(videoId: number, sourceUrl: string) {
       processingError: null,
     });
 
-    const response = await fetch(sourceUrl);
-    if (!response.ok) {
-      throw new Error(`Source video download failed (${response.status}).`);
-    }
-    await fs.writeFile(inputPath, Buffer.from(await response.arrayBuffer()));
+    await fs.writeFile(inputPath, await storageDownload(sourceUrl));
 
     const sourceDimensions = await probeDimensions(inputPath);
     const availableVariants = variants.filter(
