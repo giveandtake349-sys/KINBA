@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { connectionRequestInput, isAcceptedParticipant, signalInput } from "./nivoValidation";
+import { commentInput, connectionRequestInput, isAcceptedParticipant, signalInput } from "./nivoValidation";
 import { scoreSignalPair } from "./nivoMatching";
 
 describe("NIVO input contracts", () => {
@@ -11,6 +11,12 @@ describe("NIVO input contracts", () => {
   it("requires meaningful signal content", () => {
     expect(signalInput.safeParse({ type: "need", title: "Need a mentor", description: "I would value guidance for my first product launch.", category: "Business", language: "English", location: null }).success).toBe(true);
     expect(signalInput.safeParse({ type: "need", title: "No", description: "too short", category: "Business", language: "English", location: null }).success).toBe(false);
+  });
+
+  it("requires comment text or an image", () => {
+    expect(commentInput.safeParse({ postId: 10, content: "A useful thought", imageUrl: null }).success).toBe(true);
+    expect(commentInput.safeParse({ postId: 10, content: null, imageUrl: "https://cdn.example.com/comment.png" }).success).toBe(true);
+    expect(commentInput.safeParse({ postId: 10, content: "", imageUrl: null }).success).toBe(false);
   });
 
   it("permits messaging only for an accepted participant", () => {

@@ -5,9 +5,9 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
   areUsersBlocked, blockUser, createConnection, createMessage, createReport, createSignal,
   ensureProfile, getConnectionForParticipant, getOwnProfile, getPublicProfile, getUserById, listConnections,
-  getSignalById, listMatches, listMessages, listOwnSignals, listSignals, setConnectionStatus, updateProfile,
+  createComment, deleteComment, getSignalById, listComments, listMatches, listMessages, listOwnSignals, listSignals, setConnectionStatus, updateProfile,
 } from "./db";
-import { connectionRequestInput, isAcceptedParticipant, profileInput, reportInput, signalInput } from "./nivoValidation";
+import { commentIdInput, commentInput, connectionRequestInput, isAcceptedParticipant, profileInput, reportInput, signalInput } from "./nivoValidation";
 
 const positiveId = z.object({ id: z.number().int().positive() });
 
@@ -33,6 +33,21 @@ export const appRouter = router({
     list: publicProcedure.input(z.object({ type: z.enum(["need", "can"]).optional(), category: z.string().trim().min(2).max(64).optional(), search: z.string().trim().min(2).max(100).optional() }).optional()).query(({ ctx, input }) => listSignals({ ...input, viewerId: ctx.user?.id })),
     mine: protectedProcedure.query(({ ctx }) => listOwnSignals(ctx.user.id)),
     create: protectedProcedure.input(signalInput).mutation(({ ctx, input }) => createSignal(ctx.user.id, input)),
+  }),
+  comments: router({
+    list: publicProcedure.input(z.object({ postId: z.number().int().positive() })).query(({ input }) => listComments(input.postId)),
+    create: protectedProcedure.input(commentInput).mutation(async ({ ctx, input }) => {
+      const signal = await getSignalById(input.postId);
+      if (!signal || signal.status !== "active") throw new TRPCError({ code: "NOT_FOUND", message: "This post is no longer available." });
+      if (await areUsersBlocked(ctx.user.id, signal.userId)) throw new TRPCError({ code: "FORBIDDEN", message: "Comments are not available for this post." });
+      return createComment(input.postId, ctx.user.id, input.content?.trim() || null, input.imageUrl ?? null);
+    }),
+    delete: protectedProcedure.input(commentIdInput).mutation(async ({ ctx, input }) => {
+      const result = await deleteComment(input.id, ctx.user.id);
+      if (result === "not_found") throw new TRPCError({ code: "NOT_FOUND", message: "This comment no longer exists." });
+      if (result === "forbidden") throw new TRPCError({ code: "FORBIDDEN", message: "Only the comment author or post owner can delete this comment." });
+      return { success: true } as const;
+    }),
   }),
   matches: router({
     list: protectedProcedure.input(z.object({ search: z.string().trim().min(2).max(100).optional() }).optional()).query(({ ctx, input }) => listMatches(ctx.user.id, input?.search)),

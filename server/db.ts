@@ -1,8 +1,10 @@
 import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { sql } from "drizzle-orm";
 import { Pool } from "pg";
 import {
   blocks,
+  comments,
   connections,
   type InsertUser,
   messages,
@@ -109,9 +111,9 @@ export async function getPublicProfile(userId: number, viewerId?: number) {
   if (viewerId && await areUsersBlocked(viewerId, userId)) return undefined;
   const person = await db.select({ user: users, profile: profiles }).from(users).leftJoin(profiles, eq(users.id, profiles.userId)).where(eq(users.id, userId)).limit(1);
   if (!person[0]) return undefined;
-  const publicSignals = await db.select().from(signals).where(and(eq(signals.userId, userId), eq(signals.status, "active"))).orderBy(desc(signals.createdAt));
+  const publicSignals = await db.select({ signal: signals, commentCount: sql<number>`(select count(*) from comments where comments."postId" = ${signals.id})` }).from(signals).where(and(eq(signals.userId, userId), eq(signals.status, "active"))).orderBy(desc(signals.createdAt));
   const acceptedConnections = await db.select().from(connections).where(and(or(eq(connections.requesterId, userId), eq(connections.recipientId, userId)), eq(connections.status, "accepted")));
-  return { ...person[0], signals: publicSignals, completedConnections: acceptedConnections.length };
+  return { ...person[0], signals: publicSignals.map(({ signal, commentCount }) => ({ ...signal, commentCount: Number(commentCount) })), completedConnections: acceptedConnections.length };
 }
 
 export async function getBlockedIds(userId: number) {
@@ -138,7 +140,7 @@ export async function listSignals(input: { type?: "need" | "can"; category?: str
   if (input.type) conditions.push(eq(signals.type, input.type));
   if (input.category) conditions.push(eq(signals.category, input.category));
   const blockedIds = input.viewerId ? await getBlockedIds(input.viewerId) : new Set<number>();
-  const rows = await db.select({ signal: signals, user: users, profile: profiles }).from(signals)
+  const rows = await db.select({ signal: signals, user: users, profile: profiles, commentCount: sql<number>`(select count(*) from comments where comments."postId" = ${signals.id})` }).from(signals)
     .innerJoin(users, eq(signals.userId, users.id))
     .leftJoin(profiles, eq(signals.userId, profiles.userId))
     .where(and(...conditions)).orderBy(desc(signals.createdAt)).limit(60);
@@ -149,6 +151,7 @@ export async function listSignals(input: { type?: "need" | "can"; category?: str
     return `${row.signal.title} ${row.signal.description} ${row.signal.category} ${row.signal.language} ${row.signal.location ?? ""}`.toLocaleLowerCase().includes(normalizedSearch);
   }).map((row) => ({
     ...row.signal,
+    commentCount: Number(row.commentCount),
     owner: { id: row.user.id, name: row.user.name, country: row.profile?.country ?? null, languages: row.profile?.languages ?? "[]", photoUrl: row.profile?.photoUrl ?? null, phoneVerified: Boolean(row.profile?.phoneVerified) },
   }));
 }
@@ -170,7 +173,7 @@ export async function getSignalById(signalId: number) {
 export async function listOwnSignals(userId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(signals).where(eq(signals.userId, userId)).orderBy(desc(signals.createdAt));
+  return db.select({ signal: signals, commentCount: sql<number>`(select count(*) from comments where comments."postId" = ${signals.id})` }).from(signals).where(eq(signals.userId, userId)).orderBy(desc(signals.createdAt)).then((rows) => rows.map(({ signal, commentCount }) => ({ ...signal, commentCount: Number(commentCount) })));
 }
 
 export async function listMatches(userId: number, search?: string) {
@@ -270,6 +273,33 @@ export async function createMessage(connectionId: number, senderId: number, body
   const [created] = await db.insert(messages).values({ connectionId, senderId, body, imageUrl }).returning({ id: messages.id });
   await db.update(connections).set({ updatedAt: new Date() }).where(eq(connections.id, connectionId));
   return created;
+}
+
+export async function listComments(postId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.select({ comment: comments, user: users, profile: profiles }).from(comments)
+    .innerJoin(users, eq(comments.userId, users.id))
+    .leftJoin(profiles, eq(comments.userId, profiles.userId))
+    .where(eq(comments.postId, postId)).orderBy(comments.createdAt);
+  return rows.map(({ comment, user, profile }) => ({ ...comment, user: { id: user.id, name: user.name, email: user.email, avatar: profile?.photoUrl ?? null } }));
+}
+
+export async function createComment(postId: number, userId: number, content: string | null, imageUrl: string | null) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db.insert(comments).values({ postId, userId, content, imageUrl }).returning();
+  return created;
+}
+
+export async function deleteComment(commentId: string, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [target] = await db.select({ comment: comments, postOwnerId: signals.userId }).from(comments).innerJoin(signals, eq(comments.postId, signals.id)).where(eq(comments.id, commentId)).limit(1);
+  if (!target) return "not_found" as const;
+  if (target.comment.userId !== userId && target.postOwnerId !== userId) return "forbidden" as const;
+  await db.delete(comments).where(eq(comments.id, commentId));
+  return "deleted" as const;
 }
 
 export async function blockUser(blockerId: number, blockedId: number) {

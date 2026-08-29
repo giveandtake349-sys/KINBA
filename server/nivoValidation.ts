@@ -21,6 +21,14 @@ export const signalInput = z.object({
   imageUrl: z.string().url().max(1024).nullable().default(null),
 });
 
+export const commentInput = z.object({
+  postId: z.number().int().positive(),
+  content: z.string().trim().max(2000).nullable().optional(),
+  imageUrl: z.string().url().max(1024).nullable().optional(),
+}).refine((input) => Boolean(input.content || input.imageUrl), { message: "A comment needs text or an image." });
+
+export const commentIdInput = z.object({ id: z.string().uuid() });
+
 export const connectionRequestInput = z.object({
   recipientId: z.number().int().positive(),
   signalId: z.number().int().positive().nullable(),

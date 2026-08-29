@@ -1,4 +1,4 @@
-import { boolean, index, integer, pgEnum, pgTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 
 export const appRole = pgEnum("app_role", ["user", "admin"]);
 export const signalType = pgEnum("signal_type", ["need", "can"]);
@@ -59,6 +59,16 @@ export const connections = pgTable("connections", {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 }, (table) => [index("connections_requester_idx").on(table.requesterId), index("connections_recipient_idx").on(table.recipientId), index("connections_status_idx").on(table.status)]);
+
+export const comments = pgTable("comments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  postId: integer("postId").notNull().references(() => signals.id, { onDelete: "cascade" }),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  content: text("content"),
+  imageUrl: varchar("imageUrl", { length: 1024 }),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (table) => [index("comments_post_idx").on(table.postId, table.createdAt), index("comments_user_idx").on(table.userId)]);
 
 export const messages = pgTable("messages", {
   id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
