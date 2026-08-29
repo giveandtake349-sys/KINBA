@@ -27,7 +27,8 @@ const blankProfile = { country: "", languages: "", about: "", skills: "", intere
 const blankSignal = { title: "", description: "", category: "Technology", language: "English", location: "" };
 
 function OfficialLogo({ small = false }: { small?: boolean }) {
-  return <div className={`official-logo ${small ? "official-logo--small" : ""}`}><img src={logoSrc} alt="Kinba official logo" onError={(event) => { event.currentTarget.style.display = "none"; }} /><span className="logo-fallback">KINBA</span></div>;
+  const [logoFailed, setLogoFailed] = useState(false);
+  return <div className={`official-logo ${small ? "official-logo--small" : ""}`}>{logoFailed ? <span className="logo-fallback">KINBA</span> : <img src={logoSrc} alt="Kinba official logo" onError={() => setLogoFailed(true)} />}</div>;
 }
 
 function Avatar({ name, photoUrl, large = false }: { name: string | null | undefined; photoUrl?: string | null; large?: boolean }) {

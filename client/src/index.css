@@ -276,3 +276,8 @@ body, .nivo-app, .guest-layout { background-color: #0F172A; }
     display: none;
   }
 }
+
+.profile-preview > div:last-child { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+.profile-preview p,
+.profile-preview span,
+.profile-preview [class*="email"] { max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
