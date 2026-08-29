@@ -1,0 +1,204 @@
+/* Profile statistics and activity tabs */
+.profile-stat-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 0 18px;
+}
+.profile-stat {
+  background: rgba(11, 18, 30, 0.48);
+  border: 1px solid rgba(161, 174, 255, 0.13);
+  border-radius: 13px;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 13px 11px;
+  text-align: center;
+}
+.profile-stat strong {
+  color: #f4f6ff;
+  font-size: 20px;
+  line-height: 1;
+}
+.profile-stat span {
+  color: #91a0c5;
+  font-size: 10px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.profile-content-section {
+  margin-top: 32px;
+}
+.profile-content-head {
+  align-items: end;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  margin-bottom: 15px;
+}
+.profile-content-head h2 {
+  font-size: 24px;
+  margin: 3px 0 0;
+}
+.profile-content-caption {
+  color: #91a0c5;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 290px;
+  text-align: right;
+}
+.profile-tabs {
+  border-bottom: 1px solid rgba(161, 174, 255, 0.16);
+  display: flex;
+  gap: 22px;
+  margin-bottom: 17px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.profile-tabs::-webkit-scrollbar {
+  display: none;
+}
+.profile-tabs button {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: #93a0bf;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0 1px 11px;
+  text-transform: uppercase;
+  transition:
+    border-color 0.18s var(--line),
+    color 0.18s var(--line);
+}
+.profile-tabs button:hover,
+.profile-tabs button:focus-visible {
+  color: #eef2ff;
+  outline: 0;
+}
+.profile-tabs button:focus-visible {
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.65);
+}
+.profile-tabs button.active {
+  border-bottom-color: #f59e0b;
+  color: #f8bc50;
+}
+.profile-tab-panel {
+  min-height: 128px;
+}
+.profile-content-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.profile-content-card {
+  background: rgba(19, 28, 42, 0.57);
+  border: 1px solid rgba(161, 174, 255, 0.13);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+}
+.profile-content-card-head {
+  align-items: center;
+  display: flex;
+  gap: 9px;
+  min-width: 0;
+}
+.profile-content-card-head .avatar {
+  flex: 0 0 auto;
+  height: 31px;
+  width: 31px;
+}
+.profile-content-card-head > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.profile-content-card-head strong {
+  color: #eff3ff;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-content-card-head div span {
+  color: #7f8eaf;
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-content-card-head .type-pill {
+  margin-left: auto;
+}
+.profile-content-card h3 {
+  color: #f2f5ff;
+  font-size: 16px;
+  line-height: 1.25;
+  margin: 0;
+}
+.profile-content-card > p {
+  color: #a8b2cd;
+  display: -webkit-box;
+  font-size: 12px;
+  line-height: 1.55;
+  margin: -5px 0 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+.profile-content-card .signal-row-image {
+  height: 156px;
+  margin: 0;
+  width: 100%;
+}
+.profile-content-meta {
+  align-items: center;
+  border-top: 1px solid rgba(161, 174, 255, 0.12);
+  color: #8f9cbd;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 10px;
+  gap: 8px 12px;
+  margin-top: auto;
+  padding-top: 10px;
+}
+.profile-content-meta > span:first-child {
+  margin-right: auto;
+}
+.profile-content-meta > span:not(:first-child) {
+  align-items: center;
+  display: inline-flex;
+  gap: 4px;
+}
+@media (max-width: 820px) {
+  .profile-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .profile-content-head {
+    align-items: start;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .profile-content-caption {
+    max-width: none;
+    text-align: left;
+  }
+  .profile-content-grid {
+    grid-template-columns: 1fr;
+  }
+  .profile-tabs {
+    gap: 18px;
+  }
+  .profile-content-card .signal-row-image {
+    height: 190px;
+  }
+}
