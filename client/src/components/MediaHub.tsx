@@ -1,6 +1,14 @@
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
 import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  BadgeCheck,
+  ChevronDown,
   Heart,
   Loader2,
   Megaphone,
@@ -8,15 +16,14 @@ import {
   Play,
   Share2,
   Upload,
-  Verified,
   Volume2,
   VolumeX,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import {
   getVideoMetadata,
-  MAX_ANNOUNCEMENT_VIDEO_DIMENSION,
   MAX_ANNOUNCEMENT_VIDEO_DURATION_SECONDS,
   MAX_LONG_VIDEO_DURATION_SECONDS,
   MAX_SHORT_VIDEO_DURATION_SECONDS,
@@ -27,7 +34,10 @@ import {
 } from "@/lib/mediaUpload";
 import "./mediaHub.css";
 
+type HomeTab = "videos" | "trendy" | "following" | "icons";
 type VideoKind = "LONG" | "SHORT";
+type Quality = "ORIGINAL" | "1080P" | "720P" | "480P";
+type VideoSource = { quality: Quality; videoUrl: string };
 type VideoRecord = {
   id: number;
   title: string;
@@ -38,6 +48,7 @@ type VideoRecord = {
   durationSeconds: number;
   width: number;
   height: number;
+  sources: VideoSource[];
   reactionCount: number;
   shareCount: number;
   viewerReacted: boolean;
@@ -50,24 +61,45 @@ type VideoRecord = {
     isVerified: boolean;
   };
 };
-type ImageSelection = { file: File; previewUrl: string };
-type VideoSelection = {
-  file: File;
-  previewUrl: string;
-  metadata: VideoMetadata;
-  kind: VideoKind;
-};
-type AnnouncementVideoSelection = {
-  file: File;
-  previewUrl: string;
-  metadata: VideoMetadata;
-};
 type Engagement = {
   reactionCount: number;
   shareCount: number;
   viewerReacted: boolean;
   viewerShared: boolean;
 };
+type ImageSelection = { file: File; previewUrl: string };
+type AnnouncementVideoSelection = {
+  file: File;
+  previewUrl: string;
+  metadata: VideoMetadata;
+};
+
+const tabOptions: { id: HomeTab; label: string; caption: string }[] = [
+  { id: "videos", label: "Videos", caption: "Latest main-feed videos" },
+  { id: "trendy", label: "Trendy", caption: "Most reacted-to videos" },
+  {
+    id: "following",
+    label: "Following",
+    caption: "Videos from people you follow",
+  },
+  {
+    id: "icons",
+    label: "ICONS",
+    caption: "Verified creator and company videos",
+  },
+];
+const qualityLabels: Record<Quality, string> = {
+  ORIGINAL: "Auto",
+  "1080P": "1080p",
+  "720P": "720p",
+  "480P": "480p",
+};
+const qualityFileLabels: { quality: Quality; label: string }[] = [
+  { quality: "ORIGINAL", label: "Original / Auto" },
+  { quality: "1080P", label: "1080p source" },
+  { quality: "720P", label: "720p source" },
+  { quality: "480P", label: "480p source" },
+];
 
 function formatDuration(seconds: number) {
   const minutes = Math.floor(seconds / 60);
@@ -83,26 +115,109 @@ function notifyError(error: unknown) {
       : "The operation could not be completed."
   );
 }
-function VideoPreview({
+function useOptimisticEngagement(video: VideoRecord) {
+  const auth = useAuth();
+  const utils = trpc.useUtils();
+  const [override, setOverride] = useState<Engagement | null>(null);
+  const [pending, setPending] = useState<"react" | "share" | null>(null);
+  const reactMutation = trpc.videos.react.useMutation();
+  const shareMutation = trpc.videos.share.useMutation();
+  const current = override ?? {
+    reactionCount: video.reactionCount,
+    shareCount: video.shareCount,
+    viewerReacted: video.viewerReacted,
+    viewerShared: video.viewerShared,
+  };
+  const react = async () => {
+    if (!auth.isAuthenticated) return auth.openAuth();
+    const previous = current;
+    setOverride({
+      ...previous,
+      viewerReacted: !previous.viewerReacted,
+      reactionCount: previous.reactionCount + (previous.viewerReacted ? -1 : 1),
+    });
+    setPending("react");
+    try {
+      setOverride(await reactMutation.mutateAsync({ videoId: video.id }));
+      await utils.home.feed.invalidate();
+      await utils.videos.list.invalidate();
+    } catch (error) {
+      setOverride(previous);
+      notifyError(error);
+    } finally {
+      setPending(null);
+    }
+  };
+  const share = async () => {
+    if (!auth.isAuthenticated) return auth.openAuth();
+    try {
+      const url = `${window.location.origin}/videos/${video.id}`;
+      if (navigator.share)
+        await navigator.share({
+          title: video.title,
+          text: video.description,
+          url,
+        });
+      else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        toast.success("Video link copied.");
+      }
+      const previous = current;
+      setOverride({
+        ...previous,
+        viewerShared: true,
+        shareCount: previous.shareCount + (previous.viewerShared ? 0 : 1),
+      });
+      setPending("share");
+      setOverride(await shareMutation.mutateAsync({ videoId: video.id }));
+      await utils.home.feed.invalidate();
+      await utils.videos.list.invalidate();
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      notifyError(error);
+    } finally {
+      setPending(null);
+    }
+  };
+  return { current, react, share, pending };
+}
+
+function QualityVideoPlayer({
   video,
   vertical = false,
 }: {
   video: VideoRecord;
   vertical?: boolean;
 }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [quality, setQuality] = useState<Quality>("ORIGINAL");
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(true);
-  const ref = useRef<HTMLVideoElement>(null);
-  const togglePlay = async () => {
+  const positionRef = useRef(0);
+  const resumeRef = useRef(false);
+  const sourceMap = useMemo(
+    () =>
+      new Map(video.sources.map(source => [source.quality, source.videoUrl])),
+    [video.sources]
+  );
+  const sourceUrl =
+    quality === "ORIGINAL"
+      ? (sourceMap.get("ORIGINAL") ?? video.videoUrl)
+      : (sourceMap.get(quality) ?? sourceMap.get("ORIGINAL") ?? video.videoUrl);
+  const switchQuality = (next: Quality) => {
+    if (next !== "ORIGINAL" && !sourceMap.has(next)) return;
+    positionRef.current = ref.current?.currentTime ?? 0;
+    resumeRef.current = Boolean(ref.current && !ref.current.paused);
+    setQuality(next);
+  };
+  const restorePlayback = () => {
     const element = ref.current;
     if (!element) return;
-    if (element.paused) {
-      await element.play();
-      setPlaying(true);
-    } else {
-      element.pause();
-      setPlaying(false);
-    }
+    element.currentTime = Math.min(
+      positionRef.current,
+      Number.isFinite(element.duration) ? element.duration : positionRef.current
+    );
+    if (resumeRef.current) void element.play().catch(() => undefined);
   };
   return (
     <div
@@ -114,12 +229,14 @@ function VideoPreview({
     >
       <video
         ref={ref}
-        src={video.videoUrl}
+        key={sourceUrl}
+        src={sourceUrl}
         poster={video.thumbnailUrl ?? undefined}
         controls
         playsInline
         preload="metadata"
         muted={muted}
+        onLoadedMetadata={restorePlayback}
         onPlay={() => setPlaying(true)}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
@@ -127,95 +244,203 @@ function VideoPreview({
       <div className="media-video-controls">
         <button
           type="button"
-          onClick={togglePlay}
+          onClick={() => {
+            const element = ref.current;
+            if (!element) return;
+            if (element.paused) void element.play();
+            else element.pause();
+          }}
           aria-label={playing ? "Pause video" : "Play video"}
         >
           {playing ? <Pause size={16} /> : <Play size={16} />}
         </button>
         <button
           type="button"
-          onClick={() => setMuted(current => !current)}
+          onClick={() => setMuted(value => !value)}
           aria-label={muted ? "Unmute video" : "Mute video"}
         >
           {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
         </button>
-        <span>{formatDuration(video.durationSeconds)}</span>
-        <div className="media-native-controls">
-          <button
-            type="button"
-            onClick={() => ref.current?.requestFullscreen?.()}
-            aria-label="Open fullscreen video"
+        <label className="media-quality-control">
+          <ChevronDown size={13} />
+          <span className="sr-only">Video quality</span>
+          <select
+            value={quality}
+            onChange={event => switchQuality(event.target.value as Quality)}
+            aria-label="Video quality"
           >
-            ↗
-          </button>
-        </div>
+            <option value="ORIGINAL">Auto</option>
+            {(["1080P", "720P", "480P"] as Quality[]).map(option => (
+              <option
+                key={option}
+                value={option}
+                disabled={!sourceMap.has(option)}
+              >
+                {qualityLabels[option]}
+                {sourceMap.has(option) ? "" : " (not available)"}
+              </option>
+            ))}
+          </select>
+        </label>
+        <span>{formatDuration(video.durationSeconds)}</span>
       </div>
     </div>
   );
 }
-function UploadVideoPanel() {
-  const utils = trpc.useUtils();
+
+function EngagementActions({
+  engagement,
+  onReact,
+  onShare,
+  pending,
+}: {
+  engagement: Engagement;
+  onReact: () => void;
+  onShare: () => void;
+  pending: "react" | "share" | null;
+}) {
+  return (
+    <div className="media-engagement-actions">
+      <button
+        type="button"
+        className={engagement.viewerReacted ? "is-active" : ""}
+        onClick={onReact}
+        disabled={pending === "react"}
+        aria-pressed={engagement.viewerReacted}
+      >
+        <Heart
+          size={16}
+          fill={engagement.viewerReacted ? "currentColor" : "none"}
+        />{" "}
+        <span>{engagement.viewerReacted ? "Liked" : "React/Like"}</span>{" "}
+        <strong>{engagement.reactionCount}</strong>
+      </button>
+      <button
+        type="button"
+        className={engagement.viewerShared ? "is-active" : ""}
+        onClick={onShare}
+        disabled={pending === "share"}
+      >
+        <Share2 size={16} />{" "}
+        <span>{pending === "share" ? "Sharing" : "Share"}</span>{" "}
+        <strong>{engagement.shareCount}</strong>
+      </button>
+    </div>
+  );
+}
+function VideoCard({ video }: { video: VideoRecord }) {
+  const { current, react, share, pending } = useOptimisticEngagement(video);
+  return (
+    <article className="long-video-card">
+      <QualityVideoPlayer video={video} />
+      <div className="long-video-copy">
+        <div className="media-owner">
+          <div>
+            <strong>{video.owner.name ?? "KINBA member"}</strong>
+            <span>
+              {video.owner.isVerified ? (
+                <>
+                  <BadgeCheck size={12} /> Verified {video.owner.accountType}
+                </>
+              ) : (
+                video.owner.accountType
+              )}
+            </span>
+          </div>
+          <span>{formatDuration(video.durationSeconds)}</span>
+        </div>
+        <h3>{video.title}</h3>
+        <p>{video.description}</p>
+        <EngagementActions
+          engagement={current}
+          onReact={react}
+          onShare={share}
+          pending={pending}
+        />
+      </div>
+    </article>
+  );
+}
+function UploadVideoPanel({ onPublished }: { onPublished: () => void }) {
   const [kind, setKind] = useState<VideoKind>("LONG");
-  const [selection, setSelection] = useState<VideoSelection | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [files, setFiles] = useState<Partial<Record<Quality, File>>>({});
+  const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
   const [busy, setBusy] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
   const createVideo = trpc.videos.create.useMutation();
-  const clearSelection = () => {
-    if (selection) URL.revokeObjectURL(selection.previewUrl);
-    setSelection(null);
-    if (inputRef.current) inputRef.current.value = "";
-  };
-  const selectVideo = async (event: ChangeEvent<HTMLInputElement>) => {
+  const inputRefs = useRef<Partial<Record<Quality, HTMLInputElement | null>>>(
+    {}
+  );
+  const originalFile = files.ORIGINAL;
+  const selectFile = async (
+    quality: Quality,
+    event: ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
     try {
-      const metadata = await getVideoMetadata(file, {
-        maxDurationSeconds:
-          kind === "LONG"
-            ? MAX_LONG_VIDEO_DURATION_SECONDS
-            : MAX_SHORT_VIDEO_DURATION_SECONDS,
-        orientation: kind === "LONG" ? "square" : "portrait",
-      });
-      clearSelection();
-      setSelection({
-        file,
-        previewUrl: URL.createObjectURL(file),
-        metadata,
-        kind,
-      });
+      if (!file.type.startsWith("video/"))
+        throw new Error("Choose a supported video file.");
+      if (quality === "ORIGINAL") {
+        const nextMetadata = await getVideoMetadata(file, {
+          maxDurationSeconds:
+            kind === "LONG"
+              ? MAX_LONG_VIDEO_DURATION_SECONDS
+              : MAX_SHORT_VIDEO_DURATION_SECONDS,
+        });
+        setMetadata(nextMetadata);
+      }
+      setFiles(current => ({ ...current, [quality]: file }));
     } catch (error) {
       notifyError(error);
     }
   };
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const removeFile = (quality: Quality) => {
+    setFiles(current => {
+      const next = { ...current };
+      delete next[quality];
+      return next;
+    });
+    if (quality === "ORIGINAL") setMetadata(null);
+  };
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selection || !title.trim()) return;
+    if (!originalFile || !metadata || !title.trim())
+      return toast.error("Add an original video and title first.");
     setBusy(true);
     try {
-      const videoUrl = await uploadVideo(selection.file, selection.kind);
+      const uploadEntries = await Promise.all(
+        Object.entries(files).map(async ([quality, file]) => ({
+          quality: quality as Quality,
+          videoUrl: await uploadVideo(file as File, kind),
+        }))
+      );
+      const originalUrl = uploadEntries.find(
+        entry => entry.quality === "ORIGINAL"
+      )?.videoUrl;
+      if (!originalUrl)
+        throw new Error("The original video source is required.");
       await createVideo.mutateAsync({
         title: title.trim(),
         description: description.trim(),
-        videoUrl,
+        videoUrl: originalUrl,
         thumbnailUrl: null,
-        kind: selection.kind,
-        durationSeconds: selection.metadata.durationSeconds,
-        width: selection.metadata.width,
-        height: selection.metadata.height,
+        kind,
+        durationSeconds: metadata.durationSeconds,
+        width: metadata.width,
+        height: metadata.height,
+        sources: uploadEntries,
       });
-      await Promise.all([
-        utils.videos.list.invalidate({ kind: "LONG" }),
-        utils.videos.list.invalidate({ kind: "SHORT" }),
-      ]);
-      clearSelection();
+      await onPublished();
       setTitle("");
       setDescription("");
+      setFiles({});
+      setMetadata(null);
       toast.success(
-        selection.kind === "LONG"
-          ? "Video published to the main feed."
+        kind === "LONG"
+          ? "Video published to the Home feed."
           : "Short published."
       );
     } catch (error) {
@@ -224,7 +449,10 @@ function UploadVideoPanel() {
       setBusy(false);
     }
   };
-  useEffect(() => clearSelection, [kind]);
+  useEffect(() => {
+    setFiles({});
+    setMetadata(null);
+  }, [kind]);
   return (
     <details className="media-publish-panel">
       <summary>
@@ -256,9 +484,8 @@ function UploadVideoPanel() {
           </button>
         </div>
         <p className="media-form-hint">
-          {kind === "LONG"
-            ? "Square 1:1 video, up to 1080p HD and 30 minutes."
-            : "Vertical portrait video, up to 1080p HD and 1 minute."}
+          Duration is checked per format. Source dimensions and upload size are
+          not restricted.
         </p>
         <label>
           Title
@@ -281,44 +508,48 @@ function UploadVideoPanel() {
             placeholder="Tell viewers what this video is about"
           />
         </label>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="video/mp4,video/webm,video/quicktime,video/ogg"
-          onChange={selectVideo}
-          className="sr-only"
-        />
-        {selection ? (
-          <div className="media-selection">
-            <video src={selection.previewUrl} controls muted playsInline />
-            <div>
-              <strong>{selection.file.name}</strong>
-              <span>
-                {selection.metadata.width}×{selection.metadata.height} ·{" "}
-                {formatDuration(selection.metadata.durationSeconds)}
-              </span>
-            </div>
-            <button
-              type="button"
-              className="muted-btn"
-              onClick={clearSelection}
+        <div className="quality-upload-grid">
+          {qualityFileLabels.map(({ quality, label }) => (
+            <div
+              className={`quality-upload ${quality === "ORIGINAL" ? "required" : ""}`}
+              key={quality}
             >
-              Remove
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="secondary-media-btn"
-            onClick={() => inputRef.current?.click()}
-          >
-            Choose {kind === "LONG" ? "square main video" : "vertical Short"}
-          </button>
-        )}
+              <input
+                ref={element => {
+                  inputRefs.current[quality] = element;
+                }}
+                type="file"
+                accept="video/*"
+                className="sr-only"
+                onChange={event => selectFile(quality, event)}
+              />
+              <button
+                type="button"
+                className="secondary-media-btn"
+                onClick={() => inputRefs.current[quality]?.click()}
+              >
+                {label}
+                {quality === "ORIGINAL" ? " · required" : " · optional"}
+              </button>
+              {files[quality] && (
+                <span className="selected-file">
+                  {files[quality]?.name}
+                  <button
+                    type="button"
+                    className="muted-btn"
+                    onClick={() => removeFile(quality)}
+                  >
+                    Remove
+                  </button>
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
         <button
           className="primary-btn"
           type="submit"
-          disabled={!selection || !title.trim() || busy}
+          disabled={!originalFile || !metadata || !title.trim() || busy}
         >
           {busy ? <Loader2 className="spin" size={16} /> : <Upload size={16} />}{" "}
           {busy ? "Publishing" : "Publish video"}
@@ -327,185 +558,80 @@ function UploadVideoPanel() {
     </details>
   );
 }
-function EngagementActions({
-  video,
-  engagement,
-  onReact,
-  onShare,
-  reacting,
-  sharing,
-}: {
-  video: VideoRecord;
-  engagement: Engagement;
-  onReact: () => void;
-  onShare: () => void;
-  reacting: boolean;
-  sharing: boolean;
-}) {
-  return (
-    <div className="media-engagement-actions">
-      <button
-        type="button"
-        className={engagement.viewerReacted ? "is-active" : ""}
-        onClick={onReact}
-        disabled={reacting}
-        aria-pressed={engagement.viewerReacted}
-      >
-        <Heart
-          size={16}
-          fill={engagement.viewerReacted ? "currentColor" : "none"}
-        />{" "}
-        <span>{engagement.viewerReacted ? "Liked" : "React/Like"}</span>{" "}
-        <strong>{engagement.reactionCount}</strong>
-      </button>
-      <button
-        type="button"
-        className={engagement.viewerShared ? "is-active" : ""}
-        onClick={onShare}
-        disabled={sharing}
-      >
-        <Share2 size={16} /> <span>{sharing ? "Sharing" : "Share"}</span>{" "}
-        <strong>{engagement.shareCount}</strong>
-      </button>
-    </div>
-  );
-}
-function LongFormFeed() {
-  const utils = trpc.useUtils();
+function HomeFeedPanel({ tab }: { tab: HomeTab }) {
   const auth = useAuth();
-  const videosQuery = trpc.videos.list.useQuery(
-    { kind: "LONG" },
-    { refetchOnWindowFocus: false }
+  const utils = trpc.useUtils();
+  const query = trpc.home.feed.useQuery(
+    { tab },
+    {
+      enabled: tab !== "following" || auth.isAuthenticated,
+      refetchOnWindowFocus: false,
+    }
   );
-  const [overrides, setOverrides] = useState<Record<number, Engagement>>({});
-  const [pendingReact, setPendingReact] = useState<number | null>(null);
-  const [pendingShare, setPendingShare] = useState<number | null>(null);
-  const reactMutation = trpc.videos.react.useMutation();
-  const shareMutation = trpc.videos.share.useMutation();
-  const engagementFor = (video: VideoRecord): Engagement =>
-    overrides[video.id] ?? {
-      reactionCount: video.reactionCount,
-      shareCount: video.shareCount,
-      viewerReacted: video.viewerReacted,
-      viewerShared: video.viewerShared,
-    };
-  const react = async (video: VideoRecord) => {
-    if (!auth.isAuthenticated) return auth.openAuth();
-    const previous = engagementFor(video);
-    const next = {
-      ...previous,
-      viewerReacted: !previous.viewerReacted,
-      reactionCount: previous.reactionCount + (previous.viewerReacted ? -1 : 1),
-    };
-    setOverrides(current => ({ ...current, [video.id]: next }));
-    setPendingReact(video.id);
-    try {
-      const synced = await reactMutation.mutateAsync({ videoId: video.id });
-      setOverrides(current => ({ ...current, [video.id]: synced }));
-      await utils.videos.list.invalidate({ kind: "LONG" });
-    } catch (error) {
-      setOverrides(current => ({ ...current, [video.id]: previous }));
-      notifyError(error);
-    } finally {
-      setPendingReact(null);
-    }
-  };
-  const share = async (video: VideoRecord) => {
-    if (!auth.isAuthenticated) return auth.openAuth();
-    try {
-      if (navigator.share)
-        await navigator.share({
-          title: video.title,
-          text: video.description,
-          url: `${window.location.origin}/videos/${video.id}`,
-        });
-      else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(
-          `${window.location.origin}/videos/${video.id}`
-        );
-        toast.success("Video link copied.");
-      }
-      const previous = engagementFor(video);
-      const next = {
-        ...previous,
-        viewerShared: true,
-        shareCount: previous.shareCount + (previous.viewerShared ? 0 : 1),
-      };
-      setOverrides(current => ({ ...current, [video.id]: next }));
-      setPendingShare(video.id);
-      const synced = await shareMutation.mutateAsync({ videoId: video.id });
-      setOverrides(current => ({ ...current, [video.id]: synced }));
-      await utils.videos.list.invalidate({ kind: "LONG" });
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      notifyError(error);
-    } finally {
-      setPendingShare(null);
-    }
-  };
+  const videos = (query.data ?? []) as VideoRecord[];
   return (
     <section
-      className="media-section long-form-section"
-      aria-labelledby="main-video-feed-heading"
+      className="media-section home-feed-section"
+      aria-labelledby="home-feed-heading"
     >
       <div className="media-section-heading">
         <div>
-          <p className="eyebrow">Main video feed</p>
-          <h2 id="main-video-feed-heading">Watch what matters.</h2>
+          <p className="eyebrow">
+            {tabOptions.find(option => option.id === tab)?.caption}
+          </p>
+          <h2 id="home-feed-heading">
+            {tab === "icons"
+              ? "Signals from trusted voices."
+              : tab === "following"
+                ? "Your following, in motion."
+                : tab === "trendy"
+                  ? "What the network is watching."
+                  : "Watch what matters."}
+          </h2>
         </div>
-        <span>Square HD · up to 30 minutes</span>
+        <span>
+          {tab === "icons"
+            ? "Verified creators & companies"
+            : "Real-time database feed"}
+        </span>
       </div>
-      {videosQuery.isLoading ? (
+      {query.isLoading ? (
         <div className="loading-row">
-          <Loader2 className="spin" /> Loading videos
+          <Loader2 className="spin" /> Loading feed
         </div>
-      ) : videosQuery.data?.length ? (
+      ) : query.isError ? (
+        <div className="media-empty">
+          <h3>Unable to load this feed.</h3>
+          <p>Try again in a moment.</p>
+        </div>
+      ) : videos.length ? (
         <div className="long-video-grid">
-          {videosQuery.data.map(video => {
-            const engagement = engagementFor(video as VideoRecord);
-            return (
-              <article className="long-video-card" key={video.id}>
-                <VideoPreview video={video as VideoRecord} />
-                <div className="long-video-copy">
-                  <div className="media-owner">
-                    <div>
-                      <strong>{video.owner.name ?? "KINBA member"}</strong>
-                      <span>
-                        {video.owner.isVerified ? (
-                          <>
-                            <Verified size={12} /> Verified{" "}
-                            {video.owner.accountType}
-                          </>
-                        ) : (
-                          video.owner.accountType
-                        )}
-                      </span>
-                    </div>
-                    <span>{formatDuration(video.durationSeconds)}</span>
-                  </div>
-                  <h3>{video.title}</h3>
-                  <p>{video.description}</p>
-                  <EngagementActions
-                    video={video as VideoRecord}
-                    engagement={engagement}
-                    onReact={() => react(video as VideoRecord)}
-                    onShare={() => share(video as VideoRecord)}
-                    reacting={pendingReact === video.id}
-                    sharing={pendingShare === video.id}
-                  />
-                </div>
-              </article>
-            );
-          })}
+          {videos.map(video => (
+            <VideoCard key={video.id} video={video} />
+          ))}
         </div>
       ) : (
         <div className="media-empty">
           <Play size={18} />
-          <h3>No main videos yet.</h3>
-          <p>Publish a square HD video to start the main feed.</p>
+          <h3>
+            {tab === "following" && !auth.isAuthenticated
+              ? "Sign in to see Following."
+              : "Nothing here yet."}
+          </h3>
+          <p>
+            {tabOptions.find(option => option.id === tab)?.caption}. New content
+            will appear here as it is published.
+          </p>
         </div>
       )}
-      <UploadVideoPanel />
+      <UploadVideoPanel
+        onPublished={async () => {
+          await Promise.all([
+            utils.home.feed.invalidate(),
+            utils.videos.list.invalidate(),
+          ]);
+        }}
+      />
     </section>
   );
 }
@@ -518,19 +644,23 @@ function ShortsFeed() {
   const [activeIndex, setActiveIndex] = useState(0);
   const goTo = (index: number) => {
     const clamped = Math.max(0, Math.min(index, (query.data?.length ?? 1) - 1));
-    const target = viewportRef.current?.querySelector<HTMLElement>(
-      `[data-short-index="${clamped}"]`
-    );
-    target?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    viewportRef.current
+      ?.querySelector<HTMLElement>(`[data-short-index="${clamped}"]`)
+      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     setActiveIndex(clamped);
   };
   const onScroll = () => {
     const viewport = viewportRef.current;
     if (!viewport) return;
-    const index = Math.round(
-      viewport.scrollTop / Math.max(viewport.clientHeight, 1)
+    setActiveIndex(
+      Math.max(
+        0,
+        Math.min(
+          Math.round(viewport.scrollTop / Math.max(viewport.clientHeight, 1)),
+          (query.data?.length ?? 1) - 1
+        )
+      )
     );
-    setActiveIndex(Math.max(0, Math.min(index, (query.data?.length ?? 1) - 1)));
   };
   return (
     <section
@@ -575,19 +705,13 @@ function ShortsFeed() {
         </div>
       ) : query.data?.length ? (
         <div className="shorts-viewport" ref={viewportRef} onScroll={onScroll}>
-          {query.data.map((video, index) => (
+          {(query.data as VideoRecord[]).map((video, index) => (
             <article
               className="short-card"
               data-short-index={index}
               key={video.id}
             >
-              <video
-                src={video.videoUrl}
-                poster={video.thumbnailUrl ?? undefined}
-                controls
-                playsInline
-                preload="metadata"
-              />
+              <QualityVideoPlayer video={video} vertical />
               <div className="short-overlay">
                 <div>
                   <strong>{video.title}</strong>
@@ -605,10 +729,7 @@ function ShortsFeed() {
         <div className="media-empty">
           <Play size={18} />
           <h3>No Shorts yet.</h3>
-          <p>
-            Publish a vertical video of 60 seconds or less to start the Shorts
-            feed.
-          </p>
+          <p>Publish a video of 60 seconds or less to start the Shorts feed.</p>
         </div>
       )}
     </section>
@@ -654,8 +775,6 @@ function AnnouncementComposer({ onCreated }: { onCreated: () => void }) {
     try {
       const metadata = await getVideoMetadata(file, {
         maxDurationSeconds: MAX_ANNOUNCEMENT_VIDEO_DURATION_SECONDS,
-        maxDimension: MAX_ANNOUNCEMENT_VIDEO_DIMENSION,
-        orientation: "any",
       });
       clearVideo();
       setVideo({ file, previewUrl: URL.createObjectURL(file), metadata });
@@ -663,7 +782,7 @@ function AnnouncementComposer({ onCreated }: { onCreated: () => void }) {
       notifyError(error);
     }
   };
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!body.trim() && !images.length && !video)
       return toast.error("Add text, an image, or a video first.");
@@ -744,7 +863,7 @@ function AnnouncementComposer({ onCreated }: { onCreated: () => void }) {
         <input
           ref={videoInputRef}
           type="file"
-          accept="video/mp4,video/webm,video/quicktime,video/ogg"
+          accept="video/*"
           onChange={chooseVideo}
           className="sr-only"
         />
@@ -831,7 +950,7 @@ function CommunityAnnouncements() {
                 <div>
                   <strong>
                     {announcement.author.name ?? "KINBA organization"}{" "}
-                    <Verified size={13} />
+                    <BadgeCheck size={13} />
                   </strong>
                   <span>{announcement.author.accountType} · verified</span>
                 </div>
@@ -876,9 +995,24 @@ function CommunityAnnouncements() {
   );
 }
 export default function MediaHub() {
+  const [activeTab, setActiveTab] = useState<HomeTab>("videos");
   return (
     <div className="media-hub">
-      <LongFormFeed />
+      <nav className="home-feed-tabs" aria-label="Home feed tabs">
+        {tabOptions.map(tab => (
+          <button
+            type="button"
+            key={tab.id}
+            className={activeTab === tab.id ? "active" : ""}
+            onClick={() => setActiveTab(tab.id)}
+            aria-selected={activeTab === tab.id}
+            role="tab"
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+      <HomeFeedPanel tab={activeTab} />
       <ShortsFeed />
       <CommunityAnnouncements />
     </div>

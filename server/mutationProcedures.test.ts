@@ -1,36 +1,20 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { vi, describe, beforeEach, expect, it } from "vitest";
 import type { TrpcContext } from "./_core/context";
 
 const databaseMocks = vi.hoisted(() => ({
-  areUsersBlocked: vi.fn(),
-  blockUser: vi.fn(),
-  createConnection: vi.fn(),
-  createMessage: vi.fn(),
-  createReport: vi.fn(),
-  createSignal: vi.fn(),
+  createCommunityAnnouncement: vi.fn(),
+  createVideo: vi.fn(),
   ensureProfile: vi.fn(),
-  getConnectionForParticipant: vi.fn(),
   getOwnProfile: vi.fn(),
-  getPublicProfile: vi.fn(),
-  getUserById: vi.fn(),
-  getSignalById: vi.fn(),
-  listConnections: vi.fn(),
-  listMatches: vi.fn(),
-  listMessages: vi.fn(),
-  listOwnSignals: vi.fn(),
-  listSignals: vi.fn(),
-  setConnectionStatus: vi.fn(),
-  updateProfile: vi.fn(),
 }));
-
 vi.mock("./db", () => databaseMocks);
 
 import { appRouter } from "./routers";
 
 const user = {
   id: 41,
-  openId: "nivo-test-user",
-  name: "NIVO Test Member",
+  openId: "kinba-test-user",
+  name: "KINBA Test Member",
   email: "member@example.test",
   loginMethod: "email",
   role: "user" as const,
@@ -38,56 +22,88 @@ const user = {
   updatedAt: new Date(),
   lastSignedIn: new Date(),
 };
-
 function context(): TrpcContext {
   return { user, req: {} as TrpcContext["req"], res: {} as TrpcContext["res"] };
 }
 
-describe("NIVO protected mutations", () => {
+describe("KINBA protected procedures", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    databaseMocks.areUsersBlocked.mockResolvedValue(false);
-    databaseMocks.getUserById.mockResolvedValue({ id: 42 });
+    databaseMocks.ensureProfile.mockResolvedValue(undefined);
   });
 
-  it("returns the persisted signal identifier after a valid signal mutation", async () => {
-    databaseMocks.createSignal.mockResolvedValue({ id: 501 });
-    const caller = appRouter.createCaller(context());
-
-    await expect(caller.signals.create({
-      type: "need",
-      title: "Need production API verification",
-      description: "Looking for help verifying the NIVO PostgreSQL signal publishing flow.",
-      category: "Technology",
-      language: "English",
-      location: null,
-    })).resolves.toEqual({ id: 501 });
-    expect(databaseMocks.createSignal).toHaveBeenCalledWith(user.id, expect.objectContaining({ type: "need" }));
+  it("returns the persisted video after a valid video mutation", async () => {
+    const persistedVideo = { id: 501 };
+    databaseMocks.createVideo.mockResolvedValue(persistedVideo);
+    await expect(
+      appRouter.createCaller(context()).videos.create({
+        title: "A real main-feed video",
+        description: "A square video for the main Home feed.",
+        videoUrl: "https://cdn.example.com/original.mp4",
+        thumbnailUrl: null,
+        kind: "LONG",
+        durationSeconds: 120,
+        width: 3840,
+        height: 2160,
+        sources: [
+          {
+            quality: "ORIGINAL",
+            videoUrl: "https://cdn.example.com/original.mp4",
+          },
+          { quality: "1080P", videoUrl: "https://cdn.example.com/1080.mp4" },
+        ],
+      })
+    ).resolves.toEqual(persistedVideo);
+    expect(databaseMocks.createVideo).toHaveBeenCalledWith(
+      user.id,
+      expect.objectContaining({ kind: "LONG", durationSeconds: 120 })
+    );
   });
 
-  it("returns the updated profile from the database mutation helper", async () => {
-    const persistedProfile = { user, profile: { userId: user.id, country: "Kenya" } };
-    databaseMocks.updateProfile.mockResolvedValue(persistedProfile);
-    const caller = appRouter.createCaller(context());
-
-    await expect(caller.profile.update({
-      country: "Kenya",
-      languages: ["English"],
-      about: "Testing the production profile update flow.",
-      skills: ["QA"],
-      interests: ["Product quality"],
-      photoUrl: null,
-    })).resolves.toEqual(persistedProfile);
+  it("returns real profile statistics from the profile procedure", async () => {
+    const profile = {
+      stats: {
+        reactionsReceived: 4,
+        iconsCount: 2,
+        followingCount: 5,
+        followersCount: 7,
+      },
+    };
+    databaseMocks.getOwnProfile.mockResolvedValue(profile);
+    await expect(
+      appRouter.createCaller(context()).profile.me()
+    ).resolves.toEqual(profile);
+    expect(databaseMocks.ensureProfile).toHaveBeenCalledWith(user.id);
+    expect(databaseMocks.getOwnProfile).toHaveBeenCalledWith(user.id);
   });
 
-  it("returns a controlled conflict when connection persistence fails", async () => {
-    databaseMocks.createConnection.mockRejectedValue(new Error("NIVO PostgreSQL database is unavailable."));
-    const caller = appRouter.createCaller(context());
-
-    await expect(caller.connections.request({
-      recipientId: 42,
-      signalId: null,
-      note: "I would like to connect about this request.",
-    })).rejects.toMatchObject({ code: "CONFLICT", message: "NIVO PostgreSQL database is unavailable." });
+  it("passes validated community attachments to the persistence helper", async () => {
+    databaseMocks.createCommunityAnnouncement.mockResolvedValue({ id: 602 });
+    await expect(
+      appRouter.createCaller(context()).community.create({
+        body: "An official KINBA update.",
+        attachments: [
+          {
+            mediaType: "IMAGE",
+            mediaUrl: "https://cdn.example.com/update.jpg",
+            sortOrder: 0,
+          },
+          {
+            mediaType: "VIDEO",
+            mediaUrl: "https://cdn.example.com/update.mp4",
+            sortOrder: 1,
+            durationSeconds: 300,
+          },
+        ],
+      })
+    ).resolves.toEqual({ id: 602 });
+    expect(databaseMocks.createCommunityAnnouncement).toHaveBeenCalledWith(
+      user.id,
+      expect.objectContaining({
+        attachments: expect.arrayContaining([
+          expect.objectContaining({ mediaType: "VIDEO" }),
+        ]),
+      })
+    );
   });
 });

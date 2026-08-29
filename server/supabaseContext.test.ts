@@ -23,37 +23,38 @@ describe("Supabase-authenticated tRPC context", () => {
       email: "member@example.com",
       user_metadata: { full_name: "Member Example" },
     });
-
     const context = await createContext(
-      { req: { headers: { authorization: "Bearer valid-token" } }, res: {} } as never,
-      { verifyAccessToken, saveUser, findUser },
+      {
+        req: { headers: { authorization: "Bearer valid-token" } },
+        res: {},
+      } as never,
+      { verifyAccessToken, saveUser, findUser }
     );
-
     expect(context.user).toEqual(user);
-    expect(saveUser).toHaveBeenCalledWith(expect.objectContaining({
-      openId: "supabase:auth-user-42",
-      email: "member@example.com",
-      name: "Member Example",
-      loginMethod: "supabase",
-    }));
-
-    const result = await appRouter.createCaller(context).auth.me();
-    expect(result).toEqual(user);
+    expect(saveUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        openId: "supabase:auth-user-42",
+        email: "member@example.com",
+        name: "Member Example",
+        loginMethod: "supabase",
+      })
+    );
+    expect(await appRouter.createCaller(context).auth.me()).toEqual(user);
   });
 
-  it("keeps anonymous requests outside protected procedures", async () => {
+  it("keeps anonymous requests outside protected profile procedures", async () => {
     const context = await createContext(
       { req: { headers: {} }, res: {} } as never,
-      { verifyAccessToken: vi.fn().mockResolvedValue(null), saveUser: vi.fn(), findUser: vi.fn() },
+      {
+        verifyAccessToken: vi.fn().mockResolvedValue(null),
+        saveUser: vi.fn(),
+        findUser: vi.fn(),
+      }
     );
-
-    await expect(appRouter.createCaller(context).signals.create({
-      type: "need",
-      title: "A valid title",
-      description: "A sufficiently descriptive signal for the test.",
-      category: "Other",
-      language: "English",
-      location: null,
-    })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(
+      appRouter.createCaller(context).profile.me()
+    ).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    });
   });
 });

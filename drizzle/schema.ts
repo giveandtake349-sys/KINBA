@@ -7,19 +7,17 @@ import {
   text,
   timestamp,
   uniqueIndex,
-  uuid,
   varchar,
 } from "drizzle-orm/pg-core";
 
 export const appRole = pgEnum("app_role", ["user", "admin"]);
-export const signalType = pgEnum("signal_type", ["need", "can"]);
-export const signalStatus = pgEnum("signal_status", ["active", "closed"]);
-export const signalMediaType = pgEnum("signal_media_type", [
-  "NONE",
-  "AUDIO",
-  "VIDEO",
-]);
 export const videoKind = pgEnum("video_kind", ["LONG", "SHORT"]);
+export const videoSourceQuality = pgEnum("video_source_quality", [
+  "ORIGINAL",
+  "1080P",
+  "720P",
+  "480P",
+]);
 export const profileAccountType = pgEnum("profile_account_type", [
   "member",
   "creator",
@@ -29,12 +27,6 @@ export const announcementAttachmentType = pgEnum(
   "announcement_attachment_type",
   ["IMAGE", "VIDEO"]
 );
-export const connectionStatus = pgEnum("connection_status", [
-  "pending",
-  "accepted",
-  "declined",
-  "cancelled",
-]);
 
 const createdAt = () =>
   timestamp("createdAt", { withTimezone: true }).defaultNow().notNull();
@@ -77,33 +69,6 @@ export const profiles = pgTable(
   table => [uniqueIndex("profiles_userId_unique").on(table.userId)]
 );
 
-export const signals = pgTable(
-  "signals",
-  {
-    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
-    userId: integer("userId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    type: signalType("type").notNull(),
-    title: varchar("title", { length: 180 }).notNull(),
-    description: text("description").notNull(),
-    category: varchar("category", { length: 64 }).notNull(),
-    language: varchar("language", { length: 64 }).notNull(),
-    location: varchar("location", { length: 120 }),
-    imageUrl: varchar("imageUrl", { length: 1024 }),
-    mediaUrl: varchar("mediaUrl", { length: 1024 }),
-    mediaType: signalMediaType("mediaType").default("NONE").notNull(),
-    mediaDuration: integer("mediaDuration").default(0).notNull(),
-    status: signalStatus("status").default("active").notNull(),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  table => [
-    index("signals_discovery_idx").on(table.type, table.category, table.status),
-    index("signals_user_idx").on(table.userId),
-  ]
-);
-
 export const videos = pgTable(
   "videos",
   {
@@ -127,6 +92,27 @@ export const videos = pgTable(
     index("videos_kind_created_idx").on(table.kind, table.createdAt),
   ]
 );
+
+export const videoSources = pgTable(
+  "video_sources",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    videoId: integer("videoId")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    quality: videoSourceQuality("quality").notNull(),
+    videoUrl: varchar("videoUrl", { length: 1024 }).notNull(),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("video_sources_quality_unique").on(
+      table.videoId,
+      table.quality
+    ),
+    index("video_sources_video_idx").on(table.videoId),
+  ]
+);
+
 export const videoReactions = pgTable(
   "video_reactions",
   {
@@ -145,6 +131,7 @@ export const videoReactions = pgTable(
     index("video_reactions_user_idx").on(table.userId),
   ]
 );
+
 export const videoShares = pgTable(
   "video_shares",
   {
@@ -163,6 +150,7 @@ export const videoShares = pgTable(
     index("video_shares_user_idx").on(table.userId),
   ]
 );
+
 export const communityAnnouncements = pgTable(
   "community_announcements",
   {
@@ -179,6 +167,7 @@ export const communityAnnouncements = pgTable(
     index("community_announcements_created_idx").on(table.createdAt),
   ]
 );
+
 export const communityAnnouncementAttachments = pgTable(
   "community_announcement_attachments",
   {
@@ -199,70 +188,6 @@ export const communityAnnouncementAttachments = pgTable(
       table.announcementId,
       table.sortOrder
     ),
-  ]
-);
-export const connections = pgTable(
-  "connections",
-  {
-    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
-    requesterId: integer("requesterId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    recipientId: integer("recipientId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    signalId: integer("signalId").references(() => signals.id, {
-      onDelete: "set null",
-    }),
-    note: text("note").notNull(),
-    status: connectionStatus("status").default("pending").notNull(),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  table => [
-    index("connections_requester_idx").on(table.requesterId),
-    index("connections_recipient_idx").on(table.recipientId),
-    index("connections_status_idx").on(table.status),
-  ]
-);
-
-export const comments = pgTable(
-  "comments",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    postId: integer("postId")
-      .notNull()
-      .references(() => signals.id, { onDelete: "cascade" }),
-    userId: integer("userId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    content: text("content"),
-    imageUrl: varchar("imageUrl", { length: 1024 }),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  table => [
-    index("comments_post_idx").on(table.postId, table.createdAt),
-    index("comments_user_idx").on(table.userId),
-  ]
-);
-
-export const messages = pgTable(
-  "messages",
-  {
-    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
-    connectionId: integer("connectionId")
-      .notNull()
-      .references(() => connections.id, { onDelete: "cascade" }),
-    senderId: integer("senderId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    body: text("body").notNull(),
-    imageUrl: varchar("imageUrl", { length: 1024 }),
-    createdAt: createdAt(),
-  },
-  table => [
-    index("messages_connection_idx").on(table.connectionId, table.createdAt),
   ]
 );
 
@@ -301,27 +226,7 @@ export const follows = pgTable(
     index("follows_followed_idx").on(table.followedId),
   ]
 );
-export const reactions = pgTable(
-  "reactions",
-  {
-    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
-    signalId: integer("signalId")
-      .notNull()
-      .references(() => signals.id, { onDelete: "cascade" }),
-    userId: integer("userId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    createdAt: createdAt(),
-  },
-  table => [
-    uniqueIndex("reactions_signal_user_unique").on(
-      table.signalId,
-      table.userId
-    ),
-    index("reactions_signal_idx").on(table.signalId),
-    index("reactions_user_idx").on(table.userId),
-  ]
-);
+
 export const reports = pgTable(
   "reports",
   {

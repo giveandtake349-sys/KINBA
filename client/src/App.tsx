@@ -1,30 +1,28 @@
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Switch } from "wouter";
+import { Toaster } from "sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { ThemeProvider } from "./contexts/ThemeContext";
+import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { SupabaseAuthProvider } from "./contexts/SupabaseAuthContext";
-import { LanguageProvider } from "./contexts/LanguageContext";
 import Home from "./pages/Home";
+
+function ThemedToaster() {
+  const { theme } = useTheme();
+  return <Toaster theme={theme} />;
+}
 
 export default function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="dark">
+      <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
           <SupabaseAuthProvider>
-            <LanguageProvider>
-            <Toaster theme="dark" />
+            <ThemedToaster />
             <Switch>
-            <Route path="/" component={Home} />
-            <Route path="/discover" component={Home} />
-            <Route path="/connections" component={Home} />
-            <Route path="/profile" component={Home} />
-            <Route path="/members/:id" component={Home} />
-            <Route path="/chat/:id" component={Home} />
-            <Route component={Home} />
+              <Route path="/" component={Home} />
+              <Route path="/profile" component={Home} />
+              <Route component={Home} />
             </Switch>
-            </LanguageProvider>
           </SupabaseAuthProvider>
         </TooltipProvider>
       </ThemeProvider>
