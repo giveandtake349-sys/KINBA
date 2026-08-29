@@ -201,6 +201,13 @@ export async function getVerificationStatus(userId: number) {
   };
 }
 
+function normalizeBangladeshiPhone(value: string) {
+  const digits = value.replace(/[^0-9]/g, "");
+  if (/^01\d{9}$/.test(digits)) return `+88${digits}`;
+  if (/^8801\d{9}$/.test(digits)) return `+${digits}`;
+  throw new Error("Enter a valid Bangladesh mobile number.");
+}
+
 export async function submitVerificationTransaction(
   userId: number,
   input: {
@@ -212,21 +219,46 @@ export async function submitVerificationTransaction(
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
+
+  const [profile] = await db
+    .select({ isVerified: profiles.isVerified })
+    .from(profiles)
+    .where(eq(profiles.userId, userId))
+    .limit(1);
+  if (profile?.isVerified) {
+    throw new Error("This account is already verified.");
+  }
+
+  const [pending] = await db
+    .select({ id: transactions.id })
+    .from(transactions)
+    .where(
+      and(eq(transactions.userId, userId), eq(transactions.status, "pending"))
+    )
+    .limit(1);
+  if (pending) {
+    throw new Error("A verification payment is already pending review.");
+  }
+
+  const transactionId = input.transactionId.trim();
   const [duplicate] = await db
     .select({ id: transactions.id })
     .from(transactions)
-    .where(eq(transactions.transactionId, input.transactionId))
+    .where(eq(transactions.transactionId, transactionId))
     .limit(1);
-  if (duplicate)
+  if (duplicate) {
     throw new Error("This transaction ID has already been submitted.");
+  }
+
   const [created] = await db
     .insert(transactions)
     .values({
       userId,
       amount: input.amount,
       paymentMethod: input.paymentMethod,
-      senderNumber: input.senderNumber.trim(),
-      transactionId: input.transactionId.trim(),
+      senderNumber: normalizeBangladeshiPhone(input.senderNumber),
+      transactionId,
+      status: "pending",
     })
     .returning();
   return created;
@@ -256,6 +288,9 @@ export async function approveVerificationTransaction(
       .where(eq(transactions.id, transactionId))
       .limit(1);
     if (!transaction) throw new Error("Transaction not found.");
+    if (transaction.status !== "pending") {
+      throw new Error("This transaction has already been reviewed.");
+    }
     const [updated] = await tx
       .update(transactions)
       .set({
@@ -264,8 +299,16 @@ export async function approveVerificationTransaction(
         approvedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(transactions.id, transactionId))
+      .where(
+        and(
+          eq(transactions.id, transactionId),
+          eq(transactions.status, "pending")
+        )
+      )
       .returning();
+    if (!updated) {
+      throw new Error("This transaction has already been reviewed.");
+    }
     if (status === "approved")
       await tx
         .update(profiles)
@@ -540,19 +583,44 @@ export async function createVideo(
   });
 }
 
-export async function updateVideoProcessing(videoId: number, input: { status: "PENDING" | "PROCESSING" | "READY" | "FAILED"; hlsMasterUrl?: string | null; videoUrl?: string; processingError?: string | null }) {
+export async function updateVideoProcessing(
+  videoId: number,
+  input: {
+    status: "PENDING" | "PROCESSING" | "READY" | "FAILED";
+    hlsMasterUrl?: string | null;
+    videoUrl?: string;
+    processingError?: string | null;
+  }
+) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const [updated] = await db.update(videos).set({ ...input, updatedAt: new Date() }).where(eq(videos.id, videoId)).returning();
+  const [updated] = await db
+    .update(videos)
+    .set({ ...input, updatedAt: new Date() })
+    .where(eq(videos.id, videoId))
+    .returning();
   return updated;
 }
-
-export async function replaceVideoSources(videoId: number, sources: VideoSourceInput[]) {
+export async function listVideosAwaitingTranscode() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({ id: videos.id, videoUrl: videos.videoUrl })
+    .from(videos)
+    .where(inArray(videos.processingStatus, ["PENDING", "PROCESSING"]));
+}
+export async function replaceVideoSources(
+  videoId: number,
+  sources: VideoSourceInput[]
+) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   await db.transaction(async tx => {
     await tx.delete(videoSources).where(eq(videoSources.videoId, videoId));
-    if (sources.length) await tx.insert(videoSources).values(sources.map(source => ({ videoId, ...source })));
+    if (sources.length)
+      await tx
+        .insert(videoSources)
+        .values(sources.map(source => ({ videoId, ...source })));
   });
 }
 

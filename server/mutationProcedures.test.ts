@@ -6,8 +6,14 @@ const databaseMocks = vi.hoisted(() => ({
   createVideo: vi.fn(),
   ensureProfile: vi.fn(),
   getOwnProfile: vi.fn(),
+  submitVerificationTransaction: vi.fn(),
+  approveVerificationTransaction: vi.fn(),
+}));
+const hlsMocks = vi.hoisted(() => ({
+  queueVideoTranscode: vi.fn(),
 }));
 vi.mock("./db", () => databaseMocks);
+vi.mock("./hlsProcessor", () => hlsMocks);
 
 import { appRouter } from "./routers";
 
@@ -22,8 +28,13 @@ const user = {
   updatedAt: new Date(),
   lastSignedIn: new Date(),
 };
-function context(): TrpcContext {
-  return { user, req: {} as TrpcContext["req"], res: {} as TrpcContext["res"] };
+const adminUser = { ...user, role: "admin" as const };
+function context(activeUser = user): TrpcContext {
+  return {
+    user: activeUser,
+    req: {} as TrpcContext["req"],
+    res: {} as TrpcContext["res"],
+  };
 }
 
 describe("KINBA protected procedures", () => {
@@ -75,6 +86,66 @@ describe("KINBA protected procedures", () => {
     ).resolves.toEqual(profile);
     expect(databaseMocks.ensureProfile).toHaveBeenCalledWith(user.id);
     expect(databaseMocks.getOwnProfile).toHaveBeenCalledWith(user.id);
+  });
+
+  it("stores a valid manual verification payment for review", async () => {
+    const transaction = { id: 91, status: "pending" };
+    databaseMocks.submitVerificationTransaction.mockResolvedValue(transaction);
+
+    await expect(
+      appRouter.createCaller(context()).payments.submit({
+        amount: "100",
+        paymentMethod: "bkash",
+        senderNumber: "01779557226",
+        transactionId: "TRX-2026-001",
+      })
+    ).resolves.toEqual(transaction);
+
+    expect(databaseMocks.ensureProfile).toHaveBeenCalledWith(user.id);
+    expect(databaseMocks.submitVerificationTransaction).toHaveBeenCalledWith(
+      user.id,
+      expect.objectContaining({
+        paymentMethod: "bkash",
+        senderNumber: "01779557226",
+        transactionId: "TRX-2026-001",
+      })
+    );
+  });
+
+  it("rejects a non-Bangladesh sender number before creating a payment", async () => {
+    await expect(
+      appRouter.createCaller(context()).payments.submit({
+        amount: "100",
+        paymentMethod: "nagad",
+        senderNumber: "+12025550123",
+        transactionId: "TRX-2026-002",
+      })
+    ).rejects.toThrow("Bangladesh mobile number");
+    expect(databaseMocks.submitVerificationTransaction).not.toHaveBeenCalled();
+  });
+
+  it("allows only an administrator to approve a pending verification payment", async () => {
+    const approved = { id: 91, status: "approved" };
+    databaseMocks.approveVerificationTransaction.mockResolvedValue(approved);
+
+    await expect(
+      appRouter.createCaller(context(adminUser)).payments.approve({
+        transactionId: 91,
+        status: "approved",
+      })
+    ).resolves.toEqual(approved);
+    expect(databaseMocks.approveVerificationTransaction).toHaveBeenCalledWith(
+      91,
+      adminUser.id,
+      "approved"
+    );
+
+    await expect(
+      appRouter.createCaller(context()).payments.approve({
+        transactionId: 92,
+        status: "rejected",
+      })
+    ).rejects.toThrow("required permission");
   });
 
   it("passes validated community attachments to the persistence helper", async () => {

@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import Hls from "hls.js";
 import {
   BadgeCheck,
   ChevronDown,
@@ -30,6 +31,7 @@ import {
   MAX_ANNOUNCEMENT_VIDEO_DURATION_SECONDS,
   MAX_LONG_VIDEO_DURATION_SECONDS,
   MAX_SHORT_VIDEO_DURATION_SECONDS,
+  publishVideo,
   uploadImage,
   uploadVideo,
   validateImageFile,
@@ -219,6 +221,10 @@ function useOptimisticEngagement(video: VideoRecord) {
   return { current, react, share, pending };
 }
 
+function isHlsPlaylist(sourceUrl: string) {
+  return /\.m3u8(?:$|[?#])/i.test(sourceUrl);
+}
+
 function QualityVideoPlayer({
   video,
   vertical = false,
@@ -229,9 +235,11 @@ function QualityVideoPlayer({
   onFirstPlay?: () => void;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const [quality, setQuality] = useState<Quality>("ORIGINAL");
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(true);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
   const positionRef = useRef(0);
   const resumeRef = useRef(false);
   const viewedRef = useRef(false);
@@ -244,6 +252,61 @@ function QualityVideoPlayer({
     quality === "ORIGINAL"
       ? (video.hlsMasterUrl ?? sourceMap.get("ORIGINAL") ?? video.videoUrl)
       : (sourceMap.get(quality) ?? sourceMap.get("ORIGINAL") ?? video.videoUrl);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    hlsRef.current?.destroy();
+    hlsRef.current = null;
+    setPlaybackError(null);
+
+    if (isHlsPlaylist(sourceUrl) && Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        capLevelToPlayerSize: true,
+        abrEwmaDefaultEstimate: 1_200_000,
+      });
+      hlsRef.current = hls;
+      hls.loadSource(sourceUrl);
+      hls.attachMedia(element);
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (!data.fatal) return;
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          hls.startLoad();
+          return;
+        }
+        if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+          hls.recoverMediaError();
+          return;
+        }
+        setPlaybackError(
+          "This HLS stream could not be played. Please try again."
+        );
+        hls.destroy();
+      });
+      return () => {
+        hls.destroy();
+        if (hlsRef.current === hls) hlsRef.current = null;
+      };
+    }
+
+    if (
+      isHlsPlaylist(sourceUrl) &&
+      !element.canPlayType("application/vnd.apple.mpegurl")
+    ) {
+      setPlaybackError("HLS playback is not supported by this browser.");
+      return;
+    }
+
+    element.src = sourceUrl;
+    element.load();
+    return () => {
+      element.removeAttribute("src");
+      element.load();
+    };
+  }, [sourceUrl]);
+
   const switchQuality = (next: Quality) => {
     if (next !== "ORIGINAL" && !sourceMap.has(next)) return;
     positionRef.current = ref.current?.currentTime ?? 0;
@@ -259,6 +322,9 @@ function QualityVideoPlayer({
     );
     if (resumeRef.current) void element.play().catch(() => undefined);
   };
+  const isProcessing =
+    video.processingStatus === "PENDING" ||
+    video.processingStatus === "PROCESSING";
   return (
     <div
       className={
@@ -269,14 +335,17 @@ function QualityVideoPlayer({
     >
       <video
         ref={ref}
-        key={sourceUrl}
-        src={sourceUrl}
         poster={video.thumbnailUrl ?? undefined}
         controls
         playsInline
         preload="metadata"
         muted={muted}
         onLoadedMetadata={restorePlayback}
+        onError={() =>
+          setPlaybackError(
+            "This video stream could not be loaded. Please try again."
+          )
+        }
         onPlay={() => {
           setPlaying(true);
           if (!viewedRef.current) {
@@ -314,9 +383,10 @@ function QualityVideoPlayer({
             value={quality}
             onChange={event => switchQuality(event.target.value as Quality)}
             aria-label="Video quality"
+            disabled={isProcessing}
           >
             <option value="ORIGINAL">Auto</option>
-            {(["1080P", "720P", "480P"] as Quality[]).map(option => (
+            {(["1080P", "720P", "480P", "240P"] as Quality[]).map(option => (
               <option
                 key={option}
                 value={option}
@@ -330,6 +400,28 @@ function QualityVideoPlayer({
         </label>
         <span>{formatDuration(video.durationSeconds)}</span>
       </div>
+      {isProcessing && (
+        <p className="media-processing-status" role="status">
+          Optimizing quality options…
+        </p>
+      )}
+      {video.processingStatus === "FAILED" && (
+        <p
+          className="media-processing-status media-processing-status--error"
+          role="alert"
+        >
+          Video processing did not finish. The original source may still be
+          available.
+        </p>
+      )}
+      {playbackError && (
+        <p
+          className="media-processing-status media-processing-status--error"
+          role="alert"
+        >
+          {playbackError}
+        </p>
+      )}
     </div>
   );
 }
@@ -512,83 +604,41 @@ function UploadVideoPanel({
   const [kind, setKind] = useState<VideoKind>("LONG");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [files, setFiles] = useState<Partial<Record<Quality, File>>>({});
+  const [file, setFile] = useState<File | null>(null);
   const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
   const [busy, setBusy] = useState(false);
-  const createVideo = trpc.videos.create.useMutation();
-  const inputRefs = useRef<Partial<Record<Quality, HTMLInputElement | null>>>(
-    {}
-  );
-  const originalFile = files.ORIGINAL;
-  const selectFile = async (
-    quality: Quality,
-    event: ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0];
+  const inputRef = useRef<HTMLInputElement>(null);
+  const selectFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const nextFile = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
+    if (!nextFile) return;
     try {
-      if (!file.type.startsWith("video/"))
-        throw new Error("Choose a supported video file.");
-      if (quality === "ORIGINAL") {
-        const nextMetadata = await getVideoMetadata(file, {
-          maxDurationSeconds:
-            kind === "LONG"
-              ? MAX_LONG_VIDEO_DURATION_SECONDS
-              : MAX_SHORT_VIDEO_DURATION_SECONDS,
-        });
-        setMetadata(nextMetadata);
-      }
-      setFiles(current => ({ ...current, [quality]: file }));
+      const nextMetadata = await getVideoMetadata(nextFile, {
+        maxDurationSeconds:
+          kind === "LONG"
+            ? MAX_LONG_VIDEO_DURATION_SECONDS
+            : MAX_SHORT_VIDEO_DURATION_SECONDS,
+      });
+      setFile(nextFile);
+      setMetadata(nextMetadata);
     } catch (error) {
       notifyError(error);
     }
   };
-  const removeFile = (quality: Quality) => {
-    setFiles(current => {
-      const next = { ...current };
-      delete next[quality];
-      return next;
-    });
-    if (quality === "ORIGINAL") setMetadata(null);
-  };
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!originalFile || !metadata || !title.trim())
+    if (!file || !metadata || !title.trim())
       return toast.error("Add an original video and title first.");
     setBusy(true);
     try {
-      const uploadEntries = await Promise.all(
-        Object.entries(files).map(async ([quality, file]) => ({
-          quality: quality as Quality,
-          videoUrl: await uploadVideo(file as File, kind),
-        }))
-      );
-      const originalUrl = uploadEntries.find(
-        entry => entry.quality === "ORIGINAL"
-      )?.videoUrl;
-      if (!originalUrl)
-        throw new Error("The original video source is required.");
-      await createVideo.mutateAsync({
-        title: title.trim(),
-        description: description.trim(),
-        videoUrl: originalUrl,
-        thumbnailUrl: null,
-        kind,
-        durationSeconds: metadata.durationSeconds,
-        width: metadata.width,
-        height: metadata.height,
-        sources: uploadEntries,
-      });
+      await publishVideo(file, kind, title.trim(), description.trim());
       await onPublished();
       setTitle("");
       setDescription("");
-      setFiles({});
+      setFile(null);
       setMetadata(null);
       toast.success(
-        kind === "LONG"
-          ? "Video published to the Home feed."
-          : "Short published."
+        "Video received. It will play in Auto mode while 1080p, 720p, 480p, and 240p streams are prepared."
       );
     } catch (error) {
       notifyError(error);
@@ -597,7 +647,7 @@ function UploadVideoPanel({
     }
   };
   useEffect(() => {
-    setFiles({});
+    setFile(null);
     setMetadata(null);
   }, [kind]);
   return (
@@ -631,8 +681,8 @@ function UploadVideoPanel({
           </button>
         </div>
         <p className="media-form-hint">
-          Duration is checked per format. Source dimensions and upload size are
-          not restricted.
+          Upload one original video. KINBA securely creates the available HLS
+          qualities automatically after the upload finishes.
         </p>
         <label>
           Title
@@ -656,50 +706,43 @@ function UploadVideoPanel({
           />
         </label>
         <div className="quality-upload-grid">
-          {qualityFileLabels.map(({ quality, label }) => (
-            <div
-              className={`quality-upload ${quality === "ORIGINAL" ? "required" : ""}`}
-              key={quality}
-            >
-              <input
-                ref={element => {
-                  inputRefs.current[quality] = element;
-                }}
-                type="file"
-                accept="video/*"
-                className="sr-only"
-                onChange={event => selectFile(quality, event)}
-              />
+          <input
+            ref={inputRef}
+            type="file"
+            accept="video/*"
+            className="sr-only"
+            onChange={selectFile}
+          />
+          <button
+            type="button"
+            className="secondary-media-btn"
+            onClick={() => inputRef.current?.click()}
+          >
+            Choose original video · required
+          </button>
+          {file && (
+            <span className="selected-file">
+              {file.name}
               <button
                 type="button"
-                className="secondary-media-btn"
-                onClick={() => inputRefs.current[quality]?.click()}
+                className="muted-btn"
+                onClick={() => {
+                  setFile(null);
+                  setMetadata(null);
+                }}
               >
-                {label}
-                {quality === "ORIGINAL" ? " · required" : " · optional"}
+                Remove
               </button>
-              {files[quality] && (
-                <span className="selected-file">
-                  {files[quality]?.name}
-                  <button
-                    type="button"
-                    className="muted-btn"
-                    onClick={() => removeFile(quality)}
-                  >
-                    Remove
-                  </button>
-                </span>
-              )}
-            </div>
-          ))}
+            </span>
+          )}
         </div>
         <button
           className="primary-btn"
           type="submit"
-          disabled={!originalFile || !metadata || !title.trim() || busy}
+          disabled={!file || !metadata || !title.trim() || busy}
         >
           {busy ? <Loader2 className="spin" size={16} /> : <Upload size={16} />}{" "}
-          {busy ? "Publishing" : "Publish video"}
+          {busy ? "Uploading" : "Upload and prepare qualities"}
         </button>
       </form>
     </details>
@@ -735,6 +778,7 @@ function HomeFeedPanel({
     {
       enabled: tab !== "following" || auth.isAuthenticated,
       refetchOnWindowFocus: false,
+      refetchInterval: 10_000,
     }
   );
   const videos = (query.data ?? []) as VideoRecord[];
@@ -820,7 +864,7 @@ function HomeFeedPanel({
 function ShortsFeed() {
   const query = trpc.videos.list.useQuery(
     { kind: "SHORT" },
-    { refetchOnWindowFocus: false }
+    { refetchOnWindowFocus: false, refetchInterval: 10_000 }
   );
   const viewportRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);

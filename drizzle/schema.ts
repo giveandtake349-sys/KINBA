@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -291,6 +292,9 @@ export const transactions = pgTable(
   },
   table => [
     uniqueIndex("transactions_transaction_id_unique").on(table.transactionId),
+    uniqueIndex("transactions_user_pending_unique")
+      .on(table.userId)
+      .where(sql`${table.status} = 'pending'`),
     index("transactions_user_idx").on(table.userId, table.createdAt),
     index("transactions_status_idx").on(table.status, table.createdAt),
   ]

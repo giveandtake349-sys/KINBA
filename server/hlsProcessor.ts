@@ -3,76 +3,249 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { replaceVideoSources, updateVideoProcessing, type VideoSourceInput } from "./db";
+import {
+  listVideosAwaitingTranscode,
+  replaceVideoSources,
+  updateVideoProcessing,
+  type VideoSourceInput,
+} from "./db";
 import { storagePut } from "./storage";
 
 const execFileAsync = promisify(execFile);
+const segmentDurationSeconds = 6;
 const variants = [
   { quality: "1080P" as const, height: 1080, bandwidth: 5_000_000 },
   { quality: "720P" as const, height: 720, bandwidth: 2_800_000 },
   { quality: "480P" as const, height: 480, bandwidth: 1_400_000 },
   { quality: "240P" as const, height: 240, bandwidth: 600_000 },
 ];
+const activeTranscodes = new Set<number>();
+
+type SourceDimensions = { width: number; height: number };
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message.slice(0, 1000) : "HLS processing failed.";
+  return error instanceof Error
+    ? error.message.slice(0, 1000)
+    : "HLS processing failed.";
 }
 
-async function uploadVariant(videoId: number, quality: string, directory: string) {
+async function probeDimensions(inputPath: string): Promise<SourceDimensions> {
+  const { stdout } = await execFileAsync(process.env.FFPROBE_BIN || "ffprobe", [
+    "-v",
+    "error",
+    "-select_streams",
+    "v:0",
+    "-show_entries",
+    "stream=width,height",
+    "-of",
+    "json",
+    inputPath,
+  ]);
+  const result = JSON.parse(stdout) as {
+    streams?: Array<{ width?: number; height?: number }>;
+  };
+  const stream = result.streams?.[0];
+  if (!stream?.width || !stream.height) {
+    throw new Error("The uploaded video has no readable video stream.");
+  }
+  return { width: stream.width, height: stream.height };
+}
+
+function variantDimensions(
+  source: SourceDimensions,
+  targetHeight: number
+): SourceDimensions {
+  const height = Math.min(targetHeight, source.height);
+  const width = Math.max(
+    2,
+    Math.floor((source.width * height) / source.height / 2) * 2
+  );
+  return { width, height };
+}
+
+async function uploadVariant(
+  videoId: number,
+  quality: string,
+  directory: string
+) {
   const playlistPath = path.join(directory, "variant.m3u8");
   let playlist = await fs.readFile(playlistPath, "utf8");
   const lines = playlist.split(/\r?\n/);
   const uploadedSegments = new Map<string, string>();
+
   for (let index = 0; index < lines.length; index += 1) {
     const segmentName = lines[index].trim();
-    if (!segmentName || segmentName.startsWith("#") || !segmentName.endsWith(".ts")) continue;
+    if (
+      !segmentName ||
+      segmentName.startsWith("#") ||
+      !segmentName.endsWith(".ts")
+    ) {
+      continue;
+    }
     if (!uploadedSegments.has(segmentName)) {
-      const segment = await storagePut(`videos/${videoId}/hls/${quality}/${segmentName}`, await fs.readFile(path.join(directory, segmentName)), "video/mp2t");
+      const segment = await storagePut(
+        `videos/${videoId}/hls/${quality}/${segmentName}`,
+        await fs.readFile(path.join(directory, segmentName)),
+        "video/mp2t"
+      );
       uploadedSegments.set(segmentName, segment.url);
     }
     lines[index] = uploadedSegments.get(segmentName) as string;
   }
+
   playlist = lines.join("\n");
-  const uploadedPlaylist = await storagePut(`videos/${videoId}/hls/${quality}/variant.m3u8`, playlist, "application/vnd.apple.mpegurl");
+  const uploadedPlaylist = await storagePut(
+    `videos/${videoId}/hls/${quality}/variant.m3u8`,
+    playlist,
+    "application/vnd.apple.mpegurl"
+  );
   return uploadedPlaylist.url;
 }
 
 export async function transcodeVideoToHls(videoId: number, sourceUrl: string) {
-  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), `kinba-hls-${videoId}-`));
+  if (activeTranscodes.has(videoId)) return;
+  activeTranscodes.add(videoId);
+
+  const tempRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), `kinba-hls-${videoId}-`)
+  );
   const inputPath = path.join(tempRoot, "source-video");
   try {
-    await updateVideoProcessing(videoId, { status: "PROCESSING", processingError: null });
+    await updateVideoProcessing(videoId, {
+      status: "PROCESSING",
+      processingError: null,
+    });
+
     const response = await fetch(sourceUrl);
-    if (!response.ok) throw new Error(`Source video download failed (${response.status}).`);
-    await fs.writeFile(inputPath, Buffer.from(await response.arrayBuffer()));
-    const sources: VideoSourceInput[] = [{ quality: "ORIGINAL", videoUrl: sourceUrl }];
-    const masterLines = ["#EXTM3U", "#EXT-X-VERSION:3"];
-    for (const variant of variants) {
-      const directory = path.join(tempRoot, variant.quality);
-      await fs.mkdir(directory);
-      await execFileAsync(process.env.FFMPEG_BIN || "ffmpeg", [
-        "-y", "-i", inputPath,
-        "-vf", `scale=-2:min(${variant.height},ih)`,
-        "-c:v", "libx264", "-preset", "veryfast", "-profile:v", "main",
-        "-b:v", `${variant.bandwidth}`, "-maxrate", `${Math.round(variant.bandwidth * 1.15)}`, "-bufsize", `${variant.bandwidth * 2}`,
-        "-c:a", "aac", "-b:a", "128k", "-f", "hls", "-hls_time", "6", "-hls_playlist_type", "vod",
-        "-hls_segment_filename", path.join(directory, "segment-%03d.ts"), path.join(directory, "variant.m3u8"),
-      ], { maxBuffer: 8 * 1024 * 1024 });
-      const playlistUrl = await uploadVariant(videoId, variant.quality, directory);
-      sources.push({ quality: variant.quality, videoUrl: playlistUrl });
-      masterLines.push(`#EXT-X-STREAM-INF:BANDWIDTH=${variant.bandwidth},RESOLUTION=0x${variant.height}`, playlistUrl);
+    if (!response.ok) {
+      throw new Error(`Source video download failed (${response.status}).`);
     }
-    const master = await storagePut(`videos/${videoId}/hls/master.m3u8`, `${masterLines.join("\n")}\n`, "application/vnd.apple.mpegurl");
+    await fs.writeFile(inputPath, Buffer.from(await response.arrayBuffer()));
+
+    const sourceDimensions = await probeDimensions(inputPath);
+    const availableVariants = variants.filter(
+      variant => sourceDimensions.height >= variant.height
+    );
+    if (!availableVariants.length) {
+      throw new Error(
+        "The source video must be at least 240 pixels high for HLS processing."
+      );
+    }
+
+    const sources: VideoSourceInput[] = [
+      { quality: "ORIGINAL", videoUrl: sourceUrl },
+    ];
+    const masterLines = [
+      "#EXTM3U",
+      "#EXT-X-VERSION:3",
+      "#EXT-X-INDEPENDENT-SEGMENTS",
+    ];
+
+    for (const variant of availableVariants) {
+      const directory = path.join(tempRoot, variant.quality);
+      const dimensions = variantDimensions(sourceDimensions, variant.height);
+      await fs.mkdir(directory);
+      await execFileAsync(
+        process.env.FFMPEG_BIN || "ffmpeg",
+        [
+          "-y",
+          "-i",
+          inputPath,
+          "-map",
+          "0:v:0",
+          "-map",
+          "0:a?",
+          "-vf",
+          `scale=${dimensions.width}:${dimensions.height}:flags=lanczos,format=yuv420p`,
+          "-c:v",
+          "libx264",
+          "-preset",
+          "veryfast",
+          "-profile:v",
+          "main",
+          "-b:v",
+          `${variant.bandwidth}`,
+          "-maxrate",
+          `${Math.round(variant.bandwidth * 1.15)}`,
+          "-bufsize",
+          `${variant.bandwidth * 2}`,
+          "-g",
+          `${segmentDurationSeconds * 30}`,
+          "-keyint_min",
+          `${segmentDurationSeconds * 30}`,
+          "-sc_threshold",
+          "0",
+          "-force_key_frames",
+          `expr:gte(t,n_forced*${segmentDurationSeconds})`,
+          "-c:a",
+          "aac",
+          "-b:a",
+          "128k",
+          "-f",
+          "hls",
+          "-hls_time",
+          `${segmentDurationSeconds}`,
+          "-hls_playlist_type",
+          "vod",
+          "-hls_flags",
+          "independent_segments",
+          "-hls_segment_filename",
+          path.join(directory, "segment-%03d.ts"),
+          path.join(directory, "variant.m3u8"),
+        ],
+        { maxBuffer: 8 * 1024 * 1024 }
+      );
+
+      const playlistUrl = await uploadVariant(
+        videoId,
+        variant.quality,
+        directory
+      );
+      sources.push({ quality: variant.quality, videoUrl: playlistUrl });
+      masterLines.push(
+        `#EXT-X-STREAM-INF:BANDWIDTH=${variant.bandwidth},AVERAGE-BANDWIDTH=${Math.round(variant.bandwidth * 0.85)},RESOLUTION=${dimensions.width}x${dimensions.height}`,
+        playlistUrl
+      );
+    }
+
+    const master = await storagePut(
+      `videos/${videoId}/hls/master.m3u8`,
+      `${masterLines.join("\n")}\n`,
+      "application/vnd.apple.mpegurl"
+    );
     await replaceVideoSources(videoId, sources);
-    await updateVideoProcessing(videoId, { status: "READY", hlsMasterUrl: master.url, videoUrl: master.url, processingError: null });
+    await updateVideoProcessing(videoId, {
+      status: "READY",
+      hlsMasterUrl: master.url,
+      videoUrl: master.url,
+      processingError: null,
+    });
   } catch (error) {
-    await updateVideoProcessing(videoId, { status: "FAILED", processingError: errorMessage(error) });
+    await updateVideoProcessing(videoId, {
+      status: "FAILED",
+      processingError: errorMessage(error),
+    });
     console.error(`[HLS] Video ${videoId} processing failed:`, error);
   } finally {
-    await fs.rm(tempRoot, { recursive: true, force: true }).catch(() => undefined);
+    activeTranscodes.delete(videoId);
+    await fs
+      .rm(tempRoot, { recursive: true, force: true })
+      .catch(() => undefined);
   }
 }
 
 export function queueVideoTranscode(videoId: number, sourceUrl: string) {
   void transcodeVideoToHls(videoId, sourceUrl);
+}
+
+export async function resumeVideoTranscodes() {
+  const pendingVideos = await listVideosAwaitingTranscode();
+  for (const video of pendingVideos) {
+    queueVideoTranscode(video.id, video.videoUrl);
+  }
+  if (pendingVideos.length) {
+    console.log(
+      `[HLS] Resumed ${pendingVideos.length} unfinished transcode job(s).`
+    );
+  }
 }

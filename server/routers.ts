@@ -43,12 +43,18 @@ const profileUpdateInput = z.object({
   photoUrl: z.string().url().max(1024).nullable().optional(),
 });
 const paymentInput = z.object({
-  amount: z.string().regex(/^\d{1,8}(\.\d{1,2})?$/, "Enter a valid amount."),
+  amount: z
+    .string()
+    .regex(/^\d{1,8}(\.\d{1,2})?$/, "Enter a valid amount.")
+    .refine(value => Number(value) > 0, "Enter an amount greater than zero."),
   paymentMethod: z.enum(["bkash", "nagad"]),
   senderNumber: z
     .string()
     .trim()
-    .regex(/^\+?[0-9][0-9\s-]{7,30}$/, "Enter a valid sender number."),
+    .refine(
+      value => /^(?:01\d{9}|8801\d{9})$/.test(value.replace(/[^0-9]/g, "")),
+      "Enter a valid Bangladesh mobile number."
+    ),
   transactionId: z
     .string()
     .trim()
@@ -129,9 +135,10 @@ export const appRouter = router({
     ),
     submit: protectedProcedure
       .input(paymentInput)
-      .mutation(({ ctx, input }) =>
-        submitVerificationTransaction(ctx.user.id, input)
-      ),
+      .mutation(async ({ ctx, input }) => {
+        await ensureProfile(ctx.user.id);
+        return submitVerificationTransaction(ctx.user.id, input);
+      }),
     all: adminProcedure.query(() => listVerificationTransactions()),
     approve: adminProcedure
       .input(

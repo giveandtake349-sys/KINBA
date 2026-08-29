@@ -95,7 +95,15 @@ function ProfileIdentity({
         )}
       </div>
       <div>
-        <strong>{name}</strong>
+        <strong>
+          {name}
+          {profile?.profile?.isVerified && (
+            <BadgeCheck
+              size={compact ? 15 : 17}
+              aria-label="Verified profile"
+            />
+          )}
+        </strong>
         {!compact && <span>{username}</span>}
       </div>
     </div>
@@ -217,8 +225,10 @@ function ProfileEditor({ profile }: { profile?: ProfileSnapshot }) {
 }
 
 function GetVerifiedPanel() {
+  const utils = trpc.useUtils();
   const status = trpc.payments.status.useQuery(undefined, {
     refetchOnWindowFocus: false,
+    refetchInterval: 10_000,
   });
   const submit = trpc.payments.submit.useMutation();
   const [amount, setAmount] = useState("100");
@@ -250,6 +260,11 @@ function GetVerifiedPanel() {
       );
     }
   };
+  const isPending = status.data?.latestTransaction?.status === "pending";
+  const wasRejected = status.data?.latestTransaction?.status === "rejected";
+  useEffect(() => {
+    if (status.data?.isVerified) void utils.profile.me.invalidate();
+  }, [status.data?.isVerified, utils.profile.me]);
   if (status.data?.isVerified)
     return (
       <div className="verified-state">
@@ -268,9 +283,16 @@ function GetVerifiedPanel() {
           Send the verification amount to <strong>+8801779557226</strong> via
           bKash or Nagad, then submit the details below.
         </p>
-        {status.data?.latestTransaction?.status === "pending" && (
+        {isPending && (
           <p className="form-message">
-            Your latest transaction is pending review.
+            Your latest transaction is pending review. You will receive the
+            verification badge automatically after approval.
+          </p>
+        )}
+        {wasRejected && (
+          <p className="form-message form-message--error">
+            Your previous submission was not approved. Check the sender number
+            and TrxID, then submit a new payment only if required.
           </p>
         )}
         <form onSubmit={send}>
@@ -278,8 +300,11 @@ function GetVerifiedPanel() {
             Amount
             <input
               inputMode="decimal"
+              min="0.01"
+              step="0.01"
               value={amount}
               onChange={event => setAmount(event.target.value)}
+              disabled={isPending}
               required
             />
           </label>
@@ -290,6 +315,7 @@ function GetVerifiedPanel() {
               onChange={event =>
                 setPaymentMethod(event.target.value as "bkash" | "nagad")
               }
+              disabled={isPending}
             >
               <option value="bkash">bKash</option>
               <option value="nagad">Nagad</option>
@@ -298,26 +324,38 @@ function GetVerifiedPanel() {
           <label>
             Sender phone number
             <input
+              inputMode="tel"
+              autoComplete="tel"
+              maxLength={16}
               value={senderNumber}
               onChange={event => setSenderNumber(event.target.value)}
-              placeholder="+8801XXXXXXXXX"
+              placeholder="01XXXXXXXXX or +8801XXXXXXXXX"
+              disabled={isPending}
               required
             />
           </label>
           <label>
             Transaction ID (TrxID)
             <input
+              autoCapitalize="characters"
+              autoCorrect="off"
+              maxLength={128}
               value={transactionId}
               onChange={event => setTransactionId(event.target.value)}
+              disabled={isPending}
               required
             />
           </label>
           <button
             type="submit"
             className="primary-btn"
-            disabled={submit.isPending}
+            disabled={submit.isPending || isPending}
           >
-            {submit.isPending ? "Submitting…" : "Submit for review"}
+            {isPending
+              ? "Payment pending review"
+              : submit.isPending
+                ? "Submitting…"
+                : "Submit for review"}
           </button>
           {message && (
             <p className="form-message" role="status">
@@ -327,6 +365,163 @@ function GetVerifiedPanel() {
         </form>
       </div>
     </details>
+  );
+}
+
+type VerificationTransaction = {
+  transaction: {
+    id: number;
+    amount: string;
+    paymentMethod: "bkash" | "nagad";
+    senderNumber: string;
+    transactionId: string;
+    status: "pending" | "approved" | "rejected";
+    createdAt: Date | string;
+  };
+  user: { name: string | null; email: string | null };
+};
+
+function AdminVerificationPanel() {
+  const transactions = trpc.payments.all.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+    refetchInterval: 10_000,
+  });
+  const review = trpc.payments.approve.useMutation();
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const [message, setMessage] = useState("");
+  const decide = async (
+    transactionId: number,
+    status: "approved" | "rejected"
+  ) => {
+    setActiveId(transactionId);
+    setMessage("");
+    try {
+      await review.mutateAsync({ transactionId, status });
+      await transactions.refetch();
+      setMessage(
+        status === "approved"
+          ? "Payment approved. The member will receive their verification badge automatically."
+          : "Payment submission rejected. The member may submit corrected details."
+      );
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "The payment review could not be completed."
+      );
+    } finally {
+      setActiveId(null);
+    }
+  };
+  const rows = (transactions.data ?? []) as VerificationTransaction[];
+  const pendingCount = rows.filter(
+    row => row.transaction.status === "pending"
+  ).length;
+  return (
+    <section
+      className="admin-verification-panel"
+      aria-labelledby="payment-review-heading"
+    >
+      <div className="admin-verification-heading">
+        <div>
+          <p className="eyebrow">Administrator</p>
+          <h2 id="payment-review-heading">Verification payments</h2>
+        </div>
+        <span>{pendingCount} pending</span>
+      </div>
+      <p>
+        Confirm bKash or Nagad transfers before approving. Approval immediately
+        marks the member’s profile as verified.
+      </p>
+      {transactions.isPending ? (
+        <p className="profile-loading-note">Loading payment submissions…</p>
+      ) : transactions.isError ? (
+        <p className="form-message form-message--error">
+          Payment submissions are temporarily unavailable.
+        </p>
+      ) : rows.length ? (
+        <div className="verification-review-table-wrap">
+          <table className="verification-review-table">
+            <thead>
+              <tr>
+                <th>Member</th>
+                <th>Payment</th>
+                <th>Sender</th>
+                <th>TrxID</th>
+                <th>Submitted</th>
+                <th>Status</th>
+                <th>Review</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(({ transaction, user }) => {
+                const isPending = transaction.status === "pending";
+                const isBusy = activeId === transaction.id;
+                return (
+                  <tr key={transaction.id}>
+                    <td>
+                      <strong>{user.name ?? "KINBA member"}</strong>
+                      <span>{user.email ?? "No email recorded"}</span>
+                    </td>
+                    <td>
+                      {transaction.amount} BDT
+                      <span>
+                        {transaction.paymentMethod === "bkash"
+                          ? "bKash"
+                          : "Nagad"}
+                      </span>
+                    </td>
+                    <td>{transaction.senderNumber}</td>
+                    <td className="verification-trxid">
+                      {transaction.transactionId}
+                    </td>
+                    <td>{new Date(transaction.createdAt).toLocaleString()}</td>
+                    <td>
+                      <span
+                        className={`verification-status verification-status--${transaction.status}`}
+                      >
+                        {transaction.status}
+                      </span>
+                    </td>
+                    <td>
+                      {isPending ? (
+                        <div className="verification-review-actions">
+                          <button
+                            type="button"
+                            className="primary-btn"
+                            disabled={isBusy}
+                            onClick={() => decide(transaction.id, "approved")}
+                          >
+                            {isBusy ? "Saving…" : "Approve"}
+                          </button>
+                          <button
+                            type="button"
+                            className="verification-reject-btn"
+                            disabled={isBusy}
+                            onClick={() => decide(transaction.id, "rejected")}
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="reviewed-label">Reviewed</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="profile-loading-note">No verification submissions yet.</p>
+      )}
+      {message && (
+        <p className="form-message" role="status">
+          {message}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -542,9 +737,11 @@ function Landing({ onLogin }: { onLogin: () => void }) {
 function ProfileStats({
   profile,
   enabled,
+  isAdmin,
 }: {
   profile?: ProfileSnapshot;
   enabled: boolean;
+  isAdmin: boolean;
 }) {
   return (
     <main className="profile-page section-shell">
@@ -556,6 +753,7 @@ function ProfileStats({
         <>
           <ProfileEditor profile={profile} />
           <GetVerifiedPanel />
+          {isAdmin && <AdminVerificationPanel />}
         </>
       ) : (
         <p className="profile-loading-note">
@@ -733,7 +931,11 @@ export default function Home() {
               )}
             </section>
           ) : (
-            <ProfileStats profile={profile} enabled={auth.isAuthenticated} />
+            <ProfileStats
+              profile={profile}
+              enabled={auth.isAuthenticated}
+              isAdmin={auth.user?.role === "admin"}
+            />
           )}
         </main>
         <MobileDrawer

@@ -1,0 +1,2 @@
+ALTER TYPE "public"."video_source_quality" ADD VALUE '240P';--> statement-breakpoint
+CREATE UNIQUE INDEX "transactions_user_pending_unique" ON "transactions" USING btree ("userId") WHERE "transactions"."status" = 'pending';

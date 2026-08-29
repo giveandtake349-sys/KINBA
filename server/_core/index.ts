@@ -9,6 +9,7 @@ import { createContext } from "./context";
 import { isAllowedCorsOrigin, parseAllowedOrigins } from "../httpSecurity";
 import { serveStatic, setupVite } from "./vite";
 import { registerVideoUploadRoute } from "../videoUploadRoute";
+import { resumeVideoTranscodes } from "../hlsProcessor";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -43,7 +44,10 @@ async function startServer() {
     res.vary("Origin");
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization"
+    );
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     if (req.method === "OPTIONS") return res.status(204).end();
     return next();
@@ -77,6 +81,9 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    void resumeVideoTranscodes().catch(error => {
+      console.error("[HLS] Unable to resume unfinished transcodes:", error);
+    });
   });
 }
 

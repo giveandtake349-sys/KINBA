@@ -811,3 +811,56 @@
     height: 280px;
   }
 }
+
+.media-processing-status {
+  background: rgba(8, 13, 24, 0.88);
+  border: 1px solid rgba(245, 193, 93, 0.34);
+  border-radius: 999px;
+  bottom: 48px;
+  color: #f7cf7d;
+  font-size: 10px;
+  left: 12px;
+  margin: 0;
+  padding: 6px 9px;
+  position: absolute;
+  z-index: 1;
+}
+.media-processing-status--error {
+  border-color: rgba(248, 113, 113, 0.48);
+  color: #fca5a5;
+}
+.media-quality-control {
+  align-items: center;
+  background: rgba(2, 5, 17, 0.63);
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  border-radius: 999px;
+  color: #eef2ff;
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 2px;
+  padding: 0 7px;
+}
+.media-quality-control select {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font-size: 10px;
+  outline: 0;
+  padding: 5px 0;
+}
+.media-quality-control select:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+.media-quality-control option {
+  background: #111827;
+  color: #eef2ff;
+}
+@media (max-width: 560px) {
+  .media-processing-status {
+    bottom: 43px;
+    max-width: calc(100% - 24px);
+  }
+}
