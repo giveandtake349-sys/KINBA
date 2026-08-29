@@ -19,7 +19,10 @@ export const signalInput = z.object({
   language: z.string().trim().min(2).max(64),
   location: z.string().trim().max(120).nullable(),
   imageUrl: z.string().url().max(1024).nullable().default(null),
-});
+  mediaUrl: z.string().url().max(1024).nullable().default(null),
+  mediaType: z.enum(["NONE", "AUDIO", "VIDEO"]).default("NONE"),
+  mediaDuration: z.number().int().min(0).max(15).default(0),
+}).refine((input) => input.mediaType === "NONE" ? (!input.mediaUrl && input.mediaDuration === 0) : Boolean(input.mediaUrl && input.mediaDuration >= 1), { message: "Audio and video signals need a media URL and a duration from 1 to 15 seconds." });
 
 export const commentInput = z.object({
   postId: z.number().int().positive(),

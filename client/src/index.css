@@ -182,3 +182,39 @@ body, .nivo-app, .guest-layout { background-color: #0F172A; }
 .comment-preview button { align-items: center; background: rgba(190, 56, 87, .12); border: 0; border-radius: 50%; color: #f29bb3; display: inline-flex; height: 22px; justify-content: center; margin-left: auto; width: 22px; }
 .comment-form > small { color: #647594; display: block; font-size: 9px; margin-top: 6px; }
 @media (max-width: 640px) { .comment-meta time { width: 100%; } .comment-delete { margin-left: 0; } }
+
+
+.signal-media-picker { border-top: 1px solid rgba(148, 163, 184, .14); margin-top: 14px; padding-top: 12px; }
+.signal-media-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.media-action-button { align-items: center; background: rgba(99, 230, 255, .08); border: 1px solid rgba(99, 230, 255, .25); border-radius: 10px; color: #a9efff; display: inline-flex; font-size: 11px; font-weight: 700; gap: 7px; padding: 9px 12px; }
+.media-action-button:hover:not(:disabled) { background: rgba(99, 230, 255, .15); border-color: rgba(99, 230, 255, .65); }
+.media-action-button:disabled { cursor: not-allowed; opacity: .42; }
+.signal-media-picker > small { color: #7182a2; display: block; font-size: 9px; margin-top: 8px; }
+.recording-status { align-items: center; color: #f5b3c1; display: flex; flex-wrap: wrap; font-size: 11px; gap: 7px; margin-top: 11px; }
+.recording-status strong { color: #fff; margin-left: auto; }
+.recording-dot { background: #fb7185; border-radius: 50%; box-shadow: 0 0 0 4px rgba(251, 113, 133, .13); height: 7px; width: 7px; }
+.recording-waveform { align-items: center; display: flex; gap: 3px; height: 28px; width: 100%; }
+.recording-waveform i, .audio-waveform i { animation: signal-wave 720ms ease-in-out infinite alternate; background: linear-gradient(180deg, #63e6ff, #a855f7); border-radius: 3px; display: block; height: 16px; width: 4px; }
+.recording-waveform i:nth-child(3n), .audio-waveform i:nth-child(3n) { height: 22px; }
+@keyframes signal-wave { from { opacity: .45; transform: scaleY(.55); } to { opacity: 1; transform: scaleY(1); } }
+.signal-media-review { align-items: center; background: rgba(15, 23, 42, .62); border: 1px solid rgba(99, 230, 255, .2); border-radius: 12px; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 11px; padding: 10px; }
+.voice-review { align-items: center; color: #9feaff; display: flex; flex: 1; gap: 9px; min-width: 180px; }
+.voice-review div { display: grid; gap: 3px; }
+.voice-review strong { color: #e4edff; font-size: 11px; }
+.voice-review span { color: #8292b2; font-size: 10px; }
+.signal-media-review video { border-radius: 8px; max-height: 130px; max-width: 100%; object-fit: cover; }
+.media-rerecord { background: transparent; border: 0; color: #f3b5c5; font-size: 10px; margin-left: auto; padding: 5px; }
+.media-rerecord:hover { color: #fb7185; }
+.signal-audio-player { align-items: center; background: linear-gradient(105deg, rgba(11, 19, 43, .9), rgba(25, 35, 68, .78)); border: 1px solid rgba(99, 230, 255, .22); border-radius: 13px; display: flex; gap: 11px; margin: 12px 0; padding: 10px 12px; }
+.signal-audio-player audio { display: none; }
+.audio-play-button { align-items: center; background: #63e6ff; border: 0; border-radius: 50%; color: #07101d; display: inline-flex; flex: 0 0 auto; height: 32px; justify-content: center; width: 32px; }
+.audio-waveform { align-items: center; display: flex; flex: 1; gap: 3px; height: 28px; }
+.audio-waveform i { animation-play-state: paused; height: 12px; opacity: .68; }
+.audio-waveform.is-playing i { animation-play-state: running; }
+.audio-duration { color: #9feaff; font-size: 10px; font-variant-numeric: tabular-nums; }
+.signal-video-player { background: #050914; border-radius: 15px; margin: 12px auto; max-width: 270px; overflow: hidden; position: relative; }
+.signal-video-player video { aspect-ratio: 9 / 14; background: #050914; display: block; object-fit: cover; width: 100%; }
+.video-player-overlay { align-items: flex-end; background: linear-gradient(transparent, rgba(4, 8, 20, .78)); bottom: 0; display: flex; gap: 7px; left: 0; padding: 28px 10px 10px; position: absolute; right: 0; }
+.video-player-overlay button { align-items: center; background: rgba(7, 16, 29, .7); border: 1px solid rgba(255, 255, 255, .18); border-radius: 50%; color: #e4edff; display: inline-flex; height: 30px; justify-content: center; width: 30px; }
+.video-player-overlay span { color: #a9efff; font-size: 10px; margin-left: auto; padding: 8px 2px; }
+.signal-media-card { margin: 12px 0; }

@@ -3,6 +3,7 @@ import { boolean, index, integer, pgEnum, pgTable, text, timestamp, uniqueIndex,
 export const appRole = pgEnum("app_role", ["user", "admin"]);
 export const signalType = pgEnum("signal_type", ["need", "can"]);
 export const signalStatus = pgEnum("signal_status", ["active", "closed"]);
+export const signalMediaType = pgEnum("signal_media_type", ["NONE", "AUDIO", "VIDEO"]);
 export const connectionStatus = pgEnum("connection_status", ["pending", "accepted", "declined", "cancelled"]);
 
 const createdAt = () => timestamp("createdAt", { withTimezone: true }).defaultNow().notNull();
@@ -44,6 +45,9 @@ export const signals = pgTable("signals", {
   language: varchar("language", { length: 64 }).notNull(),
   location: varchar("location", { length: 120 }),
   imageUrl: varchar("imageUrl", { length: 1024 }),
+  mediaUrl: varchar("mediaUrl", { length: 1024 }),
+  mediaType: signalMediaType("mediaType").default("NONE").notNull(),
+  mediaDuration: integer("mediaDuration").default(0).notNull(),
   status: signalStatus("status").default("active").notNull(),
   createdAt: createdAt(),
   updatedAt: updatedAt(),

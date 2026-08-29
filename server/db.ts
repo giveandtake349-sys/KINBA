@@ -143,7 +143,7 @@ export async function listSignals(input: { type?: "need" | "can"; category?: str
   const rows = await db.select({ signal: signals, user: users, profile: profiles, commentCount: sql<number>`(select count(*) from comments where comments."postId" = ${signals.id})` }).from(signals)
     .innerJoin(users, eq(signals.userId, users.id))
     .leftJoin(profiles, eq(signals.userId, profiles.userId))
-    .where(and(...conditions)).orderBy(desc(signals.createdAt)).limit(60);
+    .where(and(...conditions)).orderBy(sql`case when ${signals.mediaType} <> 'NONE' then 0 else 1 end`, desc(signals.createdAt)).limit(60);
   const normalizedSearch = input.search?.trim().toLocaleLowerCase();
   return rows.filter((row) => {
     if (blockedIds.has(row.signal.userId)) return false;
@@ -156,7 +156,7 @@ export async function listSignals(input: { type?: "need" | "can"; category?: str
   }));
 }
 
-export async function createSignal(userId: number, input: { type: "need" | "can"; title: string; description: string; category: string; language: string; location: string | null; imageUrl: string | null }) {
+export async function createSignal(userId: number, input: { type: "need" | "can"; title: string; description: string; category: string; language: string; location: string | null; imageUrl: string | null; mediaUrl: string | null; mediaType: "NONE" | "AUDIO" | "VIDEO"; mediaDuration: number }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const [created] = await db.insert(signals).values({ userId, ...input }).returning({ id: signals.id });
@@ -191,7 +191,7 @@ export async function listMatches(userId: number, search?: string) {
 
   const normalizedSearch = search?.trim().toLocaleLowerCase();
   const bestBySignalId = new Map<number, {
-    id: number; type: "need" | "can"; title: string; description: string; category: string; language: string; location: string | null; imageUrl: string | null;
+    id: number; type: "need" | "can"; title: string; description: string; category: string; language: string; location: string | null; imageUrl: string | null; mediaUrl: string | null; mediaType: "NONE" | "AUDIO" | "VIDEO"; mediaDuration: number;
     matchScore: number; matchedWith: "need" | "can"; owner: { id: number; name: string | null; country: string | null; photoUrl: string | null; phoneVerified: boolean };
   }>();
 
@@ -214,6 +214,9 @@ export async function listMatches(userId: number, search?: string) {
         language: candidate.signal.language,
         location: candidate.signal.location,
         imageUrl: candidate.signal.imageUrl,
+        mediaUrl: candidate.signal.mediaUrl,
+        mediaType: candidate.signal.mediaType,
+        mediaDuration: candidate.signal.mediaDuration,
         matchScore: score,
         matchedWith: ownSignal.type,
         owner: { id: candidate.user.id, name: candidate.user.name, country: candidate.profile?.country ?? null, photoUrl: candidate.profile?.photoUrl ?? null, phoneVerified: Boolean(candidate.profile?.phoneVerified) },
