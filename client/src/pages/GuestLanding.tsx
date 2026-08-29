@@ -12,9 +12,9 @@ export default function GuestLanding({ onLogin, onExplore, onHowItWorks }: Guest
   return (
     <div className="min-h-screen bg-[#0b121e] text-slate-100 font-sans pb-12 antialiased guest-layout">
       <header className="sticky top-0 z-50 bg-[#0b121e]/90 backdrop-blur-md border-b border-slate-800/80 px-5 py-3.5 flex items-center justify-between">
-        <button type="button" onClick={onHowItWorks} className="flex items-center gap-2.5 text-left" aria-label="NIVO home">
-          <span className="w-8 h-8 rounded-full bg-amber-500/10 border border-amber-500/40 flex items-center justify-center text-amber-500 font-bold text-sm shadow-sm">N</span>
-          <span className="font-bold text-lg tracking-tight text-white">NIVO <span className="font-light text-slate-300">Now</span></span>
+        <button type="button" onClick={onHowItWorks} className="flex items-center gap-2.5 text-left" aria-label="Kinba home">
+          <img src="/logo.png" alt="Kinba" className="h-9 w-9 rounded-full object-cover shadow-sm" />
+          <span className="font-bold text-lg tracking-tight text-white">Kinba <span className="font-light text-slate-300">Now</span></span>
         </button>
         <div className="flex items-center gap-2 sm:gap-3">
           <LanguageSelector /><button type="button" onClick={onLogin} className="text-xs font-medium text-slate-300 hover:text-white transition-colors">{t("login")}</button>
@@ -67,7 +67,7 @@ export default function GuestLanding({ onLogin, onExplore, onHowItWorks }: Guest
             <p className="text-xs text-slate-400 leading-relaxed">{t("browseSignals")}</p>
           </div>
           <div className="pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5"><span className="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-700 to-slate-800 border border-slate-600 flex items-center justify-center text-slate-200 text-xs font-bold">N</span><div><p className="text-xs font-semibold text-slate-200">{t("nivoNetwork")}</p><p className="text-[10px] text-slate-500">{t("realPeople")}</p></div></div>
+            <div className="flex items-center gap-2.5"><img src="/logo.png" alt="Kinba" className="w-8 h-8 rounded-full object-cover border border-slate-600" /><div><p className="text-xs font-semibold text-slate-200">Kinba network</p><p className="text-[10px] text-slate-500">{t("realPeople")}</p></div></div>
             <button type="button" onClick={onExplore} className="bg-[#F59E0B] hover:bg-amber-300 text-slate-950 font-bold px-4 py-1.5 rounded-full text-xs transition-all shadow-md shadow-amber-500/20">{t("details")}</button>
           </div>
         </section>

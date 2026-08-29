@@ -1,12 +1,12 @@
-# NIVO — Connect What Matters
+# KINBA — Connect What Matters
 
-NIVO is a mobile-first human matching platform organized around a simple product loop: **I NEED ↔ I CAN**. Members publish real needs or capabilities, browse the live network, create private connection requests, and message only after both people accept a connection.
+KINBA is a mobile-first human matching platform organized around a simple product loop: **I NEED ↔ I CAN**. Members publish real needs or capabilities, browse the live network, create private connection requests, and message only after both people accept a connection.
 
 ## MVP capabilities
 
 | Capability | Implementation |
 |---|---|
-| Authentication | Supabase Auth Email/Password sign-up, sign-in, sign-out, and persistent browser sessions. Private routes open the NIVO auth dialog for anonymous visitors. |
+| Authentication | Supabase Auth Email/Password sign-up, sign-in, sign-out, and persistent browser sessions. Private routes open the KINBA auth dialog for anonymous visitors. |
 | Member profiles | Persistent editable profile data, including country, languages, about, skills, interests, and profile image URL. |
 | Signals | Authenticated members can publish NEED and CAN signals with category, language, and optional location. |
 | Discovery | Public, database-backed browsing with signal type and category filters. |
@@ -18,9 +18,9 @@ NIVO is a mobile-first human matching platform organized around a simple product
 
 The project uses **React 19**, **TypeScript**, **Vite**, **Tailwind CSS**, **Express**, **tRPC**, **Drizzle ORM**, and **PostgreSQL on Supabase**. The client uses URL-based screens for `/`, `/discover`, `/connections`, `/profile`, `/members/:id`, and `/chat/:id`.
 
-## NIVO logo
+## Kinba logo
 
-The application reserves `client/public/official-nivo-logo.png` as the single official brand-logo path. Use **only the exact image supplied by the NIVO owner** at that path; do not redesign, regenerate, or replace it. The original image file was not present in the provided workspace at the time of this repository preparation, so it must be supplied before a production visual release.
+The application uses the official Kinba logo at `client/public/logo.png` and exposes it at `/logo.png` for the header, landing page, authentication screen, favicon, and social metadata.
 
 ## Local setup
 
@@ -52,7 +52,7 @@ The managed Manus environment injects these values automatically. External deplo
 |---|---|
 | `SUPABASE_DATABASE_URL` | Preferred server-side Supabase PostgreSQL Session Pooler connection used by Drizzle. |
 | `DATABASE_URL` | Supported PostgreSQL fallback for hosts such as Render; must begin with `postgres://` or `postgresql://`. |
-| `CORS_ORIGIN` | Optional comma-separated HTTPS origins for a separately hosted frontend. Omit when the NIVO client and API share one Render service. |
+| `CORS_ORIGIN` | Optional comma-separated HTTPS origins for a separately hosted frontend. Omit when the KINBA client and API share one Render service. |
 | `CROSS_SITE_SESSION` | Legacy cookie option; Supabase Auth normally persists sessions in the browser and does not require this value. |
 | `SUPABASE_URL` | Supabase project URL used by browser Auth and server access-token verification. |
 | `SUPABASE_ANON_KEY` | Supabase publishable/anon key used by browser Auth and server token verification. Never use a service-role key in the browser. |
@@ -87,7 +87,7 @@ The project does not seed fake members, reviews, or signals. Test real account w
 
 For the managed Manus environment, configure production secrets through the project settings, create a checkpoint, and use the **Publish** control. The platform builds with `pnpm build` and starts the resulting server with `pnpm start`.
 
-For another host, provision a PostgreSQL database compatible with Supabase. On Render, configure either `SUPABASE_DATABASE_URL` (preferred) or a PostgreSQL `DATABASE_URL` using the Supabase **Session Pooler** URL, together with `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and the existing owner/database variables. The browser uses Supabase Auth’s persisted session storage and sends the current access token as `Authorization: Bearer <token>` to `/api/trpc`; the server verifies that token with Supabase Auth before resolving the PostgreSQL user row. If your frontend is deployed separately, set `CORS_ORIGIN` to its exact HTTPS URL; otherwise leave it unset and serve the NIVO client and `/api/trpc` from the same Render service. Enable Email/Password under Supabase Authentication → Sign-in methods, run the migration command once against the target database, and deploy the Node application. Do not use placeholder secrets in any public or production environment.
+For another host, provision a PostgreSQL database compatible with Supabase. On Render, configure either `SUPABASE_DATABASE_URL` (preferred) or a PostgreSQL `DATABASE_URL` using the Supabase **Session Pooler** URL, together with `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and the existing owner/database variables. The browser uses Supabase Auth’s persisted session storage and sends the current access token as `Authorization: Bearer <token>` to `/api/trpc`; the server verifies that token with Supabase Auth before resolving the PostgreSQL user row. If your frontend is deployed separately, set `CORS_ORIGIN` to its exact HTTPS URL; otherwise leave it unset and serve the KINBA client and `/api/trpc` from the same Render service. Enable Email/Password under Supabase Authentication → Sign-in methods, run the migration command once against the target database, and deploy the Node application. Do not use placeholder secrets in any public or production environment.
 
 ## Repository hygiene
 

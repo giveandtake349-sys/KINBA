@@ -27,7 +27,7 @@ export function SupabaseAuthDialog({ open, onOpenChange }: SupabaseAuthDialogPro
       if (mode === "sign-up" && !result.data.session) {
         toast.success("Account created. Check your email to confirm your address, then sign in.");
       } else {
-        toast.success(mode === "sign-in" ? "Welcome to NIVO." : "Your NIVO account is ready.");
+        toast.success(mode === "sign-in" ? "Welcome to Kinba." : "Your Kinba account is ready.");
       }
       setPassword("");
       onOpenChange(false);
@@ -42,7 +42,8 @@ export function SupabaseAuthDialog({ open, onOpenChange }: SupabaseAuthDialogPro
     <div className="modal-backdrop" role="presentation">
       <form className="request-modal auth-modal" onSubmit={submit} role="dialog" aria-modal="true" aria-labelledby="auth-title">
         <button type="button" className="modal-close" onClick={() => onOpenChange(false)} aria-label="Close authentication dialog"><X size={18} /></button>
-        <p className="eyebrow">NIVO account</p>
+        <img src="/logo.png" alt="Kinba" className="auth-brand-logo" />
+        <p className="eyebrow">Kinba account</p>
         <h2 id="auth-title">{mode === "sign-in" ? "Welcome back." : "Join the network."}</h2>
         <p className="modal-copy">Use your email and password to keep your profile, signals, and connections persistent.</p>
         <label className="input-label"><span>Email</span><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required /></label>

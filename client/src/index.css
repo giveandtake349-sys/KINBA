@@ -218,3 +218,5 @@ body, .nivo-app, .guest-layout { background-color: #0F172A; }
 .video-player-overlay button { align-items: center; background: rgba(7, 16, 29, .7); border: 1px solid rgba(255, 255, 255, .18); border-radius: 50%; color: #e4edff; display: inline-flex; height: 30px; justify-content: center; width: 30px; }
 .video-player-overlay span { color: #a9efff; font-size: 10px; margin-left: auto; padding: 8px 2px; }
 .signal-media-card { margin: 12px 0; }
+
+.auth-brand-logo { border: 1px solid rgba(148, 163, 184, .2); border-radius: 14px; display: block; height: 56px; margin: 4px auto 16px; object-fit: cover; width: 56px; }

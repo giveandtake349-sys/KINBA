@@ -36,5 +36,5 @@ export function supabaseOpenId(userId: string) {
 export function supabaseDisplayName(user: SupabaseUser) {
   const metadata = user.user_metadata as Record<string, unknown> | null;
   const name = metadata?.full_name ?? metadata?.name;
-  return typeof name === "string" && name.trim() ? name.trim() : user.email ?? "NIVO member";
+  return typeof name === "string" && name.trim() ? name.trim() : user.email ?? "Kinba member";
 }
