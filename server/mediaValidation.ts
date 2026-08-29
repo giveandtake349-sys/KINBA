@@ -5,7 +5,7 @@ export const MAX_SHORT_VIDEO_DURATION_SECONDS = 60;
 export const MAX_ANNOUNCEMENT_VIDEO_DURATION_SECONDS = 5 * 60;
 
 const videoSourceInput = z.object({
-  quality: z.enum(["ORIGINAL", "1080P", "720P", "480P"]),
+  quality: z.enum(["ORIGINAL", "1080P", "720P", "480P", "240P"]),
   videoUrl: z.string().url().max(1024),
 });
 

@@ -52,3 +52,118 @@
     font-size: 9px;
   }
 }
+
+.profile-editor,
+.verification-panel,
+.verified-state {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  margin-top: 22px;
+  max-width: 760px;
+  padding: 20px;
+}
+.profile-editor {
+  display: grid;
+  gap: 16px;
+}
+.profile-editor-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+.profile-editor-heading > div:last-child {
+  display: grid;
+  gap: 4px;
+}
+.profile-editor-heading strong {
+  color: var(--text);
+  font-size: 16px;
+}
+.profile-editor-heading span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.profile-avatar--large {
+  height: 56px;
+  width: 56px;
+}
+.profile-editor label,
+.verification-content label {
+  color: var(--muted);
+  display: grid;
+  font-size: 11px;
+  gap: 7px;
+}
+.profile-editor input,
+.verification-content input,
+.verification-content select {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  min-height: 40px;
+  padding: 9px 11px;
+}
+.profile-editor input[type="file"] {
+  padding: 8px;
+}
+.form-message {
+  color: var(--accent);
+  font-size: 11px;
+  margin: 0;
+}
+.verification-panel {
+  overflow: hidden;
+}
+.verification-panel > summary {
+  align-items: center;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  font-size: 14px;
+  font-weight: 700;
+  gap: 8px;
+  list-style: none;
+}
+.verification-panel > summary::-webkit-details-marker {
+  display: none;
+}
+.verification-panel > summary svg {
+  color: var(--accent);
+}
+.verification-content {
+  display: grid;
+  gap: 14px;
+  padding-top: 16px;
+}
+.verification-content > p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0;
+}
+.verification-content > p strong {
+  color: var(--text);
+  letter-spacing: 0.04em;
+}
+.verification-content form {
+  display: grid;
+  gap: 12px;
+}
+.verified-state {
+  align-items: start;
+  display: grid;
+  gap: 7px;
+}
+.verified-state svg {
+  color: var(--accent);
+}
+.verified-state strong {
+  color: var(--text);
+}
+.verified-state p {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 0;
+}

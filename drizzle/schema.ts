@@ -2,6 +2,7 @@ import {
   boolean,
   index,
   integer,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -12,11 +13,24 @@ import {
 
 export const appRole = pgEnum("app_role", ["user", "admin"]);
 export const videoKind = pgEnum("video_kind", ["LONG", "SHORT"]);
+export const videoProcessingStatus = pgEnum("video_processing_status", [
+  "PENDING",
+  "PROCESSING",
+  "READY",
+  "FAILED",
+]);
+export const paymentMethod = pgEnum("payment_method", ["bkash", "nagad"]);
+export const transactionStatus = pgEnum("transaction_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
 export const videoSourceQuality = pgEnum("video_source_quality", [
   "ORIGINAL",
   "1080P",
   "720P",
   "480P",
+  "240P",
 ]);
 export const profileAccountType = pgEnum("profile_account_type", [
   "member",
@@ -67,7 +81,10 @@ export const profiles = pgTable(
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
-  table => [uniqueIndex("profiles_userId_unique").on(table.userId)]
+  table => [
+    uniqueIndex("profiles_userId_unique").on(table.userId),
+    uniqueIndex("profiles_username_unique").on(table.username),
+  ]
 );
 
 export const videos = pgTable(
@@ -86,6 +103,11 @@ export const videos = pgTable(
     width: integer("width").notNull(),
     height: integer("height").notNull(),
     viewCount: integer("viewCount").default(0).notNull(),
+    hlsMasterUrl: varchar("hlsMasterUrl", { length: 1024 }),
+    processingStatus: videoProcessingStatus("processingStatus")
+      .default("PENDING")
+      .notNull(),
+    processingError: text("processingError"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -245,6 +267,32 @@ export const follows = pgTable(
     uniqueIndex("follows_pair_unique").on(table.followerId, table.followedId),
     index("follows_follower_idx").on(table.followerId),
     index("follows_followed_idx").on(table.followedId),
+  ]
+);
+
+export const transactions = pgTable(
+  "transactions",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    paymentMethod: paymentMethod("paymentMethod").notNull(),
+    senderNumber: varchar("senderNumber", { length: 32 }).notNull(),
+    transactionId: varchar("transactionId", { length: 128 }).notNull(),
+    status: transactionStatus("status").default("pending").notNull(),
+    approvedBy: integer("approvedBy").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    approvedAt: timestamp("approvedAt", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  table => [
+    uniqueIndex("transactions_transaction_id_unique").on(table.transactionId),
+    index("transactions_user_idx").on(table.userId, table.createdAt),
+    index("transactions_status_idx").on(table.status, table.createdAt),
   ]
 );
 

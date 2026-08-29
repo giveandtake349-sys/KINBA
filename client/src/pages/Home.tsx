@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import {
+  BadgeCheck,
   Bell,
   Film,
   Home as HomeIcon,
@@ -21,6 +22,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useTheme } from "@/contexts/ThemeContext";
 import { SupabaseAuthDialog } from "@/components/SupabaseAuthDialog";
+import { uploadImage } from "@/lib/mediaUpload";
 import MediaHub, { SearchFeed, type FeedSection } from "@/components/MediaHub";
 import "./profile.css";
 
@@ -28,7 +30,12 @@ type Screen = "landing" | "dashboard" | "profile";
 
 type ProfileSnapshot = {
   user?: { name: string | null } | null;
-  profile?: { username?: string | null; photoUrl?: string | null } | null;
+  profile?: {
+    username?: string | null;
+    photoUrl?: string | null;
+    isVerified?: boolean;
+    accountType?: "member" | "creator" | "company";
+  } | null;
   stats?: {
     reactionsReceived: number;
     iconsCount: number;
@@ -112,6 +119,214 @@ function ProfileStatsGrid({ profile }: { profile?: ProfileSnapshot }) {
         </div>
       ))}
     </div>
+  );
+}
+
+function ProfileEditor({ profile }: { profile?: ProfileSnapshot }) {
+  const [username, setUsername] = useState(profile?.profile?.username ?? "");
+  const [photoUrl, setPhotoUrl] = useState(profile?.profile?.photoUrl ?? "");
+  const [message, setMessage] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const update = trpc.profile.update.useMutation();
+  const utils = trpc.useUtils();
+  const chooseAvatar = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    setMessage("");
+    try {
+      setPhotoUrl(await uploadImage("avatar", file));
+      setMessage("Profile picture uploaded. Save your profile to keep it.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "The profile picture could not be uploaded."
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    try {
+      await update.mutateAsync({
+        username: username.trim() || null,
+        photoUrl: photoUrl || null,
+      });
+      await utils.profile.me.invalidate();
+      setMessage("Profile updated.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "The profile could not be updated."
+      );
+    }
+  };
+  return (
+    <form className="profile-editor" onSubmit={submit}>
+      <div className="profile-editor-heading">
+        <div className="profile-avatar profile-avatar--large">
+          {photoUrl ? (
+            <img src={photoUrl} alt="Profile preview" />
+          ) : (
+            <UserRound size={28} />
+          )}
+        </div>
+        <div>
+          <strong>Edit Profile</strong>
+          <span>Update the identity shown across KINBA.</span>
+        </div>
+      </div>
+      <label>
+        Username
+        <input
+          value={username}
+          onChange={event => setUsername(event.target.value)}
+          minLength={3}
+          maxLength={64}
+          pattern="[A-Za-z0-9_]+"
+          placeholder="kinba_creator"
+        />
+      </label>
+      <label>
+        Profile picture
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          onChange={chooseAvatar}
+          disabled={uploading}
+        />
+      </label>
+      <button
+        className="primary-btn"
+        type="submit"
+        disabled={update.isPending || uploading}
+      >
+        {update.isPending ? "Saving…" : "Save Profile"}
+      </button>
+      {message && (
+        <p className="form-message" role="status">
+          {message}
+        </p>
+      )}
+    </form>
+  );
+}
+
+function GetVerifiedPanel() {
+  const status = trpc.payments.status.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+  const submit = trpc.payments.submit.useMutation();
+  const [amount, setAmount] = useState("100");
+  const [paymentMethod, setPaymentMethod] = useState<"bkash" | "nagad">(
+    "bkash"
+  );
+  const [senderNumber, setSenderNumber] = useState("");
+  const [transactionId, setTransactionId] = useState("");
+  const [message, setMessage] = useState("");
+  const send = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    try {
+      await submit.mutateAsync({
+        amount,
+        paymentMethod,
+        senderNumber,
+        transactionId,
+      });
+      await status.refetch();
+      setMessage(
+        "Payment submitted for review. Verification activates after approval."
+      );
+      setTransactionId("");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "The payment could not be submitted."
+      );
+    }
+  };
+  if (status.data?.isVerified)
+    return (
+      <div className="verified-state">
+        <BadgeCheck size={20} />
+        <strong>Verified profile</strong>
+        <p>You can publish official community announcements.</p>
+      </div>
+    );
+  return (
+    <details className="verification-panel">
+      <summary>
+        <BadgeCheck size={17} /> Get Verified
+      </summary>
+      <div className="verification-content">
+        <p>
+          Send the verification amount to <strong>+8801779557226</strong> via
+          bKash or Nagad, then submit the details below.
+        </p>
+        {status.data?.latestTransaction?.status === "pending" && (
+          <p className="form-message">
+            Your latest transaction is pending review.
+          </p>
+        )}
+        <form onSubmit={send}>
+          <label>
+            Amount
+            <input
+              inputMode="decimal"
+              value={amount}
+              onChange={event => setAmount(event.target.value)}
+              required
+            />
+          </label>
+          <label>
+            Payment method
+            <select
+              value={paymentMethod}
+              onChange={event =>
+                setPaymentMethod(event.target.value as "bkash" | "nagad")
+              }
+            >
+              <option value="bkash">bKash</option>
+              <option value="nagad">Nagad</option>
+            </select>
+          </label>
+          <label>
+            Sender phone number
+            <input
+              value={senderNumber}
+              onChange={event => setSenderNumber(event.target.value)}
+              placeholder="+8801XXXXXXXXX"
+              required
+            />
+          </label>
+          <label>
+            Transaction ID (TrxID)
+            <input
+              value={transactionId}
+              onChange={event => setTransactionId(event.target.value)}
+              required
+            />
+          </label>
+          <button
+            type="submit"
+            className="primary-btn"
+            disabled={submit.isPending}
+          >
+            {submit.isPending ? "Submitting…" : "Submit for review"}
+          </button>
+          {message && (
+            <p className="form-message" role="status">
+              {message}
+            </p>
+          )}
+        </form>
+      </div>
+    </details>
   );
 }
 
@@ -337,7 +552,12 @@ function ProfileStats({
       <div className="profile-stat-grid" aria-label="Profile statistics">
         <ProfileStatsGrid profile={profile} />
       </div>
-      {!enabled && (
+      {enabled ? (
+        <>
+          <ProfileEditor profile={profile} />
+          <GetVerifiedPanel />
+        </>
+      ) : (
         <p className="profile-loading-note">
           Sign in to view your live profile statistics.
         </p>

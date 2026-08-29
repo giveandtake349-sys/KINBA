@@ -78,6 +78,32 @@ async function getSessionUserId(message: string) {
   return sessionData.session.user.id;
 }
 
+export async function publishVideo(
+  file: File,
+  kind: VideoUploadKind,
+  title: string,
+  description: string
+): Promise<{ videoId: number; status: string }> {
+  if (!file.type.startsWith("video/")) throw new Error("Choose a supported video file.");
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+  const session = sessionData.session;
+  if (!session) throw new Error("Please sign in before uploading video.");
+  const body = new FormData();
+  body.append("video", file, file.name);
+  body.append("kind", kind);
+  body.append("title", title);
+  body.append("description", description);
+  const response = await fetch("/api/videos/upload", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${session.access_token}` },
+    body,
+  });
+  const payload = (await response.json().catch(() => ({}))) as { videoId?: number; status?: string; error?: string };
+  if (!response.ok || !payload.videoId) throw new Error(payload.error || "The video could not be published.");
+  return { videoId: payload.videoId, status: payload.status || "PROCESSING" };
+}
+
 export async function uploadVideo(
   file: File,
   kind: VideoUploadKind

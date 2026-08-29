@@ -1,6 +1,11 @@
 import { z } from "zod";
 import { systemRouter } from "./_core/systemRouter";
-import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
+import {
+  adminProcedure,
+  protectedProcedure,
+  publicProcedure,
+  router,
+} from "./_core/trpc";
 import {
   createCommunityAnnouncement,
   createVideo,
@@ -10,7 +15,12 @@ import {
   listCommunityAnnouncements,
   listHomeFeed,
   listNotifications,
+  listVerificationTransactions,
   listVideoComments,
+  approveVerificationTransaction,
+  getVerificationStatus,
+  submitVerificationTransaction,
+  updateOwnProfile,
   searchVideos,
   listVideos,
   recordVideoShare,
@@ -18,8 +28,34 @@ import {
   toggleVideoReaction,
 } from "./db";
 import { communityAnnouncementInput, videoInput } from "./mediaValidation";
+import { queueVideoTranscode } from "./hlsProcessor";
 
 const videoIdInput = z.object({ videoId: z.number().int().positive() });
+const profileUpdateInput = z.object({
+  username: z
+    .string()
+    .trim()
+    .min(3)
+    .max(64)
+    .regex(/^[a-z0-9_]+$/i)
+    .nullable()
+    .optional(),
+  photoUrl: z.string().url().max(1024).nullable().optional(),
+});
+const paymentInput = z.object({
+  amount: z.string().regex(/^\d{1,8}(\.\d{1,2})?$/, "Enter a valid amount."),
+  paymentMethod: z.enum(["bkash", "nagad"]),
+  senderNumber: z
+    .string()
+    .trim()
+    .regex(/^\+?[0-9][0-9\s-]{7,30}$/, "Enter a valid sender number."),
+  transactionId: z
+    .string()
+    .trim()
+    .min(4)
+    .max(128)
+    .regex(/^[a-z0-9_-]+$/i, "Enter a valid transaction ID."),
+});
 
 export const appRouter = router({
   system: systemRouter,
@@ -32,6 +68,12 @@ export const appRouter = router({
       await ensureProfile(ctx.user.id);
       return getOwnProfile(ctx.user.id);
     }),
+    update: protectedProcedure
+      .input(profileUpdateInput)
+      .mutation(({ ctx, input }) => updateOwnProfile(ctx.user.id, input)),
+    verification: protectedProcedure.query(({ ctx }) =>
+      getVerificationStatus(ctx.user.id)
+    ),
   }),
   home: router({
     search: publicProcedure
@@ -52,7 +94,11 @@ export const appRouter = router({
       .query(({ ctx, input }) => listVideos(input.kind, ctx.user?.id)),
     create: protectedProcedure
       .input(videoInput)
-      .mutation(({ ctx, input }) => createVideo(ctx.user.id, input)),
+      .mutation(async ({ ctx, input }) => {
+        const created = await createVideo(ctx.user.id, input);
+        queueVideoTranscode(created.id, input.videoUrl);
+        return created;
+      }),
     react: protectedProcedure
       .input(videoIdInput)
       .mutation(({ ctx, input }) =>
@@ -76,6 +122,31 @@ export const appRouter = router({
           createVideoComment(input.videoId, ctx.user.id, input.body)
         ),
     }),
+  }),
+  payments: router({
+    status: protectedProcedure.query(({ ctx }) =>
+      getVerificationStatus(ctx.user.id)
+    ),
+    submit: protectedProcedure
+      .input(paymentInput)
+      .mutation(({ ctx, input }) =>
+        submitVerificationTransaction(ctx.user.id, input)
+      ),
+    all: adminProcedure.query(() => listVerificationTransactions()),
+    approve: adminProcedure
+      .input(
+        z.object({
+          transactionId: z.number().int().positive(),
+          status: z.enum(["approved", "rejected"]),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        approveVerificationTransaction(
+          input.transactionId,
+          ctx.user.id,
+          input.status
+        )
+      ),
   }),
   community: router({
     list: publicProcedure.query(() => listCommunityAnnouncements()),

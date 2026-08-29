@@ -39,7 +39,7 @@ import "./mediaHub.css";
 
 type HomeTab = "videos" | "trendy" | "following" | "icons";
 type VideoKind = "LONG" | "SHORT";
-type Quality = "ORIGINAL" | "1080P" | "720P" | "480P";
+type Quality = "ORIGINAL" | "1080P" | "720P" | "480P" | "240P";
 type VideoSource = { quality: Quality; videoUrl: string };
 type VideoRecord = {
   id: number;
@@ -52,6 +52,8 @@ type VideoRecord = {
   width: number;
   height: number;
   sources: VideoSource[];
+  hlsMasterUrl?: string | null;
+  processingStatus?: "PENDING" | "PROCESSING" | "READY" | "FAILED";
   createdAt: Date | string;
   viewCount: number;
   reactionCount: number;
@@ -100,12 +102,14 @@ const qualityLabels: Record<Quality, string> = {
   "1080P": "1080p",
   "720P": "720p",
   "480P": "480p",
+  "240P": "240p",
 };
 const qualityFileLabels: { quality: Quality; label: string }[] = [
   { quality: "ORIGINAL", label: "Original / Auto" },
   { quality: "1080P", label: "1080p source" },
   { quality: "720P", label: "720p source" },
   { quality: "480P", label: "480p source" },
+  { quality: "240P", label: "240p source" },
 ];
 
 function formatDuration(seconds: number) {
@@ -238,7 +242,7 @@ function QualityVideoPlayer({
   );
   const sourceUrl =
     quality === "ORIGINAL"
-      ? (sourceMap.get("ORIGINAL") ?? video.videoUrl)
+      ? (video.hlsMasterUrl ?? sourceMap.get("ORIGINAL") ?? video.videoUrl)
       : (sourceMap.get(quality) ?? sourceMap.get("ORIGINAL") ?? video.videoUrl);
   const switchQuality = (next: Quality) => {
     if (next !== "ORIGINAL" && !sourceMap.has(next)) return;
@@ -1106,7 +1110,27 @@ export function CommunityAnnouncements() {
         </div>
         <span>Verified creators & companies</span>
       </div>
-      {canPost && <AnnouncementComposer onCreated={() => query.refetch()} />}
+      {!auth.isAuthenticated ? (
+        <div className="verification-gate">
+          <p>Sign in to access verified community announcements.</p>
+          <a className="primary-btn" href="/profile">
+            Sign in / Get Verified
+          </a>
+        </div>
+      ) : !canPost ? (
+        <div className="verification-gate">
+          <Megaphone size={18} />
+          <h3>Get Verified to publish.</h3>
+          <p>
+            Verified creators and companies can publish official announcements.
+          </p>
+          <a className="primary-btn" href="/profile">
+            Get Verified
+          </a>
+        </div>
+      ) : (
+        <AnnouncementComposer onCreated={() => query.refetch()} />
+      )}
       {query.isPending ? (
         <FeedSkeleton />
       ) : query.isError ? (

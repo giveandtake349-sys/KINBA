@@ -13,6 +13,7 @@ import {
   videoShares,
   videoSources,
   videos,
+  transactions,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { resolvePostgresDatabaseUrl } from "./databaseConfig";
@@ -146,8 +147,136 @@ export async function getOwnProfile(userId: number) {
   return { ...result[0], stats };
 }
 
+export async function updateOwnProfile(
+  userId: number,
+  input: { username?: string | null; photoUrl?: string | null }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const username = input.username?.trim().toLowerCase() || null;
+  if (username) {
+    const [existing] = await db
+      .select({ userId: profiles.userId })
+      .from(profiles)
+      .where(
+        and(
+          eq(profiles.username, username),
+          sql`${profiles.userId} <> ${userId}`
+        )
+      )
+      .limit(1);
+    if (existing) throw new Error("That username is already taken.");
+  }
+  await db
+    .insert(profiles)
+    .values({ userId, username, photoUrl: input.photoUrl ?? null })
+    .onConflictDoUpdate({
+      target: profiles.userId,
+      set: {
+        username,
+        photoUrl: input.photoUrl ?? null,
+        updatedAt: new Date(),
+      },
+    });
+  return getOwnProfile(userId);
+}
+
+export async function getVerificationStatus(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [profile] = await db
+    .select({ isVerified: profiles.isVerified })
+    .from(profiles)
+    .where(eq(profiles.userId, userId))
+    .limit(1);
+  const [latest] = await db
+    .select()
+    .from(transactions)
+    .where(eq(transactions.userId, userId))
+    .orderBy(desc(transactions.createdAt))
+    .limit(1);
+  return {
+    isVerified: Boolean(profile?.isVerified),
+    latestTransaction: latest ?? null,
+  };
+}
+
+export async function submitVerificationTransaction(
+  userId: number,
+  input: {
+    amount: string;
+    paymentMethod: "bkash" | "nagad";
+    senderNumber: string;
+    transactionId: string;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [duplicate] = await db
+    .select({ id: transactions.id })
+    .from(transactions)
+    .where(eq(transactions.transactionId, input.transactionId))
+    .limit(1);
+  if (duplicate)
+    throw new Error("This transaction ID has already been submitted.");
+  const [created] = await db
+    .insert(transactions)
+    .values({
+      userId,
+      amount: input.amount,
+      paymentMethod: input.paymentMethod,
+      senderNumber: input.senderNumber.trim(),
+      transactionId: input.transactionId.trim(),
+    })
+    .returning();
+  return created;
+}
+
+export async function listVerificationTransactions() {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({ transaction: transactions, user: users })
+    .from(transactions)
+    .innerJoin(users, eq(transactions.userId, users.id))
+    .orderBy(desc(transactions.createdAt));
+}
+
+export async function approveVerificationTransaction(
+  transactionId: number,
+  adminId: number,
+  status: "approved" | "rejected"
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return db.transaction(async tx => {
+    const [transaction] = await tx
+      .select()
+      .from(transactions)
+      .where(eq(transactions.id, transactionId))
+      .limit(1);
+    if (!transaction) throw new Error("Transaction not found.");
+    const [updated] = await tx
+      .update(transactions)
+      .set({
+        status,
+        approvedBy: adminId,
+        approvedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(transactions.id, transactionId))
+      .returning();
+    if (status === "approved")
+      await tx
+        .update(profiles)
+        .set({ isVerified: true, phoneVerified: true, updatedAt: new Date() })
+        .where(eq(profiles.userId, transaction.userId));
+    return updated;
+  });
+}
+
 export type VideoKind = "LONG" | "SHORT";
-export type VideoQuality = "ORIGINAL" | "1080P" | "720P" | "480P";
+export type VideoQuality = "ORIGINAL" | "1080P" | "720P" | "480P" | "240P";
 export type VideoSourceInput = { quality: VideoQuality; videoUrl: string };
 export type VideoAttachmentInput = {
   mediaType: "IMAGE" | "VIDEO";
@@ -399,6 +528,7 @@ export async function createVideo(
         durationSeconds: input.durationSeconds,
         width: input.width,
         height: input.height,
+        processingStatus: "PENDING",
       })
       .returning();
     await tx
@@ -407,6 +537,22 @@ export async function createVideo(
         input.sources.map(source => ({ videoId: created.id, ...source }))
       );
     return created;
+  });
+}
+
+export async function updateVideoProcessing(videoId: number, input: { status: "PENDING" | "PROCESSING" | "READY" | "FAILED"; hlsMasterUrl?: string | null; videoUrl?: string; processingError?: string | null }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [updated] = await db.update(videos).set({ ...input, updatedAt: new Date() }).where(eq(videos.id, videoId)).returning();
+  return updated;
+}
+
+export async function replaceVideoSources(videoId: number, sources: VideoSourceInput[]) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.transaction(async tx => {
+    await tx.delete(videoSources).where(eq(videoSources.videoId, videoId));
+    if (sources.length) await tx.insert(videoSources).values(sources.map(source => ({ videoId, ...source })));
   });
 }
 
