@@ -4,10 +4,12 @@ import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
   createCommunityAnnouncement,
   createVideo,
+  createVideoComment,
   ensureProfile,
   getOwnProfile,
   listCommunityAnnouncements,
   listHomeFeed,
+  listVideoComments,
   listVideos,
   recordVideoShare,
   toggleVideoReaction,
@@ -52,6 +54,16 @@ export const appRouter = router({
       .mutation(({ ctx, input }) =>
         recordVideoShare(input.videoId, ctx.user.id)
       ),
+    comments: router({
+      list: publicProcedure
+        .input(videoIdInput)
+        .query(({ input }) => listVideoComments(input.videoId)),
+      create: protectedProcedure
+        .input(videoIdInput.extend({ body: z.string().trim().min(1).max(500) }))
+        .mutation(({ ctx, input }) =>
+          createVideoComment(input.videoId, ctx.user.id, input.body)
+        ),
+    }),
   }),
   community: router({
     list: publicProcedure.query(() => listCommunityAnnouncements()),

@@ -8,6 +8,7 @@ import {
   profiles,
   type InsertUser,
   users,
+  videoComments,
   videoReactions,
   videoShares,
   videoSources,
@@ -194,6 +195,7 @@ function shapeVideoRow(row: any) {
     ...row.video,
     reactionCount: Number(row.reactionCount),
     shareCount: Number(row.shareCount),
+    commentCount: Number(row.commentCount),
     viewerReacted: Boolean(row.viewerReacted),
     viewerShared: Boolean(row.viewerShared),
     owner: {
@@ -215,6 +217,7 @@ async function selectVideos(
   if (!db) return [];
   const reactionCount = sql<number>`(select count(*) from video_reactions where video_reactions."videoId" = ${videos.id})`;
   const shareCount = sql<number>`(select count(*) from video_shares where video_shares."videoId" = ${videos.id})`;
+  const commentCount = sql<number>`(select count(*) from video_comments where video_comments."videoId" = ${videos.id})`;
   const viewerReacted = viewerId
     ? sql<boolean>`exists (select 1 from video_reactions where video_reactions."videoId" = ${videos.id} and video_reactions."userId" = ${viewerId})`
     : sql<boolean>`false`;
@@ -228,6 +231,7 @@ async function selectVideos(
       profile: profiles,
       reactionCount,
       shareCount,
+      commentCount,
       viewerReacted,
       viewerShared,
     })
@@ -325,6 +329,7 @@ async function getVideoEngagement(videoId: number, viewerId: number) {
     .select({
       reactionCount: sql<number>`(select count(*) from video_reactions where video_reactions."videoId" = ${videoId})`,
       shareCount: sql<number>`(select count(*) from video_shares where video_shares."videoId" = ${videoId})`,
+      commentCount: sql<number>`(select count(*) from video_comments where video_comments."videoId" = ${videoId})`,
       viewerReacted: sql<boolean>`exists (select 1 from video_reactions where video_reactions."videoId" = ${videoId} and video_reactions."userId" = ${viewerId})`,
       viewerShared: sql<boolean>`exists (select 1 from video_shares where video_shares."videoId" = ${videoId} and video_shares."userId" = ${viewerId})`,
     })
@@ -333,9 +338,40 @@ async function getVideoEngagement(videoId: number, viewerId: number) {
   return {
     reactionCount: Number(counts?.reactionCount ?? 0),
     shareCount: Number(counts?.shareCount ?? 0),
+    commentCount: Number(counts?.commentCount ?? 0),
     viewerReacted: Boolean(counts?.viewerReacted),
     viewerShared: Boolean(counts?.viewerShared),
   };
+}
+
+export async function listVideoComments(videoId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({ comment: videoComments, user: users })
+    .from(videoComments)
+    .innerJoin(users, eq(videoComments.userId, users.id))
+    .where(eq(videoComments.videoId, videoId))
+    .orderBy(desc(videoComments.createdAt))
+    .limit(50);
+  return rows.map(row => ({
+    ...row.comment,
+    author: { id: row.user.id, name: row.user.name },
+  }));
+}
+
+export async function createVideoComment(
+  videoId: number,
+  userId: number,
+  body: string
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [comment] = await db
+    .insert(videoComments)
+    .values({ videoId, userId, body })
+    .returning();
+  return comment;
 }
 
 export async function toggleVideoReaction(videoId: number, userId: number) {

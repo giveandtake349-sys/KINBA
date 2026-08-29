@@ -151,6 +151,25 @@ export const videoShares = pgTable(
   ]
 );
 
+export const videoComments = pgTable(
+  "video_comments",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    videoId: integer("videoId")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+  },
+  table => [
+    index("video_comments_video_idx").on(table.videoId, table.createdAt),
+    index("video_comments_user_idx").on(table.userId),
+  ]
+);
+
 export const communityAnnouncements = pgTable(
   "community_announcements",
   {

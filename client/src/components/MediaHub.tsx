@@ -11,6 +11,7 @@ import {
   ChevronDown,
   Heart,
   Loader2,
+  MessageCircle,
   Megaphone,
   Pause,
   Play,
@@ -50,6 +51,7 @@ type VideoRecord = {
   height: number;
   sources: VideoSource[];
   reactionCount: number;
+  commentCount: number;
   shareCount: number;
   viewerReacted: boolean;
   viewerShared: boolean;
@@ -64,6 +66,7 @@ type VideoRecord = {
 type Engagement = {
   reactionCount: number;
   shareCount: number;
+  commentCount: number;
   viewerReacted: boolean;
   viewerShared: boolean;
 };
@@ -125,6 +128,7 @@ function useOptimisticEngagement(video: VideoRecord) {
   const current = override ?? {
     reactionCount: video.reactionCount,
     shareCount: video.shareCount,
+    commentCount: video.commentCount,
     viewerReacted: video.viewerReacted,
     viewerShared: video.viewerShared,
   };
@@ -292,11 +296,13 @@ function EngagementActions({
   engagement,
   onReact,
   onShare,
+  onComments,
   pending,
 }: {
   engagement: Engagement;
   onReact: () => void;
   onShare: () => void;
+  onComments: () => void;
   pending: "react" | "share" | null;
 }) {
   return (
@@ -315,6 +321,10 @@ function EngagementActions({
         <span>{engagement.viewerReacted ? "Liked" : "React/Like"}</span>{" "}
         <strong>{engagement.reactionCount}</strong>
       </button>
+      <button type="button" onClick={onComments}>
+        <MessageCircle size={16} /> <span>Comments</span>{" "}
+        <strong>{engagement.commentCount}</strong>
+      </button>
       <button
         type="button"
         className={engagement.viewerShared ? "is-active" : ""}
@@ -328,7 +338,71 @@ function EngagementActions({
     </div>
   );
 }
+function CommentsPanel({ videoId, open }: { videoId: number; open: boolean }) {
+  const auth = useAuth();
+  const [body, setBody] = useState("");
+  const commentsQuery = trpc.videos.comments.list.useQuery(
+    { videoId },
+    { enabled: open, refetchOnWindowFocus: false }
+  );
+  const createComment = trpc.videos.comments.create.useMutation();
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!body.trim()) return;
+    if (!auth.isAuthenticated) return auth.openAuth();
+    try {
+      await createComment.mutateAsync({ videoId, body: body.trim() });
+      setBody("");
+      await commentsQuery.refetch();
+    } catch (error) {
+      notifyError(error);
+    }
+  };
+  if (!open) return null;
+  return (
+    <div className="video-comments" aria-live="polite">
+      {commentsQuery.isPending ? (
+        <div className="comment-loading">Loading comments…</div>
+      ) : commentsQuery.isError ? (
+        <div className="comment-loading">
+          Comments are temporarily unavailable.
+        </div>
+      ) : commentsQuery.data?.length ? (
+        commentsQuery.data.map(comment => (
+          <div className="video-comment" key={comment.id}>
+            <strong>{comment.author.name ?? "KINBA member"}</strong>
+            <span>{comment.body}</span>
+          </div>
+        ))
+      ) : (
+        <div className="comment-loading">
+          No comments yet. Start the conversation.
+        </div>
+      )}
+      <form onSubmit={submit} className="comment-form">
+        <input
+          value={body}
+          onChange={event => setBody(event.target.value)}
+          maxLength={500}
+          placeholder={
+            auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"
+          }
+          aria-label="Write a comment"
+        />
+        <button
+          type="submit"
+          className="primary-btn"
+          disabled={createComment.isPending || !body.trim()}
+        >
+          Post
+        </button>
+      </form>
+    </div>
+  );
+}
+
 function VideoCard({ video }: { video: VideoRecord }) {
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const { current, react, share, pending } = useOptimisticEngagement(video);
   return (
     <article className="long-video-card">
@@ -355,13 +429,21 @@ function VideoCard({ video }: { video: VideoRecord }) {
           engagement={current}
           onReact={react}
           onShare={share}
+          onComments={() => setCommentsOpen(value => !value)}
           pending={pending}
         />
+        <CommentsPanel videoId={video.id} open={commentsOpen} />
       </div>
     </article>
   );
 }
-function UploadVideoPanel({ onPublished }: { onPublished: () => void }) {
+function UploadVideoPanel({
+  onPublished,
+  detailsRef,
+}: {
+  onPublished: () => void;
+  detailsRef: { current: HTMLDetailsElement | null };
+}) {
   const [kind, setKind] = useState<VideoKind>("LONG");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -454,7 +536,7 @@ function UploadVideoPanel({ onPublished }: { onPublished: () => void }) {
     setMetadata(null);
   }, [kind]);
   return (
-    <details className="media-publish-panel">
+    <details ref={detailsRef} className="media-publish-panel">
       <summary>
         <Upload size={17} /> Publish a video
       </summary>
@@ -558,6 +640,22 @@ function UploadVideoPanel({ onPublished }: { onPublished: () => void }) {
     </details>
   );
 }
+function FeedSkeleton({ short = false }: { short?: boolean }) {
+  return (
+    <div
+      className={
+        short ? "feed-skeleton feed-skeleton--short" : "feed-skeleton-grid"
+      }
+      aria-busy="true"
+      aria-label="Loading feed"
+    >
+      <span />
+      <span />
+      <span />
+    </div>
+  );
+}
+
 function HomeFeedPanel({ tab }: { tab: HomeTab }) {
   const auth = useAuth();
   const utils = trpc.useUtils();
@@ -569,6 +667,14 @@ function HomeFeedPanel({ tab }: { tab: HomeTab }) {
     }
   );
   const videos = (query.data ?? []) as VideoRecord[];
+  const uploadDetailsRef = useRef<HTMLDetailsElement>(null);
+  const openUploader = () => {
+    uploadDetailsRef.current?.setAttribute("open", "");
+    uploadDetailsRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  };
   return (
     <section
       className="media-section home-feed-section"
@@ -595,10 +701,8 @@ function HomeFeedPanel({ tab }: { tab: HomeTab }) {
             : "Real-time database feed"}
         </span>
       </div>
-      {query.isLoading ? (
-        <div className="loading-row">
-          <Loader2 className="spin" /> Loading feed
-        </div>
+      {query.isPending ? (
+        <FeedSkeleton />
       ) : query.isError ? (
         <div className="media-empty">
           <h3>Unable to load this feed.</h3>
@@ -616,15 +720,19 @@ function HomeFeedPanel({ tab }: { tab: HomeTab }) {
           <h3>
             {tab === "following" && !auth.isAuthenticated
               ? "Sign in to see Following."
-              : "Nothing here yet."}
+              : "No videos available yet. Be the first creator!"}
           </h3>
           <p>
-            {tabOptions.find(option => option.id === tab)?.caption}. New content
-            will appear here as it is published.
+            {tabOptions.find(option => option.id === tab)?.caption}. Publish a
+            video and it will appear here.
           </p>
+          <button type="button" className="primary-btn" onClick={openUploader}>
+            <Upload size={15} /> Upload Video
+          </button>
         </div>
       )}
       <UploadVideoPanel
+        detailsRef={uploadDetailsRef}
         onPublished={async () => {
           await Promise.all([
             utils.home.feed.invalidate(),
@@ -699,10 +807,8 @@ function ShortsFeed() {
           </button>
         </div>
       </div>
-      {query.isLoading ? (
-        <div className="loading-row">
-          <Loader2 className="spin" /> Loading Shorts
-        </div>
+      {query.isPending ? (
+        <FeedSkeleton short />
       ) : query.data?.length ? (
         <div className="shorts-viewport" ref={viewportRef} onScroll={onScroll}>
           {(query.data as VideoRecord[]).map((video, index) => (
@@ -931,9 +1037,12 @@ function CommunityAnnouncements() {
         <span>Verified creators & companies</span>
       </div>
       {canPost && <AnnouncementComposer onCreated={() => query.refetch()} />}
-      {query.isLoading ? (
-        <div className="loading-row">
-          <Loader2 className="spin" /> Loading announcements
+      {query.isPending ? (
+        <FeedSkeleton />
+      ) : query.isError ? (
+        <div className="media-empty">
+          <h3>Unable to load announcements.</h3>
+          <p>Try again in a moment.</p>
         </div>
       ) : query.data?.length ? (
         <div className="announcement-list">

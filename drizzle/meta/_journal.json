@@ -57,6 +57,13 @@
       "when": 1788004645401,
       "tag": "0007_remove_legacy_add_video_sources",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788007563905,
+      "tag": "0008_add_video_comments",
+      "breakpoints": true
     }
   ]
 }

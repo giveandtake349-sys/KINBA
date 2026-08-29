@@ -713,3 +713,101 @@
   background: #f9fafb;
   border-color: rgba(20, 24, 32, 0.2);
 }
+
+.feed-skeleton-grid {
+  display: grid;
+  gap: 17px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.feed-skeleton-grid span {
+  animation: feed-pulse 1.4s ease-in-out infinite;
+  background: linear-gradient(
+    110deg,
+    var(--surface-raised) 30%,
+    rgba(255, 255, 255, 0.1) 45%,
+    var(--surface-raised) 60%
+  );
+  background-size: 200% 100%;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  height: 330px;
+}
+.feed-skeleton-grid span:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.feed-skeleton-grid span:nth-child(3) {
+  animation-delay: 0.36s;
+}
+.feed-skeleton {
+  animation: feed-pulse 1.4s ease-in-out infinite;
+  background: linear-gradient(
+    110deg,
+    var(--surface-raised) 30%,
+    rgba(255, 255, 255, 0.1) 45%,
+    var(--surface-raised) 60%
+  );
+  background-size: 200% 100%;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  height: min(610px, 76vh);
+}
+.video-comments {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 9px;
+  margin-top: 4px;
+  padding-top: 12px;
+}
+.video-comment {
+  display: grid;
+  gap: 3px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.video-comment strong {
+  color: var(--text);
+}
+.video-comment span,
+.comment-loading {
+  color: var(--muted);
+}
+.comment-loading {
+  font-size: 11px;
+}
+.comment-form {
+  display: flex;
+  gap: 7px;
+}
+.comment-form input {
+  background: var(--page-bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  min-width: 0;
+  outline: 0;
+  padding: 9px 12px;
+  width: 100%;
+}
+.comment-form .primary-btn {
+  font-size: 10px;
+  padding: 8px 12px;
+}
+@keyframes feed-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    background-position: 100% 0;
+  }
+  50% {
+    opacity: 1;
+    background-position: 0 0;
+  }
+}
+@media (max-width: 820px) {
+  .feed-skeleton-grid {
+    grid-template-columns: 1fr;
+  }
+  .feed-skeleton-grid span {
+    height: 280px;
+  }
+}
