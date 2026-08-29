@@ -84,8 +84,10 @@ export async function publishVideo(
   title: string,
   description: string
 ): Promise<{ videoId: number; status: string }> {
-  if (!file.type.startsWith("video/")) throw new Error("Choose a supported video file.");
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (!file.type.startsWith("video/"))
+    throw new Error("Choose a supported video file.");
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
   if (sessionError) throw sessionError;
   const session = sessionData.session;
   if (!session) throw new Error("Please sign in before uploading video.");
@@ -94,13 +96,25 @@ export async function publishVideo(
   body.append("kind", kind);
   body.append("title", title);
   body.append("description", description);
-  const response = await fetch("/api/videos/upload", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${session.access_token}` },
-    body,
-  });
-  const payload = (await response.json().catch(() => ({}))) as { videoId?: number; status?: string; error?: string };
-  if (!response.ok || !payload.videoId) throw new Error(payload.error || "The video could not be published.");
+  let response: Response;
+  try {
+    response = await fetch("/api/videos/upload", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      body,
+    });
+  } catch {
+    throw new Error(
+      "The video upload service could not be reached. Check the Render service URL and CORS_ORIGIN configuration."
+    );
+  }
+  const payload = (await response.json().catch(() => ({}))) as {
+    videoId?: number;
+    status?: string;
+    error?: string;
+  };
+  if (!response.ok || !payload.videoId)
+    throw new Error(payload.error || "The video could not be published.");
   return { videoId: payload.videoId, status: payload.status || "PROCESSING" };
 }
 
@@ -110,27 +124,34 @@ export async function uploadVideo(
 ): Promise<string> {
   if (!file.type.startsWith("video/"))
     throw new Error("Choose a supported video file.");
-  const userId = await getSessionUserId(
-    "Please sign in before uploading video."
-  );
-  const extension = file.name.split(".").pop()?.toLowerCase() || "mp4";
-  const objectPath = `${userId}/video-${kind.toLowerCase()}-${Date.now()}-${crypto.randomUUID()}.${extension}`;
-  const { error: uploadError } = await supabase.storage
-    .from("signal-media")
-    .upload(objectPath, file, {
-      cacheControl: "3600",
-      contentType: file.type,
-      upsert: false,
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+  const session = sessionData.session;
+  if (!session) throw new Error("Please sign in before uploading video.");
+
+  const body = new FormData();
+  body.append("video", file, file.name);
+  body.append("kind", kind);
+  let response: Response;
+  try {
+    response = await fetch("/api/media/video-upload", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      body,
     });
-  if (uploadError) throw uploadError;
-  const { data } = supabase.storage
-    .from("signal-media")
-    .getPublicUrl(objectPath);
-  if (!data.publicUrl)
+  } catch {
     throw new Error(
-      "The video uploaded, but its public URL could not be created."
+      "The video upload service could not be reached. Check the Render service URL and CORS_ORIGIN configuration."
     );
-  return data.publicUrl;
+  }
+  const payload = (await response.json().catch(() => ({}))) as {
+    url?: string;
+    error?: string;
+  };
+  if (!response.ok || !payload.url)
+    throw new Error(payload.error || "The video could not be uploaded.");
+  return payload.url;
 }
 
 export async function uploadImage(
