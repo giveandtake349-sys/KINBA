@@ -4,15 +4,15 @@ KINBA is a mobile-first human matching platform organized around a simple produc
 
 ## MVP capabilities
 
-| Capability | Implementation |
-|---|---|
-| Authentication | Supabase Auth Email/Password sign-up, sign-in, sign-out, and persistent browser sessions. Private routes open the KINBA auth dialog for anonymous visitors. |
-| Member profiles | Persistent editable profile data, including country, languages, about, skills, interests, and profile image URL. |
-| Signals | Authenticated members can publish NEED and CAN signals with category, language, and optional location. |
-| Discovery | Public, database-backed browsing with signal type and category filters. |
-| Connections | Private requests, acceptance, decline, cancellation, and an explicit accepted state. |
-| Private messaging | Persistent messages available only to participants in an accepted, unblocked connection. |
-| Trust and safety | Report and block actions, plus server-side block enforcement on discovery, connections, and messaging. |
+| Capability        | Implementation                                                                                                                                              |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Authentication    | Supabase Auth Email/Password sign-up, sign-in, sign-out, and persistent browser sessions. Private routes open the KINBA auth dialog for anonymous visitors. |
+| Member profiles   | Persistent editable profile data, including country, languages, about, skills, interests, and profile image URL.                                            |
+| Signals           | Authenticated members can publish NEED and CAN signals with category, language, and optional location.                                                      |
+| Discovery         | Public, database-backed browsing with signal type and category filters.                                                                                     |
+| Connections       | Private requests, acceptance, decline, cancellation, and an explicit accepted state.                                                                        |
+| Private messaging | Persistent messages available only to participants in an accepted, unblocked connection.                                                                    |
+| Trust and safety  | Report and block actions, plus server-side block enforcement on discovery, connections, and messaging.                                                      |
 
 ## Stack
 
@@ -48,27 +48,28 @@ pnpm dev
 
 The managed Manus environment injects these values automatically. External deployments must configure them securely; do not commit their values.
 
-| Variable | Purpose |
-|---|---|
-| `SUPABASE_DATABASE_URL` | Preferred server-side Supabase PostgreSQL Session Pooler connection used by Drizzle. |
-| `DATABASE_URL` | Supported PostgreSQL fallback for hosts such as Render; must begin with `postgres://` or `postgresql://`. |
-| `CORS_ORIGIN` | Optional comma-separated HTTPS origins for a separately hosted frontend. Omit when the KINBA client and API share one Render service. |
-| `CROSS_SITE_SESSION` | Legacy cookie option; Supabase Auth normally persists sessions in the browser and does not require this value. |
-| `SUPABASE_URL` | Supabase project URL used by browser Auth and server access-token verification. |
-| `SUPABASE_ANON_KEY` | Supabase publishable/anon key used by browser Auth and server token verification. Never use a service-role key in the browser. |
-| `OWNER_OPEN_ID` | Project owner identifier used for the owner admin role. |
-| `OWNER_NAME` | Project owner display name. |
-| `BUILT_IN_FORGE_API_URL` | Manus built-in integration endpoint, where applicable. |
-| `BUILT_IN_FORGE_API_KEY` | Server-side credential for Manus built-in integrations. |
+| Variable                    | Purpose                                                                                                                                                                                                                                      |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SUPABASE_DATABASE_URL`     | Preferred server-side Supabase PostgreSQL Session Pooler connection used by Drizzle.                                                                                                                                                         |
+| `DATABASE_URL`              | Supported PostgreSQL fallback for hosts such as Render; must begin with `postgres://` or `postgresql://`.                                                                                                                                    |
+| `CORS_ORIGIN`               | Optional comma-separated HTTPS origins for a separately hosted frontend. Omit when the KINBA client and API share one Render service.                                                                                                        |
+| `CROSS_SITE_SESSION`        | Legacy cookie option; Supabase Auth normally persists sessions in the browser and does not require this value.                                                                                                                               |
+| `SUPABASE_URL`              | Supabase project URL used by browser Auth and server access-token verification.                                                                                                                                                              |
+| `SUPABASE_ANON_KEY`         | Supabase publishable/anon key used by browser Auth and server token verification. Never use a service-role key in the browser.                                                                                                               |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only Supabase Storage credential used by the Render Node process to upload source videos, HLS playlists, and HLS segments. Never expose this value to the browser. `SUPABASE_SECRET_KEY` is accepted as an alternative variable name. |
+| `OWNER_OPEN_ID`             | Project owner identifier used for the owner admin role.                                                                                                                                                                                      |
+| `OWNER_NAME`                | Project owner display name.                                                                                                                                                                                                                  |
+| `BUILT_IN_FORGE_API_URL`    | Optional legacy integration endpoint for unrelated built-in features. Video and HLS storage do not use this variable.                                                                                                                        |
+| `BUILT_IN_FORGE_API_KEY`    | Optional legacy credential for unrelated built-in features. Video and HLS storage do not use this variable.                                                                                                                                  |
 
 ## Development commands
 
-| Command | Description |
-|---|---|
-| `pnpm dev` | Start the full-stack development server. |
-| `pnpm check` | Run TypeScript validation. |
-| `pnpm test` | Run the Vitest suite. |
-| `pnpm build` | Generate the production client and server bundles. |
+| Command        | Description                                                                                     |
+| -------------- | ----------------------------------------------------------------------------------------------- |
+| `pnpm dev`     | Start the full-stack development server.                                                        |
+| `pnpm check`   | Run TypeScript validation.                                                                      |
+| `pnpm test`    | Run the Vitest suite.                                                                           |
+| `pnpm build`   | Generate the production client and server bundles.                                              |
 | `pnpm db:push` | Compare the Drizzle PostgreSQL schema with Supabase and apply approved non-destructive changes. |
 
 ## Validation
@@ -87,7 +88,7 @@ The project does not seed fake members, reviews, or signals. Test real account w
 
 For the managed Manus environment, configure production secrets through the project settings, create a checkpoint, and use the **Publish** control. The platform builds with `pnpm build` and starts the resulting server with `pnpm start`.
 
-For another host, provision a PostgreSQL database compatible with Supabase. On Render, configure either `SUPABASE_DATABASE_URL` (preferred) or a PostgreSQL `DATABASE_URL` using the Supabase **Session Pooler** URL, together with `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and the existing owner/database variables. The browser uses Supabase Auth’s persisted session storage and sends the current access token as `Authorization: Bearer <token>` to `/api/trpc`; the server verifies that token with Supabase Auth before resolving the PostgreSQL user row. If your frontend is deployed separately, set `CORS_ORIGIN` to its exact HTTPS URL; otherwise leave it unset and serve the KINBA client and `/api/trpc` from the same Render service. Enable Email/Password under Supabase Authentication → Sign-in methods, run the migration command once against the target database, and deploy the Node application. Do not use placeholder secrets in any public or production environment.
+For another host, provision a PostgreSQL database compatible with Supabase. On Render, configure either `SUPABASE_DATABASE_URL` (preferred) or a PostgreSQL `DATABASE_URL` using the Supabase **Session Pooler** URL, together with `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and the existing owner/database variables. The service-role key is server-only and is required because the Node process uploads source videos and generated HLS assets without a browser user session. The browser uses Supabase Auth’s persisted session storage and sends the current access token as `Authorization: Bearer <token>` to `/api/trpc`; the server verifies that token with Supabase Auth before resolving the PostgreSQL user row. If your frontend is deployed separately, set `CORS_ORIGIN` to its exact HTTPS URL; otherwise leave it unset and serve the KINBA client and `/api/trpc` from the same Render service. Enable Email/Password under Supabase Authentication → Sign-in methods, apply migrations through `0012_supabase_video_storage.sql`, and deploy the Node application. Do not use placeholder secrets in any public or production environment.
 
 ## Repository hygiene
 
