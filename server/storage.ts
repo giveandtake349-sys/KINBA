@@ -1,27 +1,46 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { ENV } from "./_core/env";
 
 export const MEDIA_BUCKET = "signal-media";
+const signedUrlLifetimeSeconds = 60 * 60;
 
-let storageClient: SupabaseClient | null = null;
+let r2Client: S3Client | null = null;
 
-function getStorageClient() {
-  if (!storageClient) {
-    const serviceRoleKey = ENV.supabaseServiceRoleKey;
-    if (!ENV.supabaseUrl || !serviceRoleKey) {
-      throw new Error(
-        "Supabase Storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the server."
-      );
-    }
-    storageClient = createClient(ENV.supabaseUrl, serviceRoleKey, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
+function getR2Config() {
+  const config = {
+    endpoint: ENV.r2Endpoint,
+    accessKeyId: ENV.r2AccessKeyId,
+    secretAccessKey: ENV.r2SecretAccessKey,
+    bucket: ENV.r2BucketName || "kinba-media",
+    publicBaseUrl: ENV.r2PublicBaseUrl,
+  };
+  if (!config.endpoint || !config.accessKeyId || !config.secretAccessKey) {
+    throw new Error(
+      "R2 storage is not configured. Set R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET_NAME on Render."
+    );
+  }
+  return config;
+}
+
+function getR2Client() {
+  if (!r2Client) {
+    const config = getR2Config();
+    r2Client = new S3Client({
+      endpoint: config.endpoint,
+      region: "auto",
+      forcePathStyle: true,
+      credentials: {
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey,
       },
     });
   }
-  return storageClient;
+  return r2Client;
 }
 
 function normalizeKey(relKey: string) {
@@ -43,12 +62,20 @@ function appendHashSuffix(relKey: string) {
 }
 
 function publicUrl(key: string) {
-  const { data } = getStorageClient()
-    .storage.from(MEDIA_BUCKET)
-    .getPublicUrl(key);
-  if (!data.publicUrl)
-    throw new Error("Supabase Storage returned an empty public URL.");
-  return data.publicUrl;
+  const baseUrl = getR2Config().publicBaseUrl;
+  if (!baseUrl) {
+    throw new Error(
+      "R2 public playback is not configured. Set R2_PUBLIC_BASE_URL for stable HLS URLs."
+    );
+  }
+  const normalizedBaseUrl = baseUrl.replace(/\/+$/, "");
+  return `${normalizedBaseUrl}/${key.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+function asBody(data: Buffer | Uint8Array | string) {
+  return typeof data === "string"
+    ? Buffer.from(data, "utf8")
+    : Buffer.from(data);
 }
 
 export async function storagePut(
@@ -56,16 +83,22 @@ export async function storagePut(
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
+  const config = getR2Config();
   const key = appendHashSuffix(normalizeKey(relKey));
-  const { error } = await getStorageClient()
-    .storage.from(MEDIA_BUCKET)
-    .upload(key, data, {
-      cacheControl: "3600",
-      contentType,
-      upsert: false,
-    });
-  if (error)
-    throw new Error(`Supabase Storage upload failed: ${error.message}`);
+  try {
+    await getR2Client().send(
+      new PutObjectCommand({
+        Bucket: config.bucket,
+        Key: key,
+        Body: asBody(data),
+        ContentType: contentType,
+        CacheControl: "public, max-age=3600",
+      })
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown R2 error";
+    throw new Error(`Cloudflare R2 upload failed: ${message}`);
+  }
   return { key, url: publicUrl(key) };
 }
 
@@ -73,9 +106,17 @@ export async function storageGet(
   relKey: string
 ): Promise<{ key: string; url: string }> {
   const key = normalizeKey(relKey);
-  return { key, url: publicUrl(key) };
+  const url = ENV.r2PublicBaseUrl
+    ? publicUrl(key)
+    : await storageGetSignedUrl(key);
+  return { key, url };
 }
 
 export async function storageGetSignedUrl(relKey: string): Promise<string> {
-  return publicUrl(normalizeKey(relKey));
+  const config = getR2Config();
+  return getSignedUrl(
+    getR2Client(),
+    new GetObjectCommand({ Bucket: config.bucket, Key: normalizeKey(relKey) }),
+    { expiresIn: signedUrlLifetimeSeconds }
+  );
 }
