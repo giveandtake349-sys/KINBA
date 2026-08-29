@@ -19,6 +19,16 @@ export const signalMediaType = pgEnum("signal_media_type", [
   "AUDIO",
   "VIDEO",
 ]);
+export const videoKind = pgEnum("video_kind", ["LONG", "SHORT"]);
+export const profileAccountType = pgEnum("profile_account_type", [
+  "member",
+  "creator",
+  "company",
+]);
+export const announcementAttachmentType = pgEnum(
+  "announcement_attachment_type",
+  ["IMAGE", "VIDEO"]
+);
 export const connectionStatus = pgEnum("connection_status", [
   "pending",
   "accepted",
@@ -59,6 +69,8 @@ export const profiles = pgTable(
     interests: text("interests"),
     photoUrl: varchar("photoUrl", { length: 1024 }),
     phoneVerified: boolean("phoneVerified").default(false).notNull(),
+    accountType: profileAccountType("accountType").default("member").notNull(),
+    isVerified: boolean("isVerified").default(false).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -92,6 +104,103 @@ export const signals = pgTable(
   ]
 );
 
+export const videos = pgTable(
+  "videos",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 180 }).notNull(),
+    description: text("description").notNull(),
+    videoUrl: varchar("videoUrl", { length: 1024 }).notNull(),
+    thumbnailUrl: varchar("thumbnailUrl", { length: 1024 }),
+    kind: videoKind("kind").notNull(),
+    durationSeconds: integer("durationSeconds").notNull(),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  table => [
+    index("videos_user_idx").on(table.userId),
+    index("videos_kind_created_idx").on(table.kind, table.createdAt),
+  ]
+);
+export const videoReactions = pgTable(
+  "video_reactions",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    videoId: integer("videoId")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("video_reactions_pair_unique").on(table.videoId, table.userId),
+    index("video_reactions_video_idx").on(table.videoId),
+    index("video_reactions_user_idx").on(table.userId),
+  ]
+);
+export const videoShares = pgTable(
+  "video_shares",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    videoId: integer("videoId")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("video_shares_pair_unique").on(table.videoId, table.userId),
+    index("video_shares_video_idx").on(table.videoId),
+    index("video_shares_user_idx").on(table.userId),
+  ]
+);
+export const communityAnnouncements = pgTable(
+  "community_announcements",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  table => [
+    index("community_announcements_user_idx").on(table.userId),
+    index("community_announcements_created_idx").on(table.createdAt),
+  ]
+);
+export const communityAnnouncementAttachments = pgTable(
+  "community_announcement_attachments",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    announcementId: integer("announcementId")
+      .notNull()
+      .references(() => communityAnnouncements.id, { onDelete: "cascade" }),
+    mediaType: announcementAttachmentType("mediaType").notNull(),
+    mediaUrl: varchar("mediaUrl", { length: 1024 }).notNull(),
+    sortOrder: integer("sortOrder").default(0).notNull(),
+    width: integer("width"),
+    height: integer("height"),
+    durationSeconds: integer("durationSeconds"),
+    createdAt: createdAt(),
+  },
+  table => [
+    index("community_announcement_attachments_announcement_idx").on(
+      table.announcementId,
+      table.sortOrder
+    ),
+  ]
+);
 export const connections = pgTable(
   "connections",
   {

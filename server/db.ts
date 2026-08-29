@@ -5,6 +5,8 @@ import { Pool } from "pg";
 import {
   blocks,
   comments,
+  communityAnnouncementAttachments,
+  communityAnnouncements,
   connections,
   follows,
   type InsertUser,
@@ -14,6 +16,9 @@ import {
   reports,
   signals,
   users,
+  videoReactions,
+  videoShares,
+  videos,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { resolvePostgresDatabaseUrl } from "./databaseConfig";
@@ -412,6 +417,210 @@ export async function listProfileContent(
         photoUrl: row.profile?.photoUrl ?? null,
       },
     }));
+}
+export type VideoKind = "LONG" | "SHORT";
+export type VideoAttachmentInput = {
+  mediaType: "IMAGE" | "VIDEO";
+  mediaUrl: string;
+  sortOrder: number;
+  width?: number | null;
+  height?: number | null;
+  durationSeconds?: number | null;
+};
+export async function listVideos(kind: VideoKind, viewerId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const reactionCount = sql<number>`(select count(*) from video_reactions where video_reactions."videoId" = ${videos.id})`;
+  const shareCount = sql<number>`(select count(*) from video_shares where video_shares."videoId" = ${videos.id})`;
+  const viewerReacted = viewerId
+    ? sql<boolean>`exists (select 1 from video_reactions where video_reactions."videoId" = ${videos.id} and video_reactions."userId" = ${viewerId})`
+    : sql<boolean>`false`;
+  const viewerShared = viewerId
+    ? sql<boolean>`exists (select 1 from video_shares where video_shares."videoId" = ${videos.id} and video_shares."userId" = ${viewerId})`
+    : sql<boolean>`false`;
+  const rows = await db
+    .select({
+      video: videos,
+      user: users,
+      profile: profiles,
+      reactionCount,
+      shareCount,
+      viewerReacted,
+      viewerShared,
+    })
+    .from(videos)
+    .innerJoin(users, eq(videos.userId, users.id))
+    .leftJoin(profiles, eq(videos.userId, profiles.userId))
+    .where(eq(videos.kind, kind))
+    .orderBy(desc(videos.createdAt))
+    .limit(60);
+  return rows.map(row => ({
+    ...row.video,
+    reactionCount: Number(row.reactionCount),
+    shareCount: Number(row.shareCount),
+    viewerReacted: Boolean(row.viewerReacted),
+    viewerShared: Boolean(row.viewerShared),
+    owner: {
+      id: row.user.id,
+      name: row.user.name,
+      photoUrl: row.profile?.photoUrl ?? null,
+      accountType: row.profile?.accountType ?? "member",
+      isVerified: Boolean(row.profile?.isVerified),
+    },
+  }));
+}
+export async function createVideo(
+  userId: number,
+  input: {
+    title: string;
+    description: string;
+    videoUrl: string;
+    thumbnailUrl?: string | null;
+    kind: VideoKind;
+    durationSeconds: number;
+    width: number;
+    height: number;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db
+    .insert(videos)
+    .values({ userId, ...input, thumbnailUrl: input.thumbnailUrl ?? null })
+    .returning();
+  return created;
+}
+async function getVideoEngagement(videoId: number, viewerId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [counts] = await db
+    .select({
+      reactionCount: sql<number>`(select count(*) from video_reactions where video_reactions."videoId" = ${videoId})`,
+      shareCount: sql<number>`(select count(*) from video_shares where video_shares."videoId" = ${videoId})`,
+      viewerReacted: sql<boolean>`exists (select 1 from video_reactions where video_reactions."videoId" = ${videoId} and video_reactions."userId" = ${viewerId})`,
+      viewerShared: sql<boolean>`exists (select 1 from video_shares where video_shares."videoId" = ${videoId} and video_shares."userId" = ${viewerId})`,
+    })
+    .from(videos)
+    .where(eq(videos.id, videoId));
+  return {
+    reactionCount: Number(counts?.reactionCount ?? 0),
+    shareCount: Number(counts?.shareCount ?? 0),
+    viewerReacted: Boolean(counts?.viewerReacted),
+    viewerShared: Boolean(counts?.viewerShared),
+  };
+}
+export async function toggleVideoReaction(videoId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const existing = await db
+    .select({ id: videoReactions.id })
+    .from(videoReactions)
+    .where(
+      and(
+        eq(videoReactions.videoId, videoId),
+        eq(videoReactions.userId, userId)
+      )
+    )
+    .limit(1);
+  if (existing[0])
+    await db
+      .delete(videoReactions)
+      .where(eq(videoReactions.id, existing[0].id));
+  else await db.insert(videoReactions).values({ videoId, userId });
+  return getVideoEngagement(videoId, userId);
+}
+export async function recordVideoShare(videoId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db
+    .insert(videoShares)
+    .values({ videoId, userId })
+    .onConflictDoNothing({ target: [videoShares.videoId, videoShares.userId] });
+  return getVideoEngagement(videoId, userId);
+}
+export async function listCommunityAnnouncements() {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      announcement: communityAnnouncements,
+      user: users,
+      profile: profiles,
+    })
+    .from(communityAnnouncements)
+    .innerJoin(users, eq(communityAnnouncements.userId, users.id))
+    .innerJoin(profiles, eq(communityAnnouncements.userId, profiles.userId))
+    .where(
+      and(
+        eq(profiles.isVerified, true),
+        inArray(profiles.accountType, ["creator", "company"])
+      )
+    )
+    .orderBy(desc(communityAnnouncements.createdAt))
+    .limit(60);
+  if (!rows.length) return [];
+  const announcementIds = rows.map(row => row.announcement.id);
+  const attachments = await db
+    .select()
+    .from(communityAnnouncementAttachments)
+    .where(
+      inArray(communityAnnouncementAttachments.announcementId, announcementIds)
+    )
+    .orderBy(communityAnnouncementAttachments.sortOrder);
+  const attachmentsByAnnouncement = new Map<number, typeof attachments>();
+  attachments.forEach(attachment => {
+    const current =
+      attachmentsByAnnouncement.get(attachment.announcementId) ?? [];
+    current.push(attachment);
+    attachmentsByAnnouncement.set(attachment.announcementId, current);
+  });
+  return rows.map(row => ({
+    ...row.announcement,
+    author: {
+      id: row.user.id,
+      name: row.user.name,
+      photoUrl: row.profile.photoUrl ?? null,
+      accountType: row.profile.accountType,
+      isVerified: row.profile.isVerified,
+    },
+    attachments: attachmentsByAnnouncement.get(row.announcement.id) ?? [],
+  }));
+}
+export async function createCommunityAnnouncement(
+  userId: number,
+  input: { body: string; attachments: VideoAttachmentInput[] }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [profile] = await db
+    .select({
+      accountType: profiles.accountType,
+      isVerified: profiles.isVerified,
+    })
+    .from(profiles)
+    .where(eq(profiles.userId, userId))
+    .limit(1);
+  if (
+    !profile?.isVerified ||
+    !["creator", "company"].includes(profile.accountType)
+  )
+    throw new Error(
+      "Only verified creators and companies can publish announcements."
+    );
+  if (!input.body.trim() && !input.attachments.length)
+    throw new Error("An announcement needs text or an attachment.");
+  const [announcement] = await db
+    .insert(communityAnnouncements)
+    .values({ userId, body: input.body.trim() })
+    .returning();
+  if (input.attachments.length)
+    await db.insert(communityAnnouncementAttachments).values(
+      input.attachments.map(attachment => ({
+        announcementId: announcement.id,
+        ...attachment,
+      }))
+    );
+  return announcement;
 }
 export async function listMatches(userId: number, search?: string) {
   const db = await getDb();

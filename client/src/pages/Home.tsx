@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import "./profile.css";
 import { toast } from "sonner";
 import GuestLanding from "@/pages/GuestLanding";
+import MediaHub from "@/components/MediaHub";
 import { LanguageSelector, useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { SupabaseAuthDialog } from "@/components/SupabaseAuthDialog";
@@ -1382,6 +1383,7 @@ export default function Home() {
                 <ArrowRight size={18} />
               </button>
             </div>
+            <MediaHub />
             <div className="app-section-head">
               <div>
                 <p className="eyebrow">{t("activeSignals")}</p>

@@ -9,6 +9,8 @@ import {
   createMessage,
   createReport,
   createSignal,
+  createVideo,
+  createCommunityAnnouncement,
   ensureProfile,
   getConnectionForParticipant,
   getOwnProfile,
@@ -19,22 +21,28 @@ import {
   deleteComment,
   getSignalById,
   listComments,
+  listCommunityAnnouncements,
   listMatches,
   listMessages,
   listOwnSignals,
   listProfileContent,
   listSignals,
+  listVideos,
+  recordVideoShare,
   setConnectionStatus,
+  toggleVideoReaction,
   updateProfile,
 } from "./db";
 import {
   commentIdInput,
   commentInput,
+  communityAnnouncementInput,
   connectionRequestInput,
   isAcceptedParticipant,
   profileInput,
   reportInput,
   signalInput,
+  videoInput,
 } from "./nivoValidation";
 
 const positiveId = z.object({ id: z.number().int().positive() });
@@ -69,6 +77,32 @@ export const appRouter = router({
     update: protectedProcedure
       .input(profileInput)
       .mutation(({ ctx, input }) => updateProfile(ctx.user.id, input)),
+  }),
+  videos: router({
+    list: publicProcedure
+      .input(z.object({ kind: z.enum(["LONG", "SHORT"]) }))
+      .query(({ ctx, input }) => listVideos(input.kind, ctx.user?.id)),
+    create: protectedProcedure
+      .input(videoInput)
+      .mutation(({ ctx, input }) => createVideo(ctx.user.id, input)),
+    react: protectedProcedure
+      .input(z.object({ videoId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) =>
+        toggleVideoReaction(input.videoId, ctx.user.id)
+      ),
+    share: protectedProcedure
+      .input(z.object({ videoId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) =>
+        recordVideoShare(input.videoId, ctx.user.id)
+      ),
+  }),
+  community: router({
+    list: publicProcedure.query(() => listCommunityAnnouncements()),
+    create: protectedProcedure
+      .input(communityAnnouncementInput)
+      .mutation(({ ctx, input }) =>
+        createCommunityAnnouncement(ctx.user.id, input)
+      ),
   }),
   signals: router({
     list: publicProcedure
