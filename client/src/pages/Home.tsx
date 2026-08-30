@@ -902,7 +902,7 @@ export default function Home() {
   if (screen === "landing")
     return (
       <>
-        <div className="kinba-app guest-layout">
+        <div className="kinba-app guest-layout max-w-vw overflow-x-hidden box-border">
           <Landing onLogin={auth.openAuth} />
         </div>
         {authDialog}
@@ -910,14 +910,14 @@ export default function Home() {
     );
   return (
     <>
-      <div className="kinba-app">
+      <div className="kinba-app max-w-vw overflow-x-hidden box-border">
         <AppHeader
           profile={profile}
           onMenu={() => setMenuOpen(true)}
           onNavigate={navigate}
           onLogout={logout}
         />
-        <main>
+        <main className="max-w-vw overflow-x-hidden box-border">
           {screen === "dashboard" ? (
             <section className="section-shell home-page">
               {section === "search" ? (

@@ -332,14 +332,15 @@ function QualityVideoPlayer({
     video.processingStatus === "PROCESSING";
   return (
     <div
-      className={
+      className={`media-video-frame w-full h-full object-cover ${
         vertical
-          ? "media-video-frame media-video-frame--short"
-          : "media-video-frame media-video-frame--square"
-      }
+          ? "media-video-frame--short aspect-[9/16]"
+          : "media-video-frame--square"
+      }`}
     >
       <video
         ref={ref}
+        className={`w-full h-full object-cover ${vertical ? "aspect-[9/16]" : ""}`}
         poster={video.thumbnailUrl ?? undefined}
         controls
         playsInline
@@ -925,7 +926,10 @@ function ShortCard({ video }: { video: VideoRecord }) {
           </span>
         </div>
       </div>
-      <div className="short-action-rail" aria-label="Short actions">
+      <div
+        className="short-action-rail absolute right-2 bottom-12 z-30 flex flex-col items-center gap-3"
+        aria-label="Short actions"
+      >
         <button
           type="button"
           className={current.viewerReacted ? "is-active" : ""}

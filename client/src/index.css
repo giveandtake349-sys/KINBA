@@ -850,3 +850,27 @@ h3 {
     flex-direction: column;
   }
 }
+
+/* Platform-wide mobile viewport boundary */
+html,
+body,
+#root {
+  box-sizing: border-box;
+  max-width: 100vw;
+  overflow-x: hidden;
+  width: 100%;
+}
+.max-w-vw {
+  box-sizing: border-box;
+  max-width: 100vw;
+  min-width: 0;
+  overflow-x: hidden;
+  width: 100%;
+}
+.kinba-app > main {
+  box-sizing: border-box;
+  max-width: 100vw;
+  min-width: 0;
+  overflow-x: hidden;
+  width: 100%;
+}

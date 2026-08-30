@@ -1165,14 +1165,16 @@
   width: 100%;
 }
 .short-action-rail {
-  bottom: max(18px, env(safe-area-inset-bottom));
-  display: grid;
-  gap: 12px;
+  align-items: center;
+  bottom: 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
   max-width: 56px;
   position: absolute;
-  right: max(12px, env(safe-area-inset-right));
+  right: 0.5rem;
   width: 46px;
-  z-index: 3;
+  z-index: 30;
 }
 .short-action-rail button {
   align-items: center;
@@ -1224,7 +1226,8 @@
 }
 @media (max-width: 560px) {
   .short-action-rail {
-    right: max(10px, env(safe-area-inset-right));
+    bottom: max(3rem, calc(3rem + env(safe-area-inset-bottom)));
+    right: max(0.5rem, env(safe-area-inset-right));
     width: 42px;
   }
   .short-overlay > div {
