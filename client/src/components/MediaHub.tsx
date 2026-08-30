@@ -8,7 +8,10 @@ import {
 } from "react";
 import Hls from "hls.js";
 import {
+  ArrowLeft,
+  ArrowRight,
   BadgeCheck,
+  Bookmark,
   ChevronDown,
   Heart,
   Loader2,
@@ -20,9 +23,11 @@ import {
   Search,
   Upload,
   UserRound,
+  X,
   Volume2,
   VolumeX,
 } from "lucide-react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
@@ -472,7 +477,15 @@ function EngagementActions({
     </div>
   );
 }
-function CommentsPanel({ videoId, open }: { videoId: number; open: boolean }) {
+function CommentsPanel({
+  videoId,
+  open,
+  onClose,
+}: {
+  videoId: number;
+  open: boolean;
+  onClose: () => void;
+}) {
   const auth = useAuth();
   const [body, setBody] = useState("");
   const commentsQuery = trpc.videos.comments.list.useQuery(
@@ -482,10 +495,11 @@ function CommentsPanel({ videoId, open }: { videoId: number; open: boolean }) {
   const createComment = trpc.videos.comments.create.useMutation();
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!body.trim()) return;
+    const commentBody = body.trim();
+    if (!commentBody || createComment.isPending) return;
     if (!auth.isAuthenticated) return auth.openAuth();
     try {
-      await createComment.mutateAsync({ videoId, body: body.trim() });
+      await createComment.mutateAsync({ videoId, body: commentBody });
       setBody("");
       await commentsQuery.refetch();
     } catch (error) {
@@ -493,45 +507,75 @@ function CommentsPanel({ videoId, open }: { videoId: number; open: boolean }) {
     }
   };
   if (!open) return null;
-  return (
-    <div className="video-comments" aria-live="polite">
-      {commentsQuery.isPending ? (
-        <div className="comment-loading">Loading comments…</div>
-      ) : commentsQuery.isError ? (
-        <div className="comment-loading">
-          Comments are temporarily unavailable.
-        </div>
-      ) : commentsQuery.data?.length ? (
-        commentsQuery.data.map(comment => (
-          <div className="video-comment" key={comment.id}>
-            <strong>{comment.author.name ?? "KINBA member"}</strong>
-            <span>{comment.body}</span>
+  return createPortal(
+    <div
+      className="comment-drawer-backdrop"
+      role="presentation"
+      onMouseDown={event => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <aside
+        className="comment-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Video comments"
+      >
+        <div className="comment-drawer-header">
+          <div>
+            <p className="eyebrow">Conversation</p>
+            <h3>Comments</h3>
           </div>
-        ))
-      ) : (
-        <div className="comment-loading">
-          No comments yet. Start the conversation.
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onClose}
+            aria-label="Close comments"
+          >
+            <X size={18} />
+          </button>
         </div>
-      )}
-      <form onSubmit={submit} className="comment-form">
-        <input
-          value={body}
-          onChange={event => setBody(event.target.value)}
-          maxLength={500}
-          placeholder={
-            auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"
-          }
-          aria-label="Write a comment"
-        />
-        <button
-          type="submit"
-          className="primary-btn"
-          disabled={createComment.isPending || !body.trim()}
-        >
-          Post
-        </button>
-      </form>
-    </div>
+        <div className="comment-drawer-list" aria-live="polite">
+          {commentsQuery.isPending ? (
+            <div className="comment-loading">Loading comments…</div>
+          ) : commentsQuery.isError ? (
+            <div className="comment-loading">
+              Comments are temporarily unavailable. Try again.
+            </div>
+          ) : commentsQuery.data?.length ? (
+            commentsQuery.data.map(comment => (
+              <div className="video-comment" key={comment.id}>
+                <strong>{comment.author.name ?? "KINBA member"}</strong>
+                <span>{comment.body}</span>
+              </div>
+            ))
+          ) : (
+            <div className="comment-loading">
+              No comments yet. Start the conversation.
+            </div>
+          )}
+        </div>
+        <form onSubmit={submit} className="comment-form">
+          <input
+            value={body}
+            onChange={event => setBody(event.target.value)}
+            maxLength={500}
+            placeholder={
+              auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"
+            }
+            aria-label="Write a comment"
+          />
+          <button
+            type="submit"
+            className="primary-btn"
+            disabled={createComment.isPending || !body.trim()}
+          >
+            {createComment.isPending ? "Posting" : "Post"}
+          </button>
+        </form>
+      </aside>
+    </div>,
+    document.body
   );
 }
 
@@ -589,7 +633,11 @@ function VideoCard({ video }: { video: VideoRecord }) {
           onComments={() => setCommentsOpen(value => !value)}
           pending={pending}
         />
-        <CommentsPanel videoId={video.id} open={commentsOpen} />
+        <CommentsPanel
+          videoId={video.id}
+          open={commentsOpen}
+          onClose={() => setCommentsOpen(false)}
+        />
       </div>
     </article>
   );
@@ -861,6 +909,72 @@ function HomeFeedPanel({
     </section>
   );
 }
+function ShortCard({ video }: { video: VideoRecord }) {
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const { current, react, share, pending } = useOptimisticEngagement(video);
+  return (
+    <article className="short-card">
+      <QualityVideoPlayer video={video} vertical />
+      <div className="short-overlay">
+        <div>
+          <strong>{video.title}</strong>
+          <p>{video.description}</p>
+          <span>
+            {ownerHandle(video.owner.name)} ·{" "}
+            {video.owner.name ?? "KINBA member"}
+          </span>
+        </div>
+      </div>
+      <div className="short-action-rail" aria-label="Short actions">
+        <button
+          type="button"
+          className={current.viewerReacted ? "is-active" : ""}
+          onClick={react}
+          disabled={pending === "react"}
+          aria-label="React to Short"
+        >
+          <Heart
+            size={19}
+            fill={current.viewerReacted ? "currentColor" : "none"}
+          />
+          <span>{formatCount(current.reactionCount)}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setCommentsOpen(true)}
+          aria-label="Open comments"
+        >
+          <MessageCircle size={19} />
+          <span>{formatCount(current.commentCount)}</span>
+        </button>
+        <button
+          type="button"
+          className="short-bookmark"
+          disabled
+          aria-label="Bookmark coming soon"
+        >
+          <Bookmark size={19} />
+          <span>Save</span>
+        </button>
+        <button
+          type="button"
+          onClick={share}
+          disabled={pending === "share"}
+          aria-label="Share Short"
+        >
+          <Share2 size={19} />
+          <span>{formatCount(current.shareCount)}</span>
+        </button>
+      </div>
+      <CommentsPanel
+        videoId={video.id}
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+      />
+    </article>
+  );
+}
+
 function ShortsFeed() {
   const query = trpc.videos.list.useQuery(
     { kind: "SHORT" },
@@ -930,23 +1044,13 @@ function ShortsFeed() {
       ) : query.data?.length ? (
         <div className="shorts-viewport" ref={viewportRef} onScroll={onScroll}>
           {(query.data as VideoRecord[]).map((video, index) => (
-            <article
-              className="short-card"
+            <div
+              className="short-slide"
               data-short-index={index}
               key={video.id}
             >
-              <QualityVideoPlayer video={video} vertical />
-              <div className="short-overlay">
-                <div>
-                  <strong>{video.title}</strong>
-                  <p>{video.description}</p>
-                  <span>
-                    {video.owner.name ?? "KINBA member"} ·{" "}
-                    {formatDuration(video.durationSeconds)}
-                  </span>
-                </div>
-              </div>
-            </article>
+              <ShortCard video={video} />
+            </div>
           ))}
         </div>
       ) : (
@@ -959,6 +1063,97 @@ function ShortsFeed() {
     </section>
   );
 }
+type AnnouncementImage = { id: number; mediaUrl: string };
+
+function AnnouncementLightbox({
+  images,
+  activeIndex,
+  onChange,
+  onClose,
+}: {
+  images: AnnouncementImage[];
+  activeIndex: number;
+  onChange: (index: number) => void;
+  onClose: () => void;
+}) {
+  const touchStartX = useRef<number | null>(null);
+  const current = images[activeIndex];
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+      if (event.key === "ArrowLeft") onChange(Math.max(0, activeIndex - 1));
+      if (event.key === "ArrowRight")
+        onChange(Math.min(images.length - 1, activeIndex + 1));
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [activeIndex, images.length, onChange, onClose]);
+  if (!current) return null;
+  return createPortal(
+    <div
+      className="announcement-lightbox"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Image ${activeIndex + 1} of ${images.length}`}
+      onTouchStart={event => {
+        touchStartX.current = event.changedTouches[0]?.clientX ?? null;
+      }}
+      onTouchEnd={event => {
+        const start = touchStartX.current;
+        const end = event.changedTouches[0]?.clientX;
+        touchStartX.current = null;
+        if (start === null || end === undefined || Math.abs(end - start) < 40)
+          return;
+        onChange(
+          end < start
+            ? Math.min(images.length - 1, activeIndex + 1)
+            : Math.max(0, activeIndex - 1)
+        );
+      }}
+    >
+      <button
+        type="button"
+        className="lightbox-close icon-btn"
+        onClick={onClose}
+        aria-label="Close image viewer"
+      >
+        <X size={22} />
+      </button>
+      <button
+        type="button"
+        className="lightbox-nav lightbox-nav--previous"
+        onClick={() => onChange(Math.max(0, activeIndex - 1))}
+        disabled={activeIndex === 0}
+        aria-label="Previous image"
+      >
+        <ArrowLeft size={24} />
+      </button>
+      <img
+        src={current.mediaUrl}
+        alt={`Announcement image ${activeIndex + 1} of ${images.length}`}
+      />
+      <button
+        type="button"
+        className="lightbox-nav lightbox-nav--next"
+        onClick={() => onChange(Math.min(images.length - 1, activeIndex + 1))}
+        disabled={activeIndex === images.length - 1}
+        aria-label="Next image"
+      >
+        <ArrowRight size={24} />
+      </button>
+      <div className="lightbox-counter">
+        {activeIndex + 1} of {images.length}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 function AnnouncementComposer({ onCreated }: { onCreated: () => void }) {
   const [body, setBody] = useState("");
   const [images, setImages] = useState<ImageSelection[]>([]);
@@ -1142,6 +1337,10 @@ export function CommunityAnnouncements() {
     profileQuery.data?.profile?.isVerified &&
       ["creator", "company"].includes(profileQuery.data.profile.accountType)
   );
+  const [lightbox, setLightbox] = useState<{
+    images: AnnouncementImage[];
+    activeIndex: number;
+  } | null>(null);
   return (
     <section
       className="media-section community-section"
@@ -1184,52 +1383,76 @@ export function CommunityAnnouncements() {
         </div>
       ) : query.data?.length ? (
         <div className="announcement-list">
-          {query.data.map(announcement => (
-            <article className="announcement-card" key={announcement.id}>
-              <div className="announcement-author">
-                <div className="announcement-author-avatar">
-                  {announcement.author.photoUrl ? (
-                    <img src={announcement.author.photoUrl} alt="" />
-                  ) : (
-                    <Megaphone size={16} />
+          {query.data.map(announcement => {
+            const imageAttachments = announcement.attachments
+              .filter(attachment => attachment.mediaType === "IMAGE")
+              .map(attachment => ({
+                id: attachment.id,
+                mediaUrl: attachment.mediaUrl,
+              }));
+            return (
+              <article className="announcement-card" key={announcement.id}>
+                <div className="announcement-author">
+                  <div className="announcement-author-avatar">
+                    {announcement.author.photoUrl ? (
+                      <img src={announcement.author.photoUrl} alt="" />
+                    ) : (
+                      <Megaphone size={16} />
+                    )}
+                  </div>
+                  <div>
+                    <strong>
+                      {announcement.author.name ?? "KINBA organization"}{" "}
+                      <BadgeCheck size={13} />
+                    </strong>
+                    <span>{announcement.author.accountType} · verified</span>
+                  </div>
+                  <time
+                    dateTime={new Date(announcement.createdAt).toISOString()}
+                  >
+                    {new Date(announcement.createdAt).toLocaleDateString()}
+                  </time>
+                </div>
+                {announcement.body && <p>{announcement.body}</p>}
+                <div
+                  className={`announcement-attachments ${announcement.attachments.length > 1 ? "has-grid" : ""}`}
+                >
+                  {announcement.attachments.map(attachment =>
+                    attachment.mediaType === "IMAGE" ? (
+                      <button
+                        type="button"
+                        className="announcement-image-button"
+                        key={attachment.id}
+                        onClick={() =>
+                          setLightbox({
+                            images: imageAttachments,
+                            activeIndex: imageAttachments.findIndex(
+                              image => image.id === attachment.id
+                            ),
+                          })
+                        }
+                        aria-label={`Open announcement image ${imageAttachments.findIndex(image => image.id === attachment.id) + 1} of ${imageAttachments.length}`}
+                      >
+                        <img
+                          src={attachment.mediaUrl}
+                          alt="Community announcement attachment"
+                          loading="lazy"
+                        />
+                      </button>
+                    ) : (
+                      <video
+                        key={attachment.id}
+                        src={attachment.mediaUrl}
+                        controls
+                        playsInline
+                        preload="metadata"
+                      />
+                    )
                   )}
                 </div>
-                <div>
-                  <strong>
-                    {announcement.author.name ?? "KINBA organization"}{" "}
-                    <BadgeCheck size={13} />
-                  </strong>
-                  <span>{announcement.author.accountType} · verified</span>
-                </div>
-                <time dateTime={new Date(announcement.createdAt).toISOString()}>
-                  {new Date(announcement.createdAt).toLocaleDateString()}
-                </time>
-              </div>
-              {announcement.body && <p>{announcement.body}</p>}
-              <div
-                className={`announcement-attachments ${announcement.attachments.length > 1 ? "has-grid" : ""}`}
-              >
-                {announcement.attachments.map(attachment =>
-                  attachment.mediaType === "IMAGE" ? (
-                    <img
-                      key={attachment.id}
-                      src={attachment.mediaUrl}
-                      alt="Community announcement attachment"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <video
-                      key={attachment.id}
-                      src={attachment.mediaUrl}
-                      controls
-                      playsInline
-                      preload="metadata"
-                    />
-                  )
-                )}
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       ) : (
         <div className="media-empty">
@@ -1237,6 +1460,18 @@ export function CommunityAnnouncements() {
           <h3>No announcements yet.</h3>
           <p>Verified creators and companies will appear here.</p>
         </div>
+      )}
+      {lightbox && (
+        <AnnouncementLightbox
+          images={lightbox.images}
+          activeIndex={lightbox.activeIndex}
+          onChange={activeIndex =>
+            setLightbox(current =>
+              current ? { ...current, activeIndex } : current
+            )
+          }
+          onClose={() => setLightbox(null)}
+        />
       )}
     </section>
   );
