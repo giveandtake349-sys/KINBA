@@ -1790,6 +1790,7 @@ export default function Home() {
   const profileQuery = trpc.profile.me.useQuery(undefined, {
     enabled: auth.isAuthenticated,
     refetchOnWindowFocus: false,
+    refetchInterval: 30_000,
   });
   const notificationQuery = trpc.home.notifications.useQuery(undefined, {
     enabled: auth.isAuthenticated,
