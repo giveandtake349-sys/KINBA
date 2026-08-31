@@ -466,7 +466,9 @@ async function selectVideos(
 }
 
 export async function listVideos(kind: VideoKind, viewerId?: number) {
-  return selectVideos([eq(videos.kind, kind)], viewerId, "recent");
+  const conditions = [eq(videos.kind, kind)];
+  if (kind === "LONG") conditions.push(eq(videos.mediaType, "VIDEO"));
+  return selectVideos(conditions, viewerId, "recent");
 }
 
 export async function listProfileVideos(userId: number) {
@@ -498,7 +500,7 @@ export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
   if (!db) return [];
   const conditions: any[] = [];
   if (tab === "videos" || tab === "trendy" || tab === "following")
-    conditions.push(eq(videos.kind, "LONG"));
+    conditions.push(eq(videos.kind, "LONG"), eq(videos.mediaType, "VIDEO"));
   if (tab === "following")
     conditions.push(
       inArray(
