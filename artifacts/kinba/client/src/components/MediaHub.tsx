@@ -66,6 +66,8 @@ type VideoRecord = {
   shareCount: number;
   viewerReacted: boolean;
   viewerShared: boolean;
+  bookmarkCount: number;
+  viewerBookmarked: boolean;
   owner: {
     id: number;
     name: string | null;
@@ -536,7 +538,19 @@ function VideoCard({
   showDetailsOverlay?: boolean;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [bookmarked, setBookmarked] = useState(false);
+  const auth = useAuth();
+  const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
+  const bookmarkMutation = trpc.videos.bookmark.useMutation();
+  const toggleBookmark = async () => {
+    if (!auth.isAuthenticated) return auth.openAuth();
+    if (bookmarkMutation.isPending) return;
+    try {
+      const engagement = await bookmarkMutation.mutateAsync({ videoId: video.id });
+      setBookmarked(engagement.viewerBookmarked);
+    } catch (error) {
+      notifyError(error);
+    }
+  };
   const [views, setViews] = useState(video.viewCount);
   const viewMutation = trpc.videos.view.useMutation();
   const { current, react, share, pending } = useOptimisticEngagement(video);
@@ -603,7 +617,7 @@ function VideoCard({
               pending={pending}
               overlay
               bookmarked={bookmarked}
-              onBookmark={() => setBookmarked(value => !value)}
+              onBookmark={toggleBookmark}
             />
           </div>
         )}
@@ -652,7 +666,7 @@ function VideoCard({
             onComments={() => setCommentsOpen(value => !value)}
             pending={pending}
             bookmarked={bookmarked}
-            onBookmark={() => setBookmarked(value => !value)}
+            onBookmark={toggleBookmark}
           />
         </div>
       )}
@@ -959,7 +973,19 @@ function ShortVideoCard({
   active: boolean;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [bookmarked, setBookmarked] = useState(false);
+  const auth = useAuth();
+  const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
+  const bookmarkMutation = trpc.videos.bookmark.useMutation();
+  const toggleBookmark = async () => {
+    if (!auth.isAuthenticated) return auth.openAuth();
+    if (bookmarkMutation.isPending) return;
+    try {
+      const engagement = await bookmarkMutation.mutateAsync({ videoId: video.id });
+      setBookmarked(engagement.viewerBookmarked);
+    } catch (error) {
+      notifyError(error);
+    }
+  };
   const { current, react, share, pending } = useOptimisticEngagement(video);
   return (
     <article
@@ -1008,7 +1034,7 @@ function ShortVideoCard({
           pending={pending}
           overlay
           bookmarked={bookmarked}
-          onBookmark={() => setBookmarked(value => !value)}
+          onBookmark={toggleBookmark}
         />
       </div>
       <CommentsPanel videoId={video.id} open={commentsOpen} overlay />
@@ -1645,11 +1671,18 @@ export default function MediaHub({
           activeSection === "wheels" ? " media-tab-panel--wheels" : ""
         }`}
       >
-        {wheels ?? (
-          <div className="media-empty">
-            <h3>Wheels are unavailable.</h3>
-          </div>
-        )}
+        <div className="wheels-feed-layout">
+          {wheels ?? (
+            <div className="media-empty">
+              <h3>Wheels are unavailable.</h3>
+            </div>
+          )}
+          <HomeFeedPanel
+            tab="videos"
+            active={activeSection === "wheels"}
+            showDetailsOverlay
+          />
+        </div>
       </div>
       <div hidden={activeSection !== "all"} className="media-tab-panel">
         <ErrorBoundary fallback={<FeedRecovery />}>
