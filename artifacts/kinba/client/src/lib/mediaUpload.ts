@@ -216,7 +216,7 @@ export async function publishVideo(
     throw new Error(payload.error || "The video could not be published.");
   return {
     videoId: payload.videoId,
-    status: payload.status || "READY",
+    status: payload.status || "PUBLISHED",
     videoUrl: payload.videoUrl,
   };
 }

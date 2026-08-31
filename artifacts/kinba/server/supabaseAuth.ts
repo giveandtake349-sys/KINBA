@@ -18,7 +18,9 @@ function getAuthClient() {
 
 export function getBearerToken(req: RequestWithHeaders): string | null {
   const value = req.headers.authorization;
-  return typeof value === "string" && value.startsWith("Bearer ") ? value.slice(7).trim() || null : null;
+  if (typeof value !== "string") return null;
+  const match = value.match(/^Bearer\s+(.+)$/i);
+  return match?.[1]?.trim() || null;
 }
 
 export async function verifySupabaseAccessToken(req: RequestWithHeaders, client: SupabaseClient = getAuthClient()): Promise<SupabaseUser | null> {
