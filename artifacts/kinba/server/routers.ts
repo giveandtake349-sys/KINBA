@@ -133,7 +133,7 @@ export const appRouter = router({
     ),
     feed: publicProcedure
       .input(
-        z.object({ tab: z.enum(["videos", "trendy", "following", "icons"]) })
+        z.object({ tab: z.enum(["all", "videos", "trendy", "following", "icons"]) })
       )
       .query(({ ctx, input }) => listHomeFeed(input.tab, ctx.user?.id)),
   }),
