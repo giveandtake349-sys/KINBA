@@ -5,7 +5,12 @@ import { execFile } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { createVideo, getUserByOpenId, upsertUser } from "./db";
+import {
+  createPhotoPost,
+  createVideo,
+  getUserByOpenId,
+  upsertUser,
+} from "./db";
 import { storagePut } from "./storage";
 import {
   supabaseDisplayName,
@@ -121,6 +126,65 @@ export function registerVideoUploadRoute(app: Express) {
     }
   );
 
+  app.post("/api/photos/upload", upload.single("photo"), async (req, res) => {
+    let temporaryPath: string | undefined;
+    try {
+      const user = await authenticate(req);
+      if (!user) {
+        res.status(401).json({ error: "Please sign in before uploading." });
+        return;
+      }
+      if (!req.file) {
+        res.status(400).json({ error: "Choose an image file." });
+        return;
+      }
+      temporaryPath = req.file.path;
+      if (!["image/jpeg", "image/png", "image/webp"].includes(req.file.mimetype)) {
+        res.status(400).json({ error: "Choose a JPG, PNG, or WEBP image." });
+        return;
+      }
+      if (req.file.size > 5 * 1024 * 1024) {
+        res.status(400).json({ error: "Images must be 5MB or smaller." });
+        return;
+      }
+      const title = String(req.body.title ?? "").trim();
+      const description = String(req.body.description ?? "").trim();
+      const width = Number(req.body.width);
+      const height = Number(req.body.height);
+      if (title.length < 3 || title.length > 180) {
+        res.status(400).json({ error: "Title must be between 3 and 180 characters." });
+        return;
+      }
+      if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
+        res.status(400).json({ error: "The image dimensions could not be read." });
+        return;
+      }
+      const uploaded = await storagePut(
+        `photos/${user.id}/photo-${Date.now()}-${req.file.originalname}`,
+        await fs.readFile(temporaryPath),
+        req.file.mimetype
+      );
+      const post = await createPhotoPost(user.id, {
+        title,
+        description,
+        imageUrl: uploaded.url,
+        width,
+        height,
+      });
+      res.status(201).json({
+        postId: post.id,
+        mediaType: "IMAGE",
+        status: "PUBLISHED",
+        imageUrl: uploaded.url,
+      });
+    } catch (error) {
+      res.status(500).json({ error: errorMessage(error) });
+    } finally {
+      if (temporaryPath)
+        await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
+    }
+  });
+
   app.post("/api/videos/upload", upload.single("video"), async (req, res) => {
     let temporaryPath: string | undefined;
     try {
@@ -180,7 +244,8 @@ export function registerVideoUploadRoute(app: Express) {
       });
       res.status(201).json({
         videoId: video.id,
-        status: "READY",
+        status: "PUBLISHED",
+        processingStatus: video.processingStatus,
         videoUrl: sourceUrl,
       });
     } catch (error) {

@@ -25,6 +25,13 @@ function isAllowedImageType(type: string): type is AllowedImageType {
   return type in allowedImageTypes;
 }
 
+export function validatePhotoFile(file: File): void {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type))
+    throw new Error("Choose a JPG, PNG, or WEBP image.");
+  if (file.size > MAX_IMAGE_SIZE_BYTES)
+    throw new Error("Images must be 5MB or smaller.");
+}
+
 export function validateImageFile(file: File): void {
   if (!isAllowedImageType(file.type))
     throw new Error("Choose a JPG, PNG, WEBP, or GIF image.");
@@ -77,6 +84,76 @@ async function getSessionUserId(message: string) {
   if (sessionError) throw sessionError;
   if (!sessionData.session) throw new Error(message);
   return sessionData.session.user.id;
+}
+
+export async function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
+  validatePhotoFile(file);
+  const previewUrl = URL.createObjectURL(file);
+  const image = new Image();
+  image.decoding = "async";
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      URL.revokeObjectURL(previewUrl);
+      image.remove();
+    };
+    image.onload = () => {
+      const dimensions = { width: image.naturalWidth, height: image.naturalHeight };
+      cleanup();
+      if (!dimensions.width || !dimensions.height)
+        return reject(new Error("The image dimensions could not be read."));
+      resolve(dimensions);
+    };
+    image.onerror = () => {
+      cleanup();
+      reject(new Error("This image could not be previewed."));
+    };
+    image.src = previewUrl;
+  });
+}
+
+export async function publishPhoto(
+  file: File,
+  title: string,
+  description: string,
+  dimensions: { width: number; height: number }
+): Promise<{ postId: number; status: string; imageUrl: string }> {
+  validatePhotoFile(file);
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) throw sessionError;
+  const session = sessionData.session;
+  if (!session) throw new Error("Please sign in before uploading a photo.");
+
+  const body = new FormData();
+  body.append("photo", file, file.name);
+  body.append("title", title);
+  body.append("description", description);
+  body.append("width", String(dimensions.width));
+  body.append("height", String(dimensions.height));
+  let response: Response;
+  try {
+    response = await fetch(apiUrl("/api/photos/upload"), {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      body,
+    });
+  } catch {
+    throw new Error(
+      "The photo upload service could not be reached. Check the Render service URL and CORS_ORIGIN configuration."
+    );
+  }
+  const payload = (await response.json().catch(() => ({}))) as {
+    postId?: number;
+    status?: string;
+    imageUrl?: string;
+    error?: string;
+  };
+  if (!response.ok || !payload.postId || !payload.imageUrl)
+    throw new Error(payload.error || "The photo could not be published.");
+  return {
+    postId: payload.postId,
+    status: payload.status || "PUBLISHED",
+    imageUrl: payload.imageUrl,
+  };
 }
 
 export async function publishVideo(

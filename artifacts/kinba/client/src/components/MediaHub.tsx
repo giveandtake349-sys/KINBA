@@ -13,6 +13,7 @@ import {
   Check,
   ChevronDown,
   Heart,
+  Image,
   Loader2,
   MessageCircle,
   Megaphone,
@@ -32,14 +33,17 @@ import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import {
+  getImageDimensions,
   getVideoMetadata,
   MAX_ANNOUNCEMENT_VIDEO_DURATION_SECONDS,
   MAX_LONG_VIDEO_DURATION_SECONDS,
   MAX_SHORT_VIDEO_DURATION_SECONDS,
+  publishPhoto,
   publishVideo,
   uploadImage,
   uploadVideo,
   validateImageFile,
+  validatePhotoFile,
   type VideoMetadata,
 } from "@/lib/mediaUpload";
 import ErrorBoundary from "./ErrorBoundary";
@@ -56,6 +60,7 @@ type VideoRecord = {
   description: string;
   videoUrl: string;
   thumbnailUrl: string | null;
+  mediaType?: "VIDEO" | "IMAGE";
   kind: VideoKind;
   durationSeconds: number;
   width: number;
@@ -640,12 +645,17 @@ function VideoCard({
   };
   return (
     <article className="long-video-card w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 mb-4 overflow-hidden box-border">
-      <div className="media-fullscreen-frame">
-        <QualityVideoPlayer
-          video={video}
-          active={active}
-          onFirstPlay={recordView}
-        />
+              <div className={`media-fullscreen-frame ${video.mediaType === "IMAGE" ? "media-photo-frame" : ""}`}>
+        {video.mediaType === "IMAGE" ? (
+          <img className="media-photo" src={video.videoUrl} alt={video.title} />
+        ) : (
+          <QualityVideoPlayer
+            video={video}
+            active={active}
+            onFirstPlay={recordView}
+          />
+        )}
+
         {showDetailsOverlay && (
           <div className="media-overlay-copy">
             <div className="media-overlay-details">
@@ -682,13 +692,15 @@ function VideoCard({
               <p className="media-caption-tags">
                 {ownerHandle(video.owner.name, video.owner.username)} · {hashtagsFromDescription(video.description)}
               </p>
-              <p className="media-sound-track">
-                <Volume2 size={14} aria-hidden="true" /> Original sound · {ownerHandle(video.owner.name, video.owner.username)}
-              </p>
-              <div className="media-meta-line" aria-label="Video metadata">
+              {video.mediaType !== "IMAGE" && (
+                <p className="media-sound-track">
+                  <Volume2 size={14} aria-hidden="true" /> Original sound · {ownerHandle(video.owner.name, video.owner.username)}
+                </p>
+              )}
+              <div className="media-meta-line" aria-label="Media metadata">
                 <span>{formatCount(views)} views</span>
                 <span>{relativeTime(video.createdAt)}</span>
-                <span>{video.kind === "SHORT" ? "Short" : "Video"}</span>
+                <span>{video.mediaType === "IMAGE" ? "Photo" : video.kind === "SHORT" ? "Short" : "Video"}</span>
               </div>
             </div>
             <EngagementActions
@@ -706,7 +718,8 @@ function VideoCard({
         )}
       </div>
       {!showDetailsOverlay && (
-        <div className="video-card-details">
+                  <div className={video.mediaType === "IMAGE" ? "video-card-details photo-card-details" : "video-card-details"}>
+
           <div className="media-owner">
             <div className="video-owner-identity">
               <div className="video-owner-avatar">
@@ -737,10 +750,10 @@ function VideoCard({
           </div>
           <h3>{video.title}</h3>
           <p>{video.description}</p>
-          <div className="media-meta-line" aria-label="Video metadata">
+          <div className="media-meta-line" aria-label="Media metadata">
             <span>{formatCount(views)} views</span>
             <span>{relativeTime(video.createdAt)}</span>
-            <span>{video.kind === "SHORT" ? "Short" : "Video"}</span>
+            <span>{video.mediaType === "IMAGE" ? "Photo" : video.kind === "SHORT" ? "Short" : "Video"}</span>
           </div>
           <EngagementActions
             engagement={current}
@@ -769,11 +782,14 @@ function UploadVideoPanel({
   onPublished: () => void;
   detailsRef: { current: HTMLDetailsElement | null };
 }) {
+  const [mode, setMode] = useState<"video" | "photo">("video");
   const [kind, setKind] = useState<VideoKind>("LONG");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const selectFile = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -781,6 +797,14 @@ function UploadVideoPanel({
     event.target.value = "";
     if (!nextFile) return;
     try {
+      if (mode === "photo") {
+        validatePhotoFile(nextFile);
+        setFile(nextFile);
+        setMetadata(null);
+        setImagePreviewUrl(URL.createObjectURL(nextFile));
+        setImageDimensions(await getImageDimensions(nextFile));
+        return;
+      }
       const nextMetadata = await getVideoMetadata(nextFile, {
         maxDurationSeconds:
           kind === "LONG"
@@ -789,27 +813,32 @@ function UploadVideoPanel({
       });
       setFile(nextFile);
       setMetadata(nextMetadata);
+      setImageDimensions(null);
     } catch (error) {
       notifyError(error);
     }
   };
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!file || !metadata || !title.trim()) {
-      toast.error("Add an original video and title first.");
+    if (!file || !title.trim() || (mode === "video" && !metadata) || (mode === "photo" && !imageDimensions)) {
+      toast.error(mode === "photo" ? "Add an image and title first." : "Add an original video and title first.");
       return;
     }
     setBusy(true);
     try {
-      await publishVideo(file, kind, title.trim(), description.trim());
+      if (mode === "photo" && imageDimensions) {
+        await publishPhoto(file, title.trim(), description.trim(), imageDimensions);
+      } else {
+        await publishVideo(file, kind, title.trim(), description.trim());
+      }
       await onPublished();
       setTitle("");
       setDescription("");
       setFile(null);
       setMetadata(null);
-      toast.success(
-        "Video received. It will play in Auto mode while 1080p, 720p, 480p, and 240p streams are prepared."
-      );
+      setImageDimensions(null);
+      setImagePreviewUrl(null);
+      toast.success(mode === "photo" ? "Photo published to your feed." : "Video published to your feed.");
     } catch (error) {
       notifyError(error);
     } finally {
@@ -819,18 +848,47 @@ function UploadVideoPanel({
   useEffect(() => {
     setFile(null);
     setMetadata(null);
-  }, [kind]);
+    setImageDimensions(null);
+    setImagePreviewUrl(null);
+  }, [kind, mode]);
+
+  useEffect(() => {
+    return () => {
+      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    };
+  }, [imagePreviewUrl]);
   return (
     <details ref={detailsRef} className="media-publish-panel">
       <summary>
-        <Upload size={17} /> Publish a video
+        {mode === "photo" ? <Image size={17} /> : <Upload size={17} />} Publish media
       </summary>
       <form onSubmit={submit} className="media-publish-form">
-        <div
-          className="media-kind-switch"
-          role="tablist"
-          aria-label="Video format"
-        >
+        <div className="media-kind-switch" role="tablist" aria-label="Upload type">
+          <button
+            type="button"
+            className={mode === "video" ? "active" : ""}
+            onClick={() => setMode("video")}
+            role="tab"
+            aria-selected={mode === "video"}
+          >
+            Video upload
+          </button>
+          <button
+            type="button"
+            className={mode === "photo" ? "active" : ""}
+            onClick={() => setMode("photo")}
+            role="tab"
+            aria-selected={mode === "photo"}
+          >
+            Photo upload
+          </button>
+        </div>
+        {mode === "video" && (
+          <div
+            className="media-kind-switch"
+            role="tablist"
+            aria-label="Video format"
+          >
           <button
             type="button"
             className={kind === "LONG" ? "active" : ""}
@@ -840,19 +898,21 @@ function UploadVideoPanel({
           >
             Main video · 30 min
           </button>
-          <button
-            type="button"
-            className={kind === "SHORT" ? "active" : ""}
-            onClick={() => setKind("SHORT")}
-            role="tab"
-            aria-selected={kind === "SHORT"}
-          >
-            Short · 1 min
-          </button>
-        </div>
+            <button
+              type="button"
+              className={kind === "SHORT" ? "active" : ""}
+              onClick={() => setKind("SHORT")}
+              role="tab"
+              aria-selected={kind === "SHORT"}
+            >
+              Short · 1 min
+            </button>
+          </div>
+        )}
         <p className="media-form-hint">
-          Upload one original video. KINBA securely creates the available HLS
-          qualities automatically after the upload finishes.
+          {mode === "photo"
+            ? "Share a JPEG, PNG, or WEBP image with your KINBA feed."
+            : "Upload one original video. KINBA publishes it immediately after the upload finishes."}
         </p>
         <label>
           Title
@@ -879,7 +939,7 @@ function UploadVideoPanel({
           <input
             ref={inputRef}
             type="file"
-            accept="video/*"
+            accept={mode === "photo" ? "image/jpeg,image/png,image/webp" : "video/*"}
             className="sr-only"
             onChange={selectFile}
           />
@@ -888,10 +948,11 @@ function UploadVideoPanel({
             className="secondary-media-btn"
             onClick={() => inputRef.current?.click()}
           >
-            Choose original video · required
+            {mode === "photo" ? "Choose photo · JPG, PNG, or WEBP" : "Choose original video · required"}
           </button>
           {file && (
             <span className="selected-file">
+              {imagePreviewUrl && <img className="selected-image-preview" src={imagePreviewUrl} alt="Selected photo preview" />}
               {file.name}
               <button
                 type="button"
@@ -899,6 +960,8 @@ function UploadVideoPanel({
                 onClick={() => {
                   setFile(null);
                   setMetadata(null);
+                  setImageDimensions(null);
+                  setImagePreviewUrl(null);
                 }}
               >
                 Remove
@@ -909,10 +972,10 @@ function UploadVideoPanel({
         <button
           className="primary-btn"
           type="submit"
-          disabled={!file || !metadata || !title.trim() || busy}
+          disabled={!file || !title.trim() || (mode === "video" ? !metadata : !imageDimensions) || busy}
         >
           {busy ? <Loader2 className="spin" size={16} /> : <Upload size={16} />}{" "}
-          {busy ? "Uploading" : "Upload and prepare qualities"}
+          {busy ? "Uploading" : mode === "photo" ? "Publish photo" : "Publish video"}
         </button>
       </form>
     </details>

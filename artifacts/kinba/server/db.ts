@@ -339,6 +339,7 @@ export async function approveVerificationTransaction(
 }
 
 export type VideoKind = "LONG" | "SHORT";
+export type MediaType = "VIDEO" | "IMAGE";
 export type VideoQuality = "ORIGINAL" | "1080P" | "720P" | "480P" | "240P";
 export type VideoSourceInput = { quality: VideoQuality; videoUrl: string };
 export type VideoAttachmentInput = {
@@ -600,6 +601,7 @@ export async function createVideo(
         description: input.description,
         videoUrl: input.videoUrl,
         thumbnailUrl: input.thumbnailUrl ?? null,
+        mediaType: "VIDEO",
         kind: input.kind,
         durationSeconds: input.durationSeconds,
         width: input.width,
@@ -614,6 +616,37 @@ export async function createVideo(
       );
     return created;
   });
+}
+
+export async function createPhotoPost(
+  userId: number,
+  input: {
+    title: string;
+    description: string;
+    imageUrl: string;
+    width: number;
+    height: number;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [created] = await db
+    .insert(videos)
+    .values({
+      userId,
+      title: input.title,
+      description: input.description,
+      videoUrl: input.imageUrl,
+      thumbnailUrl: input.imageUrl,
+      mediaType: "IMAGE",
+      kind: "LONG",
+      durationSeconds: 1,
+      width: input.width,
+      height: input.height,
+      processingStatus: "READY",
+    })
+    .returning();
+  return created;
 }
 
 export async function updateVideoProcessing(

@@ -15,6 +15,7 @@ import {
 
 export const appRole = pgEnum("app_role", ["user", "admin"]);
 export const videoKind = pgEnum("video_kind", ["LONG", "SHORT"]);
+export const mediaType = pgEnum("media_type", ["VIDEO", "IMAGE"]);
 export const videoProcessingStatus = pgEnum("video_processing_status", [
   "PENDING",
   "PROCESSING",
@@ -290,6 +291,7 @@ export const videos = pgTable(
     description: text("description").notNull(),
     videoUrl: varchar("videoUrl", { length: 1024 }).notNull(),
     thumbnailUrl: varchar("thumbnailUrl", { length: 1024 }),
+    mediaType: mediaType("mediaType").default("VIDEO").notNull(),
     kind: videoKind("kind").notNull(),
     durationSeconds: integer("durationSeconds").notNull(),
     width: integer("width").notNull(),
