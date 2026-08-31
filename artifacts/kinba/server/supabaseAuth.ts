@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient, type User as SupabaseUser } from "@supabase/supabase-js";
-import type { Request } from "express";
+type RequestWithHeaders = { headers: { authorization?: unknown } };
 import { ENV } from "./_core/env";
 
 let authClient: SupabaseClient | null = null;
@@ -16,12 +16,12 @@ function getAuthClient() {
   return authClient;
 }
 
-export function getBearerToken(req: Request): string | null {
+export function getBearerToken(req: RequestWithHeaders): string | null {
   const value = req.headers.authorization;
   return typeof value === "string" && value.startsWith("Bearer ") ? value.slice(7).trim() || null : null;
 }
 
-export async function verifySupabaseAccessToken(req: Request, client: SupabaseClient = getAuthClient()): Promise<SupabaseUser | null> {
+export async function verifySupabaseAccessToken(req: RequestWithHeaders, client: SupabaseClient = getAuthClient()): Promise<SupabaseUser | null> {
   const token = getBearerToken(req);
   if (!token) return null;
   const { data, error } = await client.auth.getUser(token);

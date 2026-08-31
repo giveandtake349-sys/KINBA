@@ -691,8 +691,10 @@ function UploadVideoPanel({
   };
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!file || !metadata || !title.trim())
-      return toast.error("Add an original video and title first.");
+    if (!file || !metadata || !title.trim()) {
+      toast.error("Add an original video and title first.");
+      return;
+    }
     setBusy(true);
     try {
       await publishVideo(file, kind, title.trim(), description.trim());
@@ -1116,8 +1118,10 @@ function AnnouncementComposer({ onCreated }: { onCreated: () => void }) {
   const chooseImages = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
-    if (files.length + images.length > 10)
-      return toast.error("Choose up to 10 images for one announcement.");
+    if (files.length + images.length > 10) {
+      toast.error("Choose up to 10 images for one announcement.");
+      return;
+    }
     try {
       files.forEach(validateImageFile);
       setImages(current => [
@@ -1144,8 +1148,10 @@ function AnnouncementComposer({ onCreated }: { onCreated: () => void }) {
   };
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!body.trim() && !images.length && !video)
-      return toast.error("Add text, an image, or a video first.");
+    if (!body.trim() && !images.length && !video) {
+      toast.error("Add text, an image, or a video first.");
+      return;
+    }
     setBusy(true);
     try {
       const uploadedImages = await Promise.all(
