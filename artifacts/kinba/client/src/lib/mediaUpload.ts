@@ -98,6 +98,16 @@ async function fetchUploadWithRetry(
   throw lastError instanceof Error ? lastError : new Error("Upload request failed.");
 }
 
+async function getUploadSession(message: string) {
+  const current = await supabase.auth.getSession();
+  if (current.error) throw current.error;
+  if (current.data.session) return current.data.session;
+  const refreshed = await supabase.auth.refreshSession();
+  if (refreshed.error) throw refreshed.error;
+  if (!refreshed.data.session) throw new Error(message);
+  return refreshed.data.session;
+}
+
 async function getSessionUserId(message: string) {
   const { data: sessionData, error: sessionError } =
     await supabase.auth.getSession();
@@ -138,10 +148,7 @@ export async function publishPhoto(
   dimensions: { width: number; height: number }
 ): Promise<{ postId: number; status: string; imageUrl: string }> {
   validatePhotoFile(file);
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) throw sessionError;
-  const session = sessionData.session;
-  if (!session) throw new Error("Please sign in before uploading a photo.");
+  const session = await getUploadSession("Please sign in before uploading a photo.");
 
   const body = new FormData();
   body.append("photo", file, file.name);
@@ -154,6 +161,7 @@ export async function publishPhoto(
     response = await fetchUploadWithRetry(apiUrl("/api/photos/upload"), {
       method: "POST",
       headers: { Authorization: `Bearer ${session.access_token}` },
+      credentials: "include",
       body,
     });
   } catch {
@@ -184,11 +192,7 @@ export async function publishVideo(
 ): Promise<{ videoId: number; status: string; videoUrl: string }> {
   if (!file.type.startsWith("video/"))
     throw new Error("Choose a supported video file.");
-  const { data: sessionData, error: sessionError } =
-    await supabase.auth.getSession();
-  if (sessionError) throw sessionError;
-  const session = sessionData.session;
-  if (!session) throw new Error("Please sign in before uploading video.");
+  const session = await getUploadSession("Please sign in before uploading video.");
   const body = new FormData();
   body.append("video", file, file.name);
   body.append("kind", kind);
@@ -199,6 +203,7 @@ export async function publishVideo(
     response = await fetchUploadWithRetry(apiUrl("/api/videos/upload"), {
       method: "POST",
       headers: { Authorization: `Bearer ${session.access_token}` },
+      credentials: "include",
       body,
     });
   } catch {
@@ -227,11 +232,7 @@ export async function uploadVideo(
 ): Promise<string> {
   if (!file.type.startsWith("video/"))
     throw new Error("Choose a supported video file.");
-  const { data: sessionData, error: sessionError } =
-    await supabase.auth.getSession();
-  if (sessionError) throw sessionError;
-  const session = sessionData.session;
-  if (!session) throw new Error("Please sign in before uploading video.");
+  const session = await getUploadSession("Please sign in before uploading video.");
 
   const body = new FormData();
   body.append("video", file, file.name);
@@ -241,6 +242,7 @@ export async function uploadVideo(
     response = await fetchUploadWithRetry(apiUrl("/api/media/video-upload"), {
       method: "POST",
       headers: { Authorization: `Bearer ${session.access_token}` },
+      credentials: "include",
       body,
     });
   } catch {
