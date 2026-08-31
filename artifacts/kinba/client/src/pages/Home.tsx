@@ -610,7 +610,7 @@ function MobileDrawer({
           section: "qr",
           label: "QR code",
           description: "Share your KINBA identity",
-          icon: ImagePlus,
+          icon: QrCode,
         },
       ],
     },
