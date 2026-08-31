@@ -988,6 +988,7 @@ function NotificationsPanel({ enabled }: { enabled: boolean }) {
   const query = trpc.home.notifications.useQuery(undefined, {
     enabled,
     refetchOnWindowFocus: false,
+    refetchInterval: 15_000,
   });
   return (
     <section
@@ -1154,8 +1155,11 @@ function QrPanel({ profile }: { profile?: ProfileSnapshot }) {
         <QrCode size={22} aria-hidden="true" />
       </div>
       <div className="qr-share-card">
-        <div className="qr-mark" aria-hidden="true">
-          <QrCode size={72} strokeWidth={1.4} />
+        <div className="qr-mark">
+          <img
+            src={"https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=" + encodeURIComponent(shareUrl)}
+            alt="QR code for your KINBA profile"
+          />
         </div>
         <div>
           <strong>{profileDisplayName(profile)}</strong>
@@ -1172,6 +1176,10 @@ function QrPanel({ profile }: { profile?: ProfileSnapshot }) {
 }
 
 function OfflineVideosPanel({ onBrowse }: { onBrowse: () => void }) {
+  const saved = trpc.videos.bookmarked.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+    refetchInterval: 30_000,
+  });
   return (
     <section className="media-section utility-section offline-panel" aria-labelledby="offline-heading">
       <div className="media-section-heading">
@@ -1181,14 +1189,39 @@ function OfflineVideosPanel({ onBrowse }: { onBrowse: () => void }) {
         </div>
         <Film size={22} aria-hidden="true" />
       </div>
-      <div className="media-empty">
-        <Film size={22} />
-        <h3>No offline videos on this device.</h3>
-        <p>Videos you make available for offline viewing will appear here.</p>
-        <button type="button" className="primary-btn" onClick={onBrowse}>
-          Browse feed
-        </button>
-      </div>
+      {saved.isPending ? (
+        <div className="utility-loading" aria-busy="true">Loading your saved videos…</div>
+      ) : saved.isError ? (
+        <div className="media-empty" role="alert">
+          <Film size={22} />
+          <h3>Your saved videos are unavailable.</h3>
+          <p>We could not reach the saved-video library. Try again.</p>
+          <button type="button" className="muted-btn" onClick={() => saved.refetch()}>Retry</button>
+        </div>
+      ) : saved.data?.length ? (
+        <div className="offline-video-list" aria-label="Saved videos">
+          {saved.data.map(video => (
+            <a className="offline-video-item" href="/?panel=videos" key={video.id}>
+              <div className="offline-video-thumb">
+                {video.thumbnailUrl ? <img src={video.thumbnailUrl} alt="" /> : <Film size={20} />}
+              </div>
+              <span>
+                <strong>{video.title}</strong>
+                <small>{video.owner.name ?? video.owner.username ?? "KINBA creator"} · {new Date(video.createdAt).toLocaleDateString()}</small>
+              </span>
+              <Play size={16} aria-hidden="true" />
+            </a>
+          ))}
+          <button type="button" className="primary-btn" onClick={onBrowse}>Browse feed</button>
+        </div>
+      ) : (
+        <div className="media-empty">
+          <Film size={22} />
+          <h3>No saved videos yet.</h3>
+          <p>Use Save on any video to keep it in this personal library.</p>
+          <button type="button" className="primary-btn" onClick={onBrowse}>Browse feed</button>
+        </div>
+      )}
     </section>
   );
 }
