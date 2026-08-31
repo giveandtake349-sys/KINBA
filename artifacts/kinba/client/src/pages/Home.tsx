@@ -1458,11 +1458,16 @@ function UploadVideoModal({
     setBusy(true);
     try {
       await publishVideo(file, kind, title.trim(), description.trim());
-      await onPublished();
+      try {
+        await onPublished();
+      } catch (refreshError) {
+        console.error("[MediaPublish] Published successfully but feed refresh failed:", refreshError);
+        toast.info("Published successfully. Refresh the feed if it is not visible yet.");
+      }
       setFile(null);
       setTitle("");
       setDescription("");
-      toast.success("Video received and queued for processing.");
+      toast.success("Video published to your feed.");
       onClose();
     } catch (error) {
       toast.error(

@@ -606,30 +606,36 @@ export async function createVideo(
     throw new Error("Authenticated application user ID is invalid.");
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  return db.transaction(async tx => {
-    const [created] = await tx
-      .insert(videos)
-      .values({
-        userId,
-        title: requiredText(input.title, "Untitled video"),
-        description: requiredText(input.description, "No description provided."),
-        videoUrl: requiredText(input.videoUrl, "about:blank"),
-        thumbnailUrl: optionalText(input.thumbnailUrl),
-        mediaType: "VIDEO",
-        kind: input.kind === "SHORT" ? "SHORT" : "LONG",
-        durationSeconds: input.durationSeconds,
-        width: input.width,
-        height: input.height,
-        processingStatus: "READY",
-      })
-      .returning();
-    await tx
-      .insert(videoSources)
-      .values(
-        input.sources.map(source => ({ videoId: created.id, ...source }))
-      );
-    return created;
-  });
+  const [created] = await db
+    .insert(videos)
+    .values({
+      userId,
+      title: requiredText(input.title, "Untitled video"),
+      description: requiredText(input.description, "No description provided."),
+      videoUrl: requiredText(input.videoUrl, "about:blank"),
+      thumbnailUrl: optionalText(input.thumbnailUrl),
+      mediaType: "VIDEO",
+      kind: input.kind === "SHORT" ? "SHORT" : "LONG",
+      durationSeconds: input.durationSeconds,
+      width: input.width,
+      height: input.height,
+      processingStatus: "READY",
+    })
+    .returning();
+  if (input.sources.length) {
+    try {
+      await db
+        .insert(videoSources)
+        .values(
+          input.sources.map(source => ({ videoId: created.id, ...source }))
+        );
+    } catch (error) {
+      // Direct original playback only needs videos.videoUrl. Keep an enum or
+      // legacy video_sources mismatch from rolling back the published row.
+      console.error("[MediaPublish] Optional video source insert failed:", error);
+    }
+  }
+  return created;
 }
 
 export async function createPhotoPost(

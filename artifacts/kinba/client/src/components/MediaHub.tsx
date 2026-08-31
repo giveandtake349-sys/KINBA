@@ -835,7 +835,12 @@ function UploadVideoPanel({
       } else {
         await publishVideo(file, kind, title.trim(), description.trim());
       }
-      await onPublished();
+      try {
+        await onPublished();
+      } catch (refreshError) {
+        console.error("[MediaPublish] Published successfully but feed refresh failed:", refreshError);
+        toast.info("Published successfully. Refresh the feed if it is not visible yet.");
+      }
       setTitle("");
       setDescription("");
       setFile(null);
