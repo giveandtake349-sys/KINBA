@@ -1,4 +1,4 @@
-import type { Express, Request } from "express";
+import type { Express, NextFunction, Request, Response } from "express";
 import multer from "multer";
 import { promises as fs } from "node:fs";
 import { execFile } from "node:child_process";
@@ -26,13 +26,33 @@ import {
 const execFileAsync = promisify(execFile);
 const upload = multer({
   dest: path.join(os.tmpdir(), "kinba-video-uploads"),
-  limits: { files: 1 },
+  limits: { files: 1, fileSize: 500 * 1024 * 1024 },
 });
 
 function errorMessage(error: unknown) {
   if (error instanceof Error && error.message.trim()) return error.message;
   return "The media could not be published. Please try again.";
 }
+
+function uploadSingle(field: "video" | "photo") {
+  return (req: Request, res: Response, next: NextFunction) => {
+    upload.single(field)(req, res, error => {
+      if (!error) { next(); return; }
+      const message =
+        error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE"
+          ? "The file is too large. Maximum upload size is 500MB."
+          : error instanceof multer.MulterError
+            ? "Upload form error: " + error.code + "."
+            : errorMessage(error);
+      console.error("[MediaUpload] " + field + " multipart failure", {
+        message,
+        code: error instanceof multer.MulterError ? error.code : undefined,
+      });
+      res.status(400).json({ error: message });
+    });
+  };
+}
+
 
 function logUploadFailure(route: string, request: Request, error: unknown) {
   const detail = error instanceof Error ? error : new Error(String(error));
@@ -49,7 +69,9 @@ function logUploadStage(route: string, stage: string, details: Record<string, un
 }
 
 async function probeVideo(filePath: string) {
-  const { stdout } = await execFileAsync(process.env.FFPROBE_BIN || "ffprobe", [
+  let stdout: string;
+  try {
+    ({ stdout } = await execFileAsync(process.env.FFPROBE_BIN || "ffprobe", [
     "-v",
     "error",
     "-show_entries",
@@ -57,7 +79,13 @@ async function probeVideo(filePath: string) {
     "-of",
     "json",
     filePath,
-  ]);
+    ]);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error("Video metadata validation is unavailable because ffprobe is not installed in the Render runtime.");
+    }
+    throw new Error("ffprobe could not read this video: " + errorMessage(error));
+  }
   const result = JSON.parse(stdout) as {
     format?: { duration?: string };
     streams?: { width?: number; height?: number }[];
@@ -90,7 +118,7 @@ async function authenticate(request: Request) {
 export function registerVideoUploadRoute(app: Express) {
   app.post(
     "/api/media/video-upload",
-    upload.single("video"),
+    uploadSingle("video"),
     async (req, res) => {
       let temporaryPath: string | undefined;
       try {
@@ -141,7 +169,7 @@ export function registerVideoUploadRoute(app: Express) {
     }
   );
 
-  app.post("/api/photos/upload", upload.single("photo"), async (req, res) => {
+  app.post("/api/photos/upload", uploadSingle("photo"), async (req, res) => {
     let temporaryPath: string | undefined;
     try {
       logUploadStage("photo", "received", {
@@ -211,7 +239,7 @@ export function registerVideoUploadRoute(app: Express) {
         await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
     }
   });
-  app.post("/api/videos/upload", upload.single("video"), async (req, res) => {
+  app.post("/api/videos/upload", uploadSingle("video"), async (req, res) => {
     let temporaryPath: string | undefined;
     try {
       logUploadStage("video", "received", {
