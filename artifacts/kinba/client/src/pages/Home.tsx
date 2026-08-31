@@ -304,9 +304,10 @@ function ProfileEditor({ profile }: { profile?: ProfileSnapshot }) {
 
 function GetVerifiedPanel() {
   const utils = trpc.useUtils();
+  const hasSyncedVerification = useRef(false);
   const status = trpc.payments.status.useQuery(undefined, {
     refetchOnWindowFocus: false,
-    refetchInterval: 10_000,
+    staleTime: 30_000,
   });
   const submit = trpc.payments.submit.useMutation();
   const [amount, setAmount] = useState("100");
@@ -341,7 +342,14 @@ function GetVerifiedPanel() {
   const isPending = status.data?.latestTransaction?.status === "pending";
   const wasRejected = status.data?.latestTransaction?.status === "rejected";
   useEffect(() => {
-    if (status.data?.isVerified) void utils.profile.me.invalidate();
+    if (!status.data?.isVerified) {
+      hasSyncedVerification.current = false;
+      return;
+    }
+    if (hasSyncedVerification.current) return;
+
+    hasSyncedVerification.current = true;
+    void utils.profile.me.invalidate();
   }, [status.data?.isVerified, utils.profile.me]);
   if (status.data?.isVerified)
     return (
@@ -463,7 +471,7 @@ type VerificationTransaction = {
 function AdminVerificationPanel() {
   const transactions = trpc.payments.all.useQuery(undefined, {
     refetchOnWindowFocus: false,
-    refetchInterval: 10_000,
+    staleTime: 30_000,
   });
   const review = trpc.payments.approve.useMutation();
   const [activeId, setActiveId] = useState<number | null>(null);
@@ -896,7 +904,7 @@ function BottomNavigation({
   const isHome = ["all", "videos", "shorts", "wheels"].includes(activePanel);
   return (
     <nav
-      className={`bottom-navigation transition-transform duration-300 ${className ?? ""}`}
+      className={`bottom-navigation fixed left-0 right-0 z-50 transition-transform duration-300 ease-in-out ${className ?? ""}`}
       aria-label="Mobile navigation"
     >
       <button
@@ -1062,7 +1070,7 @@ function ProfileStats({
             <p className="eyebrow">Creator library</p>
             <h2 id="profile-content-heading">Your videos</h2>
           </div>
-          {videosQuery.isFetching && (
+          {videosQuery.isFetching && !videosQuery.isPending && (
             <span className="profile-loading-note">Refreshing…</span>
           )}
         </div>
@@ -1135,7 +1143,7 @@ function NotificationsPanel({ enabled }: { enabled: boolean }) {
   const query = trpc.home.notifications.useQuery(undefined, {
     enabled,
     refetchOnWindowFocus: false,
-    refetchInterval: 15_000,
+    staleTime: 30_000,
   });
   return (
     <section
@@ -1228,7 +1236,7 @@ function SettingsPanel({ onLogout }: { onLogout: () => void }) {
 function WalletPanel() {
   const wallet = trpc.sponsorBids.walletBalance.useQuery(undefined, {
     refetchOnWindowFocus: false,
-    refetchInterval: 15_000,
+    staleTime: 30_000,
   });
   const verification = trpc.payments.status.useQuery(undefined, {
     refetchOnWindowFocus: false,
@@ -1705,7 +1713,7 @@ function QrPanel({ profile }: { profile?: ProfileSnapshot }) {
 function OfflineVideosPanel({ onBrowse }: { onBrowse: () => void }) {
   const saved = trpc.videos.bookmarked.useQuery(undefined, {
     refetchOnWindowFocus: false,
-    refetchInterval: 30_000,
+    staleTime: 30_000,
   });
   return (
     <section
@@ -1796,13 +1804,13 @@ function SponsorWidget({ sessionId }: { sessionId: number }) {
     { sessionId },
     {
       refetchOnWindowFocus: false,
-      refetchInterval: 15_000,
+      staleTime: 30_000,
     }
   );
   const sponsor = trpc.sponsorBids.sponsor.useMutation();
   const wallet = trpc.sponsorBids.walletBalance.useQuery(undefined, {
     refetchOnWindowFocus: false,
-    refetchInterval: 15_000,
+    staleTime: 30_000,
   });
   const utils = trpc.useUtils();
   const [open, setOpen] = useState(false);
@@ -2086,11 +2094,11 @@ function SponsorWheel({
 function SponsorBidsPanel() {
   const sessions = trpc.sponsorBids.sessions.useQuery(undefined, {
     refetchOnWindowFocus: false,
-    refetchInterval: 30_000,
+    staleTime: 30_000,
   });
   const wallet = trpc.sponsorBids.walletBalance.useQuery(undefined, {
     refetchOnWindowFocus: false,
-    refetchInterval: 15_000,
+    staleTime: 30_000,
   });
   const join = trpc.sponsorBids.join.useMutation();
   const utils = trpc.useUtils();
@@ -2119,7 +2127,7 @@ function SponsorBidsPanel() {
     {
       enabled: Boolean(session),
       refetchOnWindowFocus: false,
-      refetchInterval: 5_000,
+      staleTime: 30_000,
     }
   );
   useEffect(() => {
@@ -2317,7 +2325,7 @@ function SponsorBidsPanel() {
 
 export default function Home() {
   const auth = useAuth();
-  const { isScrollingDown, onFeedScroll } = useScrollDirection();
+  const { isScrollingDown } = useScrollDirection();
   const utils = trpc.useUtils();
   const [location, navigate] = useLocation();
   const { theme } = useTheme();
@@ -2328,12 +2336,12 @@ export default function Home() {
   const profileQuery = trpc.profile.me.useQuery(undefined, {
     enabled: auth.isAuthenticated,
     refetchOnWindowFocus: false,
-    refetchInterval: 30_000,
+    staleTime: 30_000,
   });
   const notificationQuery = trpc.home.notifications.useQuery(undefined, {
     enabled: auth.isAuthenticated,
     refetchOnWindowFocus: false,
-    refetchInterval: 15_000,
+    staleTime: 30_000,
   });
   const notificationCount = Math.min(notificationQuery.data?.length ?? 0, 99);
   const profile = profileQuery.data as ProfileSnapshot | undefined;
@@ -2435,7 +2443,7 @@ export default function Home() {
         onClick={guardNonSubmitNavigation}
       >
         <div
-          className={`top-navigation-wrapper fixed top-0 left-0 right-0 z-50 bg-[#0B0F17]/95 backdrop-blur-md transition-transform duration-300 ${
+          className={`top-navigation-wrapper fixed top-0 left-0 right-0 z-50 bg-[#0B0F17]/95 backdrop-blur-md transition-transform duration-300 ease-in-out ${
             screen === "dashboard" && isScrollingDown
               ? "-translate-y-full"
               : "translate-y-0"
@@ -2470,7 +2478,6 @@ export default function Home() {
                 <MediaHub
                   section={activeView}
                   onSectionChange={showFeed}
-                  onFeedScroll={onFeedScroll}
                   showTabs={false}
                   wheels={<SponsorBidsPanel />}
                 />

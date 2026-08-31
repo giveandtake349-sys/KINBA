@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
   type ReactNode,
-  type UIEvent,
 } from "react";
 import {
   BadgeCheck,
@@ -971,7 +970,7 @@ function HomeFeedPanel({
       retry: 1,
       throwOnError: false,
       refetchOnWindowFocus: false,
-      refetchInterval: 10_000,
+      staleTime: 30_000,
     }
   );
   const videos = ((query.data ?? []) as VideoRecord[]).filter(
@@ -1156,7 +1155,7 @@ function ShortsFeed({ active = true }: { active?: boolean }) {
       retry: 1,
       throwOnError: false,
       refetchOnWindowFocus: false,
-      refetchInterval: 10_000,
+      staleTime: 30_000,
     }
   );
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -1724,13 +1723,11 @@ export function SearchFeed() {
 export default function MediaHub({
   section = "all",
   onSectionChange,
-  onFeedScroll,
   showTabs = true,
   wheels,
 }: {
   section?: FeedSection;
   onSectionChange?: (section: FeedSection) => void;
-  onFeedScroll?: (event: UIEvent<HTMLElement>) => void;
   showTabs?: boolean;
   wheels?: ReactNode;
 }) {
@@ -1750,7 +1747,7 @@ export default function MediaHub({
     onSectionChange?.(next);
   };
   return (
-    <div className="media-hub" onScrollCapture={onFeedScroll}>
+    <div className="media-hub">
       {showTabs && (
         <nav
           className="home-feed-tabs"

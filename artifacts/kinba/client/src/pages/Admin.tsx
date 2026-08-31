@@ -14,7 +14,7 @@ export default function Admin() {
   const dashboard = trpc.admin.dashboard.useQuery(undefined, {
     enabled: !auth.loading && isAdmin,
     refetchOnWindowFocus: false,
-    refetchInterval: 15_000,
+    staleTime: 30_000,
   });
   const createSession = trpc.admin.createSession.useMutation();
   const startSession = trpc.admin.startSession.useMutation();

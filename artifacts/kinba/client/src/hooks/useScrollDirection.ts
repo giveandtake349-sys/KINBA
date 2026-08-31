@@ -1,34 +1,48 @@
-import { useCallback, useEffect, useRef, useState, type UIEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type UseScrollDirectionOptions = {
   threshold?: number;
   stopDelay?: number;
 };
 
+const FEED_SCROLL_SELECTOR = "[data-feed-scroll], .media-feed-scroll, .shorts-viewport";
+
 /**
- * Tracks the direction of a scrollable feed surface. Navigation hides only
- * after a meaningful downward scroll and is restored for upward scrolls,
- * at the top of the feed, or after scrolling stops.
+ * Observes the document and KINBA's nested feed surfaces in capture phase.
+ * Chrome is hidden only after a meaningful downward movement and is restored
+ * when the feed moves upward, returns to its origin, or becomes idle.
  */
 export function useScrollDirection({
-  threshold = 8,
+  threshold = 5,
   stopDelay = 180,
 }: UseScrollDirectionOptions = {}) {
   const [isScrollingDown, setIsScrollingDown] = useState(false);
   const lastScrollTop = useRef(0);
-  const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopTimer = useRef<number | null>(null);
 
   const clearStopTimer = useCallback(() => {
-    if (stopTimer.current) {
-      clearTimeout(stopTimer.current);
+    if (stopTimer.current !== null) {
+      window.clearTimeout(stopTimer.current);
       stopTimer.current = null;
     }
   }, []);
 
-  const onFeedScroll = useCallback(
-    (event: UIEvent<HTMLElement>) => {
-      const scrollSurface = event.target;
-      if (!(scrollSurface instanceof HTMLElement)) return;
+  const handleScroll = useCallback(
+    (event: Event) => {
+      const target = event.target;
+      const isFeedSurface =
+        target instanceof HTMLElement && target.matches(FEED_SCROLL_SELECTOR);
+      const isDocumentSurface =
+        target === document ||
+        target === document.documentElement ||
+        target === document.body;
+
+      if (!isFeedSurface && !isDocumentSurface) return;
+
+      const scrollSurface = isFeedSurface
+        ? (target as HTMLElement)
+        : document.scrollingElement;
+      if (!scrollSurface) return;
 
       const currentScrollTop = Math.max(0, scrollSurface.scrollTop);
       const scrollDelta = currentScrollTop - lastScrollTop.current;
@@ -41,7 +55,7 @@ export function useScrollDirection({
 
       lastScrollTop.current = currentScrollTop;
       clearStopTimer();
-      stopTimer.current = setTimeout(() => {
+      stopTimer.current = window.setTimeout(() => {
         setIsScrollingDown(false);
       }, stopDelay);
     },
@@ -49,8 +63,16 @@ export function useScrollDirection({
   );
 
   useEffect(() => {
-    return clearStopTimer;
-  }, [clearStopTimer]);
+    document.addEventListener("scroll", handleScroll, {
+      capture: true,
+      passive: true,
+    });
 
-  return { isScrollingDown, onFeedScroll };
+    return () => {
+      document.removeEventListener("scroll", handleScroll, true);
+      clearStopTimer();
+    };
+  }, [clearStopTimer, handleScroll]);
+
+  return { isScrollingDown };
 }
