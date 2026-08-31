@@ -19,6 +19,7 @@ import {
   Play,
   Share2,
   Search,
+  RotateCcw,
   Upload,
   UserRound,
   Volume2,
@@ -38,6 +39,7 @@ import {
   validateImageFile,
   type VideoMetadata,
 } from "@/lib/mediaUpload";
+import ErrorBoundary from "./ErrorBoundary";
 import "./mediaHub.css";
 
 type HomeTab = "videos" | "trendy" | "following" | "icons";
@@ -830,6 +832,18 @@ function FeedSkeleton({ short = false }: { short?: boolean }) {
   );
 }
 
+function FeedRecovery() {
+  return (
+    <div className="media-empty" role="status">
+      <h3>This feed is temporarily empty.</h3>
+      <p>Navigation is still available. Try another tab or reload this feed.</p>
+      <button type="button" className="primary-btn" onClick={() => window.location.reload()}>
+        <RotateCcw size={15} /> Reload feed
+      </button>
+    </div>
+  );
+}
+
 function HomeFeedPanel({
   tab,
   active = true,
@@ -847,6 +861,8 @@ function HomeFeedPanel({
     { tab },
     {
       enabled: tab !== "following" || auth.isAuthenticated,
+      retry: 1,
+      throwOnError: false,
       refetchOnWindowFocus: false,
       refetchInterval: 10_000,
     }
@@ -893,11 +909,6 @@ function HomeFeedPanel({
       </div>
       {query.isPending ? (
         <FeedSkeleton />
-      ) : query.isError ? (
-        <div className="media-empty">
-          <h3>Unable to load this feed.</h3>
-          <p>Try again in a moment.</p>
-        </div>
       ) : videos.length ? (
         <div className="long-video-grid media-feed-scroll h-screen overflow-y-scroll scrollbar-hide snap-y snap-mandatory w-full max-w-full box-border">
           {videos.map(video => (
@@ -1008,7 +1019,12 @@ function ShortVideoCard({
 function ShortsFeed({ active = true }: { active?: boolean }) {
   const query = trpc.videos.list.useQuery(
     { kind: "SHORT" },
-    { refetchOnWindowFocus: false, refetchInterval: 10_000 }
+    {
+      retry: 1,
+      throwOnError: false,
+      refetchOnWindowFocus: false,
+      refetchInterval: 10_000,
+    }
   );
   const viewportRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -1377,12 +1393,15 @@ export function CommunityAnnouncements() {
     refetchOnWindowFocus: false,
   });
   const query = trpc.community.list.useQuery(undefined, {
+    retry: 1,
+    throwOnError: false,
     refetchOnWindowFocus: false,
   });
   const canPost = Boolean(
     profileQuery.data?.profile?.isVerified &&
       ["creator", "company"].includes(profileQuery.data.profile.accountType)
   );
+  const announcements = query.data ?? [];
   return (
     <section
       className="media-section community-section"
@@ -1418,14 +1437,9 @@ export function CommunityAnnouncements() {
       )}
       {query.isPending ? (
         <FeedSkeleton />
-      ) : query.isError ? (
-        <div className="media-empty">
-          <h3>Unable to load announcements.</h3>
-          <p>Try again in a moment.</p>
-        </div>
-      ) : query.data?.length ? (
+      ) : announcements.length ? (
         <div className="announcement-list">
-          {query.data.map(announcement => (
+          {announcements.map(announcement => (
             <article className="announcement-card" key={announcement.id}>
               <div className="announcement-author">
                 <div className="announcement-author-avatar">
@@ -1512,7 +1526,12 @@ export function SearchFeed() {
   const [term, setTerm] = useState("");
   const query = trpc.home.search.useQuery(
     { term },
-    { enabled: term.trim().length >= 2, refetchOnWindowFocus: false }
+    {
+      enabled: term.trim().length >= 2,
+      retry: 1,
+      throwOnError: false,
+      refetchOnWindowFocus: false,
+    }
   );
   const results = ((query.data ?? []) as VideoRecord[]).filter(
     video => !isReportedLegacyMedia(video)
@@ -1553,11 +1572,6 @@ export function SearchFeed() {
         </div>
       ) : query.isPending ? (
         <FeedSkeleton />
-      ) : query.isError ? (
-        <div className="media-empty">
-          <h3>Search is temporarily unavailable.</h3>
-          <p>Try again in a moment.</p>
-        </div>
       ) : results.length ? (
         <div className="long-video-grid media-feed-scroll h-screen overflow-y-scroll scrollbar-hide snap-y snap-mandatory w-full max-w-full box-border">
           {results.map(video => (
@@ -1626,24 +1640,30 @@ export default function MediaHub({
         )}
       </div>
       <div hidden={activeSection !== "all"} className="media-tab-panel">
-        <ShortsFeed active={activeSection === "all"} />
-        <HomeFeedPanel
-          tab="videos"
-          active={activeSection === "all"}
-          autoOpenUpload={false}
-          showDetailsOverlay
-        />
+        <ErrorBoundary fallback={<FeedRecovery />}>
+          <ShortsFeed active={activeSection === "all"} />
+          <HomeFeedPanel
+            tab="videos"
+            active={activeSection === "all"}
+            autoOpenUpload={false}
+            showDetailsOverlay
+          />
+        </ErrorBoundary>
       </div>
       <div hidden={activeSection !== "videos"} className="media-tab-panel">
-        <HomeFeedPanel
-          tab="videos"
-          active={activeSection === "videos"}
-          autoOpenUpload={section === "publish"}
-          showDetailsOverlay={false}
-        />
+        <ErrorBoundary fallback={<FeedRecovery />}>
+          <HomeFeedPanel
+            tab="videos"
+            active={activeSection === "videos"}
+            autoOpenUpload={section === "publish"}
+            showDetailsOverlay={false}
+          />
+        </ErrorBoundary>
       </div>
       <div hidden={activeSection !== "shorts"} className="media-tab-panel">
-        <ShortsFeed active={activeSection === "shorts"} />
+        <ErrorBoundary fallback={<FeedRecovery />}>
+          <ShortsFeed active={activeSection === "shorts"} />
+        </ErrorBoundary>
       </div>
       {activeSection === "announcements" && <CommunityAnnouncements />}
     </div>

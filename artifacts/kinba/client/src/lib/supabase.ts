@@ -1,18 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
+import { hasPublicSupabaseConfig, publicSupabaseConfig } from "./runtimeConfig";
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? import.meta.env.SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? import.meta.env.SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn("[Supabase Auth] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY.");
+if (!hasPublicSupabaseConfig()) {
+  console.warn(
+    "[Supabase Auth] Missing VITE_SUPABASE_URL/VITE_SUPABASE_ANON_KEY and server runtime config."
+  );
 }
 
 const browserStorage =
   typeof window !== "undefined" ? window.localStorage : undefined;
 
 export const supabase = createClient(
-  supabaseUrl ?? "https://invalid.supabase.co",
-  supabaseAnonKey ?? "invalid-anon-key",
+  publicSupabaseConfig.url ?? "https://invalid.supabase.co",
+  publicSupabaseConfig.anonKey ?? "invalid-anon-key",
   {
     auth: {
       persistSession: true,
