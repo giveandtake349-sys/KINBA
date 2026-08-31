@@ -107,6 +107,34 @@ async function fetchUploadWithRetry(
   throw lastError instanceof Error ? lastError : new Error("Upload request failed.");
 }
 
+type UploadPayload = {
+  postId?: number;
+  videoId?: number;
+  status?: string;
+  videoUrl?: string;
+  imageUrl?: string;
+  url?: string;
+  error?: string;
+};
+
+async function readUploadPayload(response: Response): Promise<UploadPayload> {
+  const text = await response.text();
+  if (!text.trim()) return {};
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return parsed && typeof parsed === "object" ? (parsed as UploadPayload) : {};
+  } catch {
+    return { error: text.trim().slice(0, 240) };
+  }
+}
+
+function uploadFailureMessage(response: Response, payload: UploadPayload, resource: string) {
+  if (response.status === 404) {
+    return resource + " upload endpoint was not found. Check that the Render domain is attached to the KINBA API service, not a static-only deployment.";
+  }
+  return payload.error || resource + " publish failed with HTTP " + response.status + ".";
+}
+
 async function getUploadSession(message: string) {
   const current = await supabase.auth.getSession();
   if (current.error) throw current.error;
@@ -179,15 +207,10 @@ export async function publishPhoto(
     console.error("[MediaPublish] photo network failure", error);
     throw new Error(`Photo upload request failed: ${error instanceof Error ? error.message : "network error"}`);
   }
-  const payload = (await response.json().catch(() => ({}))) as {
-    postId?: number;
-    status?: string;
-    imageUrl?: string;
-    error?: string;
-  };
+  const payload = await readUploadPayload(response);
   if (!response.ok || !payload.postId || !payload.imageUrl) {
     console.error("[MediaPublish] photo API rejection", { status: response.status, payload });
-    throw new Error(payload.error || `Photo publish failed with HTTP ${response.status}.`);
+    throw new Error(uploadFailureMessage(response, payload, "Photo"));
   }
   return {
     postId: payload.postId,
@@ -224,15 +247,10 @@ export async function publishVideo(
     console.error("[MediaPublish] video network failure", error);
     throw new Error(`Video upload request failed: ${error instanceof Error ? error.message : "network error"}`);
   }
-  const payload = (await response.json().catch(() => ({}))) as {
-    videoId?: number;
-    status?: string;
-    videoUrl?: string;
-    error?: string;
-  };
+  const payload = await readUploadPayload(response);
   if (!response.ok || !payload.videoId || !payload.videoUrl) {
     console.error("[MediaPublish] video API rejection", { status: response.status, payload });
-    throw new Error(payload.error || `Video publish failed with HTTP ${response.status}.`);
+    throw new Error(uploadFailureMessage(response, payload, "Video"));
   }
   return {
     videoId: payload.videoId,
@@ -265,12 +283,9 @@ export async function uploadVideo(
       "The video upload service could not be reached. Check the Render service URL and CORS_ORIGIN configuration."
     );
   }
-  const payload = (await response.json().catch(() => ({}))) as {
-    url?: string;
-    error?: string;
-  };
+  const payload = await readUploadPayload(response);
   if (!response.ok || !payload.url)
-    throw new Error(payload.error || "The video could not be uploaded.");
+    throw new Error(uploadFailureMessage(response, payload, "Video"));
   return payload.url;
 }
 
