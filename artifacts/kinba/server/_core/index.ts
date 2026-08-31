@@ -22,7 +22,7 @@ async function startServer() {
     res.status(200).json({ ok: true });
   });
   const allowedOrigins = parseAllowedOrigins(
-    process.env.CORS_ORIGIN?.trim() || "https://kinba.onrender.com"
+    process.env.CORS_ORIGIN?.trim() || "https://kinba.onrender.com,https://ba.onrender.com"
   );
   app.use((req, res, next) => {
     const origin = req.header("origin");
