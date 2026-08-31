@@ -350,7 +350,7 @@ export type VideoAttachmentInput = {
   height?: number | null;
   durationSeconds?: number | null;
 };
-export type HomeFeedTab = "videos" | "trendy" | "following" | "icons";
+export type HomeFeedTab = "all" | "videos" | "trendy" | "following" | "icons";
 
 function requiredText(value: string | null | undefined, fallback: string) {
   const normalized = value?.trim();
@@ -492,6 +492,7 @@ export async function searchVideos(term: string, viewerId?: number) {
 }
 
 export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
+  if (tab === "all") return listUnifiedHomeFeed(viewerId);
   if (tab === "following" && !viewerId) return [];
   const db = await getDb();
   if (!db) return [];
@@ -517,6 +518,41 @@ export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
     viewerId,
     tab === "trendy" ? "trendy" : "recent"
   );
+}
+
+/** Resolve real persisted media and text posts into one chronological feed. */
+async function listUnifiedHomeFeed(viewerId?: number) {
+  const [media, shorts, textPosts] = await Promise.all([
+    selectVideos([eq(videos.kind, "LONG")], viewerId, "recent"),
+    selectVideos([eq(videos.kind, "SHORT")], viewerId, "recent"),
+    listCommunityAnnouncements(),
+  ]);
+  const regular = [
+    ...media.map(video => ({ ...video, feedType: "media" as const })),
+    ...textPosts.map(post => ({
+      ...post,
+      text: post.body,
+      feedType: "text" as const,
+    })),
+  ].sort(
+    (left, right) =>
+      new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+  );
+  const items: any[] = [];
+  let shortIndex = 0;
+  regular.forEach((item, index) => {
+    items.push(item);
+    const nextShort = shorts[shortIndex];
+    if ((index + 1) % 5 === 0 && nextShort) {
+      items.push({
+        feedType: "shorts" as const,
+        id: "shorts-" + nextShort.id,
+        video: nextShort,
+      });
+      shortIndex += 1;
+    }
+  });
+  return items;
 }
 
 export async function listNotifications(userId: number) {
