@@ -1419,7 +1419,7 @@ function ShortsFeed({ active = true }: { active?: boolean }) {
       <div className="media-section-heading">
         <div>
           <p className="eyebrow">Shorts</p>
-          <h2 id="shorts-heading">One minute. One idea.</h2>
+          <h2 id="shorts-heading">Shorts</h2>
         </div>
         <div className="shorts-controls">
           <button type="button" className="primary-btn shorts-upload-button" onClick={openUploader}>
