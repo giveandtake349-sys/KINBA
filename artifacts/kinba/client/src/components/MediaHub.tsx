@@ -1672,16 +1672,18 @@ export default function MediaHub({
         }`}
       >
         <div className="wheels-feed-layout">
-          {wheels ?? (
-            <div className="media-empty">
-              <h3>Wheels are unavailable.</h3>
-            </div>
-          )}
           <HomeFeedPanel
             tab="videos"
             active={activeSection === "wheels"}
             showDetailsOverlay
           />
+          <div className="wheels-sponsor-panel">
+            {wheels ?? (
+              <div className="media-empty">
+                <h3>Wheels are unavailable.</h3>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <div hidden={activeSection !== "all"} className="media-tab-panel">
