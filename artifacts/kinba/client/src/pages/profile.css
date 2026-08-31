@@ -521,3 +521,67 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+
+/* KINBA mobile social shell — Facebook-inspired, KINBA-owned */
+:root, html[data-theme="dark"] {
+  --kinba-bg: #18191a;
+  --kinba-surface: #242526;
+  --kinba-raised: #3a3b3c;
+  --kinba-line: #3e4042;
+  --kinba-text: #e4e6eb;
+  --kinba-muted: #b0b3b8;
+  --kinba-blue: #2d88ff;
+  --kinba-blue-soft: rgba(45, 136, 255, 0.16);
+}
+html[data-theme="dark"], html[data-theme="dark"] body { background: var(--kinba-bg) !important; }
+body { color: var(--kinba-text); }
+.kinba-app { min-height: 100dvh; background: var(--kinba-bg); color: var(--kinba-text); }
+.topbar.mobile-first-header {
+  position: sticky; top: 0; z-index: 60; height: 64px; padding: 0 20px;
+  display: flex; align-items: center; gap: 22px; background: rgba(24, 25, 26, .96);
+  border-bottom: 1px solid var(--kinba-line); backdrop-filter: blur(16px);
+}
+.brand { display: inline-flex; align-items: center; gap: 9px; color: var(--kinba-text); text-decoration: none; }
+.brand .official-logo { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: var(--kinba-blue); color: #fff; }
+.brand .logo-fallback { font: 800 9px/1 Arial, sans-serif; letter-spacing: -.04em; }
+.brand-name { font: 800 18px/1 Arial, sans-serif; letter-spacing: -.04em; }
+.desktop-nav { display: flex; align-items: center; gap: 4px; margin-right: auto; }
+.desktop-nav button { border: 0; border-radius: 8px; padding: 9px 12px; background: transparent; color: var(--kinba-muted); font-weight: 700; cursor: pointer; }
+.desktop-nav button:hover { background: var(--kinba-raised); color: var(--kinba-text); }
+.topbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.topbar-icon-button, .header-profile-trigger, .theme-toggle, .logout-btn {
+  border: 0; cursor: pointer; color: var(--kinba-text); background: transparent;
+}
+.topbar-icon-button { position: relative; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 50%; background: var(--kinba-raised); }
+.topbar-icon-button:hover { background: #4e4f50; }
+.notification-badge { position: absolute; top: -3px; right: -4px; min-width: 17px; height: 17px; padding: 0 4px; display: grid; place-items: center; border-radius: 10px; background: #f02849; color: white; font: 700 9px/1 Arial, sans-serif; border: 2px solid var(--kinba-bg); }
+.header-profile-trigger { display: inline-flex; align-items: center; gap: 8px; padding: 3px 7px 3px 3px; border-radius: 22px; }
+.header-profile-trigger:hover { background: var(--kinba-raised); }
+.header-profile-trigger .profile-identity--compact { gap: 7px; }
+.header-profile-trigger .profile-identity--compact > div:last-child { display: none; }
+.header-profile-trigger .profile-avatar { width: 32px; height: 32px; }
+.theme-toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--kinba-muted); }
+.logout-btn { display: inline-flex; align-items: center; gap: 6px; color: var(--kinba-muted); font-size: 12px; }
+.logout-btn:hover { color: var(--kinba-text); }
+.section-shell { width: min(100% - 32px, 980px); margin: 0 auto; padding: 18px 0 90px; }
+.bottom-navigation { position: fixed; left: 0; right: 0; bottom: 0; z-index: 70; display: none; height: 68px; padding: 7px 12px max(7px, env(safe-area-inset-bottom)); background: rgba(24, 25, 26, .98); border-top: 1px solid var(--kinba-line); }
+.bottom-navigation button { flex: 1; display: grid; place-items: center; gap: 3px; border: 0; color: var(--kinba-muted); background: transparent; font-size: 10px; font-weight: 700; cursor: pointer; }
+.bottom-navigation button:hover, .bottom-navigation .publish-nav { color: var(--kinba-blue); }
+.bottom-navigation .publish-nav svg { padding: 7px; width: 36px; height: 36px; border-radius: 50%; background: var(--kinba-blue); color: white; }
+.mobile-drawer { background: var(--kinba-surface); border-left: 1px solid var(--kinba-line); color: var(--kinba-text); }
+.drawer-backdrop { background: rgba(0, 0, 0, .64); }
+.drawer-stat, .drawer-group button { border-color: var(--kinba-line); }
+.drawer-group button:hover { background: var(--kinba-raised); }
+.primary-btn { background: var(--kinba-blue); border-color: var(--kinba-blue); color: white; }
+.primary-btn:hover { background: #4599ff; }
+@media (max-width: 760px) {
+  .topbar.mobile-first-header { height: 58px; padding: 0 12px; gap: 8px; }
+  .brand-name, .desktop-nav, .theme-toggle, .logout-btn { display: none; }
+  .topbar-actions { gap: 6px; }
+  .topbar-icon-button { width: 36px; height: 36px; }
+  .header-profile-trigger { order: 5; padding-right: 2px; }
+  .header-profile-trigger > svg { display: none; }
+  .section-shell { width: 100%; padding: 0 0 78px; }
+  .bottom-navigation { display: flex; }
+}
