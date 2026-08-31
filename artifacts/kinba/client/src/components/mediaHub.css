@@ -1090,7 +1090,7 @@
 }
 @media (max-width: 760px) {
   .media-hub {
-    margin: -24px -5vw -84px;
+    margin: 0 -5vw -84px;
   }
   .media-hub .long-video-card,
   .media-fullscreen-frame,
@@ -1233,29 +1233,30 @@
   display: flex;
   flex-direction: column;
   height: calc(100dvh - 72px);
-  margin: -46px -7vw 0;
+  margin: 0 -7vw 0;
   min-height: 0;
   overflow: hidden;
   position: relative;
 }
 .media-hub .home-feed-tabs {
   align-items: center;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.92),
-    rgba(0, 0, 0, 0.56),
-    transparent
-  );
-  border: 0;
+  background: rgba(0, 0, 0, 0.94);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 0;
+  display: flex;
+  flex: 0 0 auto;
   gap: 6px;
-  left: 0;
-  padding: 14px clamp(14px, 5vw, 42px) 26px;
-  position: absolute;
-  right: 0;
-  top: 0;
-  z-index: 40;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 12px clamp(14px, 5vw, 42px);
+  position: relative;
+  scrollbar-width: none;
+  z-index: 2;
   pointer-events: auto;
+  white-space: nowrap;
+}
+.media-hub .home-feed-tabs::-webkit-scrollbar {
+  display: none;
 }
 .media-hub .home-feed-tabs button {
   color: rgba(255, 255, 255, 0.66);
@@ -1390,7 +1391,7 @@
 @media (max-width: 820px) {
   .media-hub {
     height: calc(100dvh - 64px - 64px - env(safe-area-inset-bottom));
-    margin: -22px -12px 0;
+    margin: 0 -12px 0;
     min-height: 0;
   }
   .media-hub .media-feed-scroll,
