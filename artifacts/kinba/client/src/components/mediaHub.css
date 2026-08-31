@@ -1919,7 +1919,7 @@
 
 /* KINBA feed surfaces — dense, touch-first, vertically scannable */
 .media-hub { width: 100%; color: var(--kinba-text); }
-.home-feed-tabs { position: sticky; top: 64px; z-index: 40; display: flex; gap: 4px; padding: 8px 10px; margin: 0 auto 14px; max-width: 980px; overflow-x: auto; background: rgba(24,25,26,.96); border: 1px solid var(--kinba-line); border-radius: 0 0 12px 12px; scrollbar-width: none; }
+.home-feed-tabs { position: relative; top: auto; z-index: 40; display: flex; gap: 4px; padding: 8px 10px; margin: 0; max-width: 980px; overflow-x: auto; background: rgba(24,25,26,.96); border: 1px solid var(--kinba-line); border-radius: 0 0 12px 12px; scrollbar-width: none; }
 .home-feed-tabs::-webkit-scrollbar { display: none; }
 .home-feed-tabs button { flex: 1 0 120px; border: 0; border-radius: 8px; padding: 11px 12px; color: var(--kinba-muted); background: transparent; font-size: 12px; font-weight: 800; text-transform: uppercase; white-space: nowrap; cursor: pointer; }
 .home-feed-tabs button:hover { background: var(--kinba-raised); color: var(--kinba-text); }
@@ -1952,7 +1952,7 @@
 .media-tab-panel--wheels .home-feed-section .media-fullscreen-frame { aspect-ratio: 9 / 16; height: 100%; max-height: calc(100dvh - 190px); margin: 0 auto; }
 .media-tab-panel--wheels .home-feed-section .media-fullscreen-frame video { object-fit: cover; }
 @media (max-width: 760px) {
-  .home-feed-tabs { top: 58px; margin-bottom: 0; border-left: 0; border-right: 0; border-radius: 0; }
+  .home-feed-tabs { top: auto; margin: 0; border-left: 0; border-right: 0; border-radius: 0; }
   .media-section-heading { padding-inline: 14px; }
   .long-video-grid, .shorts-viewport { height: calc(100dvh - 124px) !important; padding-inline: 0; }
   .long-video-card, .short-card { min-height: calc(100dvh - 132px); border-radius: 0 !important; border-left: 0 !important; border-right: 0 !important; margin-bottom: 8px !important; }
