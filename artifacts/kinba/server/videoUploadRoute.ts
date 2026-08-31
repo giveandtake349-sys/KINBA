@@ -79,7 +79,7 @@ async function probeVideo(filePath: string) {
     "-of",
     "json",
     filePath,
-    ]);
+    ]));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       throw new Error("Video metadata validation is unavailable because ffprobe is not installed in the Render runtime.");
