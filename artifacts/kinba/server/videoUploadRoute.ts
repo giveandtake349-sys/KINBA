@@ -30,7 +30,24 @@ const upload = multer({
 });
 
 function errorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Upload failed.";
+  const message = error instanceof Error ? error.message : "";
+  console.error("[MediaUpload]", error);
+  const safeMessagePatterns = [
+    "Please sign in",
+    "Choose ",
+    "Title must",
+    "Images must",
+    "Videos must",
+    "Announcements must",
+    "The video metadata",
+    "The image dimensions",
+    "Database unavailable",
+    "application user ID is invalid",
+    "Video ID is invalid",
+  ];
+  if (safeMessagePatterns.some(pattern => message.startsWith(pattern)))
+    return message;
+  return "The media could not be published. Please try again.";
 }
 
 async function probeVideo(filePath: string) {

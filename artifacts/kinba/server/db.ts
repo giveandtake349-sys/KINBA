@@ -352,6 +352,16 @@ export type VideoAttachmentInput = {
 };
 export type HomeFeedTab = "videos" | "trendy" | "following" | "icons";
 
+function requiredText(value: string | null | undefined, fallback: string) {
+  const normalized = value?.trim();
+  return normalized || fallback;
+}
+
+function optionalText(value: string | null | undefined) {
+  const normalized = value?.trim();
+  return normalized || null;
+}
+
 function withSourceMap<T extends { id: number }>(
   rows: T[],
   sources: (typeof videoSources.$inferSelect)[]
@@ -590,6 +600,8 @@ export async function createVideo(
     sources: VideoSourceInput[];
   }
 ) {
+  if (!Number.isInteger(userId) || userId < 1)
+    throw new Error("Authenticated application user ID is invalid.");
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   return db.transaction(async tx => {
@@ -597,12 +609,12 @@ export async function createVideo(
       .insert(videos)
       .values({
         userId,
-        title: input.title,
-        description: input.description,
-        videoUrl: input.videoUrl,
-        thumbnailUrl: input.thumbnailUrl ?? null,
+        title: requiredText(input.title, "Untitled video"),
+        description: requiredText(input.description, "No description provided."),
+        videoUrl: requiredText(input.videoUrl, "about:blank"),
+        thumbnailUrl: optionalText(input.thumbnailUrl),
         mediaType: "VIDEO",
-        kind: input.kind,
+        kind: input.kind === "SHORT" ? "SHORT" : "LONG",
         durationSeconds: input.durationSeconds,
         width: input.width,
         height: input.height,
@@ -628,16 +640,18 @@ export async function createPhotoPost(
     height: number;
   }
 ) {
+  if (!Number.isInteger(userId) || userId < 1)
+    throw new Error("Authenticated application user ID is invalid.");
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const [created] = await db
     .insert(videos)
     .values({
       userId,
-      title: input.title,
-      description: input.description,
-      videoUrl: input.imageUrl,
-      thumbnailUrl: input.imageUrl,
+      title: requiredText(input.title, "Untitled photo"),
+      description: requiredText(input.description, "No description provided."),
+      videoUrl: requiredText(input.imageUrl, "about:blank"),
+      thumbnailUrl: optionalText(input.imageUrl),
       mediaType: "IMAGE",
       kind: "LONG",
       durationSeconds: 1,
@@ -658,11 +672,30 @@ export async function updateVideoProcessing(
     processingError?: string | null;
   }
 ) {
+  if (!Number.isInteger(videoId) || videoId < 1)
+    throw new Error("Video ID is invalid.");
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
+  const processingStatus =
+    input.status === "PROCESSING"
+      ? "PROCESSING"
+      : input.status === "READY"
+        ? "READY"
+        : input.status === "FAILED"
+          ? "FAILED"
+          : "PENDING";
   const [updated] = await db
     .update(videos)
-    .set({ ...input, updatedAt: new Date() })
+    .set({
+      processingStatus,
+      videoUrl:
+        input.videoUrl === undefined ? undefined : requiredText(input.videoUrl, "about:blank"),
+      hlsMasterUrl:
+        input.hlsMasterUrl === undefined ? undefined : optionalText(input.hlsMasterUrl),
+      processingError:
+        input.processingError === undefined ? undefined : optionalText(input.processingError),
+      updatedAt: new Date(),
+    })
     .where(eq(videos.id, videoId))
     .returning();
   return updated;
