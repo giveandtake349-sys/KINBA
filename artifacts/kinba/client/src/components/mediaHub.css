@@ -1869,3 +1869,7 @@
   .feed-text-card, .shorts-insertion-block { border-left: 0; border-right: 0; border-radius: 0; }
   .feed-text-card { padding: 16px 14px; }
 }
+
+
+/* Dedicated Shorts keeps the zero-content state compact and actionable. */
+.shorts-section .media-empty { min-height: 0; padding: 24px 16px; }
