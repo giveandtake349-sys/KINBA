@@ -610,3 +610,66 @@ body { color: var(--kinba-text); }
 @media (max-width: 760px) {
   .topbar.mobile-first-header { height: 58px; }
 }
+
+
+/* Compact feed chrome: the action bar and feed tabs share one fixed surface. */
+.top-navigation-wrapper {
+  isolation: isolate;
+  will-change: transform;
+  pointer-events: auto;
+}
+
+.top-navigation-wrapper .topbar.mobile-first-header {
+  position: relative !important;
+  top: auto !important;
+  inset: auto !important;
+  z-index: auto !important;
+  margin: 0 !important;
+  background: transparent !important;
+}
+
+.top-navigation-wrapper .home-feed-tabs {
+  position: relative !important;
+  top: auto !important;
+  z-index: auto !important;
+  width: 100% !important;
+  min-height: 48px;
+  margin: 0 !important;
+  padding: 0 max(12px, calc((100% - 940px) / 2)) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.top-navigation-wrapper .home-feed-tabs button {
+  min-height: 48px;
+  padding-top: 8px !important;
+  padding-bottom: 7px !important;
+}
+
+.app-main-content.has-feed-tabs .home-page {
+  padding-top: 116px !important;
+}
+
+.app-main-content:not(.has-feed-tabs) > .profile-page {
+  padding-top: 86px;
+}
+
+.bottom-navigation {
+  will-change: transform;
+}
+
+@media (max-width: 760px) {
+  .top-navigation-wrapper .topbar.mobile-first-header {
+    min-height: 58px;
+  }
+
+  .top-navigation-wrapper .home-feed-tabs,
+  .top-navigation-wrapper .home-feed-tabs button {
+    min-height: 46px;
+  }
+
+  .app-main-content.has-feed-tabs .home-page {
+    padding-top: 104px !important;
+  }
+}

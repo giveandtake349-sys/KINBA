@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type ReactNode,
+  type UIEvent,
 } from "react";
 import {
   BadgeCheck,
@@ -1723,10 +1724,14 @@ export function SearchFeed() {
 export default function MediaHub({
   section = "all",
   onSectionChange,
+  onFeedScroll,
+  showTabs = true,
   wheels,
 }: {
   section?: FeedSection;
   onSectionChange?: (section: FeedSection) => void;
+  onFeedScroll?: (event: UIEvent<HTMLElement>) => void;
+  showTabs?: boolean;
   wheels?: ReactNode;
 }) {
   const [selectedSection, setSelectedSection] = useState<FeedSection>(section);
@@ -1745,36 +1750,38 @@ export default function MediaHub({
     onSectionChange?.(next);
   };
   return (
-    <div className="media-hub">
-      <nav
-        className="home-feed-tabs"
-        aria-label="Home feed tabs"
-        role="tablist"
-      >
-        {(
-          [
-            ["wheels", "Wheels"],
-            ["all", "All Feed"],
-            ["videos", "Videos"],
-            ["shorts", "Shorts"],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            type="button"
-            key={id}
-            className={activeSection === id ? "active" : ""}
-            onClick={event => {
-              event.preventDefault();
-              event.stopPropagation();
-              select(id);
-            }}
-            aria-selected={activeSection === id}
-            role="tab"
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
+    <div className="media-hub" onScrollCapture={onFeedScroll}>
+      {showTabs && (
+        <nav
+          className="home-feed-tabs"
+          aria-label="Home feed tabs"
+          role="tablist"
+        >
+          {(
+            [
+              ["wheels", "Wheels"],
+              ["all", "All Feed"],
+              ["videos", "Videos"],
+              ["shorts", "Shorts"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              type="button"
+              key={id}
+              className={activeSection === id ? "active" : ""}
+              onClick={event => {
+                event.preventDefault();
+                event.stopPropagation();
+                select(id);
+              }}
+              aria-selected={activeSection === id}
+              role="tab"
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      )}
       <div
         hidden={activeSection !== "wheels"}
         className={`media-tab-panel${

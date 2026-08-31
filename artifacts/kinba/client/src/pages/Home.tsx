@@ -42,6 +42,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useTheme } from "@/contexts/ThemeContext";
 import { SupabaseAuthDialog } from "@/components/SupabaseAuthDialog";
+import { useScrollDirection } from "@/hooks/useScrollDirection";
 import {
   getVideoMetadata,
   MAX_LONG_VIDEO_DURATION_SECONDS,
@@ -841,7 +842,40 @@ function AppHeader({
   );
 }
 
+function FeedTabs({
+  activeSection,
+  onSectionChange,
+}: {
+  activeSection: FeedSection;
+  onSectionChange: (section: FeedSection) => void;
+}) {
+  const tabs = [
+    ["wheels", "Wheels"],
+    ["all", "All Feed"],
+    ["videos", "Videos"],
+    ["shorts", "Shorts"],
+  ] as const;
+
+  return (
+    <nav className="home-feed-tabs" aria-label="Home feed tabs" role="tablist">
+      {tabs.map(([id, label]) => (
+        <button
+          type="button"
+          key={id}
+          className={activeSection === id ? "active" : ""}
+          onClick={safeClick(() => onSectionChange(id))}
+          aria-selected={activeSection === id}
+          role="tab"
+        >
+          {label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
 function BottomNavigation({
+  className,
   activePanel,
   menuOpen,
   onHome,
@@ -850,6 +884,7 @@ function BottomNavigation({
   onNotifications,
   onMenu,
 }: {
+  className?: string;
   activePanel: FeedSection;
   menuOpen: boolean;
   onHome: () => void;
@@ -860,7 +895,10 @@ function BottomNavigation({
 }) {
   const isHome = ["all", "videos", "shorts", "wheels"].includes(activePanel);
   return (
-    <nav className="bottom-navigation" aria-label="Mobile navigation">
+    <nav
+      className={`bottom-navigation transition-transform duration-300 ${className ?? ""}`}
+      aria-label="Mobile navigation"
+    >
       <button
         type="button"
         className={isHome ? "active" : ""}
@@ -2279,6 +2317,7 @@ function SponsorBidsPanel() {
 
 export default function Home() {
   const auth = useAuth();
+  const { isScrollingDown, onFeedScroll } = useScrollDirection();
   const utils = trpc.useUtils();
   const [location, navigate] = useLocation();
   const { theme } = useTheme();
@@ -2395,17 +2434,32 @@ export default function Home() {
         className="kinba-app max-w-vw overflow-x-hidden box-border"
         onClick={guardNonSubmitNavigation}
       >
-        <AppHeader
-          profile={profile}
-          notificationCount={notificationCount}
-          onHome={() => showFeed("all")}
-          onSelectFeed={showFeed}
-          onOpenModal={openModal}
-          onMenu={() => setMenuOpen(value => !value)}
-          onProfile={openProfile}
-          onLogout={logout}
-        />
-        <main className="max-w-vw overflow-x-hidden box-border">
+        <div
+          className={`top-navigation-wrapper fixed top-0 left-0 right-0 z-50 bg-[#0B0F17]/95 backdrop-blur-md transition-transform duration-300 ${
+            screen === "dashboard" && isScrollingDown
+              ? "-translate-y-full"
+              : "translate-y-0"
+          }`}
+        >
+          <AppHeader
+            profile={profile}
+            notificationCount={notificationCount}
+            onHome={() => showFeed("all")}
+            onSelectFeed={showFeed}
+            onOpenModal={openModal}
+            onMenu={() => setMenuOpen(value => !value)}
+            onProfile={openProfile}
+            onLogout={logout}
+          />
+          {screen === "dashboard" && (
+            <FeedTabs activeSection={activeView} onSectionChange={showFeed} />
+          )}
+        </div>
+        <main
+          className={`app-main-content max-w-vw overflow-x-hidden box-border ${
+            screen === "dashboard" ? "has-feed-tabs" : ""
+          }`}
+        >
           {screen === "dashboard" ? (
             <section className="section-shell home-page">
               {activeView === "notifications" ? (
@@ -2416,6 +2470,8 @@ export default function Home() {
                 <MediaHub
                   section={activeView}
                   onSectionChange={showFeed}
+                  onFeedScroll={onFeedScroll}
+                  showTabs={false}
                   wheels={<SponsorBidsPanel />}
                 />
               )}
@@ -2485,6 +2541,11 @@ export default function Home() {
           onClose={() => setActiveModal(null)}
         />
         <BottomNavigation
+          className={
+            screen === "dashboard" && isScrollingDown
+              ? "translate-y-full"
+              : "translate-y-0"
+          }
           activePanel={activeView}
           menuOpen={menuOpen}
           onHome={() => showFeed("all")}
