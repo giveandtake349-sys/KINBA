@@ -1,0 +1,139 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1787847921092,
+      "tag": "0000_flaky_marrow",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787946271245,
+      "tag": "0001_media_attachments",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787951960000,
+      "tag": "0002_avatar_storage",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787985500000,
+      "tag": "0003_comment_media",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787986531000,
+      "tag": "0004_signal_media",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788001589181,
+      "tag": "0005_profile_social_stats",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788002176168,
+      "tag": "0006_media_and_community",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788004645401,
+      "tag": "0007_remove_legacy_add_video_sources",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788007563905,
+      "tag": "0008_add_video_comments",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788009708593,
+      "tag": "0009_mobile_profile_and_views",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788021682168,
+      "tag": "0010_verification_transactions_hls",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788024957643,
+      "tag": "0011_shallow_omega_sentinel",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788083139705,
+      "tag": "0012_tired_mikhail_rasputin",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788083766608,
+      "tag": "0013_open_giant_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1788084101232,
+      "tag": "0014_secret_malcolm_colcord",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1788084804495,
+      "tag": "0015_early_iceman",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1788087528976,
+      "tag": "0016_worried_inertia",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788096921434,
+      "tag": "0017_silent_legion",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788110766517,
+      "tag": "0018_tired_martin_li",
+      "breakpoints": true
+    }
+  ]
+}

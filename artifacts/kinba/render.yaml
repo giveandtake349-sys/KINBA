@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: kinba
+    runtime: node
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    startCommand: pnpm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: SUPABASE_DATABASE_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: OWNER_OPEN_ID
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: VITE_API_BASE_URL
+        sync: false
+      - key: R2_ENDPOINT
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_PUBLIC_BASE_URL
+        value: https://pub-70b81b5880fc4021aec379e9320a0260.r2.dev
+      - key: HLS_RECOVERY_DELAY_MS
+        value: "3000"

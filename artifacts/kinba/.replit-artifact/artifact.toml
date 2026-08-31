@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "KINBA"
+description = "A community media platform where people share short videos, follow creators, participate in Wheels, and exchange value through real Supabase-backed interactions."
+version = "1.0.0"
+id = "artifacts/kinba"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21413
+
+[services.development]
+run = "pnpm --filter @workspace/kinba run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/kinba", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/kinba/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21413"
+BASE_PATH = "/"
