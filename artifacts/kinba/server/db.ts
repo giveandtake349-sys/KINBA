@@ -396,6 +396,8 @@ async function loadVideoSources(videoIds: number[]) {
 function shapeVideoRow(row: any) {
   return {
     ...row.video,
+    mediaType: row.video.mediaType === "IMAGE" ? "IMAGE" : "VIDEO",
+    processingStatus: row.video.processingStatus ?? "READY",
     reactionCount: Number(row.reactionCount),
     shareCount: Number(row.shareCount),
     commentCount: Number(row.commentCount),

@@ -1153,7 +1153,15 @@ function ShortVideoCard({
       className="short-card w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 mb-4 overflow-hidden box-border"
       data-short-index={index}
     >
-      <QualityVideoPlayer video={video} vertical active={active} />
+      {video.mediaType === "IMAGE" ? (
+        <img
+          src={video.videoUrl}
+          className="w-full h-auto object-cover rounded-lg"
+          alt={video.title || "Post"}
+        />
+      ) : (
+        <QualityVideoPlayer video={video} vertical active={active} />
+      )}
       <div className="short-overlay">
         <div className="short-overlay-details">
           <div className="media-owner">
