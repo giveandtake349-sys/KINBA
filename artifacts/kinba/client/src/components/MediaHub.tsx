@@ -17,6 +17,7 @@ import {
   Megaphone,
   Pause,
   Play,
+  Plus,
   Share2,
   Search,
   RotateCcw,
@@ -24,6 +25,7 @@ import {
   UserRound,
   Volume2,
   VolumeX,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -41,6 +43,7 @@ import {
 } from "@/lib/mediaUpload";
 import ErrorBoundary from "./ErrorBoundary";
 import "./mediaHub.css";
+import "./kinbaModern.css";
 
 type HomeTab = "videos" | "trendy" | "following" | "icons";
 type VideoKind = "LONG" | "SHORT";
@@ -149,6 +152,10 @@ function ownerHandle(name: string | null, username?: string | null) {
       .replace(/[^a-z0-9]+/g, "_")
       .replace(/^_|_$/g, "") || "kinba_creator"
   }`;
+}
+function hashtagsFromDescription(description: string) {
+  const tags = description.match(/#[\p{L}\p{N}_-]+/gu) ?? [];
+  return tags.slice(0, 3).join(" ") || "#kinba";
 }
 function isReportedLegacyMedia(
   video: Pick<VideoRecord, "title" | "description">
@@ -395,6 +402,7 @@ function EngagementActions({
   overlay = false,
   bookmarked = false,
   onBookmark,
+  owner,
 }: {
   engagement: Engagement;
   onReact: () => void;
@@ -404,47 +412,102 @@ function EngagementActions({
   overlay?: boolean;
   bookmarked?: boolean;
   onBookmark?: () => void;
+  owner?: VideoRecord["owner"];
 }) {
+  const auth = useAuth();
+  const utils = trpc.useUtils();
+  const followState = trpc.profile.followState.useQuery(
+    { userId: owner?.id ?? 0 },
+    {
+      enabled: Boolean(
+        owner && auth.isAuthenticated && auth.user?.id !== owner.id
+      ),
+      refetchOnWindowFocus: false,
+    }
+  );
+  const toggleFollow = trpc.profile.toggleFollow.useMutation();
+  const isOwnVideo = Boolean(owner && auth.user?.id === owner.id);
+  const following = followState.data?.following ?? false;
+  const followOwner = async () => {
+    if (!owner || isOwnVideo) return;
+    if (!auth.isAuthenticated) return auth.openAuth();
+    try {
+      await toggleFollow.mutateAsync({ userId: owner.id });
+      await Promise.all([
+        followState.refetch(),
+        utils.home.feed.invalidate(),
+        utils.videos.list.invalidate(),
+      ]);
+    } catch (error) {
+      notifyError(error);
+    }
+  };
   return (
     <div
       className={`media-engagement-actions${overlay ? " media-engagement-actions--overlay absolute right-3 bottom-4 z-30 flex flex-col items-center gap-3" : ""}`}
     >
+      {overlay && owner && !isOwnVideo && (
+        <button
+          type="button"
+          className={`creator-follow-action${following ? " is-following" : ""}`}
+          onClick={followOwner}
+          disabled={toggleFollow.isPending}
+          aria-label={following ? "Unfollow creator" : "Follow creator"}
+          aria-pressed={following}
+        >
+          <span className="creator-follow-avatar">
+            {owner.photoUrl ? (
+              <img src={owner.photoUrl} alt="" />
+            ) : (
+              <UserRound size={19} />
+            )}
+          </span>
+          <span className="creator-follow-badge" aria-hidden="true">
+            {following ? <Check size={12} /> : <Plus size={13} />}
+          </span>
+          <span>{following ? "Following" : "Follow"}</span>
+        </button>
+      )}
       <button
         type="button"
         className={engagement.viewerReacted ? "is-active" : ""}
         onClick={onReact}
         disabled={pending === "react"}
         aria-pressed={engagement.viewerReacted}
+        aria-label={engagement.viewerReacted ? "Unlike video" : "Like video"}
       >
         <Heart
-          size={16}
+          size={overlay ? 27 : 16}
           fill={engagement.viewerReacted ? "currentColor" : "none"}
-        />{" "}
-        <span>{engagement.viewerReacted ? "Liked" : "React/Like"}</span>{" "}
-        <strong>{engagement.reactionCount}</strong>
+        />
+        <span>{engagement.viewerReacted ? "Liked" : "React/Like"}</span>
+        <strong>{formatCount(engagement.reactionCount)}</strong>
       </button>
-      <button type="button" onClick={onComments}>
-        <MessageCircle size={16} /> <span>Comments</span>{" "}
-        <strong>{engagement.commentCount}</strong>
+      <button type="button" onClick={onComments} aria-label="Open comments">
+        <MessageCircle size={overlay ? 27 : 16} /> <span>Comments</span>
+        <strong>{formatCount(engagement.commentCount)}</strong>
       </button>
-      <button
-        type="button"
-        className={bookmarked ? "is-active" : ""}
-        onClick={onBookmark}
-        aria-pressed={bookmarked}
-      >
-        <Bookmark size={16} fill={bookmarked ? "currentColor" : "none"} />{" "}
-        <span>Bookmark</span>
-      </button>
+      {!overlay && (
+        <button
+          type="button"
+          className={bookmarked ? "is-active" : ""}
+          onClick={onBookmark}
+          aria-pressed={bookmarked}
+        >
+          <Bookmark size={16} fill={bookmarked ? "currentColor" : "none"} />
+          <span>Bookmark</span>
+        </button>
+      )}
       <button
         type="button"
         className={engagement.viewerShared ? "is-active" : ""}
         onClick={onShare}
         disabled={pending === "share"}
+        aria-label="Share video"
       >
-        <Share2 size={16} />{" "}
-        <span>{pending === "share" ? "Sharing" : "Share"}</span>{" "}
-        <strong>{engagement.shareCount}</strong>
+        <Share2 size={overlay ? 28 : 16} />
+        <span>{pending === "share" ? "Sharing" : "Share"}</span>
+        <strong>{formatCount(engagement.shareCount)}</strong>
       </button>
     </div>
   );
@@ -453,10 +516,12 @@ function CommentsPanel({
   videoId,
   open,
   overlay = false,
+  onClose,
 }: {
   videoId: number;
   open: boolean;
   overlay?: boolean;
+  onClose?: () => void;
 }) {
   const auth = useAuth();
   const [body, setBody] = useState("");
@@ -482,7 +547,19 @@ function CommentsPanel({
     <div
       className={`video-comments${overlay ? " video-comments--overlay" : ""}`}
       aria-live="polite"
+      role={overlay ? "dialog" : undefined}
+      aria-modal={overlay || undefined}
+      aria-label={overlay ? "Comments" : undefined}
     >
+      {overlay && (
+        <div className="comment-sheet-header">
+          <span aria-hidden="true" />
+          <strong>Comments</strong>
+          <button type="button" onClick={onClose} aria-label="Close comments">
+            <X size={19} />
+          </button>
+        </div>
+      )}
       {commentsQuery.isPending ? (
         <div className="comment-loading">Loading comments…</div>
       ) : commentsQuery.isError ? (
@@ -601,6 +678,12 @@ function VideoCard({
               </div>
               <h3>{video.title}</h3>
               <p>{video.description}</p>
+              <p className="media-caption-tags">
+                {ownerHandle(video.owner.name, video.owner.username)} · {hashtagsFromDescription(video.description)}
+              </p>
+              <p className="media-sound-track">
+                <Volume2 size={14} aria-hidden="true" /> Original sound · {ownerHandle(video.owner.name, video.owner.username)}
+              </p>
               <div className="media-meta-line" aria-label="Video metadata">
                 <span>{formatCount(views)} views</span>
                 <span>{relativeTime(video.createdAt)}</span>
@@ -616,6 +699,7 @@ function VideoCard({
               overlay
               bookmarked={bookmarked}
               onBookmark={toggleBookmark}
+              owner={video.owner}
             />
           </div>
         )}
@@ -668,7 +752,12 @@ function VideoCard({
           />
         </div>
       )}
-      <CommentsPanel videoId={video.id} open={commentsOpen} />
+      <CommentsPanel
+        videoId={video.id}
+        open={commentsOpen}
+        overlay={showDetailsOverlay}
+        onClose={() => setCommentsOpen(false)}
+      />
     </article>
   );
 }
@@ -1029,6 +1118,12 @@ function ShortVideoCard({
           </div>
           <strong className="short-title">{video.title}</strong>
           <p>{video.description}</p>
+          <p className="media-caption-tags">
+            {ownerHandle(video.owner.name, video.owner.username)} · {hashtagsFromDescription(video.description)}
+          </p>
+          <p className="media-sound-track">
+            <Volume2 size={14} aria-hidden="true" /> Original sound · {ownerHandle(video.owner.name, video.owner.username)}
+          </p>
         </div>
         <EngagementActions
           engagement={current}
@@ -1039,9 +1134,15 @@ function ShortVideoCard({
           overlay
           bookmarked={bookmarked}
           onBookmark={toggleBookmark}
+          owner={video.owner}
         />
       </div>
-      <CommentsPanel videoId={video.id} open={commentsOpen} overlay />
+      <CommentsPanel
+        videoId={video.id}
+        open={commentsOpen}
+        overlay
+        onClose={() => setCommentsOpen(false)}
+      />
     </article>
   );
 }

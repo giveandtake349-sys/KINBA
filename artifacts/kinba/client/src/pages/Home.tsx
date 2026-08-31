@@ -767,7 +767,7 @@ function AppHeader({
           aria-label="Notifications"
           title="Notifications"
         >
-          <MessageCircle size={18} />
+          <Bell size={18} />
           {notificationCount > 0 && (
             <span className="notification-badge">
               {notificationCount > 99 ? "99+" : notificationCount}
@@ -794,37 +794,67 @@ function AppHeader({
 }
 
 function BottomNavigation({
+  activePanel,
+  menuOpen,
   onHome,
   onSearch,
   onPublish,
   onNotifications,
   onMenu,
 }: {
+  activePanel: FeedSection;
+  menuOpen: boolean;
   onHome: () => void;
   onSearch: () => void;
   onPublish: () => void;
   onNotifications: () => void;
   onMenu: () => void;
 }) {
+  const isHome = ["all", "videos", "shorts", "wheels"].includes(activePanel);
   return (
     <nav className="bottom-navigation" aria-label="Mobile navigation">
-      <button type="button" onClick={onHome}>
+      <button
+        type="button"
+        className={isHome ? "active" : ""}
+        onClick={onHome}
+        aria-current={isHome ? "page" : undefined}
+      >
         <HomeIcon size={23} />
         <span>Home</span>
       </button>
-      <button type="button" onClick={onSearch}>
+      <button
+        type="button"
+        className={activePanel === "search" ? "active" : ""}
+        onClick={onSearch}
+        aria-current={activePanel === "search" ? "page" : undefined}
+      >
         <Search size={23} />
         <span>Search</span>
       </button>
-      <button type="button" className="publish-nav" onClick={onPublish}>
+      <button
+        type="button"
+        className="publish-nav"
+        onClick={onPublish}
+        aria-label="Create a video"
+      >
         <PenLine size={24} />
         <span>Create</span>
       </button>
-      <button type="button" onClick={onNotifications}>
+      <button
+        type="button"
+        className={activePanel === "notifications" ? "active" : ""}
+        onClick={onNotifications}
+        aria-current={activePanel === "notifications" ? "page" : undefined}
+      >
         <Bell size={23} />
         <span>Notifications</span>
       </button>
-      <button type="button" onClick={onMenu}>
+      <button
+        type="button"
+        className={menuOpen ? "active" : ""}
+        onClick={onMenu}
+        aria-expanded={menuOpen}
+      >
         <Menu size={23} />
         <span>Menu</span>
       </button>
@@ -1170,6 +1200,42 @@ function WalletPanel() {
         </span>
       </div>
     </section>
+  );
+}
+
+function WalletModal({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div className="wallet-modal-layer" role="presentation">
+      <button
+        type="button"
+        className="wallet-modal-backdrop"
+        aria-label="Close wallet"
+        onClick={onClose}
+      />
+      <section
+        className="wallet-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wallet-heading"
+      >
+        <button
+          type="button"
+          className="wallet-modal-close"
+          aria-label="Close wallet"
+          onClick={onClose}
+        >
+          <X size={20} />
+        </button>
+        <WalletPanel />
+      </section>
+    </div>
   );
 }
 
@@ -1847,6 +1913,7 @@ export default function Home() {
   const [location, navigate] = useLocation();
   const { theme } = useTheme();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [walletOpen, setWalletOpen] = useState(false);
   const panelParam = new URLSearchParams(location.split("?")[1] ?? "").get(
     "panel"
   );
@@ -1882,9 +1949,11 @@ export default function Home() {
   const screen: Screen =
     location === "/profile"
       ? "profile"
-      : auth.isAuthenticated
-        ? "dashboard"
-        : "landing";
+      : location === "/login"
+        ? "landing"
+        : auth.isAuthenticated
+          ? "dashboard"
+          : "landing";
   useEffect(() => {
     if (screen !== "landing" && !auth.loading && !auth.isAuthenticated)
       auth.openAuth();
@@ -1893,14 +1962,26 @@ export default function Home() {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
   const logout = async () => {
-    await auth.logout();
-    setMenuOpen(false);
-    navigate("/");
-    auth.openAuth();
+    try {
+      await auth.logout();
+      setMenuOpen(false);
+      setWalletOpen(false);
+      navigate("/login");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to log out.";
+      window.alert(message);
+    }
   };
   const selectSection = (next: FeedSection | "profile") => {
-    if (next === "profile") navigate("/profile");
-    else navigate(`/?panel=${next}`);
+    if (next === "profile") {
+      navigate("/profile");
+      return;
+    }
+    if (next === "wallet") {
+      setWalletOpen(true);
+      return;
+    }
+    navigate(`/?panel=${next}`);
   };
   const authDialog = (
     <SupabaseAuthDialog
@@ -1975,7 +2056,10 @@ export default function Home() {
           onNavigate={selectSection}
           onLogout={logout}
         />
+        <WalletModal open={walletOpen} onClose={() => setWalletOpen(false)} />
         <BottomNavigation
+          activePanel={section}
+          menuOpen={menuOpen}
           onHome={() => {
             navigate("/?panel=all");
           }}

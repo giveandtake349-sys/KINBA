@@ -50,19 +50,19 @@
   color-scheme: light;
 }
 :root[data-theme="dark"] {
-  --page-bg: #182125;
-  --text: #f3efe7;
-  --muted: #a8b6b5;
-  --surface: #202c30;
-  --surface-raised: #2a383c;
-  --border: rgba(243, 239, 231, 0.14);
-  --input: rgba(243, 239, 231, 0.11);
-  --accent: #f1836f;
-  --accent-soft: rgba(241, 131, 111, 0.14);
-  --accent-border: rgba(241, 131, 111, 0.45);
-  --accent-ink: #271916;
-  --teal: #71b9ae;
-  --teal-soft: rgba(113, 185, 174, 0.14);
+  --page-bg: #0b0f17;
+  --text: #f4f7ff;
+  --muted: #9aa8bf;
+  --surface: #121825;
+  --surface-raised: #1b2536;
+  --border: rgba(190, 207, 235, 0.13);
+  --input: rgba(255, 255, 255, 0.08);
+  --accent: #ff5e56;
+  --accent-soft: rgba(255, 94, 86, 0.12);
+  --accent-border: rgba(255, 94, 86, 0.45);
+  --accent-ink: #ffffff;
+  --teal: #25d8e8;
+  --teal-soft: rgba(37, 216, 232, 0.13);
   color-scheme: dark;
 }
 @layer base {
@@ -2083,6 +2083,7 @@ h3 {
 button,
 a,
 [role="button"],
+[role="tab"],
 input,
 textarea,
 select,

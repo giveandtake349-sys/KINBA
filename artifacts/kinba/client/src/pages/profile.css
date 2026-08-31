@@ -587,15 +587,15 @@ body { color: var(--kinba-text); }
 }
 
 
-/* Full-screen video shell: chrome floats above media instead of consuming layout space. */
-.topbar.mobile-first-header {
-  position: fixed !important; inset: 0 0 auto; z-index: 100 !important;
-  pointer-events: none !important;
+/* App chrome stays in the normal stacking context; interactive targets own their touch area. */
+.topbar.mobile-first-header,
+.bottom-navigation,
+.topbar.mobile-first-header > *,
+.topbar.mobile-first-header .topbar-actions,
+.bottom-navigation button,
+.bottom-navigation a {
+  pointer-events: auto !important;
 }
-.topbar.mobile-first-header > * { pointer-events: auto !important; }
-.topbar.mobile-first-header .topbar-actions { pointer-events: auto !important; }
-.bottom-navigation { pointer-events: none !important; }
-.bottom-navigation button, .bottom-navigation a { pointer-events: auto !important; }
 .home-page { padding-top: 0 !important; }
 .qr-mark { display: grid; place-items: center; overflow: hidden; background: white; border-radius: 14px; }
 .qr-mark img { display: block; width: 180px; height: 180px; image-rendering: pixelated; }

@@ -22,6 +22,7 @@ export default function App() {
             <ThemedToaster />
             <Switch>
               <Route path="/admin" component={Admin} />
+              <Route path="/login" component={Home} />
               <Route path="/" component={Home} />
               <Route path="/profile" component={Home} />
               <Route component={NotFound} />
