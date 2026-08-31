@@ -60,7 +60,7 @@ type VideoRecord = {
   description: string;
   videoUrl: string;
   thumbnailUrl: string | null;
-  mediaType?: "VIDEO" | "IMAGE";
+  mediaType: "VIDEO" | "IMAGE";
   kind: VideoKind;
   durationSeconds: number;
   width: number;
@@ -647,7 +647,11 @@ function VideoCard({
     <article className="long-video-card w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 mb-4 overflow-hidden box-border">
               <div className={`media-fullscreen-frame ${video.mediaType === "IMAGE" ? "media-photo-frame" : ""}`}>
         {video.mediaType === "IMAGE" ? (
-          <img className="media-photo" src={video.videoUrl} alt={video.title} />
+          <img
+            className="w-full h-auto object-cover rounded-lg media-photo"
+            src={video.videoUrl}
+            alt={video.title || "Post"}
+          />
         ) : (
           <QualityVideoPlayer
             video={video}

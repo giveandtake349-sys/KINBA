@@ -1106,16 +1106,24 @@ function ProfileStats({
           <div className="profile-video-grid">
             {videos.map(video => (
               <article className="profile-video-tile" key={video.id}>
-                {video.thumbnailUrl ? (
-                  <img src={video.thumbnailUrl} alt="" />
+                {video.mediaType === "IMAGE" ? (
+                  <img
+                    src={video.videoUrl}
+                    className="w-full h-auto object-cover rounded-lg"
+                    alt={video.title || "Post"}
+                  />
+                ) : video.thumbnailUrl ? (
+                  <img src={video.thumbnailUrl} alt={video.title} />
                 ) : (
                   <div className="profile-video-tile-fallback">
                     <Video size={24} />
                   </div>
                 )}
-                <span className="profile-video-tile-play">
-                  <Video size={15} />
-                </span>
+                {video.mediaType === "VIDEO" && (
+                  <span className="profile-video-tile-play">
+                    <Video size={15} />
+                  </span>
+                )}
                 <div>
                   <strong>{video.title}</strong>
                   <span>{video.viewCount} views</span>
