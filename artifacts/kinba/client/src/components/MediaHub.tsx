@@ -86,6 +86,38 @@ type VideoRecord = {
     isVerified: boolean;
   };
 };
+type FeedAttachment = {
+  id: number;
+  mediaType: "IMAGE" | "VIDEO";
+  mediaUrl: string;
+  sortOrder: number;
+  width?: number | null;
+  height?: number | null;
+  durationSeconds?: number | null;
+};
+type FeedTextRecord = {
+  feedType: "text";
+  id: number;
+  body: string;
+  text: string;
+  createdAt: Date | string;
+  commentCount: number;
+  author: {
+    id: number;
+    name: string | null;
+    photoUrl: string | null;
+    accountType: "member" | "creator" | "company";
+    isVerified: boolean;
+  };
+  attachments: FeedAttachment[];
+};
+type FeedMediaRecord = VideoRecord & { feedType: "media" };
+type FeedShortsInsertion = {
+  feedType: "shorts";
+  id: string;
+  video: VideoRecord;
+};
+type UnifiedFeedItem = FeedMediaRecord | FeedTextRecord | FeedShortsInsertion;
 type Engagement = {
   reactionCount: number;
   shareCount: number;
@@ -493,15 +525,16 @@ function EngagementActions({
         <MessageCircle size={overlay ? 27 : 16} /> <span>Comments</span>
         <strong>{formatCount(engagement.commentCount)}</strong>
       </button>
-      {!overlay && (
+      {onBookmark && (
         <button
           type="button"
           className={bookmarked ? "is-active" : ""}
           onClick={onBookmark}
           aria-pressed={bookmarked}
+          aria-label={bookmarked ? "Remove saved video" : "Save video"}
         >
-          <Bookmark size={16} fill={bookmarked ? "currentColor" : "none"} />
-          <span>Bookmark</span>
+          <Bookmark size={overlay ? 27 : 16} fill={bookmarked ? "currentColor" : "none"} />
+          <span>{bookmarked ? "Saved" : "Save"}</span>
         </button>
       )}
       <button
@@ -616,6 +649,7 @@ function VideoCard({
   video: VideoRecord;
   active?: boolean;
   showDetailsOverlay?: boolean;
+  showHeader?: boolean;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const auth = useAuth();
@@ -782,12 +816,16 @@ function VideoCard({
 function UploadVideoPanel({
   onPublished,
   detailsRef,
+  initialKind = "LONG",
+  fixedKind,
 }: {
   onPublished: () => void;
   detailsRef: { current: HTMLDetailsElement | null };
+  initialKind?: VideoKind;
+  fixedKind?: VideoKind;
 }) {
   const [mode, setMode] = useState<"video" | "photo">("video");
-  const [kind, setKind] = useState<VideoKind>("LONG");
+  const [kind, setKind] = useState<VideoKind>(initialKind);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -811,7 +849,7 @@ function UploadVideoPanel({
       }
       const nextMetadata = await getVideoMetadata(nextFile, {
         maxDurationSeconds:
-          kind === "LONG"
+          (fixedKind ?? kind) === "LONG"
             ? MAX_LONG_VIDEO_DURATION_SECONDS
             : MAX_SHORT_VIDEO_DURATION_SECONDS,
       });
@@ -833,7 +871,7 @@ function UploadVideoPanel({
       if (mode === "photo" && imageDimensions) {
         await publishPhoto(file, title.trim(), description.trim(), imageDimensions);
       } else {
-        await publishVideo(file, kind, title.trim(), description.trim());
+        await publishVideo(file, fixedKind ?? kind, title.trim(), description.trim());
       }
       try {
         await onPublished();
@@ -859,7 +897,7 @@ function UploadVideoPanel({
     setMetadata(null);
     setImageDimensions(null);
     setImagePreviewUrl(null);
-  }, [kind, mode]);
+  }, [fixedKind, kind, mode]);
 
   useEffect(() => {
     return () => {
@@ -893,30 +931,36 @@ function UploadVideoPanel({
           </button>
         </div>
         {mode === "video" && (
-          <div
-            className="media-kind-switch"
-            role="tablist"
-            aria-label="Video format"
-          >
-          <button
-            type="button"
-            className={kind === "LONG" ? "active" : ""}
-            onClick={() => setKind("LONG")}
-            role="tab"
-            aria-selected={kind === "LONG"}
-          >
-            Main video · 30 min
-          </button>
-            <button
-              type="button"
-              className={kind === "SHORT" ? "active" : ""}
-              onClick={() => setKind("SHORT")}
-              role="tab"
-              aria-selected={kind === "SHORT"}
+          fixedKind ? (
+            <div className="media-kind-switch" aria-label="Video format">
+              <span className="active">Short · 1 min</span>
+            </div>
+          ) : (
+            <div
+              className="media-kind-switch"
+              role="tablist"
+              aria-label="Video format"
             >
-              Short · 1 min
-            </button>
-          </div>
+              <button
+                type="button"
+                className={kind === "LONG" ? "active" : ""}
+                onClick={() => setKind("LONG")}
+                role="tab"
+                aria-selected={kind === "LONG"}
+              >
+                Main video · 30 min
+              </button>
+              <button
+                type="button"
+                className={kind === "SHORT" ? "active" : ""}
+                onClick={() => setKind("SHORT")}
+                role="tab"
+                aria-selected={kind === "SHORT"}
+              >
+                Short · 1 min
+              </button>
+            </div>
+          )
         )}
         <p className="media-form-hint">
           {mode === "photo"
@@ -1022,16 +1066,107 @@ function FeedRecovery() {
   );
 }
 
+function TextFeedCard({ post }: { post: FeedTextRecord }) {
+  const share = async () => {
+    const url = window.location.origin + "/?announcement=" + post.id;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "KINBA post", text: post.body, url });
+      } else if (navigator.clipboard) {
+        await navigator.clipboard.writeText(url);
+        toast.success("Post link copied.");
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      notifyError(error);
+    }
+  };
+  return (
+    <article className="feed-text-card">
+      <div className="feed-post-author">
+        <div className="video-owner-avatar">
+          {post.author.photoUrl ? <img src={post.author.photoUrl} alt="" /> : <UserRound size={16} />}
+        </div>
+        <div>
+          <strong>{post.author.name ?? "KINBA creator"}</strong>
+          <span>{post.author.accountType} · {relativeTime(post.createdAt)}</span>
+        </div>
+        {post.author.isVerified && <BadgeCheck size={14} aria-label="Verified profile" />}
+      </div>
+      <p className="feed-post-body">{post.text}</p>
+      {post.attachments.length > 0 && (
+        <div className={post.attachments.length > 1 ? "feed-post-attachments has-grid" : "feed-post-attachments"}>
+          {post.attachments.map(attachment =>
+            attachment.mediaType === "IMAGE" ? (
+              <img key={attachment.id} src={attachment.mediaUrl} alt="Post attachment" loading="lazy" />
+            ) : (
+              <video key={attachment.id} src={attachment.mediaUrl} controls playsInline preload="metadata" />
+            )
+          )}
+        </div>
+      )}
+      <div className="feed-post-actions">
+        <AnnouncementComments announcementId={post.id} commentCount={post.commentCount} />
+        <button type="button" onClick={share} aria-label="Share post">
+          <Share2 size={15} /> Share
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function ShortsInsertionBlock({ video, active }: { video: VideoRecord; active: boolean }) {
+  return (
+    <section className="shorts-insertion-block" aria-label="Shorts discovery">
+      <div className="shorts-insertion-heading">
+        <div><span className="eyebrow">Shorts</span><strong>Quick discovery</strong></div>
+        <span>From the KINBA community</span>
+      </div>
+      <ShortVideoCard video={video} index={0} active={active} compact />
+    </section>
+  );
+}
+
+function UnifiedFeedPanel({ active = true }: { active?: boolean }) {
+  const query = trpc.home.feed.useQuery(
+    { tab: "all" },
+    { retry: 1, throwOnError: false, refetchOnWindowFocus: false, staleTime: 30_000 }
+  );
+  const items = (query.data ?? []) as unknown as UnifiedFeedItem[];
+  return (
+    <section className="unified-feed" aria-label="All Feed">
+      {query.isPending ? <FeedSkeleton /> : items.length ? (
+        <div className="unified-feed-list">
+          {items.map(item => {
+            if (item.feedType === "media")
+              return <VideoCard key={"media-" + item.id} video={item} active={active} />;
+            if (item.feedType === "text")
+              return <TextFeedCard key={"text-" + item.id} post={item} />;
+            return <ShortsInsertionBlock key={item.id} video={item.video} active={active} />;
+          })}
+        </div>
+      ) : (
+        <div className="media-empty" role="status">
+          <h3>Your feed is quiet.</h3>
+          <p>Real posts from the KINBA community will appear here.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function HomeFeedPanel({
   tab,
   active = true,
   autoOpenUpload = false,
   showDetailsOverlay = true,
+  showHeader = true,
 }: {
   tab: HomeTab;
   active?: boolean;
   autoOpenUpload?: boolean;
   showDetailsOverlay?: boolean;
+  showHeader?: boolean;
 }) {
   const auth = useAuth();
   const utils = trpc.useUtils();
@@ -1064,6 +1199,7 @@ function HomeFeedPanel({
       className="media-section home-feed-section w-full max-w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 mb-4 overflow-hidden box-border"
       aria-labelledby="home-feed-heading"
     >
+      {showHeader && (
       <div className="media-section-heading">
         <div>
           <p className="eyebrow">
@@ -1085,6 +1221,7 @@ function HomeFeedPanel({
             : "Real-time database feed"}
         </span>
       </div>
+      )}
       {query.isPending ? (
         <FeedSkeleton />
       ) : videos.length ? (
@@ -1131,10 +1268,12 @@ function ShortVideoCard({
   video,
   index,
   active,
+  compact = false,
 }: {
   video: VideoRecord;
   index: number;
   active: boolean;
+  compact?: boolean;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const auth = useAuth();
@@ -1155,7 +1294,7 @@ function ShortVideoCard({
   const { current, react, share, pending } = useOptimisticEngagement(video);
   return (
     <article
-      className="short-card w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 mb-4 overflow-hidden box-border"
+      className={`short-card${compact ? " short-card--compact" : ""} w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 mb-4 overflow-hidden box-border`}
       data-short-index={index}
     >
       {video.mediaType === "IMAGE" ? (
@@ -1239,7 +1378,13 @@ function ShortsFeed({ active = true }: { active?: boolean }) {
     }
   );
   const viewportRef = useRef<HTMLDivElement>(null);
+  const uploadDetailsRef = useRef<HTMLDetailsElement>(null);
+  const utils = trpc.useUtils();
   const [activeIndex, setActiveIndex] = useState(0);
+  const openUploader = () => {
+    uploadDetailsRef.current?.setAttribute("open", "");
+    uploadDetailsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
   const videos = ((query.data ?? []) as VideoRecord[]).filter(
     video => !isReportedLegacyMedia(video)
   );
@@ -1277,6 +1422,9 @@ function ShortsFeed({ active = true }: { active?: boolean }) {
           <h2 id="shorts-heading">One minute. One idea.</h2>
         </div>
         <div className="shorts-controls">
+          <button type="button" className="primary-btn shorts-upload-button" onClick={openUploader}>
+            <Upload size={15} /> Upload Short
+          </button>
           <button
             type="button"
             onClick={() => goTo(activeIndex - 1)}
@@ -1322,6 +1470,14 @@ function ShortsFeed({ active = true }: { active?: boolean }) {
           <p>Publish a video of 60 seconds or less to start the Shorts feed.</p>
         </div>
       )}
+      <UploadVideoPanel
+        detailsRef={uploadDetailsRef}
+        initialKind="SHORT"
+        fixedKind="SHORT"
+        onPublished={async () => {
+          await Promise.all([utils.home.feed.invalidate(), utils.videos.list.invalidate()]);
+        }}
+      />
     </section>
   );
 }
@@ -1878,12 +2034,7 @@ export default function MediaHub({
       </div>
       <div hidden={activeSection !== "all"} className="media-tab-panel">
         <ErrorBoundary fallback={<FeedRecovery />}>
-          <ShortsFeed active={activeSection === "all"} />
-          <HomeFeedPanel
-            tab="videos"
-            active={activeSection === "all"}
-            autoOpenUpload={false}
-          />
+          <UnifiedFeedPanel active={activeSection === "all"} />
         </ErrorBoundary>
       </div>
       <div hidden={activeSection !== "videos"} className="media-tab-panel">
@@ -1893,7 +2044,8 @@ export default function MediaHub({
             active={activeSection === "videos"}
             autoOpenUpload={section === "publish"}
             showDetailsOverlay={false}
-          />
+             showHeader={false}
+           />
         </ErrorBoundary>
       </div>
       <div hidden={activeSection !== "shorts"} className="media-tab-panel">
