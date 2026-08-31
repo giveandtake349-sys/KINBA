@@ -21,7 +21,9 @@ async function startServer() {
   app.get("/api/health", (_req, res) => {
     res.status(200).json({ ok: true });
   });
-  const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGIN);
+  const allowedOrigins = parseAllowedOrigins(
+    process.env.CORS_ORIGIN?.trim() || "https://kinba.onrender.com"
+  );
   app.use((req, res, next) => {
     const origin = req.header("origin");
     if (!isAllowedCorsOrigin(origin, allowedOrigins)) return next();

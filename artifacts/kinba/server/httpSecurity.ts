@@ -3,6 +3,10 @@ export function parseAllowedOrigins(value: string | undefined): Set<string> {
   for (const candidate of (value ?? "").split(",")) {
     const trimmed = candidate.trim();
     if (!trimmed) continue;
+    if (trimmed === "*") {
+      origins.add("*");
+      continue;
+    }
     try {
       const url = new URL(trimmed);
       if (url.protocol !== "https:") continue;
@@ -26,5 +30,5 @@ export function isAllowedCorsOrigin(
   origin: string | undefined,
   allowedOrigins: Set<string>
 ): origin is string {
-  return Boolean(origin && allowedOrigins.has(origin));
+  return Boolean(origin && (allowedOrigins.has("*") || allowedOrigins.has(origin)));
 }

@@ -78,6 +78,26 @@ export async function getVideoMetadata(
   });
 }
 
+async function fetchUploadWithRetry(
+  url: string,
+  init: RequestInit,
+  attempts = 3
+): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(url, init);
+      if (![502, 503, 504].includes(response.status) || attempt === attempts - 1)
+        return response;
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts - 1) throw lastError;
+    }
+    await new Promise(resolve => window.setTimeout(resolve, 500 * (attempt + 1)));
+  }
+  throw lastError instanceof Error ? lastError : new Error("Upload request failed.");
+}
+
 async function getSessionUserId(message: string) {
   const { data: sessionData, error: sessionError } =
     await supabase.auth.getSession();
@@ -131,7 +151,7 @@ export async function publishPhoto(
   body.append("height", String(dimensions.height));
   let response: Response;
   try {
-    response = await fetch(apiUrl("/api/photos/upload"), {
+    response = await fetchUploadWithRetry(apiUrl("/api/photos/upload"), {
       method: "POST",
       headers: { Authorization: `Bearer ${session.access_token}` },
       body,
@@ -176,7 +196,7 @@ export async function publishVideo(
   body.append("description", description);
   let response: Response;
   try {
-    response = await fetch(apiUrl("/api/videos/upload"), {
+    response = await fetchUploadWithRetry(apiUrl("/api/videos/upload"), {
       method: "POST",
       headers: { Authorization: `Bearer ${session.access_token}` },
       body,
@@ -218,7 +238,7 @@ export async function uploadVideo(
   body.append("kind", kind);
   let response: Response;
   try {
-    response = await fetch(apiUrl("/api/media/video-upload"), {
+    response = await fetchUploadWithRetry(apiUrl("/api/media/video-upload"), {
       method: "POST",
       headers: { Authorization: `Bearer ${session.access_token}` },
       body,
