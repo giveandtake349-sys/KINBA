@@ -1597,9 +1597,21 @@ export default function MediaHub({
   onSectionChange?: (section: FeedSection) => void;
   wheels?: ReactNode;
 }) {
+  const [selectedSection, setSelectedSection] = useState<FeedSection>(section);
+
+  useEffect(() => {
+    setSelectedSection(section);
+  }, [section]);
+
   const activeSection =
-    section === "publish" || section === "search" ? "videos" : section;
-  const select = (next: FeedSection) => onSectionChange?.(next);
+    selectedSection === "publish" || selectedSection === "search"
+      ? "videos"
+      : selectedSection;
+  const select = (next: FeedSection) => {
+    // Update the visual state immediately, then let the parent synchronize the URL.
+    setSelectedSection(next);
+    onSectionChange?.(next);
+  };
   return (
     <div className="media-hub">
       <nav
