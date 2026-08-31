@@ -1,4 +1,12 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import {
   BadgeCheck,
   Bell,
@@ -29,15 +37,53 @@ import {
   QrCode,
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { useTheme } from "@/contexts/ThemeContext";
 import { SupabaseAuthDialog } from "@/components/SupabaseAuthDialog";
-import { uploadImage } from "@/lib/mediaUpload";
-import MediaHub, { SearchFeed, type FeedSection } from "@/components/MediaHub";
+import {
+  getVideoMetadata,
+  MAX_LONG_VIDEO_DURATION_SECONDS,
+  MAX_SHORT_VIDEO_DURATION_SECONDS,
+  publishVideo,
+  uploadImage,
+} from "@/lib/mediaUpload";
+import MediaHub, {
+  CommunityAnnouncements,
+  SearchFeed,
+  type FeedSection,
+} from "@/components/MediaHub";
 import "./profile.css";
 
 type Screen = "landing" | "dashboard" | "profile";
+type AppModal =
+  | "upload"
+  | "search"
+  | "notifications"
+  | "wallet"
+  | "activity"
+  | "offline"
+  | "qr"
+  | "studio"
+  | "announcements"
+  | null;
+type DrawerAction = Exclude<AppModal, null> | "profile";
+
+function safeClick(action: () => void) {
+  return (event: ReactMouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    action();
+  };
+}
+
+function guardNonSubmitNavigation(event: ReactMouseEvent<HTMLElement>) {
+  const target = event.target as HTMLElement;
+  if (!target.closest('button[type="button"], a[href="#"]')) return;
+  event.preventDefault();
+  event.stopPropagation();
+}
 
 type ProfileSnapshot = {
   user?: { name: string | null } | null;
@@ -69,7 +115,11 @@ function ThemeToggle() {
     <button
       type="button"
       className="theme-toggle"
-      onClick={toggleTheme}
+      onClick={event => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleTheme();
+      }}
       aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
       title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
     >
@@ -568,14 +618,14 @@ function MobileDrawer({
   open: boolean;
   onClose: () => void;
   profile?: ProfileSnapshot;
-  onNavigate: (section: FeedSection | "profile") => void;
+  onNavigate: (section: DrawerAction) => void;
   onLogout: () => void;
 }) {
   if (!open) return null;
   const menuGroups: {
     title: string;
     items: {
-      section: FeedSection | "profile";
+      section: DrawerAction;
       label: string;
       description: string;
       icon: typeof Video;
@@ -596,7 +646,7 @@ function MobileDrawer({
       title: "Personal tools",
       items: [
         {
-          section: "notifications",
+          section: "activity",
           label: "Activity center",
           description: "Reactions, comments, and follows",
           icon: Bell,
@@ -619,7 +669,7 @@ function MobileDrawer({
       title: "Creation & business tools",
       items: [
         {
-          section: "publish",
+          section: "studio",
           label: "KINBA Studio",
           description: "Publish and manage your work",
           icon: Video,
@@ -639,7 +689,7 @@ function MobileDrawer({
         className="drawer-backdrop"
         type="button"
         aria-label="Close menu"
-        onClick={onClose}
+        onClick={safeClick(onClose)}
       />
       <aside className="mobile-drawer" aria-label="Main menu">
         <div className="drawer-head">
@@ -653,10 +703,10 @@ function MobileDrawer({
           <button
             type="button"
             className="drawer-edit"
-            onClick={() => {
+            onClick={safeClick(() => {
               onNavigate("profile");
               onClose();
-            }}
+            })}
           >
             Edit Profile
           </button>
@@ -676,10 +726,10 @@ function MobileDrawer({
                   <button
                     type="button"
                     key={item.label}
-                    onClick={() => {
+                    onClick={safeClick(() => {
                       onNavigate(item.section);
                       onClose();
-                    }}
+                    })}
                   >
                     <span className="drawer-item-icon">
                       <Icon size={19} />
@@ -693,7 +743,7 @@ function MobileDrawer({
               })}
             </section>
           ))}
-          <button type="button" className="drawer-logout" onClick={onLogout}>
+          <button type="button" className="drawer-logout" onClick={safeClick(onLogout)}>
             <LogOut size={19} />
             <span>Log out</span>
           </button>
@@ -706,14 +756,20 @@ function MobileDrawer({
 function AppHeader({
   profile,
   notificationCount,
+  onHome,
+  onSelectFeed,
+  onOpenModal,
   onMenu,
-  onNavigate,
+  onProfile,
   onLogout,
 }: {
   profile?: ProfileSnapshot;
   notificationCount: number;
+  onHome: () => void;
+  onSelectFeed: (section: FeedSection) => void;
+  onOpenModal: (modal: Exclude<AppModal, null>) => void;
   onMenu: () => void;
-  onNavigate: (path: string) => void;
+  onProfile: () => void;
   onLogout: () => void;
 }) {
   return (
@@ -721,40 +777,32 @@ function AppHeader({
       <button
         type="button"
         className="brand"
-        onClick={() => onNavigate("/?panel=all")}
-        aria-label="Go to Home"
+        onClick={safeClick(onHome)}
+        aria-label="Go to Home Feed"
       >
         <OfficialLogo />
         <span className="brand-name">KINBA</span>
       </button>
       <nav className="desktop-nav" aria-label="Primary navigation">
-        <button type="button" onClick={() => onNavigate("/?panel=all")}>
-          Feed
-        </button>
-        <button type="button" onClick={() => onNavigate("/?panel=shorts")}>
-          Shorts
-        </button>
-        <button type="button" onClick={() => onNavigate("/?panel=wheels")}>
-          Wheels
-        </button>
-        <button type="button" onClick={() => onNavigate("/profile")}>
-          Profile
-        </button>
+        <button type="button" onClick={safeClick(onHome)}>Feed</button>
+        <button type="button" onClick={safeClick(() => onSelectFeed("shorts"))}>Shorts</button>
+        <button type="button" onClick={safeClick(() => onSelectFeed("wheels"))}>Wheels</button>
+        <button type="button" onClick={safeClick(onProfile)}>Profile</button>
       </nav>
       <div className="topbar-actions">
         <button
           type="button"
           className="topbar-icon-button"
-          onClick={() => onNavigate("/?panel=publish")}
-          aria-label="Create"
-          title="Create"
+          onClick={safeClick(() => onOpenModal("upload"))}
+          aria-label="Create a video"
+          title="Create a video"
         >
           <Plus size={19} />
         </button>
         <button
           type="button"
           className="topbar-icon-button"
-          onClick={() => onNavigate("/?panel=search")}
+          onClick={safeClick(() => onOpenModal("search"))}
           aria-label="Search"
           title="Search"
         >
@@ -763,7 +811,7 @@ function AppHeader({
         <button
           type="button"
           className="topbar-icon-button topbar-notification-button"
-          onClick={() => onNavigate("/?panel=notifications")}
+          onClick={safeClick(() => onOpenModal("notifications"))}
           aria-label="Notifications"
           title="Notifications"
         >
@@ -777,14 +825,14 @@ function AppHeader({
         <button
           type="button"
           className="header-profile-trigger"
-          onClick={onMenu}
+          onClick={safeClick(onMenu)}
           aria-label="Open profile menu"
         >
           <ProfileIdentity profile={profile} compact />
           <Menu size={22} />
         </button>
         <ThemeToggle />
-        <button type="button" className="logout-btn" onClick={onLogout}>
+        <button type="button" className="logout-btn" onClick={safeClick(onLogout)}>
           <LogOut size={15} />
           <span>Log out</span>
         </button>
@@ -816,7 +864,7 @@ function BottomNavigation({
       <button
         type="button"
         className={isHome ? "active" : ""}
-        onClick={onHome}
+        onClick={safeClick(onHome)}
         aria-current={isHome ? "page" : undefined}
       >
         <HomeIcon size={23} />
@@ -825,7 +873,7 @@ function BottomNavigation({
       <button
         type="button"
         className={activePanel === "search" ? "active" : ""}
-        onClick={onSearch}
+        onClick={safeClick(onSearch)}
         aria-current={activePanel === "search" ? "page" : undefined}
       >
         <Search size={23} />
@@ -834,7 +882,7 @@ function BottomNavigation({
       <button
         type="button"
         className="publish-nav"
-        onClick={onPublish}
+        onClick={safeClick(onPublish)}
         aria-label="Create a video"
       >
         <PenLine size={24} />
@@ -843,7 +891,7 @@ function BottomNavigation({
       <button
         type="button"
         className={activePanel === "notifications" ? "active" : ""}
-        onClick={onNotifications}
+        onClick={safeClick(onNotifications)}
         aria-current={activePanel === "notifications" ? "page" : undefined}
       >
         <Bell size={23} />
@@ -852,7 +900,7 @@ function BottomNavigation({
       <button
         type="button"
         className={menuOpen ? "active" : ""}
-        onClick={onMenu}
+        onClick={safeClick(onMenu)}
         aria-expanded={menuOpen}
       >
         <Menu size={23} />
@@ -876,7 +924,7 @@ function Landing({ onLogin }: { onLogin: () => void }) {
           Publish, explore, and follow the people and organizations shaping what
           comes next.
         </p>
-        <button type="button" className="primary-btn" onClick={onLogin}>
+        <button type="button" className="primary-btn" onClick={safeClick(onLogin)}>
           Sign in to Kinba
         </button>
       </div>
@@ -1131,7 +1179,7 @@ function SettingsPanel({ onLogout }: { onLogout: () => void }) {
           </div>
           <ThemeToggle />
         </div>
-        <button type="button" className="settings-logout" onClick={onLogout}>
+        <button type="button" className="settings-logout" onClick={safeClick(onLogout)}>
           <LogOut size={17} /> Log out
         </button>
       </div>
@@ -1217,7 +1265,7 @@ function WalletModal({
         type="button"
         className="wallet-modal-backdrop"
         aria-label="Close wallet"
-        onClick={onClose}
+        onClick={safeClick(onClose)}
       />
       <section
         className="wallet-modal"
@@ -1229,13 +1277,334 @@ function WalletModal({
           type="button"
           className="wallet-modal-close"
           aria-label="Close wallet"
-          onClick={onClose}
+          onClick={safeClick(onClose)}
         >
           <X size={20} />
         </button>
         <WalletPanel />
+        <div className="wallet-modal-actions" aria-label="Wallet actions">
+          <button
+            type="button"
+            className="primary-btn"
+            onClick={safeClick(() =>
+              toast.info("Deposit requests are being prepared for your account.")
+            )}
+          >
+            <Plus size={16} /> Deposit funds
+          </button>
+          <button
+            type="button"
+            className="secondary-media-btn"
+            onClick={safeClick(() =>
+              toast.info("Withdrawals are reviewed before funds are released.")
+            )}
+          >
+            Withdraw funds
+          </button>
+        </div>
       </section>
     </div>
+  );
+}
+
+function ActionModal({
+  title,
+  open,
+  onClose,
+  children,
+  className = "",
+}: {
+  title: string;
+  open: boolean;
+  onClose: () => void;
+  children: ReactNode;
+  className?: string;
+}) {
+  if (!open) return null;
+  return (
+    <div className="action-modal-layer" role="presentation">
+      <button
+        type="button"
+        className="action-modal-backdrop"
+        aria-label={`Close ${title}`}
+        onClick={event => {
+          event.preventDefault();
+          event.stopPropagation();
+          onClose();
+        }}
+      />
+      <section
+        className={`action-modal ${className}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+      >
+        <div className="action-modal-head">
+          <h2>{title}</h2>
+          <button
+            type="button"
+            aria-label={`Close ${title}`}
+            onClick={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              onClose();
+            }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+        {children}
+      </section>
+    </div>
+  );
+}
+
+function UploadVideoModal({
+  open,
+  onClose,
+  onPublished,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onPublished: () => Promise<void>;
+}) {
+  const [kind, setKind] = useState<"LONG" | "SHORT">("LONG");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const selectFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const nextFile = event.target.files?.[0];
+    event.target.value = "";
+    if (!nextFile) return;
+    try {
+      await getVideoMetadata(nextFile, {
+        maxDurationSeconds:
+          kind === "LONG"
+            ? MAX_LONG_VIDEO_DURATION_SECONDS
+            : MAX_SHORT_VIDEO_DURATION_SECONDS,
+      });
+      setFile(nextFile);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "This video cannot be uploaded."
+      );
+    }
+  };
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!file || !title.trim()) {
+      toast.error("Add a title and an original video first.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await publishVideo(file, kind, title.trim(), description.trim());
+      await onPublished();
+      setFile(null);
+      setTitle("");
+      setDescription("");
+      toast.success("Video received and queued for processing.");
+      onClose();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "The video could not be uploaded."
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <ActionModal title="Create a video" open={open} onClose={onClose} className="upload-video-modal">
+      <form className="modal-form" onSubmit={submit}>
+        <div className="modal-kind-switch" role="tablist" aria-label="Video type">
+          <button
+            type="button"
+            className={kind === "LONG" ? "active" : ""}
+            onClick={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              setKind("LONG");
+            }}
+          >
+            Video · up to 30 min
+          </button>
+          <button
+            type="button"
+            className={kind === "SHORT" ? "active" : ""}
+            onClick={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              setKind("SHORT");
+            }}
+          >
+            Short · up to 1 min
+          </button>
+        </div>
+        <label>
+          Title
+          <input
+            value={title}
+            onChange={event => setTitle(event.target.value)}
+            placeholder="Give your video a title"
+            maxLength={180}
+            required
+          />
+        </label>
+        <label>
+          Caption
+          <textarea
+            value={description}
+            onChange={event => setDescription(event.target.value)}
+            placeholder="Tell viewers what this is about"
+            maxLength={2400}
+            rows={4}
+          />
+        </label>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="video/*"
+          className="sr-only"
+          onChange={selectFile}
+        />
+        <button
+          type="button"
+          className="modal-file-button"
+          onClick={event => {
+            event.preventDefault();
+            event.stopPropagation();
+            inputRef.current?.click();
+          }}
+        >
+          <Video size={18} /> {file ? file.name : "Choose original video"}
+        </button>
+        <button className="primary-btn" type="submit" disabled={busy}>
+          {busy ? "Uploading…" : "Upload video"}
+        </button>
+      </form>
+    </ActionModal>
+  );
+}
+
+function SearchModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <ActionModal title="Search KINBA" open={open} onClose={onClose} className="search-action-modal">
+      <SearchFeed />
+    </ActionModal>
+  );
+}
+
+function NotificationDrawer({
+  open,
+  onClose,
+  enabled,
+}: {
+  open: boolean;
+  onClose: () => void;
+  enabled: boolean;
+}) {
+  return (
+    <ActionModal title="Notifications" open={open} onClose={onClose} className="notification-action-drawer">
+      <NotificationsPanel enabled={enabled} />
+    </ActionModal>
+  );
+}
+
+function ActivityModal({
+  open,
+  onClose,
+  enabled,
+}: {
+  open: boolean;
+  onClose: () => void;
+  enabled: boolean;
+}) {
+  return (
+    <ActionModal title="Activity Center" open={open} onClose={onClose}>
+      <p className="modal-intro">Track the reactions, comments, shares, and follows that matter to your KINBA account.</p>
+      <NotificationsPanel enabled={enabled} />
+    </ActionModal>
+  );
+}
+
+function OfflineVideosModal({
+  open,
+  onClose,
+  onBrowse,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onBrowse: () => void;
+}) {
+  return (
+    <ActionModal title="Offline Videos" open={open} onClose={onClose}>
+      <OfflineVideosPanel onBrowse={onBrowse} />
+    </ActionModal>
+  );
+}
+
+function QRCodeModal({
+  open,
+  onClose,
+  profile,
+}: {
+  open: boolean;
+  onClose: () => void;
+  profile?: ProfileSnapshot;
+}) {
+  return (
+    <ActionModal title="Your QR Code" open={open} onClose={onClose}>
+      <QrPanel profile={profile} />
+    </ActionModal>
+  );
+}
+
+function CreatorStudioModal({
+  open,
+  onClose,
+  profile,
+  onCreate,
+}: {
+  open: boolean;
+  onClose: () => void;
+  profile?: ProfileSnapshot;
+  onCreate: () => void;
+}) {
+  const stats = profile?.stats;
+  return (
+    <ActionModal title="KINBA Studio" open={open} onClose={onClose}>
+      <p className="modal-intro">Manage your publishing momentum from one creator workspace.</p>
+      <div className="studio-stat-grid">
+        <div><strong>{stats?.followersCount ?? 0}</strong><span>Followers</span></div>
+        <div><strong>{stats?.reactionsReceived ?? 0}</strong><span>Likes</span></div>
+        <div><strong>{stats?.iconsCount ?? 0}</strong><span>ICONS</span></div>
+      </div>
+      <button
+        type="button"
+        className="primary-btn"
+        onClick={event => {
+          event.preventDefault();
+          event.stopPropagation();
+          onClose();
+          onCreate();
+        }}
+      >
+        <Plus size={17} /> Upload new video
+      </button>
+    </ActionModal>
+  );
+}
+
+function AnnouncementsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <ActionModal title="Business Announcements" open={open} onClose={onClose} className="announcements-action-modal">
+      <CommunityAnnouncements />
+    </ActionModal>
   );
 }
 
@@ -1910,30 +2279,13 @@ function SponsorBidsPanel() {
 
 export default function Home() {
   const auth = useAuth();
+  const utils = trpc.useUtils();
   const [location, navigate] = useLocation();
   const { theme } = useTheme();
+  const [activeView, setActiveView] = useState<FeedSection>("all");
+  const [activeModal, setActiveModal] = useState<AppModal>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [walletOpen, setWalletOpen] = useState(false);
-  const panelParam = new URLSearchParams(location.split("?")[1] ?? "").get(
-    "panel"
-  );
-  const validPanels: FeedSection[] = [
-    "all",
-    "videos",
-    "shorts",
-    "wheels",
-    "publish",
-    "search",
-    "notifications",
-    "settings",
-    "announcements",
-    "wallet",
-    "qr",
-    "offline",
-  ];
-  const section: FeedSection = validPanels.includes(panelParam as FeedSection)
-    ? (panelParam as FeedSection)
-    : "all";
+  const [profileOpen, setProfileOpen] = useState(() => location === "/profile");
   const profileQuery = trpc.profile.me.useQuery(undefined, {
     enabled: auth.isAuthenticated,
     refetchOnWindowFocus: false,
@@ -1947,41 +2299,65 @@ export default function Home() {
   const notificationCount = Math.min(notificationQuery.data?.length ?? 0, 99);
   const profile = profileQuery.data as ProfileSnapshot | undefined;
   const screen: Screen =
-    location === "/profile"
-      ? "profile"
-      : location === "/login"
-        ? "landing"
-        : auth.isAuthenticated
-          ? "dashboard"
-          : "landing";
+    location === "/login" || !auth.isAuthenticated
+      ? "landing"
+      : profileOpen
+        ? "profile"
+        : "dashboard";
+
   useEffect(() => {
-    if (screen !== "landing" && !auth.loading && !auth.isAuthenticated)
-      auth.openAuth();
-  }, [auth.isAuthenticated, auth.loading, screen]);
+    if (location === "/profile") setProfileOpen(true);
+  }, [location]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  const showFeed = (next: FeedSection = "all") => {
+    setProfileOpen(false);
+    setActiveView(next);
+    setActiveModal(null);
+  };
+  const openModal = (modal: Exclude<AppModal, null>) => {
+    setMenuOpen(false);
+    setActiveModal(modal);
+  };
+  const showNotifications = () => {
+    setProfileOpen(false);
+    setActiveView("notifications");
+    setActiveModal(null);
+  };
+  const openProfile = () => {
+    setActiveModal(null);
+    setMenuOpen(false);
+    setProfileOpen(true);
+    if (location !== "/profile") navigate("/profile");
+  };
+  const closeProfile = () => {
+    setProfileOpen(false);
+    if (location === "/profile") navigate("/");
+  };
+  const selectDrawerAction = (next: DrawerAction) => {
+    if (next === "profile") {
+      openProfile();
+      return;
+    }
+    openModal(next);
+  };
   const logout = async () => {
     try {
       await auth.logout();
+      Object.keys(window.localStorage)
+        .filter(key => key.startsWith("sb-") || key.startsWith("kinba-auth"))
+        .forEach(key => window.localStorage.removeItem(key));
       setMenuOpen(false);
-      setWalletOpen(false);
+      setActiveModal(null);
+      setProfileOpen(false);
+      setActiveView("all");
       navigate("/login");
+      auth.openAuth();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to log out.";
-      window.alert(message);
+      toast.error(error instanceof Error ? error.message : "Unable to log out.");
     }
-  };
-  const selectSection = (next: FeedSection | "profile") => {
-    if (next === "profile") {
-      navigate("/profile");
-      return;
-    }
-    if (next === "wallet") {
-      setWalletOpen(true);
-      return;
-    }
-    navigate(`/?panel=${next}`);
   };
   const authDialog = (
     <SupabaseAuthDialog
@@ -1991,7 +2367,10 @@ export default function Home() {
   );
   if (auth.loading)
     return (
-      <div className="kinba-app guest-layout max-w-vw overflow-x-hidden box-border">
+      <div
+        className="kinba-app guest-layout max-w-vw overflow-x-hidden box-border"
+        onClick={guardNonSubmitNavigation}
+      >
         <main className="section-shell">
           <p className="profile-loading-note">Loading KINBA…</p>
         </main>
@@ -2001,7 +2380,10 @@ export default function Home() {
   if (screen === "landing")
     return (
       <>
-        <div className="kinba-app guest-layout max-w-vw overflow-x-hidden box-border">
+        <div
+        className="kinba-app guest-layout max-w-vw overflow-x-hidden box-border"
+        onClick={guardNonSubmitNavigation}
+      >
           <Landing onLogin={auth.openAuth} />
         </div>
         {authDialog}
@@ -2009,33 +2391,31 @@ export default function Home() {
     );
   return (
     <>
-      <div className="kinba-app max-w-vw overflow-x-hidden box-border">
+      <div
+        className="kinba-app max-w-vw overflow-x-hidden box-border"
+        onClick={guardNonSubmitNavigation}
+      >
         <AppHeader
           profile={profile}
           notificationCount={notificationCount}
-          onMenu={() => setMenuOpen(true)}
-          onNavigate={navigate}
+          onHome={() => showFeed("all")}
+          onSelectFeed={showFeed}
+          onOpenModal={openModal}
+          onMenu={() => setMenuOpen(value => !value)}
+          onProfile={openProfile}
           onLogout={logout}
         />
         <main className="max-w-vw overflow-x-hidden box-border">
           {screen === "dashboard" ? (
             <section className="section-shell home-page">
-              {section === "search" ? (
-                <SearchFeed />
-              ) : section === "notifications" ? (
+              {activeView === "notifications" ? (
                 <NotificationsPanel enabled={auth.isAuthenticated} />
-              ) : section === "settings" ? (
+              ) : activeView === "settings" ? (
                 <SettingsPanel onLogout={logout} />
-              ) : section === "wallet" ? (
-                <WalletPanel />
-              ) : section === "qr" ? (
-                <QrPanel profile={profile} />
-              ) : section === "offline" ? (
-                <OfflineVideosPanel onBrowse={() => navigate("/?panel=all")} />
               ) : (
                 <MediaHub
-                  section={section}
-                  onSectionChange={next => navigate(`/?panel=${next}`)}
+                  section={activeView}
+                  onSectionChange={showFeed}
                   wheels={<SponsorBidsPanel />}
                 />
               )}
@@ -2053,26 +2433,65 @@ export default function Home() {
           open={menuOpen}
           onClose={() => setMenuOpen(false)}
           profile={profile}
-          onNavigate={selectSection}
+          onNavigate={selectDrawerAction}
           onLogout={logout}
         />
-        <WalletModal open={walletOpen} onClose={() => setWalletOpen(false)} />
+        <WalletModal
+          open={activeModal === "wallet"}
+          onClose={() => setActiveModal(null)}
+        />
+        <UploadVideoModal
+          open={activeModal === "upload"}
+          onClose={() => setActiveModal(null)}
+          onPublished={async () => {
+            await Promise.all([
+              utils.home.feed.invalidate(),
+              utils.videos.list.invalidate(),
+            ]);
+          }}
+        />
+        <SearchModal
+          open={activeModal === "search"}
+          onClose={() => setActiveModal(null)}
+        />
+        <NotificationDrawer
+          open={activeModal === "notifications"}
+          onClose={() => setActiveModal(null)}
+          enabled={auth.isAuthenticated}
+        />
+        <ActivityModal
+          open={activeModal === "activity"}
+          onClose={() => setActiveModal(null)}
+          enabled={auth.isAuthenticated}
+        />
+        <OfflineVideosModal
+          open={activeModal === "offline"}
+          onClose={() => setActiveModal(null)}
+          onBrowse={() => showFeed("all")}
+        />
+        <QRCodeModal
+          open={activeModal === "qr"}
+          onClose={() => setActiveModal(null)}
+          profile={profile}
+        />
+        <CreatorStudioModal
+          open={activeModal === "studio"}
+          onClose={() => setActiveModal(null)}
+          profile={profile}
+          onCreate={() => openModal("upload")}
+        />
+        <AnnouncementsModal
+          open={activeModal === "announcements"}
+          onClose={() => setActiveModal(null)}
+        />
         <BottomNavigation
-          activePanel={section}
+          activePanel={activeView}
           menuOpen={menuOpen}
-          onHome={() => {
-            navigate("/?panel=all");
-          }}
-          onSearch={() => {
-            navigate("/?panel=search");
-          }}
-          onPublish={() => {
-            navigate("/?panel=publish");
-          }}
-          onNotifications={() => {
-            navigate("/?panel=notifications");
-          }}
-          onMenu={() => setMenuOpen(true)}
+          onHome={() => showFeed("all")}
+          onSearch={() => openModal("search")}
+          onPublish={() => openModal("upload")}
+          onNotifications={showNotifications}
+          onMenu={() => setMenuOpen(value => !value)}
         />
       </div>
       {authDialog}

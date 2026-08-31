@@ -10,6 +10,7 @@ import {
 import {
   BadgeCheck,
   Bookmark,
+  Check,
   ChevronDown,
   Heart,
   Loader2,
@@ -1762,7 +1763,11 @@ export default function MediaHub({
             type="button"
             key={id}
             className={activeSection === id ? "active" : ""}
-            onClick={() => select(id)}
+            onClick={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              select(id);
+            }}
             aria-selected={activeSection === id}
             role="tab"
           >
