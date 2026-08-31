@@ -30,9 +30,22 @@ const upload = multer({
 });
 
 function errorMessage(error: unknown) {
-  console.error("[MediaUpload]", error);
   if (error instanceof Error && error.message.trim()) return error.message;
   return "The media could not be published. Please try again.";
+}
+
+function logUploadFailure(route: string, request: Request, error: unknown) {
+  const detail = error instanceof Error ? error : new Error(String(error));
+  console.error(`[MediaUpload] ${route} failed`, {
+    method: request.method,
+    url: request.url,
+    message: detail.message,
+    stack: detail.stack,
+  });
+}
+
+function logUploadStage(route: string, stage: string, details: Record<string, unknown>) {
+  console.info(`[MediaUpload] ${route} ${stage}`, details);
 }
 
 async function probeVideo(filePath: string) {
@@ -131,7 +144,15 @@ export function registerVideoUploadRoute(app: Express) {
   app.post("/api/photos/upload", upload.single("photo"), async (req, res) => {
     let temporaryPath: string | undefined;
     try {
+      logUploadStage("photo", "received", {
+        hasAuthorization: Boolean(req.headers.authorization),
+        bodyKeys: Object.keys(req.body ?? {}),
+        file: req.file
+          ? { field: req.file.fieldname, name: req.file.originalname, type: req.file.mimetype, size: req.file.size }
+          : null,
+      });
       const user = await authenticate(req);
+      logUploadStage("photo", "authenticated", { userId: user?.id ?? null });
       if (!user) {
         res.status(401).json({ error: "Please sign in before uploading." });
         return;
@@ -161,11 +182,13 @@ export function registerVideoUploadRoute(app: Express) {
         res.status(400).json({ error: "The image dimensions could not be read." });
         return;
       }
+      logUploadStage("photo", "validated", { userId: user.id, titleLength: title.length, width, height });
       const uploaded = await storagePut(
         `photos/${user.id}/photo-${Date.now()}-${req.file.originalname}`,
         await fs.readFile(temporaryPath),
         req.file.mimetype
       );
+      logUploadStage("photo", "stored", { userId: user.id, key: uploaded.key });
       const post = await createPhotoPost(user.id, {
         title,
         description,
@@ -173,24 +196,33 @@ export function registerVideoUploadRoute(app: Express) {
         width,
         height,
       });
+      logUploadStage("photo", "published", { userId: user.id, postId: post.id });
       res.status(201).json({
         postId: post.id,
         mediaType: "IMAGE",
         status: "PUBLISHED",
         imageUrl: uploaded.url,
       });
-    } catch (error) {
+        } catch (error) {
+      logUploadFailure("photo", req, error);
       res.status(500).json({ error: errorMessage(error) });
     } finally {
       if (temporaryPath)
         await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
     }
   });
-
   app.post("/api/videos/upload", upload.single("video"), async (req, res) => {
     let temporaryPath: string | undefined;
     try {
+      logUploadStage("video", "received", {
+        hasAuthorization: Boolean(req.headers.authorization),
+        bodyKeys: Object.keys(req.body ?? {}),
+        file: req.file
+          ? { field: req.file.fieldname, name: req.file.originalname, type: req.file.mimetype, size: req.file.size }
+          : null,
+      });
       const user = await authenticate(req);
+      logUploadStage("video", "authenticated", { userId: user?.id ?? null });
       if (!user) {
         res.status(401).json({ error: "Please sign in before uploading." });
         return;
@@ -218,6 +250,7 @@ export function registerVideoUploadRoute(app: Express) {
         kind === "SHORT"
           ? MAX_SHORT_VIDEO_DURATION_SECONDS
           : MAX_LONG_VIDEO_DURATION_SECONDS;
+      logUploadStage("video", "probed", { userId: user.id, kind, ...metadata });
       if (metadata.durationSeconds > maximum) {
         res.status(400).json({
           error: `Videos must be ${maximum / 60 === 1 ? "1 minute" : "30 minutes"} or shorter.`,
@@ -229,6 +262,7 @@ export function registerVideoUploadRoute(app: Express) {
         await fs.readFile(temporaryPath),
         req.file.mimetype
       );
+      logUploadStage("video", "stored", { userId: user.id, key: uploaded.key });
       const sourceUrl = new URL(
         uploaded.url,
         `${req.protocol}://${req.get("host")}`
@@ -244,6 +278,7 @@ export function registerVideoUploadRoute(app: Express) {
         height: metadata.height,
         sources: [{ quality: "ORIGINAL", videoUrl: sourceUrl }],
       });
+      logUploadStage("video", "published", { userId: user.id, videoId: video.id });
       res.status(201).json({
         videoId: video.id,
         status: "PUBLISHED",
@@ -251,6 +286,7 @@ export function registerVideoUploadRoute(app: Express) {
         videoUrl: sourceUrl,
       });
     } catch (error) {
+      logUploadFailure("video", req, error);
       res.status(500).json({ error: errorMessage(error) });
     } finally {
       if (temporaryPath)

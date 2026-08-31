@@ -78,6 +78,15 @@ export async function getVideoMetadata(
   });
 }
 
+function logUploadRequest(kind: "video" | "photo", url: string, fields: Record<string, string>, file: File) {
+  console.info("[MediaPublish] request", {
+    kind,
+    url,
+    fields,
+    file: { name: file.name, type: file.type, size: file.size },
+  });
+}
+
 async function fetchUploadWithRetry(
   url: string,
   init: RequestInit,
@@ -156,18 +165,19 @@ export async function publishPhoto(
   body.append("description", description);
   body.append("width", String(dimensions.width));
   body.append("height", String(dimensions.height));
+  const endpoint = apiUrl("/api/photos/upload");
+  logUploadRequest("photo", endpoint, { title, description, width: String(dimensions.width), height: String(dimensions.height) }, file);
   let response: Response;
   try {
-    response = await fetchUploadWithRetry(apiUrl("/api/photos/upload"), {
+    response = await fetchUploadWithRetry(endpoint, {
       method: "POST",
       headers: { Authorization: `Bearer ${session.access_token}` },
       credentials: "include",
       body,
     });
-  } catch {
-    throw new Error(
-      "The photo upload service could not be reached. Check the Render service URL and CORS_ORIGIN configuration."
-    );
+  } catch (error) {
+    console.error("[MediaPublish] photo network failure", error);
+    throw new Error(`Photo upload request failed: ${error instanceof Error ? error.message : "network error"}`);
   }
   const payload = (await response.json().catch(() => ({}))) as {
     postId?: number;
@@ -175,8 +185,10 @@ export async function publishPhoto(
     imageUrl?: string;
     error?: string;
   };
-  if (!response.ok || !payload.postId || !payload.imageUrl)
-    throw new Error(payload.error || "The photo could not be published.");
+  if (!response.ok || !payload.postId || !payload.imageUrl) {
+    console.error("[MediaPublish] photo API rejection", { status: response.status, payload });
+    throw new Error(payload.error || `Photo publish failed with HTTP ${response.status}.`);
+  }
   return {
     postId: payload.postId,
     status: payload.status || "PUBLISHED",
@@ -198,18 +210,19 @@ export async function publishVideo(
   body.append("kind", kind);
   body.append("title", title);
   body.append("description", description);
+  const endpoint = apiUrl("/api/videos/upload");
+  logUploadRequest("video", endpoint, { kind, title, description }, file);
   let response: Response;
   try {
-    response = await fetchUploadWithRetry(apiUrl("/api/videos/upload"), {
+    response = await fetchUploadWithRetry(endpoint, {
       method: "POST",
       headers: { Authorization: `Bearer ${session.access_token}` },
       credentials: "include",
       body,
     });
-  } catch {
-    throw new Error(
-      "The video upload service could not be reached. Check the Render service URL and CORS_ORIGIN configuration."
-    );
+  } catch (error) {
+    console.error("[MediaPublish] video network failure", error);
+    throw new Error(`Video upload request failed: ${error instanceof Error ? error.message : "network error"}`);
   }
   const payload = (await response.json().catch(() => ({}))) as {
     videoId?: number;
@@ -217,8 +230,10 @@ export async function publishVideo(
     videoUrl?: string;
     error?: string;
   };
-  if (!response.ok || !payload.videoId || !payload.videoUrl)
-    throw new Error(payload.error || "The video could not be published.");
+  if (!response.ok || !payload.videoId || !payload.videoUrl) {
+    console.error("[MediaPublish] video API rejection", { status: response.status, payload });
+    throw new Error(payload.error || `Video publish failed with HTTP ${response.status}.`);
+  }
   return {
     videoId: payload.videoId,
     status: payload.status || "PUBLISHED",
