@@ -23,6 +23,8 @@ import {
   WalletCards,
   X,
   Megaphone,
+  MessageCircle,
+  Plus,
   QrCode,
 } from "lucide-react";
 import { useLocation } from "wouter";
@@ -702,11 +704,13 @@ function MobileDrawer({
 
 function AppHeader({
   profile,
+  notificationCount,
   onMenu,
   onNavigate,
   onLogout,
 }: {
   profile?: ProfileSnapshot;
+  notificationCount: number;
   onMenu: () => void;
   onNavigate: (path: string) => void;
   onLogout: () => void;
@@ -716,36 +720,38 @@ function AppHeader({
       <button
         type="button"
         className="brand"
-        onClick={() => onNavigate("/")}
+        onClick={() => onNavigate("/?panel=all")}
         aria-label="Go to Home"
       >
         <OfficialLogo />
         <span className="brand-name">KINBA</span>
       </button>
       <nav className="desktop-nav" aria-label="Primary navigation">
-        <button type="button" onClick={() => onNavigate("/?panel=all")}>
-          Feed
-        </button>
-        <button type="button" onClick={() => onNavigate("/?panel=shorts")}>
-          Shorts
-        </button>
-        <button type="button" onClick={() => onNavigate("/?panel=wheels")}>
-          Wheels
-        </button>
-        <button type="button" onClick={() => onNavigate("/profile")}>
-          Profile
-        </button>
+        <button type="button" onClick={() => onNavigate("/?panel=all")}>Feed</button>
+        <button type="button" onClick={() => onNavigate("/?panel=shorts")}>Shorts</button>
+        <button type="button" onClick={() => onNavigate("/?panel=wheels")}>Wheels</button>
+        <button type="button" onClick={() => onNavigate("/profile")}>Profile</button>
       </nav>
-      <button
-        type="button"
-        className="header-profile-trigger"
-        onClick={onMenu}
-        aria-label="Open profile menu"
-      >
-        <ProfileIdentity profile={profile} compact />
-        <Menu size={25} />
-      </button>
       <div className="topbar-actions">
+        <button type="button" className="topbar-icon-button" onClick={() => onNavigate("/?panel=publish")} aria-label="Create" title="Create">
+          <Plus size={19} />
+        </button>
+        <button type="button" className="topbar-icon-button" onClick={() => onNavigate("/?panel=search")} aria-label="Search" title="Search">
+          <Search size={18} />
+        </button>
+        <button type="button" className="topbar-icon-button topbar-notification-button" onClick={() => onNavigate("/?panel=notifications")} aria-label="Notifications" title="Notifications">
+          <MessageCircle size={18} />
+          {notificationCount > 0 && <span className="notification-badge">{notificationCount > 99 ? "99+" : notificationCount}</span>}
+        </button>
+        <button
+          type="button"
+          className="header-profile-trigger"
+          onClick={onMenu}
+          aria-label="Open profile menu"
+        >
+          <ProfileIdentity profile={profile} compact />
+          <Menu size={22} />
+        </button>
         <ThemeToggle />
         <button type="button" className="logout-btn" onClick={onLogout}>
           <LogOut size={15} />
@@ -1752,6 +1758,12 @@ export default function Home() {
     enabled: auth.isAuthenticated,
     refetchOnWindowFocus: false,
   });
+  const notificationQuery = trpc.home.notifications.useQuery(undefined, {
+    enabled: auth.isAuthenticated,
+    refetchOnWindowFocus: false,
+    refetchInterval: 15_000,
+  });
+  const notificationCount = Math.min(notificationQuery.data?.length ?? 0, 99);
   const profile = profileQuery.data as ProfileSnapshot | undefined;
   const screen: Screen =
     location === "/profile"
@@ -1804,6 +1816,7 @@ export default function Home() {
       <div className="kinba-app max-w-vw overflow-x-hidden box-border">
         <AppHeader
           profile={profile}
+          notificationCount={notificationCount}
           onMenu={() => setMenuOpen(true)}
           onNavigate={navigate}
           onLogout={logout}
