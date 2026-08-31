@@ -1047,7 +1047,7 @@ function ProfileStats({
             <strong>{stats?.followersCount ?? 0}</strong> Followers
           </span>
           <span>
-            <strong>{stats?.reactionsReceived ?? 0}</strong> Likes
+            <strong>{stats?.reactionsReceived ?? 0}</strong> Pookies
           </span>
         </div>
         {enabled ? (
@@ -1083,7 +1083,7 @@ function ProfileStats({
             [
               ["videos", "Videos"],
               ["shorts", "Shorts"],
-              ["liked", "Liked"],
+              ["liked", "Pookies"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -1100,7 +1100,7 @@ function ProfileStats({
         </div>
         {gridTab === "liked" ? (
           <div className="profile-grid-empty">
-            Liked videos will appear here.
+            Pookied videos will appear here.
           </div>
         ) : videos.length ? (
           <div className="profile-video-grid">
@@ -1640,7 +1640,7 @@ function CreatorStudioModal({
       <p className="modal-intro">Manage your publishing momentum from one creator workspace.</p>
       <div className="studio-stat-grid">
         <div><strong>{stats?.followersCount ?? 0}</strong><span>Followers</span></div>
-        <div><strong>{stats?.reactionsReceived ?? 0}</strong><span>Likes</span></div>
+        <div><strong>{stats?.reactionsReceived ?? 0}</strong><span>Pookies</span></div>
         <div><strong>{stats?.iconsCount ?? 0}</strong><span>ICONS</span></div>
       </div>
       <button

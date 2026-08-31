@@ -480,13 +480,13 @@ function EngagementActions({
         onClick={onReact}
         disabled={pending === "react"}
         aria-pressed={engagement.viewerReacted}
-        aria-label={engagement.viewerReacted ? "Unlike video" : "Like video"}
+        aria-label={engagement.viewerReacted ? "Remove Pookie" : "Pookie video"}
       >
         <Heart
           size={overlay ? 27 : 16}
           fill={engagement.viewerReacted ? "currentColor" : "none"}
         />
-        <span>{engagement.viewerReacted ? "Liked" : "React/Like"}</span>
+        <span>{engagement.viewerReacted ? "Pookied" : "Pookie"}</span>
         <strong>{formatCount(engagement.reactionCount)}</strong>
       </button>
       <button type="button" onClick={onComments} aria-label="Open comments">
