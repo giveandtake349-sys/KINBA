@@ -1752,7 +1752,11 @@ a:focus-visible {
 }
 .kinba-app {
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--teal) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--teal) 5%, transparent) 1px,
+      transparent 1px
+    ),
     linear-gradient(var(--page-bg), var(--page-bg));
   background-size: 32px 32px;
   position: relative;
@@ -1956,7 +1960,7 @@ h3 {
 }
 .admin-page__header h1 {
   font-size: clamp(2.3rem, 5vw, 4.2rem);
-  line-height: .92;
+  line-height: 0.92;
 }
 .admin-page__header p:not(.eyebrow) {
   color: var(--muted);
@@ -2040,8 +2044,7 @@ h3 {
 }
 .not-found-card {
   background:
-    linear-gradient(135deg, var(--accent-soft), transparent 55%),
-    var(--surface);
+    linear-gradient(135deg, var(--accent-soft), transparent 55%), var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
   box-shadow: 0 18px 48px color-mix(in srgb, var(--text) 10%, transparent);
@@ -2057,7 +2060,7 @@ h3 {
 }
 .not-found-card h1 {
   font-size: clamp(4rem, 13vw, 7rem);
-  line-height: .8;
+  line-height: 0.8;
   margin: 4px 0 15px;
 }
 .not-found-card h2 {
@@ -2068,4 +2071,30 @@ h3 {
   color: var(--muted);
   line-height: 1.6;
   margin: 0 0 24px;
+}
+
+/* Emergency interaction reset: decorative layers never own touch events. */
+.landing-orb,
+.drawer-head > span::after,
+.profile-video-tile::after,
+.selected-file::before {
+  pointer-events: none;
+}
+button,
+a,
+[role="button"],
+input,
+textarea,
+select,
+summary,
+.brand,
+.header-profile-trigger,
+.topbar-actions button,
+.drawer-backdrop,
+.mobile-drawer,
+.mobile-drawer button,
+.mobile-drawer a,
+.bottom-navigation,
+.bottom-navigation button {
+  pointer-events: auto;
 }

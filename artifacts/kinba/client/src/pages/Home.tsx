@@ -14,6 +14,7 @@ import {
   Menu,
   Moon,
   PenLine,
+  Play,
   Search,
   Settings,
   Sun,
@@ -727,21 +728,51 @@ function AppHeader({
         <span className="brand-name">KINBA</span>
       </button>
       <nav className="desktop-nav" aria-label="Primary navigation">
-        <button type="button" onClick={() => onNavigate("/?panel=all")}>Feed</button>
-        <button type="button" onClick={() => onNavigate("/?panel=shorts")}>Shorts</button>
-        <button type="button" onClick={() => onNavigate("/?panel=wheels")}>Wheels</button>
-        <button type="button" onClick={() => onNavigate("/profile")}>Profile</button>
+        <button type="button" onClick={() => onNavigate("/?panel=all")}>
+          Feed
+        </button>
+        <button type="button" onClick={() => onNavigate("/?panel=shorts")}>
+          Shorts
+        </button>
+        <button type="button" onClick={() => onNavigate("/?panel=wheels")}>
+          Wheels
+        </button>
+        <button type="button" onClick={() => onNavigate("/profile")}>
+          Profile
+        </button>
       </nav>
       <div className="topbar-actions">
-        <button type="button" className="topbar-icon-button" onClick={() => onNavigate("/?panel=publish")} aria-label="Create" title="Create">
+        <button
+          type="button"
+          className="topbar-icon-button"
+          onClick={() => onNavigate("/?panel=publish")}
+          aria-label="Create"
+          title="Create"
+        >
           <Plus size={19} />
         </button>
-        <button type="button" className="topbar-icon-button" onClick={() => onNavigate("/?panel=search")} aria-label="Search" title="Search">
+        <button
+          type="button"
+          className="topbar-icon-button"
+          onClick={() => onNavigate("/?panel=search")}
+          aria-label="Search"
+          title="Search"
+        >
           <Search size={18} />
         </button>
-        <button type="button" className="topbar-icon-button topbar-notification-button" onClick={() => onNavigate("/?panel=notifications")} aria-label="Notifications" title="Notifications">
+        <button
+          type="button"
+          className="topbar-icon-button topbar-notification-button"
+          onClick={() => onNavigate("/?panel=notifications")}
+          aria-label="Notifications"
+          title="Notifications"
+        >
           <MessageCircle size={18} />
-          {notificationCount > 0 && <span className="notification-badge">{notificationCount > 99 ? "99+" : notificationCount}</span>}
+          {notificationCount > 0 && (
+            <span className="notification-badge">
+              {notificationCount > 99 ? "99+" : notificationCount}
+            </span>
+          )}
         </button>
         <button
           type="button"
@@ -1104,7 +1135,11 @@ function WalletPanel() {
         <div className="media-empty" role="alert">
           <h3>Wallet balance is unavailable.</h3>
           <p>Try again in a moment.</p>
-          <button type="button" className="muted-btn" onClick={() => wallet.refetch()}>
+          <button
+            type="button"
+            className="muted-btn"
+            onClick={() => wallet.refetch()}
+          >
             Retry
           </button>
         </div>
@@ -1118,10 +1153,20 @@ function WalletPanel() {
       <div className="wallet-status-row">
         <div>
           <span>Account status</span>
-          <strong>{verification.data?.isVerified ? "Verified" : "Standard member"}</strong>
+          <strong>
+            {verification.data?.isVerified ? "Verified" : "Standard member"}
+          </strong>
         </div>
-        <span className={verification.data?.isVerified ? "wallet-status is-ready" : "wallet-status"}>
-          {verification.data?.isVerified ? "Ready to publish" : "Verification available"}
+        <span
+          className={
+            verification.data?.isVerified
+              ? "wallet-status is-ready"
+              : "wallet-status"
+          }
+        >
+          {verification.data?.isVerified
+            ? "Ready to publish"
+            : "Verification available"}
         </span>
       </div>
     </section>
@@ -1146,7 +1191,10 @@ function QrPanel({ profile }: { profile?: ProfileSnapshot }) {
     }
   };
   return (
-    <section className="media-section utility-section qr-panel" aria-labelledby="qr-heading">
+    <section
+      className="media-section utility-section qr-panel"
+      aria-labelledby="qr-heading"
+    >
       <div className="media-section-heading">
         <div>
           <p className="eyebrow">Identity card</p>
@@ -1157,7 +1205,10 @@ function QrPanel({ profile }: { profile?: ProfileSnapshot }) {
       <div className="qr-share-card">
         <div className="qr-mark">
           <img
-            src={"https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=" + encodeURIComponent(shareUrl)}
+            src={
+              "https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=" +
+              encodeURIComponent(shareUrl)
+            }
             alt="QR code for your KINBA profile"
           />
         </div>
@@ -1170,7 +1221,10 @@ function QrPanel({ profile }: { profile?: ProfileSnapshot }) {
           {copied ? "Link copied" : "Copy profile link"}
         </button>
       </div>
-      <p className="utility-note">Share the link anywhere people gather. Your profile stays public and easy to find.</p>
+      <p className="utility-note">
+        Share the link anywhere people gather. Your profile stays public and
+        easy to find.
+      </p>
     </section>
   );
 }
@@ -1181,7 +1235,10 @@ function OfflineVideosPanel({ onBrowse }: { onBrowse: () => void }) {
     refetchInterval: 30_000,
   });
   return (
-    <section className="media-section utility-section offline-panel" aria-labelledby="offline-heading">
+    <section
+      className="media-section utility-section offline-panel"
+      aria-labelledby="offline-heading"
+    >
       <div className="media-section-heading">
         <div>
           <p className="eyebrow">Personal library</p>
@@ -1190,36 +1247,59 @@ function OfflineVideosPanel({ onBrowse }: { onBrowse: () => void }) {
         <Film size={22} aria-hidden="true" />
       </div>
       {saved.isPending ? (
-        <div className="utility-loading" aria-busy="true">Loading your saved videos…</div>
+        <div className="utility-loading" aria-busy="true">
+          Loading your saved videos…
+        </div>
       ) : saved.isError ? (
         <div className="media-empty" role="alert">
           <Film size={22} />
           <h3>Your saved videos are unavailable.</h3>
           <p>We could not reach the saved-video library. Try again.</p>
-          <button type="button" className="muted-btn" onClick={() => saved.refetch()}>Retry</button>
+          <button
+            type="button"
+            className="muted-btn"
+            onClick={() => saved.refetch()}
+          >
+            Retry
+          </button>
         </div>
       ) : saved.data?.length ? (
         <div className="offline-video-list" aria-label="Saved videos">
           {saved.data.map(video => (
-            <a className="offline-video-item" href="/?panel=videos" key={video.id}>
+            <a
+              className="offline-video-item"
+              href="/?panel=videos"
+              key={video.id}
+            >
               <div className="offline-video-thumb">
-                {video.thumbnailUrl ? <img src={video.thumbnailUrl} alt="" /> : <Film size={20} />}
+                {video.thumbnailUrl ? (
+                  <img src={video.thumbnailUrl} alt="" />
+                ) : (
+                  <Film size={20} />
+                )}
               </div>
               <span>
                 <strong>{video.title}</strong>
-                <small>{video.owner.name ?? video.owner.username ?? "KINBA creator"} · {new Date(video.createdAt).toLocaleDateString()}</small>
+                <small>
+                  {video.owner.name ?? video.owner.username ?? "KINBA creator"}{" "}
+                  · {new Date(video.createdAt).toLocaleDateString()}
+                </small>
               </span>
               <Play size={16} aria-hidden="true" />
             </a>
           ))}
-          <button type="button" className="primary-btn" onClick={onBrowse}>Browse feed</button>
+          <button type="button" className="primary-btn" onClick={onBrowse}>
+            Browse feed
+          </button>
         </div>
       ) : (
         <div className="media-empty">
           <Film size={22} />
           <h3>No saved videos yet.</h3>
           <p>Use Save on any video to keep it in this personal library.</p>
-          <button type="button" className="primary-btn" onClick={onBrowse}>Browse feed</button>
+          <button type="button" className="primary-btn" onClick={onBrowse}>
+            Browse feed
+          </button>
         </div>
       )}
     </section>
@@ -1814,8 +1894,9 @@ export default function Home() {
   }, [theme]);
   const logout = async () => {
     await auth.logout();
-    navigate("/");
     setMenuOpen(false);
+    navigate("/");
+    auth.openAuth();
   };
   const selectSection = (next: FeedSection | "profile") => {
     if (next === "profile") navigate("/profile");

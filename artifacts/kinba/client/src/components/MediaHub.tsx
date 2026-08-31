@@ -238,13 +238,11 @@ function QualityVideoPlayer({
   video,
   vertical = false,
   active = true,
-  showPoster = true,
   onFirstPlay,
 }: {
   video: VideoRecord;
   vertical?: boolean;
   active?: boolean;
-  showPoster?: boolean;
   onFirstPlay?: () => void;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -324,7 +322,6 @@ function QualityVideoPlayer({
       }
     >
       <video
-        poster={showPoster ? (video.thumbnailUrl ?? undefined) : undefined}
         className={`w-full h-full object-cover ${vertical ? "aspect-[9/16]" : ""}`}
         ref={ref}
         crossOrigin="anonymous"
@@ -531,7 +528,7 @@ function CommentsPanel({
 function VideoCard({
   video,
   active = true,
-  showDetailsOverlay = true,
+  showDetailsOverlay = false,
 }: {
   video: VideoRecord;
   active?: boolean;
@@ -545,7 +542,9 @@ function VideoCard({
     if (!auth.isAuthenticated) return auth.openAuth();
     if (bookmarkMutation.isPending) return;
     try {
-      const engagement = await bookmarkMutation.mutateAsync({ videoId: video.id });
+      const engagement = await bookmarkMutation.mutateAsync({
+        videoId: video.id,
+      });
       setBookmarked(engagement.viewerBookmarked);
     } catch (error) {
       notifyError(error);
@@ -567,7 +566,6 @@ function VideoCard({
         <QualityVideoPlayer
           video={video}
           active={active}
-          showPoster={showDetailsOverlay}
           onFirstPlay={recordView}
         />
         {showDetailsOverlay && (
@@ -603,11 +601,11 @@ function VideoCard({
               </div>
               <h3>{video.title}</h3>
               <p>{video.description}</p>
-               <div className="media-meta-line" aria-label="Video metadata">
-                 <span>{formatCount(views)} views</span>
-                 <span>{relativeTime(video.createdAt)}</span>
-                 <span>{video.kind === "SHORT" ? "Short" : "Video"}</span>
-               </div>
+              <div className="media-meta-line" aria-label="Video metadata">
+                <span>{formatCount(views)} views</span>
+                <span>{relativeTime(video.createdAt)}</span>
+                <span>{video.kind === "SHORT" ? "Short" : "Video"}</span>
+              </div>
             </div>
             <EngagementActions
               engagement={current}
@@ -654,11 +652,11 @@ function VideoCard({
           </div>
           <h3>{video.title}</h3>
           <p>{video.description}</p>
-           <div className="media-meta-line" aria-label="Video metadata">
-             <span>{formatCount(views)} views</span>
-             <span>{relativeTime(video.createdAt)}</span>
-             <span>{video.kind === "SHORT" ? "Short" : "Video"}</span>
-           </div>
+          <div className="media-meta-line" aria-label="Video metadata">
+            <span>{formatCount(views)} views</span>
+            <span>{relativeTime(video.createdAt)}</span>
+            <span>{video.kind === "SHORT" ? "Short" : "Video"}</span>
+          </div>
           <EngagementActions
             engagement={current}
             onReact={react}
@@ -851,7 +849,11 @@ function FeedRecovery() {
     <div className="media-empty" role="status">
       <h3>This feed is temporarily empty.</h3>
       <p>Navigation is still available. Try another tab or reload this feed.</p>
-      <button type="button" className="primary-btn" onClick={() => window.location.reload()}>
+      <button
+        type="button"
+        className="primary-btn"
+        onClick={() => window.location.reload()}
+      >
         <RotateCcw size={15} /> Reload feed
       </button>
     </div>
@@ -980,7 +982,9 @@ function ShortVideoCard({
     if (!auth.isAuthenticated) return auth.openAuth();
     if (bookmarkMutation.isPending) return;
     try {
-      const engagement = await bookmarkMutation.mutateAsync({ videoId: video.id });
+      const engagement = await bookmarkMutation.mutateAsync({
+        videoId: video.id,
+      });
       setBookmarked(engagement.viewerBookmarked);
     } catch (error) {
       notifyError(error);
@@ -1425,7 +1429,7 @@ export function CommunityAnnouncements() {
   });
   const canPost = Boolean(
     profileQuery.data?.profile?.isVerified &&
-      ["creator", "company"].includes(profileQuery.data.profile.accountType)
+    ["creator", "company"].includes(profileQuery.data.profile.accountType)
   );
   const announcements = query.data ?? [];
   return (
@@ -1672,11 +1676,7 @@ export default function MediaHub({
         }`}
       >
         <div className="wheels-feed-layout">
-          <HomeFeedPanel
-            tab="videos"
-            active={activeSection === "wheels"}
-            showDetailsOverlay
-          />
+          <HomeFeedPanel tab="videos" active={activeSection === "wheels"} />
           <div className="wheels-sponsor-panel">
             {wheels ?? (
               <div className="media-empty">
@@ -1693,7 +1693,6 @@ export default function MediaHub({
             tab="videos"
             active={activeSection === "all"}
             autoOpenUpload={false}
-            showDetailsOverlay
           />
         </ErrorBoundary>
       </div>
