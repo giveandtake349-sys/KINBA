@@ -26,7 +26,7 @@ services:
       - key: OWNER_OPEN_ID
         sync: false
       - key: CORS_ORIGIN
-        sync: false
+        value: https://kinba.onrender.com,https://ba.onrender.com
       - key: VITE_API_BASE_URL
         sync: false
       - key: R2_ENDPOINT
