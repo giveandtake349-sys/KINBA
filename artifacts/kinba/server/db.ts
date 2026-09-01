@@ -403,12 +403,25 @@ async function loadVideoSources(videoIds: number[]) {
 function publicMediaUrl(value: string | null | undefined) {
   const normalized = value?.trim();
   if (!normalized) return null;
+  const baseUrl = ENV.r2PublicBaseUrl?.trim().replace(/\/+$/, "");
+  if (!baseUrl) return normalized;
   try {
-    return new URL(normalized).toString();
+    const parsed = new URL(normalized);
+    const publicBase = new URL(`${baseUrl}/`);
+    if (parsed.origin === publicBase.origin) return parsed.toString();
+    const endpoint = ENV.r2Endpoint ? new URL(ENV.r2Endpoint) : null;
+    if (endpoint && parsed.origin === endpoint.origin) {
+      const bucket = (ENV.r2BucketName || "kinba-media").replace(/^\/+|\/+$/g, "");
+      const prefix = `/${bucket}/`;
+      const pathname = decodeURIComponent(parsed.pathname);
+      const key = pathname.startsWith(prefix)
+        ? pathname.slice(prefix.length)
+        : pathname.replace(/^\/+/, "");
+      return `${baseUrl}/${key.split("/").filter(Boolean).map(encodeURIComponent).join("/")}`;
+    }
+    return parsed.toString();
   } catch {
-    const baseUrl = ENV.r2PublicBaseUrl?.trim().replace(/\/+$/, "");
-    if (!baseUrl) return normalized;
-    const key = normalized.replace(/^\/+/, "").split("/").map(encodeURIComponent).join("/");
+    const key = normalized.replace(/^\/+/, "").split("/").filter(Boolean).map(encodeURIComponent).join("/");
     return `${baseUrl}/${key}`;
   }
 }
@@ -660,6 +673,28 @@ export async function listNotifications(userId: number) {
   ]
     .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
     .slice(0, 50);
+}
+
+export async function getVideoThumbnailSource(videoId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [video] = await db
+    .select({ id: videos.id, videoUrl: videos.videoUrl, thumbnailUrl: videos.thumbnailUrl, mediaType: videos.mediaType })
+    .from(videos)
+    .where(eq(videos.id, videoId))
+    .limit(1);
+  return video;
+}
+
+export async function setVideoThumbnail(videoId: number, thumbnailUrl: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [updated] = await db
+    .update(videos)
+    .set({ thumbnailUrl: optionalText(thumbnailUrl), updatedAt: new Date() })
+    .where(eq(videos.id, videoId))
+    .returning({ id: videos.id, thumbnailUrl: videos.thumbnailUrl });
+  return updated;
 }
 
 export async function createVideo(

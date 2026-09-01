@@ -9,9 +9,11 @@ import {
   createPhotoPost,
   createVideo,
   getUserByOpenId,
+  getVideoThumbnailSource,
+  setVideoThumbnail,
   upsertUser,
 } from "./db";
-import { storagePut } from "./storage";
+import { storageDownload, storagePut } from "./storage";
 import {
   supabaseDisplayName,
   supabaseOpenId,
@@ -136,6 +138,42 @@ async function authenticate(request: Request) {
 }
 
 export function registerVideoUploadRoute(app: Express) {
+  app.get("/api/videos/:videoId/thumbnail", async (req, res) => {
+    const videoId = Number(req.params.videoId);
+    if (!Number.isInteger(videoId) || videoId < 1) {
+      res.status(400).send("Invalid video ID");
+      return;
+    }
+    let sourcePath: string | undefined;
+    let thumbnailPath: string | undefined;
+    try {
+      const video = await getVideoThumbnailSource(videoId);
+      if (!video || video.mediaType !== "VIDEO") {
+        res.status(404).send("Video not found");
+        return;
+      }
+      if (video.thumbnailUrl) {
+        res.redirect(307, video.thumbnailUrl);
+        return;
+      }
+      const source = await storageDownload(video.videoUrl);
+      sourcePath = path.join(os.tmpdir(), `kinba-repair-source-${videoId}-${Date.now()}`);
+      thumbnailPath = path.join(os.tmpdir(), `kinba-repair-thumb-${videoId}-${Date.now()}.jpg`);
+      await fs.writeFile(sourcePath, source);
+      const thumbnail = await createVideoThumbnail(sourcePath, thumbnailPath);
+      const uploaded = await storagePut(`videos/repaired/thumbnail-${videoId}.jpg`, thumbnail, "image/jpeg");
+      await setVideoThumbnail(videoId, uploaded.url);
+      res.set({ "Cache-Control": "public, max-age=86400", "Content-Type": "image/jpeg" });
+      res.send(thumbnail);
+    } catch (error) {
+      console.error(`[ThumbnailRepair] Video ${videoId} failed:`, error);
+      res.status(404).send("Video thumbnail unavailable");
+    } finally {
+      if (sourcePath) await fs.rm(sourcePath, { force: true }).catch(() => undefined);
+      if (thumbnailPath) await fs.rm(thumbnailPath, { force: true }).catch(() => undefined);
+    }
+  });
+
   app.post(
     "/api/media/video-upload",
     uploadSingle("video"),

@@ -30,6 +30,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import Hls from "hls.js";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import {
@@ -295,6 +296,7 @@ function QualityVideoPlayer({
   onFirstPlay?: () => void;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const [isInView, setIsInView] = useState(false);
@@ -310,7 +312,9 @@ function QualityVideoPlayer({
   );
   const sourceUrl =
     resolveMediaUrl(sourceMap.get("ORIGINAL") ?? video.videoUrl) ?? "";
-  const posterUrl = resolveMediaUrl(video.thumbnailUrl);
+  const posterUrl =
+    resolveMediaUrl(video.thumbnailUrl) ?? `/api/videos/${video.id}/thumbnail`;
+
   const shouldPlay = active && isInView;
 
   useEffect(() => {
@@ -334,9 +338,28 @@ function QualityVideoPlayer({
     if (!element) return;
 
     setPlaybackError(null);
-    element.src = sourceUrl;
-    element.load();
+    hlsRef.current?.destroy();
+    hlsRef.current = null;
+    if (!sourceUrl) {
+      setPlaybackError("This video has no playable source.");
+      return;
+    }
+    const isHls = /\.m3u8(?:$|\?)/i.test(sourceUrl);
+    if (isHls && Hls.isSupported()) {
+      const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+      hlsRef.current = hls;
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) setPlaybackError("This video stream could not be loaded. Please try again.");
+      });
+      hls.loadSource(sourceUrl);
+      hls.attachMedia(element);
+    } else {
+      element.src = sourceUrl;
+      element.load();
+    }
     return () => {
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
       element.removeAttribute("src");
       element.load();
     };
