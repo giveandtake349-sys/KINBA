@@ -19,6 +19,7 @@ import {
   Loader2,
   MessageCircle,
   Megaphone,
+  MoreHorizontal,
   Pause,
   Play,
   Plus,
@@ -470,6 +471,7 @@ function EngagementActions({
   onComments,
   pending,
   overlay = false,
+  feedStyle = false,
   bookmarked = false,
   onBookmark,
   owner,
@@ -480,6 +482,7 @@ function EngagementActions({
   onComments: () => void;
   pending: "react" | "share" | null;
   overlay?: boolean;
+  feedStyle?: boolean;
   bookmarked?: boolean;
   onBookmark?: () => void;
   owner?: VideoRecord["owner"];
@@ -514,7 +517,7 @@ function EngagementActions({
   };
   return (
     <div
-      className={`media-engagement-actions${overlay ? " media-engagement-actions--overlay absolute right-3 bottom-4 z-30 flex flex-col items-center gap-3" : ""}`}
+      className={`media-engagement-actions${overlay ? " media-engagement-actions--overlay absolute right-3 bottom-4 z-30 flex flex-col items-center gap-3" : ""}${feedStyle ? " feed-action-bar" : ""}`}
     >
       {overlay && owner && !isOwnVideo && (
         <button
@@ -554,7 +557,7 @@ function EngagementActions({
         <strong>{formatCount(engagement.reactionCount)}</strong>
       </button>
       <button type="button" onClick={onComments} aria-label="Open comments">
-        <MessageCircle size={overlay ? 27 : 16} /> <span>Comments</span>
+        <MessageCircle size={overlay ? 27 : 16} /> <span>Comment</span>
         <strong>{formatCount(engagement.commentCount)}</strong>
       </button>
       {onBookmark && (
@@ -677,10 +680,12 @@ function VideoCard({
   video,
   active = true,
   showDetailsOverlay = false,
+  socialLayout = false,
 }: {
   video: VideoRecord;
   active?: boolean;
   showDetailsOverlay?: boolean;
+  socialLayout?: boolean;
   showHeader?: boolean;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -709,6 +714,80 @@ function VideoCard({
       .then(result => setViews(result.viewCount))
       .catch(() => undefined);
   };
+  if (socialLayout) {
+    return (
+      <article className="feed-media-post">
+        <header className="feed-post-author">
+          <div className="video-owner-avatar">
+            {video.owner.photoUrl ? (
+              <img src={video.owner.photoUrl} alt="" />
+            ) : (
+              <UserRound size={16} />
+            )}
+          </div>
+          <div className="feed-post-author-info">
+            <strong>
+              {displayName(video.owner.name, video.owner.username)}
+              {video.owner.isVerified && (
+                <BadgeCheck
+                  className="verified-badge"
+                  size={13}
+                  aria-label="Verified profile"
+                />
+              )}
+            </strong>
+            <span>
+              {relativeTime(video.createdAt)} ·{" "}
+              {video.mediaType === "IMAGE" ? "Photo" : "Video"}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="feed-post-more"
+            aria-label="More post options"
+          >
+            <MoreHorizontal size={19} />
+          </button>
+        </header>
+        {(video.title || video.description) && (
+          <div className="feed-media-copy">
+            {video.title && <h3>{video.title}</h3>}
+            {video.description && <p>{video.description}</p>}
+          </div>
+        )}
+        <div className="feed-media-content">
+          {video.mediaType === "IMAGE" ? (
+            <img
+              src={resolveMediaUrl(video.videoUrl) ?? video.videoUrl}
+              alt={video.title || "Post"}
+              loading="lazy"
+            />
+          ) : (
+            <QualityVideoPlayer
+              video={video}
+              active={active}
+              onFirstPlay={recordView}
+            />
+          )}
+        </div>
+        <EngagementActions
+          engagement={current}
+          onReact={react}
+          onShare={share}
+          onComments={() => setCommentsOpen(value => !value)}
+          pending={pending}
+          feedStyle
+          bookmarked={bookmarked}
+          onBookmark={toggleBookmark}
+        />
+        <CommentsPanel
+          videoId={video.id}
+          open={commentsOpen}
+          onClose={() => setCommentsOpen(false)}
+        />
+      </article>
+    );
+  }
   return (
     <article className="long-video-card snap-start h-full w-full overflow-hidden box-border">
               <div className={`media-fullscreen-frame ${video.mediaType === "IMAGE" ? "media-photo-frame" : ""}`}>
@@ -1160,11 +1239,15 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
         <div className="video-owner-avatar">
           {post.author.photoUrl ? <img src={post.author.photoUrl} alt="" /> : <UserRound size={16} />}
         </div>
-        <div>
-          <strong>{post.author.name ?? "KINBA creator"}</strong>
+         <div className="feed-post-author-info">
+           <strong>
+             {post.author.name ?? "KINBA creator"}
+             {post.author.isVerified && (
+               <BadgeCheck size={13} aria-label="Verified profile" />
+             )}
+           </strong>
           <span>{post.author.accountType} · {relativeTime(post.createdAt)}</span>
         </div>
-        {post.author.isVerified && <BadgeCheck size={14} aria-label="Verified profile" />}
       </div>
       <p className="feed-post-body">{post.text}</p>
       {post.attachments.length > 0 && (
@@ -1213,7 +1296,14 @@ function UnifiedFeedPanel({ active = true }: { active?: boolean }) {
         <div className="unified-feed-list">
           {items.map(item => {
             if (item.feedType === "media")
-              return <VideoCard key={"media-" + item.id} video={item} active={active} />;
+              return (
+                <VideoCard
+                  key={"media-" + item.id}
+                  video={item}
+                  active={active}
+                  socialLayout
+                />
+              );
             if (item.feedType === "text")
               return <TextFeedCard key={"text-" + item.id} post={item} />;
             return <ShortsInsertionBlock key={item.id} video={item.video} active={active} />;
@@ -1306,6 +1396,7 @@ function HomeFeedPanel({
               video={video}
               active={active}
               showDetailsOverlay={showDetailsOverlay}
+              socialLayout={tab === "videos"}
             />
           ))}
         </div>
@@ -1780,7 +1871,7 @@ function AnnouncementComments({
         aria-expanded={open}
       >
         <MessageCircle size={15} />
-        Comments <strong>{formatCount(visibleCount)}</strong>
+         Comment <strong>{formatCount(visibleCount)}</strong>
       </button>
       {open && (
         <div className="announcement-comments__panel" aria-live="polite">
