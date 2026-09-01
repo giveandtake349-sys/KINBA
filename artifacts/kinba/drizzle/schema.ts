@@ -469,6 +469,50 @@ export const communityAnnouncementAttachments = pgTable(
   ]
 );
 
+export const communityReactions = pgTable(
+  "community_reactions",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    announcementId: integer("announcementId")
+      .notNull()
+      .references(() => communityAnnouncements.id, { onDelete: "cascade" }),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("community_reactions_pair_unique").on(
+      table.announcementId,
+      table.userId
+    ),
+    index("community_reactions_announcement_idx").on(table.announcementId),
+    index("community_reactions_user_idx").on(table.userId),
+  ]
+);
+
+export const communityBookmarks = pgTable(
+  "community_bookmarks",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    announcementId: integer("announcementId")
+      .notNull()
+      .references(() => communityAnnouncements.id, { onDelete: "cascade" }),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("community_bookmarks_pair_unique").on(
+      table.announcementId,
+      table.userId
+    ),
+    index("community_bookmarks_announcement_idx").on(table.announcementId),
+    index("community_bookmarks_user_idx").on(table.userId),
+  ]
+);
+
 export const blocks = pgTable(
   "blocks",
   {
