@@ -338,7 +338,7 @@ export async function approveVerificationTransaction(
   });
 }
 
-export type VideoKind = "LONG" | "SHORT";
+export type VideoKind = "LONG" | "SHORT" | "WHEEL";
 export type MediaType = "VIDEO" | "IMAGE";
 export type VideoQuality = "ORIGINAL" | "1080P" | "720P" | "480P" | "240P";
 export type VideoSourceInput = { quality: VideoQuality; videoUrl: string };
@@ -350,7 +350,14 @@ export type VideoAttachmentInput = {
   height?: number | null;
   durationSeconds?: number | null;
 };
-export type HomeFeedTab = "all" | "videos" | "trendy" | "following" | "icons";
+export type HomeFeedTab =
+  | "all"
+  | "videos"
+  | "trendy"
+  | "following"
+  | "icons"
+  | "shorts"
+  | "wheels";
 
 function requiredText(value: string | null | undefined, fallback: string) {
   const normalized = value?.trim();
@@ -379,7 +386,7 @@ function withSourceMap<T extends { id: number }>(
     ...row,
     sources: (sourcesByVideo.get(row.id) ?? []).map(source => ({
       quality: source.quality,
-      videoUrl: source.videoUrl,
+      videoUrl: publicMediaUrl(source.videoUrl) ?? "",
     })),
   }));
 }
@@ -393,9 +400,25 @@ async function loadVideoSources(videoIds: number[]) {
     .where(inArray(videoSources.videoId, videoIds));
 }
 
+function publicMediaUrl(value: string | null | undefined) {
+  const normalized = value?.trim();
+  if (!normalized) return null;
+  try {
+    return new URL(normalized).toString();
+  } catch {
+    const baseUrl = ENV.r2PublicBaseUrl?.trim().replace(/\/+$/, "");
+    if (!baseUrl) return normalized;
+    const key = normalized.replace(/^\/+/, "").split("/").map(encodeURIComponent).join("/");
+    return `${baseUrl}/${key}`;
+  }
+}
+
 function shapeVideoRow(row: any) {
   return {
     ...row.video,
+    videoUrl: publicMediaUrl(row.video.videoUrl) ?? "",
+    thumbnailUrl: publicMediaUrl(row.video.thumbnailUrl),
+    hlsMasterUrl: publicMediaUrl(row.video.hlsMasterUrl),
     mediaType: row.video.mediaType === "IMAGE" ? "IMAGE" : "VIDEO",
     processingStatus: row.video.processingStatus ?? "READY",
     reactionCount: Number(row.reactionCount),
@@ -467,7 +490,8 @@ async function selectVideos(
 
 export async function listVideos(kind: VideoKind, viewerId?: number) {
   const conditions = [eq(videos.kind, kind)];
-  if (kind === "LONG") conditions.push(eq(videos.mediaType, "VIDEO"));
+  if (kind === "LONG" || kind === "SHORT" || kind === "WHEEL")
+    conditions.push(eq(videos.mediaType, "VIDEO"));
   return selectVideos(conditions, viewerId, "recent");
 }
 
@@ -495,6 +519,18 @@ export async function searchVideos(term: string, viewerId?: number) {
 
 export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
   if (tab === "all") return listUnifiedHomeFeed(viewerId);
+  if (tab === "shorts")
+    return selectVideos(
+      [eq(videos.kind, "SHORT"), eq(videos.mediaType, "VIDEO")],
+      viewerId,
+      "recent"
+    );
+  if (tab === "wheels")
+    return selectVideos(
+      [eq(videos.kind, "WHEEL"), eq(videos.mediaType, "VIDEO")],
+      viewerId,
+      "recent"
+    );
   if (tab === "following" && !viewerId) return [];
   const db = await getDb();
   if (!db) return [];
