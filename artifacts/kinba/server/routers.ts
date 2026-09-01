@@ -133,13 +133,23 @@ export const appRouter = router({
     ),
     feed: publicProcedure
       .input(
-        z.object({ tab: z.enum(["all", "videos", "trendy", "following", "icons"]) })
+        z.object({
+          tab: z.enum([
+            "all",
+            "videos",
+            "trendy",
+            "following",
+            "icons",
+            "shorts",
+            "wheels",
+          ]),
+        })
       )
       .query(({ ctx, input }) => listHomeFeed(input.tab, ctx.user?.id)),
   }),
   videos: router({
     list: publicProcedure
-      .input(z.object({ kind: z.enum(["LONG", "SHORT"]) }))
+      .input(z.object({ kind: z.enum(["LONG", "SHORT", "WHEEL"]) }))
       .query(({ ctx, input }) => listVideos(input.kind, ctx.user?.id)),
     create: protectedProcedure
       .input(videoInput)
