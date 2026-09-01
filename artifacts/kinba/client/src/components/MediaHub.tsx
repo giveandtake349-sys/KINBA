@@ -50,8 +50,8 @@ import ErrorBoundary from "./ErrorBoundary";
 import "./mediaHub.css";
 import "./kinbaModern.css";
 
-type HomeTab = "videos" | "trendy" | "following" | "icons";
-type VideoKind = "LONG" | "SHORT";
+type HomeTab = "videos" | "trendy" | "following" | "icons" | "wheels";
+type VideoKind = "LONG" | "SHORT" | "WHEEL";
 type Quality = "ORIGINAL" | "1080P" | "720P" | "480P" | "240P";
 type VideoSource = { quality: Quality; videoUrl: string };
 type VideoRecord = {
@@ -134,6 +134,7 @@ type AnnouncementVideoSelection = {
 
 const tabOptions: { id: HomeTab; label: string; caption: string }[] = [
   { id: "videos", label: "Videos", caption: "Latest main-feed videos" },
+  { id: "wheels", label: "Wheels", caption: "Wheel content only" },
   { id: "trendy", label: "Trendy", caption: "Most reacted-to videos" },
   {
     id: "following",
@@ -678,7 +679,7 @@ function VideoCard({
       .catch(() => undefined);
   };
   return (
-    <article className="long-video-card w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 mb-4 overflow-hidden box-border">
+    <article className="long-video-card snap-start h-full w-full overflow-hidden box-border">
               <div className={`media-fullscreen-frame ${video.mediaType === "IMAGE" ? "media-photo-frame" : ""}`}>
         {video.mediaType === "IMAGE" ? (
           <img
@@ -1196,7 +1197,7 @@ function HomeFeedPanel({
   }, [autoOpenUpload]);
   return (
     <section
-      className="media-section home-feed-section w-full max-w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 mb-4 overflow-hidden box-border"
+      className="media-section home-feed-section w-full max-w-full overflow-hidden box-border"
       aria-labelledby="home-feed-heading"
     >
       {showHeader && (
@@ -1225,7 +1226,7 @@ function HomeFeedPanel({
       {query.isPending ? (
         <FeedSkeleton />
       ) : videos.length ? (
-        <div className="long-video-grid media-feed-scroll h-screen overflow-y-scroll scrollbar-hide snap-y snap-mandatory w-full max-w-full box-border">
+        <div className="long-video-grid media-feed-scroll h-[100dvh] overflow-y-scroll scrollbar-hide snap-y snap-mandatory w-full max-w-full box-border">
           {videos.map(video => (
             <VideoCard
               key={video.id}
@@ -1294,7 +1295,7 @@ function ShortVideoCard({
   const { current, react, share, pending } = useOptimisticEngagement(video);
   return (
     <article
-      className={`short-card${compact ? " short-card--compact" : ""} w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 mb-4 overflow-hidden box-border`}
+      className={`short-card${compact ? " short-card--compact" : ""} snap-start h-full w-full overflow-hidden box-border`}
       data-short-index={index}
     >
       {video.mediaType === "IMAGE" ? (
@@ -1368,8 +1369,8 @@ function ShortVideoCard({
 }
 
 function ShortsFeed({ active = true }: { active?: boolean }) {
-  const query = trpc.videos.list.useQuery(
-    { kind: "SHORT" },
+  const query = trpc.home.feed.useQuery(
+    { tab: "shorts" },
     {
       retry: 1,
       throwOnError: false,
@@ -1413,7 +1414,7 @@ function ShortsFeed({ active = true }: { active?: boolean }) {
   };
   return (
     <section
-      className="media-section shorts-section w-full max-w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 mb-4 overflow-hidden box-border"
+      className="media-section shorts-section w-full max-w-full overflow-hidden box-border"
       aria-labelledby="shorts-heading"
     >
       <div className="media-section-heading">
@@ -1450,7 +1451,7 @@ function ShortsFeed({ active = true }: { active?: boolean }) {
         <FeedSkeleton short />
       ) : videos.length ? (
         <div
-          className="shorts-viewport media-feed-scroll h-screen overflow-y-scroll scrollbar-hide snap-y snap-mandatory w-full max-w-full box-border"
+          className="shorts-viewport media-feed-scroll h-[100dvh] overflow-y-scroll scrollbar-hide snap-y snap-mandatory w-full max-w-full box-border"
           ref={viewportRef}
           onScroll={onScroll}
         >
@@ -1941,7 +1942,7 @@ export function SearchFeed() {
       ) : query.isPending ? (
         <FeedSkeleton />
       ) : results.length ? (
-        <div className="long-video-grid media-feed-scroll h-screen overflow-y-scroll scrollbar-hide snap-y snap-mandatory w-full max-w-full box-border">
+        <div className="long-video-grid media-feed-scroll h-[100dvh] overflow-y-scroll scrollbar-hide snap-y snap-mandatory w-full max-w-full box-border">
           {results.map(video => (
             <VideoCard key={video.id} video={video} />
           ))}
@@ -2022,7 +2023,7 @@ export default function MediaHub({
         }`}
       >
         <div className="wheels-feed-layout">
-          <HomeFeedPanel tab="videos" active={activeSection === "wheels"} />
+          <HomeFeedPanel tab="wheels" active={activeSection === "wheels"} showDetailsOverlay showHeader={false} />
           <div className="wheels-sponsor-panel">
             {wheels ?? (
               <div className="media-empty">
