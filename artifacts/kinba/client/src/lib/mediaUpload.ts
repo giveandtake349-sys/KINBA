@@ -141,7 +141,13 @@ function uploadFailureMessage(response: Response, payload: UploadPayload, resour
 async function getUploadSession(message: string) {
   const current = await supabase.auth.getSession();
   if (current.error) throw current.error;
-  if (current.data.session) return current.data.session;
+  const session = current.data.session;
+  if (
+    session &&
+    (!session.expires_at || session.expires_at * 1000 > Date.now() + 60_000)
+  ) {
+    return session;
+  }
   const refreshed = await supabase.auth.refreshSession();
   if (refreshed.error) throw refreshed.error;
   if (!refreshed.data.session) throw new Error(message);
@@ -327,28 +333,10 @@ export async function uploadVideo(
   if (!file.type.startsWith("video/"))
     throw new Error("Choose a supported video file.");
   const session = await getUploadSession("Please sign in before uploading video.");
-
-  const body = new FormData();
-  body.append("video", file, file.name);
-  body.append("kind", kind);
-  let response: Response;
-  try {
-    response = await fetchUploadWithRetry(apiUrl("/api/media/video-upload"), {
-      method: "POST",
-      headers: { Authorization: `Bearer ${session.access_token}` },
-      credentials: "include",
-      body,
-    });
-  } catch {
-    throw new Error(
-      "The video upload service could not be reached. Check the Render service URL and CORS_ORIGIN configuration."
-    );
-  }
-  const payload = await readUploadPayload(response);
-  const videoUrl = payload.videoUrl ?? payload.url;
-  if (!response.ok || !videoUrl)
-    throw new Error(uploadFailureMessage(response, payload, "Video"));
-  return videoUrl;
+  // Keep announcement attachments on the same signed Cloudflare R2 path as
+  // published videos. The former /api/media/video-upload endpoint no longer
+  // exists and caused announcement video uploads to fail with a 404.
+  return uploadDirectToR2(file, kind, "source", session.access_token);
 }
 
 export async function uploadImage(
