@@ -1539,6 +1539,21 @@ body {
   background: var(--kinba-coral-soft);
 }
 
+.media-hub .feed-empty-state {
+  min-height: 180px !important;
+  margin: 0 !important;
+  padding: 44px 20px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--kinba-line-modern) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.media-hub .feed-empty-state p {
+  display: none;
+}
+
 @media (max-width: 560px) {
   .media-hub .feed-media-post,
   .media-hub .feed-text-card {
