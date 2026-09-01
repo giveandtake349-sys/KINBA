@@ -560,6 +560,17 @@ function EngagementActions({
         <MessageCircle size={overlay ? 27 : 16} /> <span>Comment</span>
         <strong>{formatCount(engagement.commentCount)}</strong>
       </button>
+      <button
+        type="button"
+        className={engagement.viewerShared ? "is-active" : ""}
+        onClick={onShare}
+        disabled={pending === "share"}
+        aria-label="Share video"
+      >
+        <Share2 size={overlay ? 28 : 16} />
+        <span>{pending === "share" ? "Sharing" : "Share"}</span>
+        <strong>{formatCount(engagement.shareCount)}</strong>
+      </button>
       {onBookmark && (
         <button
           type="button"
@@ -572,17 +583,6 @@ function EngagementActions({
           <span>{bookmarked ? "Saved" : "Save"}</span>
         </button>
       )}
-      <button
-        type="button"
-        className={engagement.viewerShared ? "is-active" : ""}
-        onClick={onShare}
-        disabled={pending === "share"}
-        aria-label="Share video"
-      >
-        <Share2 size={overlay ? 28 : 16} />
-        <span>{pending === "share" ? "Sharing" : "Share"}</span>
-        <strong>{formatCount(engagement.shareCount)}</strong>
-      </button>
     </div>
   );
 }
