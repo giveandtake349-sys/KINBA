@@ -1310,7 +1310,7 @@ function UnifiedFeedPanel({ active = true }: { active?: boolean }) {
           })}
         </div>
       ) : (
-        <div className="media-empty" role="status">
+        <div className="media-empty feed-empty-state" role="status">
           <h3>Your feed is quiet.</h3>
           <p>Real posts from the KINBA community will appear here.</p>
         </div>
@@ -1401,17 +1401,13 @@ function HomeFeedPanel({
           ))}
         </div>
       ) : (
-        <div className="media-empty">
+        <div className="media-empty feed-empty-state">
           <Play size={18} />
           <h3>
             {tab === "following" && !auth.isAuthenticated
               ? "Sign in to see Following."
-              : "No videos available yet. Be the first creator!"}
+              : "No videos to show yet."}
           </h3>
-          <p>
-            {tabOptions.find(option => option.id === tab)?.caption}. Publish a
-            video and it will appear here.
-          </p>
           <button type="button" className="primary-btn" onClick={openUploader}>
             <Upload size={15} /> Upload Video
           </button>
@@ -1629,10 +1625,9 @@ function ShortsFeed({ active = true }: { active?: boolean }) {
           ))}
         </div>
       ) : (
-        <div className="media-empty">
+        <div className="media-empty feed-empty-state">
           <Play size={18} />
-          <h3>No Shorts yet.</h3>
-          <p>Publish a video of 60 seconds or less to start the Shorts feed.</p>
+          <h3>No Shorts to show yet.</h3>
         </div>
       )}
       <UploadVideoPanel
