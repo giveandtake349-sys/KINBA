@@ -4,7 +4,9 @@ import { Pool } from "pg";
 import {
   communityAnnouncementAttachments,
   communityAnnouncements,
+  communityBookmarks,
   communityComments,
+  communityReactions,
   liveSponsors,
   participants,
   sessionWinners,
@@ -1649,12 +1651,17 @@ export async function listCommunityAnnouncements() {
     select count(*) from community_comments
     where community_comments."announcementId" = ${communityAnnouncements.id}
   )`;
+  const reactionCount = sql<number>`(
+    select count(*) from community_reactions
+    where community_reactions."announcementId" = ${communityAnnouncements.id}
+  )`;
   const rows = await db
     .select({
       announcement: communityAnnouncements,
       user: users,
       profile: profiles,
       commentCount,
+      reactionCount,
     })
     .from(communityAnnouncements)
     .innerJoin(users, eq(communityAnnouncements.userId, users.id))
@@ -1686,6 +1693,9 @@ export async function listCommunityAnnouncements() {
   return rows.map(row => ({
     ...row.announcement,
     commentCount: Number(row.commentCount ?? 0),
+    reactionCount: Number(row.reactionCount ?? 0),
+    viewerReacted: false,
+    viewerBookmarked: false,
     author: {
       id: row.user.id,
       name: row.user.name,
@@ -1695,6 +1705,58 @@ export async function listCommunityAnnouncements() {
     },
     attachments: attachmentsByAnnouncement.get(row.announcement.id) ?? [],
   }));
+}
+
+export async function toggleCommunityReaction(
+  announcementId: number,
+  userId: number
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [existing] = await db
+    .select({ id: communityReactions.id })
+    .from(communityReactions)
+    .where(
+      and(
+        eq(communityReactions.announcementId, announcementId),
+        eq(communityReactions.userId, userId)
+      )
+    )
+    .limit(1);
+  if (existing) {
+    await db
+      .delete(communityReactions)
+      .where(eq(communityReactions.id, existing.id));
+    return { viewerReacted: false };
+  }
+  await db.insert(communityReactions).values({ announcementId, userId });
+  return { viewerReacted: true };
+}
+
+export async function toggleCommunityBookmark(
+  announcementId: number,
+  userId: number
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [existing] = await db
+    .select({ id: communityBookmarks.id })
+    .from(communityBookmarks)
+    .where(
+      and(
+        eq(communityBookmarks.announcementId, announcementId),
+        eq(communityBookmarks.userId, userId)
+      )
+    )
+    .limit(1);
+  if (existing) {
+    await db
+      .delete(communityBookmarks)
+      .where(eq(communityBookmarks.id, existing.id));
+    return { viewerBookmarked: false };
+  }
+  await db.insert(communityBookmarks).values({ announcementId, userId });
+  return { viewerBookmarked: true };
 }
 
 export async function listAnnouncementComments(announcementId: number) {
