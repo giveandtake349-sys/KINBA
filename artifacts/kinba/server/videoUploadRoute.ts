@@ -223,6 +223,8 @@ export function registerVideoUploadRoute(app: Express) {
         );
         res.status(201).json({
           url: uploaded.url,
+          videoUrl: uploaded.url,
+          mediaType: "VIDEO",
           thumbnailUrl: uploadedThumbnail.url,
           width: metadata.width,
           height: metadata.height,

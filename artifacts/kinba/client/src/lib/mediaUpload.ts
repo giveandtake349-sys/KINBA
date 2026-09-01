@@ -284,9 +284,10 @@ export async function uploadVideo(
     );
   }
   const payload = await readUploadPayload(response);
-  if (!response.ok || !payload.url)
+  const videoUrl = payload.videoUrl ?? payload.url;
+  if (!response.ok || !videoUrl)
     throw new Error(uploadFailureMessage(response, payload, "Video"));
-  return payload.url;
+  return videoUrl;
 }
 
 export async function uploadImage(

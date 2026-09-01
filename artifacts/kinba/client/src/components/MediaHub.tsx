@@ -12,6 +12,8 @@ import {
   Bookmark,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Heart,
   Image,
   Loader2,
@@ -1101,7 +1103,43 @@ function FeedRecovery() {
   );
 }
 
+function FeedPhotoLightbox({
+  attachments,
+  index,
+  onClose,
+  onChange,
+}: {
+  attachments: FeedAttachment[];
+  index: number;
+  onClose: () => void;
+  onChange: (index: number) => void;
+}) {
+  const imageAttachments = attachments.filter(item => item.mediaType === "IMAGE");
+  const current = imageAttachments[index];
+  useEffect(() => {
+    if (!current) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+      if (event.key === "ArrowLeft") onChange((index - 1 + imageAttachments.length) % imageAttachments.length);
+      if (event.key === "ArrowRight") onChange((index + 1) % imageAttachments.length);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [current, imageAttachments.length, index, onChange, onClose]);
+  if (!current) return null;
+  return (
+    <div className="feed-photo-lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer" onClick={onClose}>
+      <button type="button" className="feed-photo-lightbox-close" onClick={onClose} aria-label="Close photo viewer"><X size={22} /></button>
+      <span className="feed-photo-lightbox-counter">{index + 1} of {imageAttachments.length}</span>
+      {imageAttachments.length > 1 && <button type="button" className="feed-photo-lightbox-nav feed-photo-lightbox-nav--prev" onClick={event => { event.stopPropagation(); onChange((index - 1 + imageAttachments.length) % imageAttachments.length); }} aria-label="Previous photo"><ChevronLeft size={28} /></button>}
+      <img src={resolveMediaUrl(current.mediaUrl)} alt="Expanded post attachment" onClick={event => event.stopPropagation()} />
+      {imageAttachments.length > 1 && <button type="button" className="feed-photo-lightbox-nav feed-photo-lightbox-nav--next" onClick={event => { event.stopPropagation(); onChange((index + 1) % imageAttachments.length); }} aria-label="Next photo"><ChevronRight size={28} /></button>}
+    </div>
+  );
+}
+
 function TextFeedCard({ post }: { post: FeedTextRecord }) {
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const share = async () => {
     const url = window.location.origin + "/?announcement=" + post.id;
     try {
@@ -1133,19 +1171,20 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
         <div className={post.attachments.length > 1 ? "feed-post-attachments has-grid" : "feed-post-attachments"}>
           {post.attachments.map(attachment =>
             attachment.mediaType === "IMAGE" ? (
-              <img key={attachment.id} src={attachment.mediaUrl} alt="Post attachment" loading="lazy" />
+              <button key={attachment.id} type="button" className="feed-photo-button" onClick={() => setLightboxIndex(post.attachments.filter(item => item.mediaType === "IMAGE").findIndex(item => item.id === attachment.id))} aria-label="Open photo">
+                <img src={resolveMediaUrl(attachment.mediaUrl)} alt="Post attachment" loading="lazy" />
+              </button>
             ) : (
-              <video key={attachment.id} src={attachment.mediaUrl} controls playsInline preload="metadata" />
+              <video key={attachment.id} src={resolveMediaUrl(attachment.mediaUrl)} controls playsInline preload="metadata" />
             )
           )}
         </div>
       )}
       <div className="feed-post-actions">
         <AnnouncementComments announcementId={post.id} commentCount={post.commentCount} />
-        <button type="button" onClick={share} aria-label="Share post">
-          <Share2 size={15} /> Share
-        </button>
+        <button type="button" onClick={share} aria-label="Share post"><Share2 size={15} /> Share</button>
       </div>
+      {lightboxIndex !== null && <FeedPhotoLightbox attachments={post.attachments} index={lightboxIndex} onClose={() => setLightboxIndex(null)} onChange={setLightboxIndex} />}
     </article>
   );
 }
