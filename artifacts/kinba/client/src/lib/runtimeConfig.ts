@@ -28,10 +28,30 @@ export const publicMediaConfig = {
 export function resolveMediaUrl(value: string | null | undefined) {
   const source = clean(value);
   if (!source) return undefined;
-  if (/^(https?:|blob:|data:)/i.test(source)) return source;
+  try {
+    const parsed = new URL(source, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+    if (parsed.hostname.endsWith(".r2.dev")) {
+      return `/api/media/${parsed.pathname.replace(/^\/+/, "")}`;
+    }
+    if (/^https?:$/i.test(parsed.protocol)) return parsed.toString();
+  } catch {
+    // Treat non-URL values as object keys below.
+  }
+  if (/^(blob:|data:)/i.test(source)) return source;
   if (source.startsWith("/")) return source;
   const base = publicMediaConfig.r2PublicBaseUrl;
-  return base ? `${base.replace(/\/+$/, "")}/${source.replace(/^\/+/, "")}` : source;
+  if (base) {
+    try {
+      const parsedBase = new URL(base);
+      if (parsedBase.hostname.endsWith(".r2.dev")) {
+        return `/api/media/${source.replace(/^\/+/, "")}`;
+      }
+    } catch {
+      // Fall back to the raw key if the configured base is malformed.
+    }
+    return `${base.replace(/\/+$/, "")}/${source.replace(/^\/+/, "")}`;
+  }
+  return source;
 }
 
 export const publicSupabaseConfig = {

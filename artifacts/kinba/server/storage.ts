@@ -4,6 +4,8 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import path from "node:path";
+import { Readable } from "node:stream";
 import { ENV } from "./_core/env";
 
 export const MEDIA_BUCKET = "signal-media";
@@ -130,6 +132,11 @@ function keyFromStoredUrl(sourceUrl: string) {
       }
     }
 
+    // Public R2.dev hostnames can still front a private bucket. Treat their
+    // path as the object key and read it through the authenticated S3 client.
+    if (parsed.hostname.endsWith(".r2.dev")) {
+      return normalizeKey(pathname.replace(/^\/+/, ""));
+    }
     // Older records may contain an S3/R2 endpoint URL. Because the client is
     // configured with forcePathStyle, those URLs use /<bucket>/<key>.
     const endpoint = new URL(config.endpoint);
@@ -143,27 +150,50 @@ function keyFromStoredUrl(sourceUrl: string) {
   return null;
 }
 
-export async function storageDownload(sourceUrl: string): Promise<Buffer> {
+export async function storageReadObject(
+  sourceUrlOrKey: string,
+  range?: string
+): Promise<{
+  body: Readable;
+  contentLength?: number;
+  contentType?: string;
+  contentRange?: string;
+  acceptRanges?: string;
+}> {
   const config = getR2Config();
+  const key = keyFromStoredUrl(sourceUrlOrKey) ?? normalizeKey(sourceUrlOrKey);
+  const object = await getR2Client().send(
+    new GetObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+      ...(range ? { Range: range } : {}),
+    })
+  );
+  if (!object.Body) throw new Error("R2 returned an empty object.");
+  return {
+    body: Readable.fromWeb(object.Body.transformToWebStream() as ReadableStream),
+    contentLength: object.ContentLength,
+    contentType: object.ContentType,
+    contentRange: object.ContentRange,
+    acceptRanges: object.AcceptRanges,
+  };
+}
+
+export async function storageDownload(sourceUrl: string): Promise<Buffer> {
   const key = keyFromStoredUrl(sourceUrl);
-  if (key) {
+  if (key || !/^[a-z][a-z0-9+.-]*:\/\//i.test(sourceUrl)) {
     try {
-      const object = await getR2Client().send(
-        new GetObjectCommand({ Bucket: config.bucket, Key: key })
-      );
-      if (!object.Body) throw new Error("R2 returned an empty source object.");
-      return Buffer.from(await object.Body.transformToByteArray());
+      const object = await storageReadObject(key ?? sourceUrl);
+      const chunks: Buffer[] = [];
+      for await (const chunk of object.body) chunks.push(Buffer.from(chunk));
+      return Buffer.concat(chunks);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unknown R2 error";
+      const message = error instanceof Error ? error.message : "Unknown R2 error";
       throw new Error(`Cloudflare R2 source download failed: ${message}`);
     }
   }
-
   const response = await fetch(sourceUrl);
-  if (!response.ok) {
-    throw new Error(`Source video download failed (${response.status}).`);
-  }
+  if (!response.ok) throw new Error(`Source video download failed (${response.status}).`);
   return Buffer.from(await response.arrayBuffer());
 }
 
