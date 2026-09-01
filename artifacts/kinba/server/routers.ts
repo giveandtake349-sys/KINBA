@@ -9,6 +9,8 @@ import {
 import {
   createAnnouncementComment,
   createCommunityAnnouncement,
+  toggleCommunityBookmark,
+  toggleCommunityReaction,
   createVideo,
   createVideoComment,
   ensureProfile,
@@ -277,6 +279,16 @@ export const appRouter = router({
       .input(communityAnnouncementInput)
       .mutation(({ ctx, input }) =>
         createCommunityAnnouncement(ctx.user.id, input)
+      ),
+    react: protectedProcedure
+      .input(announcementIdInput)
+      .mutation(({ ctx, input }) =>
+        toggleCommunityReaction(input.announcementId, ctx.user.id)
+      ),
+    bookmark: protectedProcedure
+      .input(announcementIdInput)
+      .mutation(({ ctx, input }) =>
+        toggleCommunityBookmark(input.announcementId, ctx.user.id)
       ),
     comments: router({
       list: publicProcedure
