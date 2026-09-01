@@ -1873,3 +1873,19 @@
 
 /* Dedicated Shorts keeps the zero-content state compact and actionable. */
 .shorts-section .media-empty { min-height: 0; padding: 24px 16px; }
+
+
+/* Targeted mobile-first feed layout fixes. */
+.media-hub { width: 100%; max-width: none; margin: 0; padding: 0; }
+.media-hub .media-tab-panel, .media-hub .wheels-feed-layout, .media-hub .home-feed-section, .media-hub .shorts-section { width: 100%; max-width: none; }
+.media-hub .home-feed-section, .media-hub .shorts-section { margin-left: 0 !important; margin-right: 0 !important; padding-left: 0 !important; padding-right: 0 !important; }
+.media-hub .long-video-grid, .media-hub .shorts-viewport { width: 100%; max-width: none; padding-left: 0; padding-right: 0; }
+.media-hub .long-video-card, .media-hub .short-card { width: 100%; max-width: none; margin-left: 0; margin-right: 0; }
+.media-tab-panel--wheels { min-height: 100dvh; overflow: hidden; }
+.media-tab-panel--wheels .home-feed-section { margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; }
+.media-tab-panel--wheels .media-section-heading, .media-tab-panel--wheels .media-publish-panel { display: none !important; }
+.media-tab-panel--wheels .home-feed-section .long-video-grid { height: 100dvh !important; min-height: 100dvh; overflow-y: scroll; scroll-snap-type: y mandatory; }
+.media-tab-panel--wheels .home-feed-section .long-video-card { height: 100dvh; min-height: 100dvh; margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important; scroll-snap-align: start; }
+.media-tab-panel--wheels .media-fullscreen-frame, .media-tab-panel--wheels .media-video-frame { width: 100%; height: 100%; max-height: none; aspect-ratio: auto; border-radius: 0; }
+.media-tab-panel--wheels .media-fullscreen-frame video, .media-tab-panel--wheels .media-video-frame video { width: 100%; height: 100%; object-fit: cover; }
+@media (max-width: 760px) { .media-tab-panel--wheels .home-feed-section .long-video-grid, .media-tab-panel--wheels .home-feed-section .long-video-card, .media-tab-panel--wheels .home-feed-section .media-fullscreen-frame { height: 100dvh !important; min-height: 100dvh; } }
