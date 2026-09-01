@@ -1,31 +1,25 @@
 import type { Express, NextFunction, Request, Response } from "express";
 import multer from "multer";
 import { promises as fs } from "node:fs";
-import { execFile } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
-import { promisify } from "node:util";
 import {
   createPhotoPost,
   createVideo,
   getUserByOpenId,
-  getVideoThumbnailSource,
-  setVideoThumbnail,
   upsertUser,
 } from "./db";
-import { storageDownload, storagePut } from "./storage";
+import { storageCreateUploadUrl, storagePut } from "./storage";
 import {
   supabaseDisplayName,
   supabaseOpenId,
   verifySupabaseAccessToken,
 } from "./supabaseAuth";
 import {
-  MAX_ANNOUNCEMENT_VIDEO_DURATION_SECONDS,
   MAX_LONG_VIDEO_DURATION_SECONDS,
   MAX_SHORT_VIDEO_DURATION_SECONDS,
 } from "./mediaValidation";
 
-const execFileAsync = promisify(execFile);
 const upload = multer({
   dest: path.join(os.tmpdir(), "kinba-video-uploads"),
   limits: { files: 1, fileSize: 500 * 1024 * 1024 },
@@ -70,58 +64,7 @@ function logUploadStage(route: string, stage: string, details: Record<string, un
   console.info(`[MediaUpload] ${route} ${stage}`, details);
 }
 
-async function createVideoThumbnail(videoPath: string, thumbnailPath: string) {
-  await execFileAsync(process.env.FFMPEG_BIN || "ffmpeg", [
-    "-y",
-    "-ss",
-    "0.2",
-    "-i",
-    videoPath,
-    "-frames:v",
-    "1",
-    "-vf",
-    "scale=640:-2",
-    "-q:v",
-    "2",
-    thumbnailPath,
-  ], { maxBuffer: 8 * 1024 * 1024 });
-  const thumbnail = await fs.readFile(thumbnailPath);
-  if (!thumbnail.length) throw new Error("The video thumbnail is empty.");
-  return thumbnail;
-}
 
-async function probeVideo(filePath: string) {
-  let stdout: string;
-  try {
-    ({ stdout } = await execFileAsync(process.env.FFPROBE_BIN || "ffprobe", [
-    "-v",
-    "error",
-    "-show_entries",
-    "format=duration:stream=width,height",
-    "-of",
-    "json",
-    filePath,
-    ]));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      throw new Error("Video metadata validation is unavailable because ffprobe is not installed in the Render runtime.");
-    }
-    throw new Error("ffprobe could not read this video: " + errorMessage(error));
-  }
-  const result = JSON.parse(stdout) as {
-    format?: { duration?: string };
-    streams?: { width?: number; height?: number }[];
-  };
-  const stream = result.streams?.find(item => item.width && item.height);
-  const duration = Number(result.format?.duration);
-  if (!Number.isFinite(duration) || !stream?.width || !stream.height)
-    throw new Error("The video metadata could not be read.");
-  return {
-    durationSeconds: Math.ceil(duration),
-    width: stream.width,
-    height: stream.height,
-  };
-}
 
 async function authenticate(request: Request) {
   const supabaseUser = await verifySupabaseAccessToken(request);
@@ -138,108 +81,75 @@ async function authenticate(request: Request) {
 }
 
 export function registerVideoUploadRoute(app: Express) {
-  app.get("/api/videos/:videoId/thumbnail", async (req, res) => {
-    const videoId = Number(req.params.videoId);
-    if (!Number.isInteger(videoId) || videoId < 1) {
-      res.status(400).send("Invalid video ID");
-      return;
-    }
-    let sourcePath: string | undefined;
-    let thumbnailPath: string | undefined;
+  // Video bytes never pass through Node. The browser uploads directly to R2
+  // with this short-lived signed URL, then posts only metadata here.
+  app.post("/api/videos/upload-url", async (req, res) => {
     try {
-      const video = await getVideoThumbnailSource(videoId);
-      if (!video || video.mediaType !== "VIDEO") {
-        res.status(404).send("Video not found");
+      const user = await authenticate(req);
+      if (!user) {
+        res.status(401).json({ error: "Please sign in before uploading." });
         return;
       }
-      if (video.thumbnailUrl) {
-        res.redirect(307, video.thumbnailUrl);
+      const contentType = String(req.body?.contentType ?? "");
+      const mediaRole = req.body?.mediaRole === "thumbnail" ? "thumbnail" : "source";
+      const kind = req.body?.kind === "SHORT" ? "SHORT" : "LONG";
+      const validType = mediaRole === "thumbnail"
+        ? ["image/jpeg", "image/png", "image/webp"].includes(contentType)
+        : contentType.startsWith("video/");
+      if (!validType) {
+        res.status(400).json({ error: "Choose a supported media file." });
         return;
       }
-      const source = await storageDownload(video.videoUrl);
-      sourcePath = path.join(os.tmpdir(), `kinba-repair-source-${videoId}-${Date.now()}`);
-      thumbnailPath = path.join(os.tmpdir(), `kinba-repair-thumb-${videoId}-${Date.now()}.jpg`);
-      await fs.writeFile(sourcePath, source);
-      const thumbnail = await createVideoThumbnail(sourcePath, thumbnailPath);
-      const uploaded = await storagePut(`videos/repaired/thumbnail-${videoId}.jpg`, thumbnail, "image/jpeg");
-      await setVideoThumbnail(videoId, uploaded.url);
-      res.set({ "Cache-Control": "public, max-age=86400", "Content-Type": "image/jpeg" });
-      res.send(thumbnail);
+      const upload = await storageCreateUploadUrl(
+        `videos/${user.id}/${mediaRole}-${Date.now()}`,
+        contentType
+      );
+      res.json({ ...upload, kind });
     } catch (error) {
-      console.error(`[ThumbnailRepair] Video ${videoId} failed:`, error);
-      res.status(404).send("Video thumbnail unavailable");
-    } finally {
-      if (sourcePath) await fs.rm(sourcePath, { force: true }).catch(() => undefined);
-      if (thumbnailPath) await fs.rm(thumbnailPath, { force: true }).catch(() => undefined);
+      logUploadFailure("video-upload-url", req, error);
+      res.status(500).json({ error: errorMessage(error) });
     }
   });
 
-  app.post(
-    "/api/media/video-upload",
-    uploadSingle("video"),
-    async (req, res) => {
-      let temporaryPath: string | undefined;
-      let temporaryThumbnailPath: string | undefined;
-      try {
-        const user = await authenticate(req);
-        if (!user) {
-          res.status(401).json({ error: "Please sign in before uploading." });
-          return;
-        }
-        if (!req.file) {
-          res.status(400).json({ error: "Choose a video file." });
-          return;
-        }
-        temporaryPath = req.file.path;
-        if (req.body.kind !== "ANNOUNCEMENT") {
-          res.status(400).json({ error: "Unsupported video attachment kind." });
-          return;
-        }
-        if (!req.file.mimetype.startsWith("video/")) {
-          res.status(400).json({ error: "Choose a supported video file." });
-          return;
-        }
-        const metadata = await probeVideo(temporaryPath);
-        if (
-          metadata.durationSeconds > MAX_ANNOUNCEMENT_VIDEO_DURATION_SECONDS
-        ) {
-          res.status(400).json({
-            error: "Announcement videos must be 5 minutes or shorter.",
-          });
-          return;
-        }
-        temporaryThumbnailPath = path.join(os.tmpdir(), `kinba-thumbnail-${Date.now()}.jpg`);
-        const thumbnail = await createVideoThumbnail(temporaryPath, temporaryThumbnailPath);
-        const objectId = `${Date.now()}-${req.file.originalname}`;
-        const uploaded = await storagePut(
-          `announcements/${user.id}/video-${objectId}`,
-          await fs.readFile(temporaryPath),
-          req.file.mimetype
-        );
-        const uploadedThumbnail = await storagePut(
-          `announcements/${user.id}/thumbnail-${objectId}.jpg`,
-          thumbnail,
-          "image/jpeg"
-        );
-        res.status(201).json({
-          url: uploaded.url,
-          videoUrl: uploaded.url,
-          mediaType: "VIDEO",
-          thumbnailUrl: uploadedThumbnail.url,
-          width: metadata.width,
-          height: metadata.height,
-          durationSeconds: metadata.durationSeconds,
-        });
-      } catch (error) {
-        res.status(500).json({ error: errorMessage(error) });
-      } finally {
-        if (temporaryPath)
-          await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
-        if (temporaryThumbnailPath)
-          await fs.rm(temporaryThumbnailPath, { force: true }).catch(() => undefined);
+  app.post("/api/videos/complete", async (req, res) => {
+    try {
+      const user = await authenticate(req);
+      if (!user) {
+        res.status(401).json({ error: "Please sign in before uploading." });
+        return;
       }
+      const body = req.body ?? {};
+      const title = String(body.title ?? "").trim();
+      const description = String(body.description ?? "").trim();
+      const videoUrl = String(body.videoUrl ?? "").trim();
+      const thumbnailUrl = String(body.thumbnailUrl ?? "").trim() || null;
+      const kind = body.kind === "SHORT" ? "SHORT" : "LONG";
+      const durationSeconds = Number(body.durationSeconds);
+      const width = Number(body.width);
+      const height = Number(body.height);
+      const maximum = kind === "SHORT" ? MAX_SHORT_VIDEO_DURATION_SECONDS : MAX_LONG_VIDEO_DURATION_SECONDS;
+      if (title.length < 3 || title.length > 180 || !videoUrl || !Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds > maximum || !Number.isInteger(width) || !Number.isInteger(height)) {
+        res.status(400).json({ error: "The video metadata is invalid." });
+        return;
+      }
+      const video = await createVideo(user.id, {
+        title,
+        description,
+        videoUrl,
+        thumbnailUrl,
+        kind,
+        durationSeconds: Math.ceil(durationSeconds),
+        width,
+        height,
+        sources: [{ quality: "ORIGINAL", videoUrl }],
+      });
+      res.status(201).json({ videoId: video.id, status: "PUBLISHED", videoUrl, thumbnailUrl });
+    } catch (error) {
+      logUploadFailure("video-complete", req, error);
+      res.status(500).json({ error: errorMessage(error) });
     }
-  );
+  });
+
 
   app.post("/api/photos/upload", uploadSingle("photo"), async (req, res) => {
     let temporaryPath: string | undefined;
@@ -310,99 +220,6 @@ export function registerVideoUploadRoute(app: Express) {
     } finally {
       if (temporaryPath)
         await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
-    }
-  });
-  app.post("/api/videos/upload", uploadSingle("video"), async (req, res) => {
-    let temporaryPath: string | undefined;
-    try {
-      logUploadStage("video", "received", {
-        hasAuthorization: Boolean(req.headers.authorization),
-        bodyKeys: Object.keys(req.body ?? {}),
-        file: req.file
-          ? { field: req.file.fieldname, name: req.file.originalname, type: req.file.mimetype, size: req.file.size }
-          : null,
-      });
-      const user = await authenticate(req);
-      logUploadStage("video", "authenticated", { userId: user?.id ?? null });
-      if (!user) {
-        res.status(401).json({ error: "Please sign in before uploading." });
-        return;
-      }
-      if (!req.file) {
-        res.status(400).json({ error: "Choose a video file." });
-        return;
-      }
-      temporaryPath = req.file.path;
-      if (!req.file.mimetype.startsWith("video/")) {
-        res.status(400).json({ error: "Choose a supported video file." });
-        return;
-      }
-      const kind = req.body.kind === "SHORT" ? "SHORT" : "LONG";
-      const title = String(req.body.title ?? "").trim();
-      const description = String(req.body.description ?? "").trim();
-      if (title.length < 3 || title.length > 180) {
-        res
-          .status(400)
-          .json({ error: "Title must be between 3 and 180 characters." });
-        return;
-      }
-      const metadata = await probeVideo(temporaryPath);
-      const maximum =
-        kind === "SHORT"
-          ? MAX_SHORT_VIDEO_DURATION_SECONDS
-          : MAX_LONG_VIDEO_DURATION_SECONDS;
-      logUploadStage("video", "probed", { userId: user.id, kind, ...metadata });
-      if (metadata.durationSeconds > maximum) {
-        res.status(400).json({
-          error: `Videos must be ${maximum / 60 === 1 ? "1 minute" : "30 minutes"} or shorter.`,
-        });
-        return;
-      }
-      temporaryThumbnailPath = path.join(os.tmpdir(), `kinba-thumbnail-${Date.now()}.jpg`);
-      const thumbnail = await createVideoThumbnail(temporaryPath, temporaryThumbnailPath);
-      const objectId = `${Date.now()}-${req.file.originalname}`;
-      const uploaded = await storagePut(
-        `videos/${user.id}/source-${objectId}`,
-        await fs.readFile(temporaryPath),
-        req.file.mimetype
-      );
-      logUploadStage("video", "stored", { userId: user.id, key: uploaded.key });
-      const uploadedThumbnail = await storagePut(
-        `videos/${user.id}/thumbnail-${objectId}.jpg`,
-        thumbnail,
-        "image/jpeg"
-      );
-      const sourceUrl = new URL(
-        uploaded.url,
-        `${req.protocol}://${req.get("host")}`
-      ).toString();
-      const video = await createVideo(user.id, {
-        title,
-        description,
-        videoUrl: sourceUrl,
-        thumbnailUrl: uploadedThumbnail.url,
-        kind,
-        durationSeconds: metadata.durationSeconds,
-        width: metadata.width,
-        height: metadata.height,
-        sources: [{ quality: "ORIGINAL", videoUrl: sourceUrl }],
-      });
-      logUploadStage("video", "published", { userId: user.id, videoId: video.id });
-      res.status(201).json({
-        videoId: video.id,
-        status: "PUBLISHED",
-        processingStatus: video.processingStatus,
-        videoUrl: sourceUrl,
-        thumbnailUrl: uploadedThumbnail.url,
-      });
-    } catch (error) {
-      logUploadFailure("video", req, error);
-      res.status(500).json({ error: errorMessage(error) });
-    } finally {
-      if (temporaryPath)
-        await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
-      if (temporaryThumbnailPath)
-        await fs.rm(temporaryThumbnailPath, { force: true }).catch(() => undefined);
     }
   });
 }

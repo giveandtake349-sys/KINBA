@@ -5,11 +5,11 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import path from "node:path";
-import { Readable } from "node:stream";
 import { ENV } from "./_core/env";
 
 export const MEDIA_BUCKET = "signal-media";
 const signedUrlLifetimeSeconds = 60 * 60;
+const uploadUrlLifetimeSeconds = 15 * 60;
 
 let r2Client: S3Client | null = null;
 
@@ -150,53 +150,6 @@ function keyFromStoredUrl(sourceUrl: string) {
   return null;
 }
 
-export async function storageReadObject(
-  sourceUrlOrKey: string,
-  range?: string
-): Promise<{
-  body: Readable;
-  contentLength?: number;
-  contentType?: string;
-  contentRange?: string;
-  acceptRanges?: string;
-}> {
-  const config = getR2Config();
-  const key = keyFromStoredUrl(sourceUrlOrKey) ?? normalizeKey(sourceUrlOrKey);
-  const object = await getR2Client().send(
-    new GetObjectCommand({
-      Bucket: config.bucket,
-      Key: key,
-      ...(range ? { Range: range } : {}),
-    })
-  );
-  if (!object.Body) throw new Error("R2 returned an empty object.");
-  return {
-    body: Readable.fromWeb(object.Body.transformToWebStream() as ReadableStream),
-    contentLength: object.ContentLength,
-    contentType: object.ContentType,
-    contentRange: object.ContentRange,
-    acceptRanges: object.AcceptRanges,
-  };
-}
-
-export async function storageDownload(sourceUrl: string): Promise<Buffer> {
-  const key = keyFromStoredUrl(sourceUrl);
-  if (key || !/^[a-z][a-z0-9+.-]*:\/\//i.test(sourceUrl)) {
-    try {
-      const object = await storageReadObject(key ?? sourceUrl);
-      const chunks: Buffer[] = [];
-      for await (const chunk of object.body) chunks.push(Buffer.from(chunk));
-      return Buffer.concat(chunks);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown R2 error";
-      throw new Error(`Cloudflare R2 source download failed: ${message}`);
-    }
-  }
-  const response = await fetch(sourceUrl);
-  if (!response.ok) throw new Error(`Source video download failed (${response.status}).`);
-  return Buffer.from(await response.arrayBuffer());
-}
-
 export async function storageGetSignedUrl(relKey: string): Promise<string> {
   const config = getR2Config();
   return getSignedUrl(
@@ -204,4 +157,27 @@ export async function storageGetSignedUrl(relKey: string): Promise<string> {
     new GetObjectCommand({ Bucket: config.bucket, Key: normalizeKey(relKey) }),
     { expiresIn: signedUrlLifetimeSeconds }
   );
+}
+
+/**
+ * Create a short-lived browser upload URL. The media bytes go directly from
+ * the browser to R2; the application server only signs the request.
+ */
+export async function storageCreateUploadUrl(
+  relKey: string,
+  contentType: string
+): Promise<{ key: string; url: string; publicUrl: string }> {
+  const config = getR2Config();
+  const key = appendHashSuffix(normalizeKey(relKey));
+  const url = await getSignedUrl(
+    getR2Client(),
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+      ContentType: contentType,
+      CacheControl: "public, max-age=31536000, immutable",
+    }),
+    { expiresIn: uploadUrlLifetimeSeconds }
+  );
+  return { key, url, publicUrl: publicUrl(key) };
 }

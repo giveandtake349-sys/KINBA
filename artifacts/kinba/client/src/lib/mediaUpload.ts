@@ -112,7 +112,10 @@ type UploadPayload = {
   videoId?: number;
   status?: string;
   videoUrl?: string;
+  thumbnailUrl?: string | null;
   imageUrl?: string;
+  uploadUrl?: string;
+  publicUrl?: string;
   url?: string;
   error?: string;
 };
@@ -219,44 +222,102 @@ export async function publishPhoto(
   };
 }
 
+async function uploadDirectToR2(
+  file: Blob,
+  kind: VideoUploadKind,
+  mediaRole: "source" | "thumbnail",
+  accessToken: string
+): Promise<string> {
+  const signResponse = await fetchUploadWithRetry(apiUrl("/api/videos/upload-url"), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify({ contentType: file.type, kind, mediaRole }),
+  });
+  const signed = await readUploadPayload(signResponse);
+  if (!signResponse.ok || !signed.uploadUrl || !signed.publicUrl)
+    throw new Error(uploadFailureMessage(signResponse, signed, "Media"));
+  const uploadResponse = await fetch(signed.uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+  if (!uploadResponse.ok)
+    throw new Error(`R2 media upload failed with HTTP ${uploadResponse.status}.`);
+  return signed.publicUrl;
+}
+
+async function captureVideoThumbnail(file: File): Promise<Blob | null> {
+  const previewUrl = URL.createObjectURL(file);
+  const video = document.createElement("video");
+  video.preload = "metadata";
+  video.muted = true;
+  video.src = previewUrl;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve();
+      video.onerror = () => reject(new Error("thumbnail metadata unavailable"));
+    });
+    video.currentTime = Math.min(0.2, Math.max(0, video.duration / 2));
+    await new Promise<void>(resolve => {
+      video.onseeked = () => resolve();
+      window.setTimeout(resolve, 800);
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    if (!canvas.width || !canvas.height) return null;
+    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.82));
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(previewUrl);
+    video.remove();
+  }
+}
+
 export async function publishVideo(
   file: File,
   kind: VideoUploadKind,
   title: string,
-  description: string
+  description: string,
+  metadata?: VideoMetadata
 ): Promise<{ videoId: number; status: string; videoUrl: string }> {
   if (!file.type.startsWith("video/"))
     throw new Error("Choose a supported video file.");
   const session = await getUploadSession("Please sign in before uploading video.");
-  const body = new FormData();
-  body.append("video", file, file.name);
-  body.append("kind", kind);
-  body.append("title", title);
-  body.append("description", description);
-  const endpoint = apiUrl("/api/videos/upload");
-  logUploadRequest("video", endpoint, { kind, title, description }, file);
-  let response: Response;
-  try {
-    response = await fetchUploadWithRetry(endpoint, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${session.access_token}` },
-      credentials: "include",
-      body,
-    });
-  } catch (error) {
-    console.error("[MediaPublish] video network failure", error);
-    throw new Error(`Video upload request failed: ${error instanceof Error ? error.message : "network error"}`);
-  }
+  const resolvedMetadata = metadata ?? await getVideoMetadata(file, {
+    maxDurationSeconds: kind === "SHORT" ? MAX_SHORT_VIDEO_DURATION_SECONDS : MAX_LONG_VIDEO_DURATION_SECONDS,
+  });
+  const videoUrl = await uploadDirectToR2(file, kind, "source", session.access_token);
+  const thumbnail = await captureVideoThumbnail(file);
+  const thumbnailUrl = thumbnail
+    ? await uploadDirectToR2(new File([thumbnail], "thumbnail.jpg", { type: "image/jpeg" }), kind, "thumbnail", session.access_token)
+    : null;
+  const response = await fetchUploadWithRetry(apiUrl("/api/videos/complete"), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    credentials: "include",
+    body: JSON.stringify({
+      kind,
+      title,
+      description,
+      videoUrl,
+      thumbnailUrl,
+      ...resolvedMetadata,
+    }),
+  });
   const payload = await readUploadPayload(response);
-  if (!response.ok || !payload.videoId || !payload.videoUrl) {
-    console.error("[MediaPublish] video API rejection", { status: response.status, payload });
+  if (!response.ok || !payload.videoId || !payload.videoUrl)
     throw new Error(uploadFailureMessage(response, payload, "Video"));
-  }
-  return {
-    videoId: payload.videoId,
-    status: payload.status || "PUBLISHED",
-    videoUrl: payload.videoUrl,
-  };
+  return { videoId: payload.videoId, status: payload.status || "PUBLISHED", videoUrl: payload.videoUrl };
 }
 
 export async function uploadVideo(
