@@ -47,6 +47,7 @@ import {
   type VideoMetadata,
 } from "@/lib/mediaUpload";
 import ErrorBoundary from "./ErrorBoundary";
+import { resolveMediaUrl } from "@/lib/runtimeConfig";
 import "./mediaHub.css";
 import "./kinbaModern.css";
 
@@ -305,7 +306,9 @@ function QualityVideoPlayer({
       new Map(video.sources.map(source => [source.quality, source.videoUrl])),
     [video.sources]
   );
-  const sourceUrl = sourceMap.get("ORIGINAL") ?? video.videoUrl;
+  const sourceUrl =
+    resolveMediaUrl(sourceMap.get("ORIGINAL") ?? video.videoUrl) ?? "";
+  const posterUrl = resolveMediaUrl(video.thumbnailUrl);
   const shouldPlay = active && isInView;
 
   useEffect(() => {
@@ -368,6 +371,7 @@ function QualityVideoPlayer({
       }
     >
       <video
+        poster={showPoster ? posterUrl : undefined}
         className={`w-full h-full object-cover ${vertical ? "aspect-[9/16]" : ""}`}
         ref={ref}
         crossOrigin="anonymous"

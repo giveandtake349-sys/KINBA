@@ -68,6 +68,26 @@ function logUploadStage(route: string, stage: string, details: Record<string, un
   console.info(`[MediaUpload] ${route} ${stage}`, details);
 }
 
+async function createVideoThumbnail(videoPath: string, thumbnailPath: string) {
+  await execFileAsync(process.env.FFMPEG_BIN || "ffmpeg", [
+    "-y",
+    "-ss",
+    "0.2",
+    "-i",
+    videoPath,
+    "-frames:v",
+    "1",
+    "-vf",
+    "scale=640:-2",
+    "-q:v",
+    "2",
+    thumbnailPath,
+  ], { maxBuffer: 8 * 1024 * 1024 });
+  const thumbnail = await fs.readFile(thumbnailPath);
+  if (!thumbnail.length) throw new Error("The video thumbnail is empty.");
+  return thumbnail;
+}
+
 async function probeVideo(filePath: string) {
   let stdout: string;
   try {
@@ -121,6 +141,7 @@ export function registerVideoUploadRoute(app: Express) {
     uploadSingle("video"),
     async (req, res) => {
       let temporaryPath: string | undefined;
+      let temporaryThumbnailPath: string | undefined;
       try {
         const user = await authenticate(req);
         if (!user) {
@@ -149,13 +170,22 @@ export function registerVideoUploadRoute(app: Express) {
           });
           return;
         }
+        temporaryThumbnailPath = path.join(os.tmpdir(), `kinba-thumbnail-${Date.now()}.jpg`);
+        const thumbnail = await createVideoThumbnail(temporaryPath, temporaryThumbnailPath);
+        const objectId = `${Date.now()}-${req.file.originalname}`;
         const uploaded = await storagePut(
-          `announcements/${user.id}/video-${Date.now()}-${req.file.originalname}`,
+          `announcements/${user.id}/video-${objectId}`,
           await fs.readFile(temporaryPath),
           req.file.mimetype
         );
+        const uploadedThumbnail = await storagePut(
+          `announcements/${user.id}/thumbnail-${objectId}.jpg`,
+          thumbnail,
+          "image/jpeg"
+        );
         res.status(201).json({
           url: uploaded.url,
+          thumbnailUrl: uploadedThumbnail.url,
           width: metadata.width,
           height: metadata.height,
           durationSeconds: metadata.durationSeconds,
@@ -165,12 +195,15 @@ export function registerVideoUploadRoute(app: Express) {
       } finally {
         if (temporaryPath)
           await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
+        if (temporaryThumbnailPath)
+          await fs.rm(temporaryThumbnailPath, { force: true }).catch(() => undefined);
       }
     }
   );
 
   app.post("/api/photos/upload", uploadSingle("photo"), async (req, res) => {
     let temporaryPath: string | undefined;
+    let temporaryThumbnailPath: string | undefined;
     try {
       logUploadStage("photo", "received", {
         hasAuthorization: Boolean(req.headers.authorization),
@@ -285,12 +318,20 @@ export function registerVideoUploadRoute(app: Express) {
         });
         return;
       }
+      temporaryThumbnailPath = path.join(os.tmpdir(), `kinba-thumbnail-${Date.now()}.jpg`);
+      const thumbnail = await createVideoThumbnail(temporaryPath, temporaryThumbnailPath);
+      const objectId = `${Date.now()}-${req.file.originalname}`;
       const uploaded = await storagePut(
-        `videos/${user.id}/source-${Date.now()}-${req.file.originalname}`,
+        `videos/${user.id}/source-${objectId}`,
         await fs.readFile(temporaryPath),
         req.file.mimetype
       );
       logUploadStage("video", "stored", { userId: user.id, key: uploaded.key });
+      const uploadedThumbnail = await storagePut(
+        `videos/${user.id}/thumbnail-${objectId}.jpg`,
+        thumbnail,
+        "image/jpeg"
+      );
       const sourceUrl = new URL(
         uploaded.url,
         `${req.protocol}://${req.get("host")}`
@@ -299,7 +340,7 @@ export function registerVideoUploadRoute(app: Express) {
         title,
         description,
         videoUrl: sourceUrl,
-        thumbnailUrl: null,
+        thumbnailUrl: uploadedThumbnail.url,
         kind,
         durationSeconds: metadata.durationSeconds,
         width: metadata.width,
@@ -312,6 +353,7 @@ export function registerVideoUploadRoute(app: Express) {
         status: "PUBLISHED",
         processingStatus: video.processingStatus,
         videoUrl: sourceUrl,
+        thumbnailUrl: uploadedThumbnail.url,
       });
     } catch (error) {
       logUploadFailure("video", req, error);
@@ -319,6 +361,8 @@ export function registerVideoUploadRoute(app: Express) {
     } finally {
       if (temporaryPath)
         await fs.rm(temporaryPath, { force: true }).catch(() => undefined);
+      if (temporaryThumbnailPath)
+        await fs.rm(temporaryThumbnailPath, { force: true }).catch(() => undefined);
     }
   });
 }

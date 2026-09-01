@@ -52,6 +52,7 @@ import {
   publishVideo,
   uploadImage,
 } from "@/lib/mediaUpload";
+import { resolveMediaUrl } from "@/lib/runtimeConfig";
 import MediaHub, {
   CommunityAnnouncements,
   SearchFeed,
@@ -1110,12 +1111,15 @@ function ProfileStats({
               <article className="profile-video-tile" key={video.id}>
                 {video.mediaType === "IMAGE" ? (
                   <img
-                    src={video.videoUrl}
+                    src={resolveMediaUrl(video.videoUrl) ?? video.videoUrl}
                     className="w-full h-auto object-cover rounded-lg"
                     alt={video.title || "Post"}
                   />
-                ) : video.thumbnailUrl ? (
-                  <img src={video.thumbnailUrl} alt={video.title} />
+                ) : resolveMediaUrl(video.thumbnailUrl) ? (
+                  <img
+                    src={resolveMediaUrl(video.thumbnailUrl)}
+                    alt={video.title}
+                  />
                 ) : (
                   <div className="profile-video-tile-fallback">
                     <Video size={24} />

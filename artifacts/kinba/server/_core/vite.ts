@@ -52,6 +52,7 @@ function runtimeConfigScript() {
   const config = JSON.stringify({
     supabaseUrl: ENV.supabaseUrl || undefined,
     supabaseAnonKey: ENV.supabaseAnonKey || undefined,
+    r2PublicBaseUrl: ENV.r2PublicBaseUrl || undefined,
   }).replace(/</g, "\\u003c");
   return `<script>window.__KINBA_CONFIG__=${config};</script>`;
 }
