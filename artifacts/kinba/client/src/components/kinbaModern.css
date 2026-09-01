@@ -1468,6 +1468,11 @@ body {
   object-fit: cover;
 }
 
+.media-hub .feed-media-content > .media-video-frame video {
+  object-fit: contain;
+  background: #05070d;
+}
+
 .media-hub .feed-media-content > .media-video-frame {
   min-height: 0;
   aspect-ratio: auto !important;
