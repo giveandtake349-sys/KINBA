@@ -1299,7 +1299,7 @@ function HomeFeedPanel({
       {query.isPending ? (
         <FeedSkeleton />
       ) : videos.length ? (
-        <div className="long-video-grid media-feed-scroll h-[100dvh] overflow-y-scroll scrollbar-hide snap-y snap-mandatory w-full max-w-full box-border">
+        <div className="unified-feed-list feed-video-list w-full max-w-full box-border">
           {videos.map(video => (
             <VideoCard
               key={video.id}
