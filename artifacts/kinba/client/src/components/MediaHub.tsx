@@ -107,6 +107,9 @@ type FeedTextRecord = {
   text: string;
   createdAt: Date | string;
   commentCount: number;
+  reactionCount: number;
+  viewerReacted?: boolean;
+  viewerBookmarked?: boolean;
   author: {
     id: number;
     name: string | null;
@@ -1218,7 +1221,34 @@ function FeedPhotoLightbox({
 }
 
 function TextFeedCard({ post }: { post: FeedTextRecord }) {
+  const auth = useAuth();
+  const [reacted, setReacted] = useState(post.viewerReacted ?? false);
+  const [bookmarked, setBookmarked] = useState(post.viewerBookmarked ?? false);
+  const [reactionCount, setReactionCount] = useState(post.reactionCount ?? 0);
+  const reactMutation = trpc.community.react.useMutation();
+  const bookmarkMutation = trpc.community.bookmark.useMutation();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const toggleReaction = async () => {
+    if (!auth.isAuthenticated) return auth.openAuth();
+    if (reactMutation.isPending) return;
+    try {
+      const result = await reactMutation.mutateAsync({ announcementId: post.id });
+      setReacted(result.viewerReacted);
+      setReactionCount(count => count + (result.viewerReacted ? 1 : -1));
+    } catch (error) {
+      notifyError(error);
+    }
+  };
+  const toggleBookmark = async () => {
+    if (!auth.isAuthenticated) return auth.openAuth();
+    if (bookmarkMutation.isPending) return;
+    try {
+      const result = await bookmarkMutation.mutateAsync({ announcementId: post.id });
+      setBookmarked(result.viewerBookmarked);
+    } catch (error) {
+      notifyError(error);
+    }
+  };
   const share = async () => {
     const url = window.location.origin + "/?announcement=" + post.id;
     try {
@@ -1264,8 +1294,30 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
         </div>
       )}
       <div className="feed-post-actions">
+         <button
+           type="button"
+           className={reacted ? "is-active" : ""}
+           onClick={toggleReaction}
+           disabled={reactMutation.isPending}
+           aria-pressed={reacted}
+           aria-label={reacted ? "Remove Pookie" : "Pookie post"}
+         >
+           <Heart size={15} fill={reacted ? "currentColor" : "none"} />
+           Pookie <strong>{formatCount(reactionCount)}</strong>
+         </button>
         <AnnouncementComments announcementId={post.id} commentCount={post.commentCount} />
         <button type="button" onClick={share} aria-label="Share post"><Share2 size={15} /> Share</button>
+         <button
+           type="button"
+           className={bookmarked ? "is-active" : ""}
+           onClick={toggleBookmark}
+           disabled={bookmarkMutation.isPending}
+           aria-pressed={bookmarked}
+           aria-label={bookmarked ? "Remove saved post" : "Save post"}
+         >
+           <Bookmark size={15} fill={bookmarked ? "currentColor" : "none"} />{" "}
+           {bookmarked ? "Saved" : "Save"}
+         </button>
       </div>
       {lightboxIndex !== null && <FeedPhotoLightbox attachments={post.attachments} index={lightboxIndex} onClose={() => setLightboxIndex(null)} onChange={setLightboxIndex} />}
     </article>
