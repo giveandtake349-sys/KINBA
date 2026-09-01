@@ -44,9 +44,11 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { SupabaseAuthDialog } from "@/components/SupabaseAuthDialog";
 import { useScrollDirection } from "@/hooks/useScrollDirection";
 import {
+  getImageDimensions,
   getVideoMetadata,
   MAX_LONG_VIDEO_DURATION_SECONDS,
   MAX_SHORT_VIDEO_DURATION_SECONDS,
+  publishPhoto,
   publishVideo,
   uploadImage,
 } from "@/lib/mediaUpload";
@@ -1422,10 +1424,12 @@ function UploadVideoModal({
   onClose: () => void;
   onPublished: () => Promise<void>;
 }) {
+  const [mediaMode, setMediaMode] = useState<"video" | "photo">("video");
   const [kind, setKind] = useState<"LONG" | "SHORT">("LONG");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const selectFile = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -1435,12 +1439,18 @@ function UploadVideoModal({
     event.target.value = "";
     if (!nextFile) return;
     try {
+      if (mediaMode === "photo") {
+        setImageDimensions(await getImageDimensions(nextFile));
+        setFile(nextFile);
+        return;
+      }
       await getVideoMetadata(nextFile, {
         maxDurationSeconds:
           kind === "LONG"
             ? MAX_LONG_VIDEO_DURATION_SECONDS
             : MAX_SHORT_VIDEO_DURATION_SECONDS,
       });
+      setImageDimensions(null);
       setFile(nextFile);
     } catch (error) {
       toast.error(
@@ -1451,13 +1461,17 @@ function UploadVideoModal({
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    if (!file || !title.trim()) {
-      toast.error("Add a title and an original video first.");
+    if (!file || !title.trim() || (mediaMode === "photo" && !imageDimensions)) {
+      toast.error(mediaMode === "photo" ? "Add a title and image first." : "Add a title and an original video first.");
       return;
     }
     setBusy(true);
     try {
-      await publishVideo(file, kind, title.trim(), description.trim());
+      if (mediaMode === "photo" && imageDimensions) {
+        await publishPhoto(file, title.trim(), description.trim(), imageDimensions);
+      } else {
+        await publishVideo(file, kind, title.trim(), description.trim());
+      }
       try {
         await onPublished();
       } catch (refreshError) {
@@ -1465,9 +1479,10 @@ function UploadVideoModal({
         toast.info("Published successfully. Refresh the feed if it is not visible yet.");
       }
       setFile(null);
+      setImageDimensions(null);
       setTitle("");
       setDescription("");
-      toast.success("Video published to your feed.");
+      toast.success(mediaMode === "photo" ? "Photo published to your feed." : "Video published to your feed.");
       onClose();
     } catch (error) {
       toast.error(
@@ -1480,30 +1495,60 @@ function UploadVideoModal({
   return (
     <ActionModal title="Create a video" open={open} onClose={onClose} className="upload-video-modal">
       <form className="modal-form" onSubmit={submit}>
-        <div className="modal-kind-switch" role="tablist" aria-label="Video type">
+        <div className="modal-kind-switch" role="tablist" aria-label="Media type">
           <button
             type="button"
-            className={kind === "LONG" ? "active" : ""}
+            className={mediaMode === "video" ? "active" : ""}
             onClick={event => {
               event.preventDefault();
               event.stopPropagation();
-              setKind("LONG");
+              setMediaMode("video");
+              setFile(null);
+              setImageDimensions(null);
             }}
           >
-            Video · up to 30 min
+            Video
           </button>
           <button
             type="button"
-            className={kind === "SHORT" ? "active" : ""}
+            className={mediaMode === "photo" ? "active" : ""}
             onClick={event => {
               event.preventDefault();
               event.stopPropagation();
-              setKind("SHORT");
+              setMediaMode("photo");
+              setFile(null);
+              setImageDimensions(null);
             }}
           >
-            Short · up to 1 min
+            Photo
           </button>
         </div>
+        {mediaMode === "video" && (
+          <div className="modal-kind-switch" role="tablist" aria-label="Video type">
+            <button
+              type="button"
+              className={kind === "LONG" ? "active" : ""}
+              onClick={event => {
+                event.preventDefault();
+                event.stopPropagation();
+                setKind("LONG");
+              }}
+            >
+              Video · up to 30 min
+            </button>
+            <button
+              type="button"
+              className={kind === "SHORT" ? "active" : ""}
+              onClick={event => {
+                event.preventDefault();
+                event.stopPropagation();
+                setKind("SHORT");
+              }}
+            >
+              Short · up to 1 min
+            </button>
+          </div>
+        )}
         <label>
           Title
           <input
@@ -1527,7 +1572,7 @@ function UploadVideoModal({
         <input
           ref={inputRef}
           type="file"
-          accept="video/*"
+          accept={mediaMode === "photo" ? "image/jpeg,image/png,image/webp" : "video/*"}
           className="sr-only"
           onChange={selectFile}
         />
@@ -1540,10 +1585,10 @@ function UploadVideoModal({
             inputRef.current?.click();
           }}
         >
-          <Video size={18} /> {file ? file.name : "Choose original video"}
+          {mediaMode === "photo" ? <ImagePlus size={18} /> : <Video size={18} />} {file ? file.name : mediaMode === "photo" ? "Choose JPG, PNG, or WEBP image" : "Choose original video"}
         </button>
         <button className="primary-btn" type="submit" disabled={busy}>
-          {busy ? "Uploading…" : "Upload video"}
+          {busy ? "Uploading…" : mediaMode === "photo" ? "Upload photo" : "Upload video"}
         </button>
       </form>
     </ActionModal>
