@@ -104,7 +104,7 @@ export function registerVideoUploadRoute(app: Express) {
         `videos/${user.id}/${mediaRole}-${Date.now()}`,
         contentType
       );
-      res.json({ ...upload, kind });
+      res.json({ ...upload, uploadUrl: upload.url, kind });
     } catch (error) {
       logUploadFailure("video-upload-url", req, error);
       res.status(500).json({ error: errorMessage(error) });
