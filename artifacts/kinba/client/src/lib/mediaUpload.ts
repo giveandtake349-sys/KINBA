@@ -244,9 +244,10 @@ async function uploadDirectToR2(
     body: JSON.stringify({ contentType: file.type, kind, mediaRole }),
   });
   const signed = await readUploadPayload(signResponse);
-  if (!signResponse.ok || !signed.uploadUrl || !signed.publicUrl)
+  const uploadUrl = signed.uploadUrl ?? signed.url;
+  if (!signResponse.ok || !uploadUrl || !signed.publicUrl)
     throw new Error(uploadFailureMessage(signResponse, signed, "Media"));
-  const uploadResponse = await fetch(signed.uploadUrl, {
+  const uploadResponse = await fetch(uploadUrl, {
     method: "PUT",
     headers: { "Content-Type": file.type },
     body: file,
