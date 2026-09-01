@@ -285,11 +285,13 @@ function QualityVideoPlayer({
   video,
   vertical = false,
   active = true,
+  showPoster = true,
   onFirstPlay,
 }: {
   video: VideoRecord;
   vertical?: boolean;
   active?: boolean;
+  showPoster?: boolean;
   onFirstPlay?: () => void;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -688,7 +690,7 @@ function VideoCard({
         {video.mediaType === "IMAGE" ? (
           <img
             className="w-full h-auto object-cover rounded-lg media-photo"
-            src={video.videoUrl}
+            src={resolveMediaUrl(video.videoUrl) ?? video.videoUrl}
             alt={video.title || "Post"}
           />
         ) : (
@@ -827,7 +829,7 @@ function UploadVideoPanel({
   onPublished: () => void;
   detailsRef: { current: HTMLDetailsElement | null };
   initialKind?: VideoKind;
-  fixedKind?: VideoKind;
+  fixedKind?: "LONG" | "SHORT";
 }) {
   const [mode, setMode] = useState<"video" | "photo">("video");
   const [kind, setKind] = useState<VideoKind>(initialKind);
@@ -876,7 +878,12 @@ function UploadVideoPanel({
       if (mode === "photo" && imageDimensions) {
         await publishPhoto(file, title.trim(), description.trim(), imageDimensions);
       } else {
-        await publishVideo(file, fixedKind ?? kind, title.trim(), description.trim());
+        await publishVideo(
+          file,
+          fixedKind ?? (kind === "SHORT" ? "SHORT" : "LONG"),
+          title.trim(),
+          description.trim()
+        );
       }
       try {
         await onPublished();
