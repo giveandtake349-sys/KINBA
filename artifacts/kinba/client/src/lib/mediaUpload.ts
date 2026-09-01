@@ -334,8 +334,7 @@ export async function uploadVideo(
     throw new Error("Choose a supported video file.");
   const session = await getUploadSession("Please sign in before uploading video.");
   // Keep announcement attachments on the same signed Cloudflare R2 path as
-  // published videos. The former /api/media/video-upload endpoint no longer
-  // exists and caused announcement video uploads to fail with a 404.
+  // published videos. This avoids the removed legacy multipart route.
   return uploadDirectToR2(file, kind, "source", session.access_token);
 }
 
