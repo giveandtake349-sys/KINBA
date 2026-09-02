@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   memo,
+  type MouseEvent,
   type ReactNode,
 } from "react";
 import {
@@ -700,11 +701,13 @@ function VideoCard({
   active = true,
   showDetailsOverlay = false,
   socialLayout = false,
+  onOpenViewer,
 }: {
   video: VideoRecord;
   active?: boolean;
   showDetailsOverlay?: boolean;
   socialLayout?: boolean;
+  onOpenViewer?: () => void;
   showHeader?: boolean;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -726,6 +729,16 @@ function VideoCard({
   const [views, setViews] = useState(video.viewCount);
   const viewMutation = trpc.videos.view.useMutation();
   const { current, react, share, pending } = useOptimisticEngagement(video);
+  const openViewer = (event: MouseEvent<HTMLElement>) => {
+    if (!onOpenViewer) return;
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      target.closest("button, a, input, textarea, select")
+    )
+      return;
+    onOpenViewer();
+  };
   const recordView = () => {
     if (viewMutation.isPending) return;
     void viewMutation
@@ -735,7 +748,12 @@ function VideoCard({
   };
   if (socialLayout) {
     return (
-      <article className="feed-media-post">
+      <article
+        className="feed-media-post"
+        role={onOpenViewer ? "button" : undefined}
+        tabIndex={onOpenViewer ? 0 : undefined}
+        onClick={openViewer}
+      >
         <header className="feed-post-author">
           <div className="video-owner-avatar">
             {video.owner.photoUrl ? (
@@ -808,7 +826,12 @@ function VideoCard({
     );
   }
   return (
-    <article className="long-video-card snap-start h-full w-full overflow-hidden box-border">
+    <article
+      className="long-video-card snap-start h-full w-full overflow-hidden box-border"
+      role={onOpenViewer ? "button" : undefined}
+      tabIndex={onOpenViewer ? 0 : undefined}
+      onClick={openViewer}
+    >
               <div className={`media-fullscreen-frame ${video.mediaType === "IMAGE" ? "media-photo-frame" : ""}`}>
         {video.mediaType === "IMAGE" ? (
           <img
@@ -1426,12 +1449,14 @@ function HomeFeedPanel({
   autoOpenUpload = false,
   showDetailsOverlay = true,
   showHeader = true,
+  onOpenShort,
 }: {
   tab: HomeTab;
   active?: boolean;
   autoOpenUpload?: boolean;
   showDetailsOverlay?: boolean;
   showHeader?: boolean;
+  onOpenShort?: (videoId: number) => void;
 }) {
   const auth = useAuth();
   const utils = trpc.useUtils();
@@ -1496,6 +1521,11 @@ function HomeFeedPanel({
               active={active}
               showDetailsOverlay={showDetailsOverlay}
               socialLayout={tab === "videos"}
+               onOpenViewer={
+                 tab === "wheels" && video.kind === "SHORT" && onOpenShort
+                   ? () => onOpenShort(video.id)
+                   : undefined
+               }
             />
           ))}
         </div>
@@ -2341,7 +2371,13 @@ export default function MediaHub({
         }${activeSection === "wheels" ? " media-tab-panel--wheels" : ""}`}
       >
         <div className="wheels-feed-layout">
-          <HomeFeedPanel tab="wheels" active={activeSection === "wheels"} showDetailsOverlay showHeader={false} />
+           <HomeFeedPanel
+             tab="wheels"
+             active={activeSection === "wheels"}
+             showDetailsOverlay
+             showHeader={false}
+             onOpenShort={setShortsViewerId}
+           />
           <div className="wheels-sponsor-panel">
             {wheels ?? (
               <div className="media-empty">
