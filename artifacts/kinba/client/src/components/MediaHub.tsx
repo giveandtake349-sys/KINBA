@@ -521,7 +521,7 @@ function EngagementActions({
   };
   return (
     <div
-      className={`media-engagement-actions${overlay ? " media-engagement-actions--overlay absolute right-3 bottom-4 z-30 flex flex-col items-center gap-3" : ""}${feedStyle ? " feed-action-bar" : ""}`}
+      className={`media-engagement-actions${overlay ? " media-engagement-actions--overlay right-3 z-30 flex flex-col items-center gap-3" : ""}${feedStyle ? " feed-action-bar" : ""}`}
     >
       {overlay && owner && !isOwnVideo && (
         <button
@@ -1401,9 +1401,7 @@ function HomeFeedPanel({
       staleTime: 30_000,
     }
   );
-  const videos = ((query.data ?? []) as VideoRecord[]).filter(
-    video => !isReportedLegacyMedia(video)
-  );
+   const videos = (query.data ?? []) as VideoRecord[];
   const uploadDetailsRef = useRef<HTMLDetailsElement>(null);
   const openUploader = () => {
     uploadDetailsRef.current?.setAttribute("open", "");
@@ -1465,9 +1463,11 @@ function HomeFeedPanel({
               ? "Sign in to see Following."
               : "No videos to show yet."}
           </h3>
-          <button type="button" className="primary-btn" onClick={openUploader}>
-            <Upload size={15} /> Upload Video
-          </button>
+           {tab !== "wheels" && (
+             <button type="button" className="primary-btn" onClick={openUploader}>
+               <Upload size={15} /> Upload Video
+             </button>
+           )}
         </div>
       )}
       <UploadVideoPanel
@@ -1605,9 +1605,7 @@ function ShortsFeed({ active = true }: { active?: boolean }) {
     uploadDetailsRef.current?.setAttribute("open", "");
     uploadDetailsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
-  const videos = ((query.data ?? []) as VideoRecord[]).filter(
-    video => !isReportedLegacyMedia(video)
-  );
+  const videos = (query.data ?? []) as VideoRecord[];
   const goTo = (index: number) => {
     const clamped = Math.max(
       0,
@@ -2237,8 +2235,10 @@ export default function MediaHub({
       <div
         hidden={activeSection !== "wheels"}
         className={`media-tab-panel${
-          activeSection === "wheels" ? " media-tab-panel--wheels" : ""
-        }`}
+          activeSection === "wheels" || activeSection === "shorts"
+            ? " media-tab-panel--fullscreen"
+            : ""
+        }${activeSection === "wheels" ? " media-tab-panel--wheels" : ""}`}
       >
         <div className="wheels-feed-layout">
           <HomeFeedPanel tab="wheels" active={activeSection === "wheels"} showDetailsOverlay showHeader={false} />
