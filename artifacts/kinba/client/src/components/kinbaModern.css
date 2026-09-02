@@ -1570,3 +1570,53 @@ body {
     width: calc(100% + 24px);
   }
 }
+
+/* Final video-feed layering: content clears the fixed bottom navigation. */
+.media-overlay-copy,
+.short-overlay {
+  bottom: 0 !important;
+  padding-bottom: calc(112px + env(safe-area-inset-bottom)) !important;
+  z-index: 20 !important;
+}
+.media-overlay-details,
+.short-overlay-details {
+  padding-bottom: 12px;
+}
+.media-engagement-actions--overlay {
+  bottom: calc(104px + env(safe-area-inset-bottom)) !important;
+  z-index: 30 !important;
+}
+/* WHEELS is an independent viewport layer; the translating header cannot move it. */
+.media-tab-panel--wheels {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  z-index: 1 !important;
+}
+.media-tab-panel--wheels .wheels-feed-layout,
+.media-tab-panel--wheels .home-feed-section,
+.media-tab-panel--wheels .home-feed-section .long-video-grid {
+  width: 100% !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+.media-tab-panel--wheels .home-feed-section .long-video-grid {
+  overflow-y: auto !important;
+  scroll-snap-type: y mandatory !important;
+}
+.media-tab-panel--wheels .home-feed-section .long-video-grid > .long-video-card {
+  flex: 0 0 100dvh !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  scroll-snap-align: start !important;
+}

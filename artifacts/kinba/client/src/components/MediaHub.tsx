@@ -411,6 +411,7 @@ function QualityVideoPlayer({
         disablePictureInPicture
         playsInline
         preload="metadata"
+        autoPlay={active}
         muted={muted}
         onLoadedMetadata={restorePlayback}
         onError={() =>

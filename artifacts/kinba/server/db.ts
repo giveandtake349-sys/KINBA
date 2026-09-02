@@ -549,12 +549,21 @@ export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
       viewerId,
       "recent"
     );
-  if (tab === "wheels")
-    return selectVideos(
+  if (tab === "wheels") {
+    const wheels = await selectVideos(
       [eq(videos.kind, "WHEEL"), eq(videos.mediaType, "VIDEO")],
       viewerId,
       "recent"
     );
+    if (wheels.length) return wheels;
+    // Keep the full-screen WHEELS surface populated with global public media
+    // when no dedicated WHEEL records exist yet; never fall back to follows.
+    return selectVideos(
+      [eq(videos.kind, "LONG"), eq(videos.mediaType, "VIDEO")],
+      viewerId,
+      "recent"
+    );
+  }
   if (tab === "following" && !viewerId) return [];
   const db = await getDb();
   if (!db) return [];
