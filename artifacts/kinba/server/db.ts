@@ -554,7 +554,6 @@ export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
     return selectVideos(
       [
         or(
-          eq(videos.kind, "WHEEL"),
           eq(videos.kind, "LONG"),
           eq(videos.kind, "SHORT")
         ),
@@ -603,16 +602,7 @@ async function listUnifiedHomeFeed(viewerId?: number) {
   const [media, shorts, textPosts] = await Promise.all([
     // All public video kinds belong in All Feed; Shorts are also surfaced as
     // their discovery insertion below.
-    selectVideos(
-      [
-        or(
-          eq(videos.kind, "LONG"),
-          eq(videos.kind, "WHEEL")
-        ),
-      ],
-      viewerId,
-      "recent"
-    ),
+    selectVideos([eq(videos.kind, "LONG")], viewerId, "recent"),
     selectVideos([eq(videos.kind, "SHORT"), eq(videos.mediaType, "VIDEO")], viewerId, "recent"),
     listCommunityAnnouncements().catch(error => {
       console.error("[Feed] Community posts unavailable:", error);
