@@ -1674,3 +1674,18 @@ body {
   min-height: 100dvh !important;
   scroll-snap-align: start !important;
 }
+
+/* Mobile feed performance: isolate off-screen cards from layout and paint work. */
+.media-hub .long-video-card,
+.media-hub .short-card,
+.media-hub .feed-media-post,
+.media-hub .feed-text-card,
+.media-hub .shorts-insertion-block {
+  contain: layout paint style;
+  content-visibility: auto;
+  contain-intrinsic-size: 0 100dvh;
+}
+.media-hub .media-video-frame,
+.media-hub .media-fullscreen-frame {
+  contain: strict;
+}

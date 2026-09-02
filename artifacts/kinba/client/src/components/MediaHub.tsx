@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  memo,
   type ReactNode,
 } from "react";
 import {
@@ -306,6 +307,7 @@ function QualityVideoPlayer({
   const containerRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const [isInView, setIsInView] = useState(false);
+  const [isNearViewport, setIsNearViewport] = useState(false);
   const [muted, setMuted] = useState(true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const positionRef = useRef(0);
@@ -329,11 +331,11 @@ function QualityVideoPlayer({
     const observer = new IntersectionObserver(
       entries => {
         const entry = entries[0];
-        setIsInView(
-          Boolean(entry?.isIntersecting && entry.intersectionRatio >= 0.7)
-        );
+        const visible = Boolean(entry?.isIntersecting);
+        setIsNearViewport(visible);
+        setIsInView(Boolean(visible && entry.intersectionRatio >= 0.7));
       },
-      { threshold: 0.7 }
+      { rootMargin: "240px 0px", threshold: [0, 0.7] }
     );
     observer.observe(container);
     return () => observer.disconnect();
@@ -343,6 +345,15 @@ function QualityVideoPlayer({
     const element = ref.current;
     if (!element) return;
 
+    if (!isNearViewport) {
+      element.pause();
+      element.removeAttribute("src");
+      element.load();
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
+      setPlaying(false);
+      return;
+    }
     setPlaybackError(null);
     hlsRef.current?.destroy();
     hlsRef.current = null;
@@ -369,7 +380,7 @@ function QualityVideoPlayer({
       element.removeAttribute("src");
       element.load();
     };
-  }, [sourceUrl]);
+  }, [sourceUrl, isNearViewport]);
 
   const restorePlayback = () => {
     const element = ref.current;
@@ -410,8 +421,8 @@ function QualityVideoPlayer({
         controlsList="nofullscreen noplaybackrate"
         disablePictureInPicture
         playsInline
-        preload="metadata"
-        autoPlay={active}
+        preload={isNearViewport ? "metadata" : "none"}
+        autoPlay={active && isInView}
         muted={muted}
         onLoadedMetadata={restorePlayback}
         onError={() =>
@@ -932,6 +943,8 @@ function VideoCard({
     </article>
   );
 }
+const MemoVideoCard = memo(VideoCard);
+
 function UploadVideoPanel({
   onPublished,
   detailsRef,
@@ -1336,7 +1349,7 @@ function ShortsInsertionBlock({ video, active }: { video: VideoRecord; active: b
         <div><span className="eyebrow">Shorts</span><strong>Quick discovery</strong></div>
         <span>From the KINBA community</span>
       </div>
-      <ShortVideoCard video={video} index={0} active={active} compact />
+      <MemoShortVideoCard video={video} index={0} active={active} compact />
     </section>
   );
 }
@@ -1354,7 +1367,7 @@ function UnifiedFeedPanel({ active = true }: { active?: boolean }) {
           {items.map(item => {
             if (item.feedType === "media")
               return (
-                <VideoCard
+                <MemoVideoCard
                   key={"media-" + item.id}
                   video={item}
                   active={active}
@@ -1446,7 +1459,7 @@ function HomeFeedPanel({
       ) : videos.length ? (
         <div className="unified-feed-list feed-video-list w-full max-w-full box-border">
           {videos.map(video => (
-            <VideoCard
+            <MemoVideoCard
               key={video.id}
               video={video}
               active={active}
@@ -1587,6 +1600,8 @@ function ShortVideoCard({
   );
 }
 
+const MemoShortVideoCard = memo(ShortVideoCard);
+
 function ShortsFeed({ active = true }: { active?: boolean }) {
   const query = trpc.home.feed.useQuery(
     { tab: "shorts" },
@@ -1673,11 +1688,11 @@ function ShortsFeed({ active = true }: { active?: boolean }) {
           onScroll={onScroll}
         >
           {videos.map((video, index) => (
-            <ShortVideoCard
+            <MemoShortVideoCard
               key={video.id}
               video={video}
               index={index}
-              active={active}
+              active={active && index === activeIndex}
             />
           ))}
         </div>
@@ -2160,7 +2175,7 @@ export function SearchFeed() {
       ) : results.length ? (
         <div className="long-video-grid media-feed-scroll h-[100dvh] overflow-y-scroll scrollbar-hide snap-y snap-mandatory w-full max-w-full box-border">
           {results.map(video => (
-            <VideoCard key={video.id} video={video} />
+            <MemoVideoCard key={video.id} video={video} />
           ))}
         </div>
       ) : (
