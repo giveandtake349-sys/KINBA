@@ -550,16 +550,15 @@ export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
       "recent"
     );
   if (tab === "wheels") {
-    const wheels = await selectVideos(
-      [eq(videos.kind, "WHEEL"), eq(videos.mediaType, "VIDEO")],
-      viewerId,
-      "recent"
-    );
-    if (wheels.length) return wheels;
-    // Keep the full-screen WHEELS surface populated with global public media
-    // when no dedicated WHEEL records exist yet; never fall back to follows.
+    // WHEELS is a global public discovery surface, not a followed-users view.
     return selectVideos(
-      [eq(videos.kind, "LONG"), eq(videos.mediaType, "VIDEO")],
+      [
+        or(
+          eq(videos.kind, "WHEEL"),
+          eq(videos.kind, "LONG"),
+          eq(videos.kind, "SHORT")
+        ),
+      ],
       viewerId,
       "recent"
     );
@@ -602,9 +601,23 @@ export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
 /** Resolve real persisted media and text posts into one chronological feed. */
 async function listUnifiedHomeFeed(viewerId?: number) {
   const [media, shorts, textPosts] = await Promise.all([
-    selectVideos([eq(videos.kind, "LONG")], viewerId, "recent"),
+    // All public video kinds belong in All Feed; Shorts are also surfaced as
+    // their discovery insertion below.
+    selectVideos(
+      [
+        or(
+          eq(videos.kind, "LONG"),
+          eq(videos.kind, "WHEEL")
+        ),
+      ],
+      viewerId,
+      "recent"
+    ),
     selectVideos([eq(videos.kind, "SHORT"), eq(videos.mediaType, "VIDEO")], viewerId, "recent"),
-    listCommunityAnnouncements(),
+    listCommunityAnnouncements().catch(error => {
+      console.error("[Feed] Community posts unavailable:", error);
+      return [];
+    }),
   ]);
   const chronological = [
     ...media.map(video => ({ ...video, feedType: "media" as const })),
