@@ -2498,6 +2498,26 @@ export default function Home() {
         {authDialog}
       </div>
     );
+  if (auth.error && !auth.unauthenticatedError)
+    return (
+      <div
+        className="kinba-app guest-layout max-w-vw overflow-x-hidden box-border"
+        onClick={guardNonSubmitNavigation}
+      >
+        <main className="section-shell" role="alert">
+          <h1>Unable to connect to KINBA</h1>
+          <p className="profile-loading-note">
+            {auth.error instanceof Error
+              ? auth.error.message
+              : "The KINBA backend is unavailable or blocked by CORS. Please try again."}
+          </p>
+          <button type="button" className="primary-btn" onClick={() => window.location.reload()}>
+            Retry connection
+          </button>
+        </main>
+        {authDialog}
+      </div>
+    );
   if (screen === "landing")
     return (
       <>

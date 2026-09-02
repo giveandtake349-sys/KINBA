@@ -9,6 +9,27 @@ import App from "./App";
 import "./index.css";
 
 const queryClient = new QueryClient();
+const API_FETCH_TIMEOUT_MS = 10_000;
+
+const fetchWithTimeout: typeof globalThis.fetch = async (input, init) => {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), API_FETCH_TIMEOUT_MS);
+  const callerSignal = init?.signal;
+  const abortFromCaller = () => controller.abort();
+  if (callerSignal?.aborted) controller.abort();
+  else callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
+  try {
+    return await globalThis.fetch(input, { ...(init ?? {}), signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted && !callerSignal?.aborted) {
+      throw new Error("KINBA backend request timed out after 10 seconds. Please try again.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
+    callerSignal?.removeEventListener("abort", abortFromCaller);
+  }
+};
 
 const logApiError = (error: unknown) => {
   if (error instanceof TRPCClientError) console.error("[API Error]", error.message, error.data);
@@ -33,7 +54,7 @@ const trpcClient = trpc.createClient({
         return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
       },
       fetch(input, init) {
-        return globalThis.fetch(input, {
+        return fetchWithTimeout(input, {
           ...(init ?? {}),
           credentials: "include",
         });
