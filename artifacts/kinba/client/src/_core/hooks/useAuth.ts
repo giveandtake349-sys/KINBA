@@ -34,7 +34,7 @@ export function useAuth(options?: UseAuthOptions) {
     () => ({
       user: meQuery.data ?? null,
       loading: authContext.loading || meQuery.isLoading,
-      error: meQuery.error ?? authContext.bootstrapError ?? null,
+      error: meQuery.error ?? null,
       isAuthenticated: Boolean(authContext.session),
     }),
     [
@@ -42,7 +42,6 @@ export function useAuth(options?: UseAuthOptions) {
       authContext.session,
       meQuery.data,
       meQuery.error,
-      authContext.bootstrapError,
       meQuery.isLoading,
     ]
   );
