@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --dir artifacts/kinba build:vercel",
+  "outputDirectory": "artifacts/kinba/dist/public",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
