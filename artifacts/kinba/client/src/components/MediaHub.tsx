@@ -2267,7 +2267,10 @@ export default function MediaHub({
            />
         </ErrorBoundary>
       </div>
-      <div hidden={activeSection !== "shorts"} className="media-tab-panel">
+      <div
+        hidden={activeSection !== "shorts"}
+        className="media-tab-panel media-tab-panel--fullscreen"
+      >
         <ErrorBoundary fallback={<FeedRecovery />}>
           <ShortsFeed active={activeSection === "shorts"} />
         </ErrorBoundary>
