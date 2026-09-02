@@ -143,7 +143,11 @@ type AnnouncementVideoSelection = {
 
 const tabOptions: { id: HomeTab; label: string; caption: string }[] = [
   { id: "videos", label: "Videos", caption: "Latest main-feed videos" },
-  { id: "wheels", label: "Wheels", caption: "Wheel content only" },
+  {
+    id: "wheels",
+    label: "Spotlight",
+    caption: "Global photo and video spotlight",
+  },
   { id: "trendy", label: "Trendy", caption: "Most reacted-to videos" },
   {
     id: "following",
@@ -1342,19 +1346,39 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
   );
 }
 
-function ShortsInsertionBlock({ video, active }: { video: VideoRecord; active: boolean }) {
+function ShortsInsertionBlock({
+  video,
+  active,
+  onOpenViewer,
+}: {
+  video: VideoRecord;
+  active: boolean;
+  onOpenViewer: () => void;
+}) {
   return (
     <section className="shorts-insertion-block" aria-label="Shorts discovery">
       <div className="shorts-insertion-heading">
         <div><span className="eyebrow">Shorts</span><strong>Quick discovery</strong></div>
         <span>From the KINBA community</span>
       </div>
-      <MemoShortVideoCard video={video} index={0} active={active} compact />
+       <MemoShortVideoCard
+         video={video}
+         index={0}
+         active={active}
+         compact
+         onOpenViewer={onOpenViewer}
+       />
     </section>
   );
 }
 
-function UnifiedFeedPanel({ active = true }: { active?: boolean }) {
+function UnifiedFeedPanel({
+  active = true,
+  onOpenShort,
+}: {
+  active?: boolean;
+  onOpenShort: (videoId: number) => void;
+}) {
   const query = trpc.home.feed.useQuery(
     { tab: "all" },
     { retry: 1, throwOnError: false, refetchOnWindowFocus: false, staleTime: 30_000 }
@@ -1376,7 +1400,14 @@ function UnifiedFeedPanel({ active = true }: { active?: boolean }) {
               );
             if (item.feedType === "text")
               return <TextFeedCard key={"text-" + item.id} post={item} />;
-            return <ShortsInsertionBlock key={item.id} video={item.video} active={active} />;
+             return (
+               <ShortsInsertionBlock
+                 key={item.id}
+                 video={item.video}
+                 active={active}
+                 onOpenViewer={() => onOpenShort(item.video.id)}
+               />
+             );
           })}
         </div>
       ) : (
@@ -1500,11 +1531,13 @@ function ShortVideoCard({
   index,
   active,
   compact = false,
+  onOpenViewer,
 }: {
   video: VideoRecord;
   index: number;
   active: boolean;
   compact?: boolean;
+  onOpenViewer?: () => void;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const auth = useAuth();
@@ -1527,6 +1560,24 @@ function ShortVideoCard({
     <article
       className={`short-card${compact ? " short-card--compact" : ""} snap-start h-full w-full overflow-hidden box-border`}
       data-short-index={index}
+      role={onOpenViewer ? "button" : undefined}
+      tabIndex={onOpenViewer ? 0 : undefined}
+      onClick={event => {
+        if (!onOpenViewer) return;
+        const target = event.target;
+        if (
+          target instanceof HTMLElement &&
+          target.closest("button, a, input, textarea, select")
+        )
+          return;
+        onOpenViewer();
+      }}
+      onKeyDown={event => {
+        if (!onOpenViewer || (event.key !== "Enter" && event.key !== " "))
+          return;
+        event.preventDefault();
+        onOpenViewer();
+      }}
     >
       {video.mediaType === "IMAGE" ? (
         <img
@@ -1602,7 +1653,13 @@ function ShortVideoCard({
 
 const MemoShortVideoCard = memo(ShortVideoCard);
 
-function ShortsFeed({ active = true }: { active?: boolean }) {
+function ShortsFeed({
+  active = true,
+  initialVideoId,
+}: {
+  active?: boolean;
+  initialVideoId?: number;
+}) {
   const query = trpc.home.feed.useQuery(
     { tab: "shorts" },
     {
@@ -1621,6 +1678,19 @@ function ShortsFeed({ active = true }: { active?: boolean }) {
     uploadDetailsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
   const videos = (query.data ?? []) as VideoRecord[];
+  useEffect(() => {
+    if (initialVideoId === undefined || !videos.length) return;
+    const nextIndex = Math.max(
+      0,
+      videos.findIndex(video => video.id === initialVideoId)
+    );
+    setActiveIndex(nextIndex);
+    requestAnimationFrame(() => {
+      viewportRef.current
+        ?.querySelector<HTMLElement>(`[data-short-index="${nextIndex}"]`)
+        ?.scrollIntoView({ behavior: "auto", block: "start" });
+    });
+  }, [initialVideoId, videos.length]);
   const goTo = (index: number) => {
     const clamped = Math.max(
       0,
@@ -2200,10 +2270,25 @@ export default function MediaHub({
   wheels?: ReactNode;
 }) {
   const [selectedSection, setSelectedSection] = useState<FeedSection>(section);
+  const [shortsViewerId, setShortsViewerId] = useState<number | null>(null);
 
   useEffect(() => {
     setSelectedSection(section);
   }, [section]);
+
+  useEffect(() => {
+    if (shortsViewerId === null) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShortsViewerId(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [shortsViewerId]);
 
   const activeSection =
     selectedSection === "publish" || selectedSection === "search"
@@ -2224,7 +2309,7 @@ export default function MediaHub({
         >
           {(
             [
-              ["wheels", "Wheels"],
+               ["wheels", "Spotlight"],
               ["all", "All Feed"],
               ["videos", "Videos"],
               ["shorts", "Shorts"],
@@ -2268,7 +2353,10 @@ export default function MediaHub({
       </div>
       <div hidden={activeSection !== "all"} className="media-tab-panel">
         <ErrorBoundary fallback={<FeedRecovery />}>
-          <UnifiedFeedPanel active={activeSection === "all"} />
+           <UnifiedFeedPanel
+             active={activeSection === "all"}
+             onOpenShort={setShortsViewerId}
+           />
         </ErrorBoundary>
       </div>
       <div hidden={activeSection !== "videos"} className="media-tab-panel">
@@ -2291,6 +2379,24 @@ export default function MediaHub({
         </ErrorBoundary>
       </div>
       {activeSection === "announcements" && <CommunityAnnouncements />}
+      {shortsViewerId !== null && (
+        <div
+          className="shorts-viewer-layer"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Shorts viewer"
+        >
+          <button
+            type="button"
+            className="shorts-viewer-close"
+            onClick={() => setShortsViewerId(null)}
+            aria-label="Close Shorts viewer"
+          >
+            <X size={22} />
+          </button>
+          <ShortsFeed active initialVideoId={shortsViewerId} />
+        </div>
+      )}
     </div>
   );
 }
