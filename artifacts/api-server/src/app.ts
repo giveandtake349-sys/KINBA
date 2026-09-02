@@ -16,7 +16,11 @@ const configuredCorsOrigins = [
   .flatMap(value => (value ?? "").split(","))
   .map(value => value.trim().replace(/\/$/, ""))
   .filter(Boolean);
-const allowedCorsOrigins = new Set(configuredCorsOrigins);
+const allowAllCors = configuredCorsOrigins.includes("*");
+const allowedCorsOrigins = new Set([
+  ...configuredCorsOrigins.filter(origin => origin !== "*"),
+  "https://upbids.vercel.app",
+]);
 const isVercelOrigin = (origin: string) =>
   /^https:\/\/[a-z0-9-]+(?:-[a-z0-9-]+)*\.vercel\.app$/i.test(origin);
 const isLocalOrigin = (origin: string) =>
@@ -27,7 +31,7 @@ const corsOrigin = (
   origin: string | undefined,
   callback: (error: Error | null, allow?: boolean) => void,
 ) => {
-  if (!origin || allowedCorsOrigins.has(origin) || isVercelOrigin(origin) || isLocalOrigin(origin)) {
+  if (!origin || allowAllCors || allowedCorsOrigins.has(origin) || isVercelOrigin(origin) || isLocalOrigin(origin)) {
     callback(null, true);
     return;
   }
