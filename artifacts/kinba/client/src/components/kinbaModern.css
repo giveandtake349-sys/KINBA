@@ -66,8 +66,8 @@ body {
 
 /* Glass application header. */
 .topbar.mobile-first-header {
-  position: sticky !important;
-  inset: auto !important;
+  position: fixed !important;
+  inset: 0 0 auto 0 !important;
   top: 0 !important;
   z-index: 120 !important;
   width: 100%;
@@ -80,6 +80,17 @@ body {
   backdrop-filter: blur(22px) saturate(145%);
   -webkit-backdrop-filter: blur(22px) saturate(145%);
   pointer-events: auto !important;
+}
+
+.top-navigation-wrapper {
+  position: fixed !important;
+  inset: 0 0 auto 0 !important;
+  z-index: 120 !important;
+  pointer-events: none;
+}
+
+.top-navigation-wrapper > * {
+  pointer-events: auto;
 }
 
 .brand {
@@ -1584,9 +1595,11 @@ body {
 }
 .media-engagement-actions--overlay {
   bottom: calc(104px + env(safe-area-inset-bottom)) !important;
-  z-index: 30 !important;
+  z-index: 40 !important;
 }
-/* WHEELS is an independent viewport layer; the translating header cannot move it. */
+/* WHEELS and Shorts are independent viewport layers; the translating header
+   cannot move them or create a scroll-dependent top gap. */
+.media-tab-panel--fullscreen,
 .media-tab-panel--wheels {
   position: fixed !important;
   inset: 0 !important;
@@ -1598,6 +1611,47 @@ body {
   padding: 0 !important;
   overflow: hidden !important;
   z-index: 1 !important;
+}
+.media-tab-panel--fullscreen {
+  isolation: isolate;
+}
+.media-tab-panel--fullscreen > .shorts-section,
+.media-tab-panel--fullscreen > .wheels-feed-layout,
+.media-tab-panel--fullscreen .home-feed-section {
+  width: 100% !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+.media-tab-panel--fullscreen .media-section-heading,
+.media-tab-panel--fullscreen .media-publish-panel,
+.media-tab-panel--fullscreen .wheels-sponsor-panel {
+  display: none !important;
+}
+.media-tab-panel--fullscreen .shorts-viewport,
+.media-tab-panel--fullscreen .home-feed-section .long-video-grid {
+  width: 100% !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scroll-snap-type: y mandatory !important;
+}
+.media-tab-panel--fullscreen .short-card,
+.media-tab-panel--fullscreen .home-feed-section .long-video-card {
+  width: 100% !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  scroll-snap-align: start !important;
 }
 .media-tab-panel--wheels .wheels-feed-layout,
 .media-tab-panel--wheels .home-feed-section,
