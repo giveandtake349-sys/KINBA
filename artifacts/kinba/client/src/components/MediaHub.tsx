@@ -711,7 +711,6 @@ function VideoCard({
   showHeader?: boolean;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [viewerOpen, setViewerOpen] = useState(false);
   const auth = useAuth();
   const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
   const bookmarkMutation = trpc.videos.bookmark.useMutation();
@@ -793,7 +792,7 @@ function VideoCard({
             {video.description && <p>{video.description}</p>}
           </div>
         )}
-        <div className="feed-media-content feed-media-content--clickable" role="button" tabIndex={0} aria-label="Open full-screen media viewer" onClick={() => setViewerOpen(true)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setViewerOpen(true); } }}>
+        <div className="feed-media-content">
           {video.mediaType === "IMAGE" ? (
             <img
               src={resolveMediaUrl(video.videoUrl) ?? video.videoUrl}
@@ -823,7 +822,6 @@ function VideoCard({
           open={commentsOpen}
           onClose={() => setCommentsOpen(false)}
         />
-        {viewerOpen && <FeedMediaViewer attachments={[{ id: video.id, mediaType: video.mediaType, mediaUrl: video.videoUrl, sortOrder: 0 }]} index={0} onClose={() => setViewerOpen(false)} onChange={() => undefined} owner={video.owner} createdAt={video.createdAt} caption={video.description} reactionCount={current.reactionCount} commentCount={current.commentCount} shareCount={video.shareCount} bookmarked={bookmarked} onReact={react} onComments={() => setCommentsOpen(true)} onShare={share} onBookmark={toggleBookmark} />}
       </article>
     );
   }
@@ -835,7 +833,6 @@ function VideoCard({
       onClick={openViewer}
     >
               <div className={`media-fullscreen-frame ${video.mediaType === "IMAGE" ? "media-photo-frame" : ""}`}>
-
         {video.mediaType === "IMAGE" ? (
           <img
             className="w-full h-auto object-cover rounded-lg media-photo"
@@ -970,7 +967,6 @@ function VideoCard({
         overlay={showDetailsOverlay}
         onClose={() => setCommentsOpen(false)}
       />
-      {viewerOpen && <FeedMediaViewer attachments={[{ id: video.id, mediaType: video.mediaType, mediaUrl: video.videoUrl, sortOrder: 0 }]} index={0} onClose={() => setViewerOpen(false)} onChange={() => undefined} owner={video.owner} createdAt={video.createdAt} caption={video.description} reactionCount={current.reactionCount} commentCount={current.commentCount} shareCount={video.shareCount} bookmarked={bookmarked} onReact={react} onComments={() => setCommentsOpen(true)} onShare={share} onBookmark={toggleBookmark} />}
     </article>
   );
 }
@@ -1234,98 +1230,37 @@ function FeedRecovery() {
   );
 }
 
-type ViewerOwner = {
-  id: number;
-  name: string | null;
-  username?: string | null;
-  photoUrl: string | null;
-};
-function FeedMediaViewer({
+function FeedPhotoLightbox({
   attachments,
   index,
   onClose,
   onChange,
-  owner,
-  createdAt,
-  caption,
-  reactionCount = 0,
-  commentCount = 0,
-  shareCount = 0,
-  bookmarked = false,
-  onReact,
-  onComments,
-  onShare,
-  onBookmark,
 }: {
   attachments: FeedAttachment[];
   index: number;
   onClose: () => void;
   onChange: (index: number) => void;
-  owner?: ViewerOwner;
-  createdAt?: Date | string;
-  caption?: string;
-  reactionCount?: number;
-  commentCount?: number;
-  shareCount?: number;
-  bookmarked?: boolean;
-  onReact?: () => void;
-  onComments?: () => void;
-  onShare?: () => void;
-  onBookmark?: () => void;
 }) {
-  const current = attachments[index];
-  const closeRef = useRef(onClose);
-  const changeRef = useRef(onChange);
-  const indexRef = useRef(index);
-  useEffect(() => { closeRef.current = onClose; }, [onClose]);
-  useEffect(() => { changeRef.current = onChange; indexRef.current = index; }, [index, onChange]);
+  const imageAttachments = attachments.filter(item => item.mediaType === "IMAGE");
+  const current = imageAttachments[index];
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    const baseUrl = window.location.pathname + window.location.search;
-    window.history.pushState({ kinbaViewer: true }, "", `${baseUrl}#media-viewer`);
+    if (!current) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeRef.current();
-      if (event.key === "ArrowLeft") changeRef.current((indexRef.current - 1 + attachments.length) % attachments.length);
-      if (event.key === "ArrowRight") changeRef.current((indexRef.current + 1) % attachments.length);
+      if (event.key === "Escape") onClose();
+      if (event.key === "ArrowLeft") onChange((index - 1 + imageAttachments.length) % imageAttachments.length);
+      if (event.key === "ArrowRight") onChange((index + 1) % imageAttachments.length);
     };
-    const onPopState = () => closeRef.current();
-    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("popstate", onPopState);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("popstate", onPopState);
-      if (window.location.hash === "#media-viewer") window.history.replaceState(null, "", baseUrl);
-    };
-  }, [attachments.length]);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [current, imageAttachments.length, index, onChange, onClose]);
   if (!current) return null;
-  const isVideo = current.mediaType === "VIDEO";
   return (
-    <div className="kinba-media-viewer" role="dialog" aria-modal="true" aria-label={isVideo ? "Video viewer" : "Photo viewer"} onClick={onClose}>
-      <button type="button" className="kinba-media-viewer__close" onClick={onClose} aria-label="Close viewer"><X size={24} /></button>
-      <button type="button" className="kinba-media-viewer__options" onClick={event => event.stopPropagation()} aria-label="Media options"><MoreHorizontal size={24} /></button>
-      {attachments.length > 1 && <span className="kinba-media-viewer__counter">{index + 1} / {attachments.length}</span>}
-      {attachments.length > 1 && <button type="button" className="kinba-media-viewer__nav kinba-media-viewer__nav--prev" onClick={event => { event.stopPropagation(); onChange((index - 1 + attachments.length) % attachments.length); }} aria-label="Previous media"><ChevronLeft size={30} /></button>}
-      {isVideo ? (
-        <video className="kinba-media-viewer__media" src={resolveMediaUrl(current.mediaUrl)} controls autoPlay muted playsInline onClick={event => { event.stopPropagation(); const element = event.currentTarget; if (element.paused) void element.play(); else element.pause(); }} />
-      ) : (
-        <img className="kinba-media-viewer__media" src={resolveMediaUrl(current.mediaUrl)} alt="Expanded post attachment" onClick={event => event.stopPropagation()} />
-      )}
-      {attachments.length > 1 && <button type="button" className="kinba-media-viewer__nav kinba-media-viewer__nav--next" onClick={event => { event.stopPropagation(); onChange((index + 1) % attachments.length); }} aria-label="Next media"><ChevronRight size={30} /></button>}
-      <div className="kinba-media-viewer__bottom" onClick={event => event.stopPropagation()}>
-        {owner && <a className="kinba-media-viewer__owner profile-link" href={`/profile/${owner.id}`}>
-          <span className="video-owner-avatar">{owner.photoUrl ? <img src={owner.photoUrl} alt="" /> : <UserRound size={18} />}</span>
-          <span><strong>{displayName(owner.name, owner.username)}</strong><small>{relativeTime(createdAt ?? new Date())}</small></span>
-        </a>}
-        {caption && <p>{caption}</p>}
-        <div className="kinba-media-viewer__actions">
-          <button type="button" onClick={onReact ?? (() => undefined)}><Heart size={17} /> Pookie {formatCount(reactionCount)}</button>
-          <button type="button" onClick={onComments ?? (() => undefined)}><MessageCircle size={17} /> Comments {formatCount(commentCount)}</button>
-          <button type="button" onClick={onShare ?? (() => undefined)}><Share2 size={17} /> Share {formatCount(shareCount)}</button>
-          <button type="button" className={bookmarked ? "is-active" : ""} onClick={onBookmark ?? (() => undefined)}><Bookmark size={17} fill={bookmarked ? "currentColor" : "none"} /> Save</button>
-        </div>
-      </div>
+    <div className="feed-photo-lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer" onClick={onClose}>
+      <button type="button" className="feed-photo-lightbox-close" onClick={onClose} aria-label="Close photo viewer"><X size={22} /></button>
+      <span className="feed-photo-lightbox-counter">{index + 1} of {imageAttachments.length}</span>
+      {imageAttachments.length > 1 && <button type="button" className="feed-photo-lightbox-nav feed-photo-lightbox-nav--prev" onClick={event => { event.stopPropagation(); onChange((index - 1 + imageAttachments.length) % imageAttachments.length); }} aria-label="Previous photo"><ChevronLeft size={28} /></button>}
+      <img src={resolveMediaUrl(current.mediaUrl)} alt="Expanded post attachment" onClick={event => event.stopPropagation()} />
+      {imageAttachments.length > 1 && <button type="button" className="feed-photo-lightbox-nav feed-photo-lightbox-nav--next" onClick={event => { event.stopPropagation(); onChange((index + 1) % imageAttachments.length); }} aria-label="Next photo"><ChevronRight size={28} /></button>}
     </div>
   );
 }
@@ -1337,7 +1272,7 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
   const [reactionCount, setReactionCount] = useState(post.reactionCount ?? 0);
   const reactMutation = trpc.community.react.useMutation();
   const bookmarkMutation = trpc.community.bookmark.useMutation();
-  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const toggleReaction = async () => {
     if (!auth.isAuthenticated) return auth.openAuth();
     if (reactMutation.isPending) return;
@@ -1394,13 +1329,11 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
         <div className={post.attachments.length > 1 ? "feed-post-attachments has-grid" : "feed-post-attachments"}>
           {post.attachments.map(attachment =>
             attachment.mediaType === "IMAGE" ? (
-              <button key={attachment.id} type="button" className="feed-photo-button" onClick={() => setViewerIndex(post.attachments.findIndex(item => item.id === attachment.id))} aria-label="Open photo">
+              <button key={attachment.id} type="button" className="feed-photo-button" onClick={() => setLightboxIndex(post.attachments.filter(item => item.mediaType === "IMAGE").findIndex(item => item.id === attachment.id))} aria-label="Open photo">
                 <img src={resolveMediaUrl(attachment.mediaUrl)} alt="Post attachment" loading="lazy" />
               </button>
             ) : (
-              <button type="button" className="feed-photo-button" onClick={() => setViewerIndex(post.attachments.findIndex(item => item.id === attachment.id))} aria-label="Open video">
-                <video src={resolveMediaUrl(attachment.mediaUrl)} muted playsInline preload="metadata" />
-              </button>
+              <video key={attachment.id} src={resolveMediaUrl(attachment.mediaUrl)} controls playsInline preload="metadata" />
             )
           )}
         </div>
@@ -1431,7 +1364,7 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
            {bookmarked ? "Saved" : "Save"}
          </button>
       </div>
-      {viewerIndex !== null && <FeedMediaViewer attachments={post.attachments} index={viewerIndex} onClose={() => setViewerIndex(null)} onChange={setViewerIndex} owner={post.author} createdAt={post.createdAt} caption={post.text} reactionCount={reactionCount} commentCount={post.commentCount} bookmarked={bookmarked} onReact={toggleReaction} onComments={() => undefined} onShare={share} onBookmark={toggleBookmark} />}
+      {lightboxIndex !== null && <FeedPhotoLightbox attachments={post.attachments} index={lightboxIndex} onClose={() => setLightboxIndex(null)} onChange={setLightboxIndex} />}
     </article>
   );
 }
