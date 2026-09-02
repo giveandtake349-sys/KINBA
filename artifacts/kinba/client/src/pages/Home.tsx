@@ -861,7 +861,7 @@ function FeedTabs({
   onSectionChange: (section: FeedSection) => void;
 }) {
   const tabs = [
-    ["wheels", "Wheels"],
+    ["wheels", "Spotlight"],
     ["all", "All Feed"],
     ["videos", "Videos"],
     ["shorts", "Shorts"],
