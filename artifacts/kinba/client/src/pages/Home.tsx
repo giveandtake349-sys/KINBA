@@ -992,25 +992,31 @@ function ProfileStats({
   enabled,
   isAdmin,
   onSignIn,
+  userId,
 }: {
   profile?: ProfileSnapshot;
   enabled: boolean;
   isAdmin: boolean;
   onSignIn: () => void;
+  userId?: number;
 }) {
   const [gridTab, setGridTab] = useState<"videos" | "shorts" | "liked">(
     "videos"
   );
   const videosQuery = trpc.profile.videos.useQuery(undefined, {
-    enabled,
+    enabled: enabled && !userId,
     refetchOnWindowFocus: false,
   });
+  const publicVideosQuery = trpc.profile.videosById.useQuery(
+    { userId: userId as number },
+    { enabled: Boolean(userId), refetchOnWindowFocus: false }
+  );
   const stats = profile?.stats;
   const displayName = profileDisplayName(profile);
   const handle = profile?.profile?.username
     ? `@${profile.profile.username}`
     : "@kinba_member";
-  const videos = (videosQuery.data ?? []).filter(video =>
+  const videos = ((userId ? publicVideosQuery.data : videosQuery.data) ?? []).filter(video =>
     gridTab === "shorts"
       ? video.kind === "SHORT"
       : gridTab === "videos"
@@ -2390,27 +2396,33 @@ export default function Home() {
   const { isScrollingDown } = useScrollDirection();
   const utils = trpc.useUtils();
   const [location, navigate] = useLocation();
+  const publicProfileMatch = location.match(/^\/profile\/(\d+)$/);
+  const publicProfileId = publicProfileMatch ? Number(publicProfileMatch[1]) : undefined;
   const { theme } = useTheme();
   const [activeView, setActiveView] = useState<FeedSection>("all");
   const [activeModal, setActiveModal] = useState<AppModal>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(() => location === "/profile");
   const profileQuery = trpc.profile.me.useQuery(undefined, {
-    enabled: auth.isAuthenticated,
+    enabled: auth.isAuthenticated && !publicProfileId,
     refetchOnWindowFocus: false,
     staleTime: 30_000,
   });
+  const publicProfileQuery = trpc.profile.byId.useQuery(
+    { userId: publicProfileId as number },
+    { enabled: Boolean(publicProfileId), refetchOnWindowFocus: false, staleTime: 30_000 }
+  );
   const notificationQuery = trpc.home.notifications.useQuery(undefined, {
     enabled: auth.isAuthenticated,
     refetchOnWindowFocus: false,
     staleTime: 30_000,
   });
   const notificationCount = Math.min(notificationQuery.data?.length ?? 0, 99);
-  const profile = profileQuery.data as ProfileSnapshot | undefined;
+  const profile = (publicProfileId ? publicProfileQuery.data : profileQuery.data) as ProfileSnapshot | undefined;
   const screen: Screen =
-    location === "/login" || !auth.isAuthenticated
+    location === "/login" || (!auth.isAuthenticated && !publicProfileId)
       ? "landing"
-      : profileOpen
+      : publicProfileId || profileOpen
         ? "profile"
         : "dashboard";
 
@@ -2546,11 +2558,12 @@ export default function Home() {
               )}
             </section>
           ) : (
-            <ProfileStats
+              <ProfileStats
               profile={profile}
-              enabled={auth.isAuthenticated}
+              enabled={auth.isAuthenticated && !publicProfileId}
               isAdmin={auth.user?.role === "admin"}
               onSignIn={auth.openAuth}
+              userId={publicProfileId}
             />
           )}
         </main>

@@ -2095,3 +2095,44 @@
     padding-inline: 0;
   }
 }
+
+/* WHEELS owns the viewport so header translate animations never create layout gaps. */
+.media-tab-panel--wheels {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 0;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.media-tab-panel--wheels .wheels-feed-layout {
+  width: 100%;
+  height: 100dvh;
+  min-height: 100dvh;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+.media-tab-panel--wheels .home-feed-section,
+.media-tab-panel--wheels .home-feed-section .long-video-grid,
+.media-tab-panel--wheels .home-feed-section .media-feed-scroll {
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.profile-link {
+  color: inherit;
+  text-decoration: none;
+}
+.profile-link:hover .video-owner-name,
+.profile-link:focus-visible .video-owner-name,
+.feed-post-author.profile-link:hover strong,
+.feed-post-author.profile-link:focus-visible strong {
+  color: var(--kinba-accent);
+}

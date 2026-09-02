@@ -812,6 +812,7 @@ function VideoCard({
           <div className="media-overlay-copy">
             <div className="media-overlay-details">
               <div className="media-owner">
+                <a className="profile-link" href={`/profile/${video.owner.id}`} aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}>
                 <div className="video-owner-identity">
                   <div className="video-owner-avatar">
                     {video.owner.photoUrl ? (
@@ -838,7 +839,8 @@ function VideoCard({
                     </span>
                   </div>
                 </div>
-              </div>
+              </a>
+            </div>
               <h3>{video.title}</h3>
               <p>{video.description}</p>
               <p className="media-caption-tags">
@@ -873,7 +875,8 @@ function VideoCard({
                   <div className={video.mediaType === "IMAGE" ? "video-card-details photo-card-details" : "video-card-details"}>
 
           <div className="media-owner">
-            <div className="video-owner-identity">
+            <a className="profile-link" href={`/profile/${video.owner.id}`} aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}>
+                <div className="video-owner-identity">
               <div className="video-owner-avatar">
                 {video.owner.photoUrl ? (
                   <img src={video.owner.photoUrl} alt="" />
@@ -898,8 +901,9 @@ function VideoCard({
                   {ownerHandle(video.owner.name, video.owner.username)}
                 </span>
               </div>
+                </div>
+              </a>
             </div>
-          </div>
           <h3>{video.title}</h3>
           <p>{video.description}</p>
           <div className="media-meta-line" aria-label="Media metadata">
@@ -1265,7 +1269,7 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
   };
   return (
     <article className="feed-text-card">
-      <div className="feed-post-author">
+      <a className="feed-post-author profile-link" href={`/profile/${post.author.id}`} aria-label={`Open ${post.author.name ?? "KINBA creator"} profile`}>
         <div className="video-owner-avatar">
           {post.author.photoUrl ? <img src={post.author.photoUrl} alt="" /> : <UserRound size={16} />}
         </div>
@@ -1278,7 +1282,7 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
            </strong>
           <span>{post.author.accountType} · {relativeTime(post.createdAt)}</span>
         </div>
-      </div>
+      </a>
       <p className="feed-post-body">{post.text}</p>
       {post.attachments.length > 0 && (
         <div className={post.attachments.length > 1 ? "feed-post-attachments has-grid" : "feed-post-attachments"}>
@@ -1522,7 +1526,8 @@ function ShortVideoCard({
       <div className="short-overlay">
         <div className="short-overlay-details">
           <div className="media-owner">
-            <div className="video-owner-identity">
+            <a className="profile-link" href={`/profile/${video.owner.id}`} aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}>
+                <div className="video-owner-identity">
               <div className="video-owner-avatar">
                 {video.owner.photoUrl ? (
                   <img src={video.owner.photoUrl} alt="" />
@@ -1548,6 +1553,7 @@ function ShortVideoCard({
                 </span>
               </div>
             </div>
+            </a>
           </div>
           <strong className="short-title">{video.title}</strong>
           <p>{video.description}</p>

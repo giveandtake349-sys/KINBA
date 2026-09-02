@@ -161,6 +161,11 @@ export async function getOwnProfile(userId: number) {
   return { ...result[0], stats };
 }
 
+export async function getPublicProfile(userId: number) {
+  if (!Number.isInteger(userId) || userId < 1) return undefined;
+  return getOwnProfile(userId);
+}
+
 export async function updateOwnProfile(
   userId: number,
   input: { username?: string | null; photoUrl?: string | null }
@@ -514,6 +519,10 @@ export async function listProfileVideos(userId: number) {
   return selectVideos([eq(videos.userId, userId)], userId, "recent");
 }
 
+export async function listPublicProfileVideos(userId: number) {
+  return selectVideos([eq(videos.userId, userId)], undefined, "recent");
+}
+
 export async function searchVideos(term: string, viewerId?: number) {
   const db = await getDb();
   const query = term.trim();
@@ -566,46 +575,46 @@ export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
     conditions.push(eq(profiles.isVerified, true));
     conditions.push(inArray(profiles.accountType, ["creator", "company"]));
   }
-  return selectVideos(
+  const filtered = await selectVideos(
     conditions,
     viewerId,
     tab === "trendy" ? "trendy" : "recent"
   );
+  if (tab === "following" && filtered.length === 0) {
+    return selectVideos(
+      [eq(videos.kind, "LONG"), eq(videos.mediaType, "VIDEO")],
+      viewerId,
+      "recent"
+    );
+  }
+  return filtered;
 }
 
 /** Resolve real persisted media and text posts into one chronological feed. */
 async function listUnifiedHomeFeed(viewerId?: number) {
   const [media, shorts, textPosts] = await Promise.all([
     selectVideos([eq(videos.kind, "LONG")], viewerId, "recent"),
-    selectVideos([eq(videos.kind, "SHORT")], viewerId, "recent"),
+    selectVideos([eq(videos.kind, "SHORT"), eq(videos.mediaType, "VIDEO")], viewerId, "recent"),
     listCommunityAnnouncements(),
   ]);
-  const regular = [
+  const chronological = [
     ...media.map(video => ({ ...video, feedType: "media" as const })),
     ...textPosts.map(post => ({
       ...post,
       text: post.body,
       feedType: "text" as const,
     })),
+    ...shorts.map(video => ({
+      feedType: "shorts" as const,
+      id: "shorts-" + video.id,
+      video,
+      createdAt: video.createdAt,
+    })),
   ].sort(
     (left, right) =>
       new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
   );
-  const items: any[] = [];
-  let shortIndex = 0;
-  regular.forEach((item, index) => {
-    items.push(item);
-    const nextShort = shorts[shortIndex];
-    if ((index + 1) % 5 === 0 && nextShort) {
-      items.push({
-        feedType: "shorts" as const,
-        id: "shorts-" + nextShort.id,
-        video: nextShort,
-      });
-      shortIndex += 1;
-    }
-  });
-  return items;
+  return chronological;
 }
 
 export async function listNotifications(userId: number) {
@@ -1665,13 +1674,7 @@ export async function listCommunityAnnouncements() {
     })
     .from(communityAnnouncements)
     .innerJoin(users, eq(communityAnnouncements.userId, users.id))
-    .innerJoin(profiles, eq(communityAnnouncements.userId, profiles.userId))
-    .where(
-      and(
-        eq(profiles.isVerified, true),
-        inArray(profiles.accountType, ["creator", "company"])
-      )
-    )
+    .leftJoin(profiles, eq(communityAnnouncements.userId, profiles.userId))
     .orderBy(desc(communityAnnouncements.createdAt))
     .limit(60);
   if (!rows.length) return [];
@@ -1699,9 +1702,9 @@ export async function listCommunityAnnouncements() {
     author: {
       id: row.user.id,
       name: row.user.name,
-      photoUrl: row.profile.photoUrl ?? null,
-      accountType: row.profile.accountType,
-      isVerified: row.profile.isVerified,
+      photoUrl: row.profile?.photoUrl ?? null,
+      accountType: row.profile?.accountType ?? "member",
+      isVerified: Boolean(row.profile?.isVerified),
     },
     attachments: attachmentsByAnnouncement.get(row.announcement.id) ?? [],
   }));

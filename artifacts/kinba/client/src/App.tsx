@@ -25,6 +25,7 @@ export default function App() {
               <Route path="/login" component={Home} />
               <Route path="/" component={Home} />
               <Route path="/profile" component={Home} />
+              <Route path="/profile/:id" component={Home} />
               <Route component={NotFound} />
             </Switch>
           </SupabaseAuthProvider>

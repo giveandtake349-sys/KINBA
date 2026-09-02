@@ -15,7 +15,9 @@ import {
   createVideoComment,
   ensureProfile,
   getOwnProfile,
+  getPublicProfile,
   listProfileVideos,
+  listPublicProfileVideos,
   listCommunityAnnouncements,
   listAnnouncementComments,
   listHomeFeed,
@@ -110,12 +112,18 @@ export const appRouter = router({
       await ensureProfile(ctx.user.id);
       return getOwnProfile(ctx.user.id);
     }),
+    byId: publicProcedure
+      .input(z.object({ userId: z.number().int().positive() }))
+      .query(({ input }) => getPublicProfile(input.userId)),
     update: protectedProcedure
       .input(profileUpdateInput)
       .mutation(({ ctx, input }) => updateOwnProfile(ctx.user.id, input)),
     videos: protectedProcedure.query(({ ctx }) =>
       listProfileVideos(ctx.user.id)
     ),
+    videosById: publicProcedure
+      .input(z.object({ userId: z.number().int().positive() }))
+      .query(({ input }) => listPublicProfileVideos(input.userId)),
     verification: protectedProcedure.query(({ ctx }) =>
       getVerificationStatus(ctx.user.id)
     ),
