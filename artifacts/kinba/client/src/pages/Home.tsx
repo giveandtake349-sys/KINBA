@@ -2486,18 +2486,6 @@ export default function Home() {
       onOpenChange={open => (open ? auth.openAuth() : auth.closeAuth())}
     />
   );
-  if (auth.loading)
-    return (
-      <div
-        className="kinba-app guest-layout max-w-vw overflow-x-hidden box-border"
-        onClick={guardNonSubmitNavigation}
-      >
-        <main className="section-shell">
-          <p className="profile-loading-note">Loading KINBA…</p>
-        </main>
-        {authDialog}
-      </div>
-    );
   if (screen === "landing")
     return (
       <>

@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "framework": "vite",
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm --dir artifacts/kinba build:vercel",
   "outputDirectory": "artifacts/kinba/dist/public",
