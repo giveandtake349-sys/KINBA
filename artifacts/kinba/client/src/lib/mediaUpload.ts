@@ -273,12 +273,22 @@ async function captureVideoThumbnail(file: File): Promise<Blob | null> {
       video.onseeked = () => resolve();
       window.setTimeout(resolve, 800);
     });
+    const sourceWidth = video.videoWidth;
+    const sourceHeight = video.videoHeight;
+    if (!sourceWidth || !sourceHeight) return null;
+    const scale = Math.min(1, 1280 / Math.max(sourceWidth, sourceHeight));
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    if (!canvas.width || !canvas.height) return null;
-    canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
-    return await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.82));
+    canvas.width = Math.max(1, Math.round(sourceWidth * scale));
+    canvas.height = Math.max(1, Math.round(sourceHeight * scale));
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const thumbnail = await new Promise<Blob | null>(resolve =>
+      canvas.toBlob(resolve, "image/jpeg", 0.82)
+    );
+    canvas.width = 1;
+    canvas.height = 1;
+    return thumbnail;
   } catch {
     return null;
   } finally {
@@ -301,10 +311,22 @@ export async function publishVideo(
     maxDurationSeconds: kind === "SHORT" ? MAX_SHORT_VIDEO_DURATION_SECONDS : MAX_LONG_VIDEO_DURATION_SECONDS,
   });
   const videoUrl = await uploadDirectToR2(file, kind, "source", session.access_token);
-  const thumbnail = await captureVideoThumbnail(file);
-  const thumbnailUrl = thumbnail
-    ? await uploadDirectToR2(new File([thumbnail], "thumbnail.jpg", { type: "image/jpeg" }), kind, "thumbnail", session.access_token)
-    : null;
+  let thumbnailUrl: string | null = null;
+  try {
+    const thumbnail = await captureVideoThumbnail(file);
+    if (thumbnail) {
+      thumbnailUrl = await uploadDirectToR2(
+        new File([thumbnail], "thumbnail.jpg", { type: "image/jpeg" }),
+        kind,
+        "thumbnail",
+        session.access_token
+      );
+    }
+  } catch (error) {
+    // A thumbnail is an enhancement; never strand an already-uploaded video
+    // because a browser decoder or optional R2 thumbnail PUT failed.
+    console.warn("[MediaPublish] optional thumbnail unavailable", error);
+  }
   const response = await fetchUploadWithRetry(apiUrl("/api/videos/complete"), {
     method: "POST",
     headers: {
