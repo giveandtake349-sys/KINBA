@@ -8,6 +8,7 @@ import { createContext } from "./context";
 import { isAllowedCorsOrigin, parseAllowedOrigins } from "../httpSecurity";
 import { serveStatic, setupVite } from "./vite";
 import { registerVideoUploadRoute } from "../videoUploadRoute";
+import { listSpotlightHighlights } from "../db";
 
 async function startServer() {
   const app = express();
@@ -20,6 +21,15 @@ async function startServer() {
   // unavailable or background jobs are recovering.
   app.get("/api/health", (_req, res) => {
     res.status(200).json({ ok: true });
+  });
+  app.get("/api/spotlight/highlights", async (_req, res) => {
+    try {
+      const highlights = await listSpotlightHighlights();
+      return res.status(200).json({ highlights });
+    } catch (error) {
+      console.error("[Spotlight] Failed to load highlights:", error);
+      return res.status(200).json({ highlights: [] });
+    }
   });
   const allowedOrigins = parseAllowedOrigins(
     [

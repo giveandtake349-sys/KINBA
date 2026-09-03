@@ -508,6 +508,117 @@ async function selectVideos(
   return withSourceMap(shaped, sources);
 }
 
+export type SpotlightHighlight = {
+  id: string;
+  sourceType: "video" | "post";
+  postId: number;
+  createdAt: Date;
+  title: string;
+  caption: string;
+  mediaType: "VIDEO" | "IMAGE" | "TEXT";
+  mediaUrl: string | null;
+  thumbnailUrl: string | null;
+  score: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  author: {
+    id: number;
+    name: string | null;
+    username: string | null;
+    photoUrl: string | null;
+  };
+};
+
+export async function listSpotlightHighlights(): Promise<SpotlightHighlight[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const since = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  const [videoRows, postRows] = await Promise.all([
+    db
+      .select({
+        video: videos,
+        user: users,
+        profile: profiles,
+        likes: sql<number>`(select count(*) from video_reactions where video_reactions."videoId" = ${videos.id})`,
+        comments: sql<number>`(select count(*) from video_comments where video_comments."videoId" = ${videos.id})`,
+        shares: sql<number>`(select count(*) from video_shares where video_shares."videoId" = ${videos.id})`,
+      })
+      .from(videos)
+      .innerJoin(users, eq(videos.userId, users.id))
+      .leftJoin(profiles, eq(videos.userId, profiles.userId))
+      .where(gt(videos.createdAt, since)),
+    db
+      .select({
+        post: communityAnnouncements,
+        user: users,
+        profile: profiles,
+        likes: sql<number>`(select count(*) from community_reactions where community_reactions."announcementId" = ${communityAnnouncements.id})`,
+        comments: sql<number>`(select count(*) from community_comments where community_comments."announcementId" = ${communityAnnouncements.id})`,
+        attachmentType: sql<"IMAGE" | "VIDEO" | null>`(select "mediaType" from community_announcement_attachments where "announcementId" = ${communityAnnouncements.id} order by "sortOrder" asc limit 1)`,
+        attachmentUrl: sql<string | null>`(select "mediaUrl" from community_announcement_attachments where "announcementId" = ${communityAnnouncements.id} order by "sortOrder" asc limit 1)`,
+      })
+      .from(communityAnnouncements)
+      .innerJoin(users, eq(communityAnnouncements.userId, users.id))
+      .leftJoin(profiles, eq(communityAnnouncements.userId, profiles.userId))
+      .where(gt(communityAnnouncements.createdAt, since)),
+  ]);
+  const videoHighlights: SpotlightHighlight[] = videoRows.map(row => {
+    const likes = Number(row.likes ?? 0);
+    const comments = Number(row.comments ?? 0);
+    const shares = Number(row.shares ?? 0);
+    return {
+      id: `video-${row.video.id}`,
+      sourceType: "video",
+      postId: row.video.id,
+      createdAt: row.video.createdAt,
+      title: row.video.title,
+      caption: row.video.description,
+      mediaType: row.video.mediaType,
+      mediaUrl: publicMediaUrl(row.video.videoUrl),
+      thumbnailUrl: publicMediaUrl(row.video.thumbnailUrl),
+      score: likes + comments * 2 + shares * 3,
+      likes,
+      comments,
+      shares,
+      author: {
+        id: row.user.id,
+        name: row.user.name,
+        username: row.profile?.username ?? null,
+        photoUrl: row.profile?.photoUrl ?? null,
+      },
+    };
+  });
+  const postHighlights: SpotlightHighlight[] = postRows.map(row => {
+    const likes = Number(row.likes ?? 0);
+    const comments = Number(row.comments ?? 0);
+    return {
+      id: `post-${row.post.id}`,
+      sourceType: "post",
+      postId: row.post.id,
+      createdAt: row.post.createdAt,
+      title: "Community post",
+      caption: row.post.body,
+      mediaType: row.attachmentType ?? "TEXT",
+      mediaUrl: publicMediaUrl(row.attachmentUrl),
+      thumbnailUrl: null,
+      score: likes + comments * 2,
+      likes,
+      comments,
+      shares: 0,
+      author: {
+        id: row.user.id,
+        name: row.user.name,
+        username: row.profile?.username ?? null,
+        photoUrl: row.profile?.photoUrl ?? null,
+      },
+    };
+  });
+  return [...videoHighlights, ...postHighlights]
+    .sort((a, b) => b.score - a.score || b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, 5);
+}
+
 export async function listVideos(kind: VideoKind, viewerId?: number) {
   const conditions = [eq(videos.kind, kind)];
   if (kind === "LONG" || kind === "SHORT" || kind === "WHEEL")

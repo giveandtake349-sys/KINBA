@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import Hls from "hls.js";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { apiUrl } from "@/lib/api";
 import {
   getImageDimensions,
   getVideoMetadata,
@@ -217,6 +218,88 @@ function isReportedLegacyMedia(
     .toLowerCase()
     .replace(/\s+/g, " ");
   return copy.includes("hey, well-connected") && copy.includes("platform");
+}
+
+type SpotlightHighlight = {
+  id: string;
+  sourceType: "video" | "post";
+  postId: number;
+  createdAt: string;
+  title: string;
+  caption: string;
+  mediaType: "VIDEO" | "IMAGE" | "TEXT";
+  mediaUrl: string | null;
+  thumbnailUrl: string | null;
+  score: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  author: { id: number; name: string | null; username: string | null; photoUrl: string | null };
+};
+
+function SpotlightHighlights({ onSelect }: { onSelect: (highlight: SpotlightHighlight) => void }) {
+  const [highlights, setHighlights] = useState<SpotlightHighlight[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(apiUrl("/api/spotlight/highlights"), { credentials: "include" })
+      .then(response => {
+        if (!response.ok) throw new Error(`Highlights request failed: ${response.status}`);
+        return response.json() as Promise<{ highlights?: SpotlightHighlight[] }>;
+      })
+      .then(payload => {
+        if (!cancelled) setHighlights(Array.isArray(payload.highlights) ? payload.highlights : []);
+      })
+      .catch(error => {
+        console.warn("[Spotlight] Highlights unavailable:", error);
+        if (!cancelled) setHighlights([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  if (loading || highlights.length === 0) return null;
+  return (
+    <section className="spotlight-highlights" aria-label="Top Content Highlights">
+      <div className="spotlight-highlights__heading">
+        <div>
+          <span className="eyebrow">Spotlight</span>
+          <h2>Top Content Highlights</h2>
+        </div>
+        <span>Last 48 hours</span>
+      </div>
+      <div className="spotlight-highlights__rail">
+        {highlights.map(highlight => (
+          <button key={highlight.id} type="button" className="spotlight-highlight-card" onClick={() => onSelect(highlight)}>
+            <div className="spotlight-highlight-card__media">
+              {highlight.mediaUrl ? (
+                highlight.mediaType === "VIDEO" ? (
+                  highlight.thumbnailUrl ? (
+                    <img src={highlight.thumbnailUrl} alt="" loading="lazy" />
+                  ) : (
+                    <video src={highlight.mediaUrl} muted playsInline preload="metadata" aria-label="Highlighted video" />
+                  )
+                ) : (
+                  <img src={highlight.mediaUrl} alt="" loading="lazy" />
+                )
+              ) : (
+                <div className="spotlight-highlight-card__text">{highlight.caption.slice(0, 120)}</div>
+              )}
+            </div>
+            <span className="spotlight-highlight-card__author">
+              {highlight.author.photoUrl ? <img src={highlight.author.photoUrl} alt="" /> : <UserRound size={13} />}
+              {displayName(highlight.author.name, highlight.author.username)}
+            </span>
+            <strong>{highlight.title || highlight.caption.slice(0, 80)}</strong>
+            <span className="spotlight-highlight-card__metrics">♥ {highlight.likes} · comments {highlight.comments} · shares {highlight.shares}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 function notifyError(error: unknown) {
@@ -749,6 +832,7 @@ function VideoCard({
   if (socialLayout) {
     return (
       <article
+        id={`feed-video-${video.id}`}
         className="feed-media-post"
         role={onOpenViewer ? "button" : undefined}
         tabIndex={onOpenViewer ? 0 : undefined}
@@ -827,6 +911,7 @@ function VideoCard({
   }
   return (
     <article
+      id={`feed-video-${video.id}`}
       className="long-video-card snap-start h-full w-full overflow-hidden box-border"
       role={onOpenViewer ? "button" : undefined}
       tabIndex={onOpenViewer ? 0 : undefined}
@@ -1309,7 +1394,7 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
     }
   };
   return (
-    <article className="feed-text-card">
+    <article id={`feed-post-${post.id}`} className="feed-text-card">
       <a className="feed-post-author profile-link" href={`/profile/${post.author.id}`} aria-label={`Open ${post.author.name ?? "KINBA creator"} profile`}>
         <div className="video-owner-avatar">
           {post.author.photoUrl ? <img src={post.author.photoUrl} alt="" /> : <UserRound size={16} />}
@@ -1379,7 +1464,7 @@ function ShortsInsertionBlock({
   onOpenViewer: () => void;
 }) {
   return (
-    <section className="shorts-insertion-block" aria-label="Shorts discovery">
+    <section id={`feed-video-${video.id}`} className="shorts-insertion-block" aria-label="Shorts discovery">
       <div className="shorts-insertion-heading">
         <div><span className="eyebrow">Shorts</span><strong>Quick discovery</strong></div>
         <span>From the KINBA community</span>
@@ -2329,6 +2414,16 @@ export default function MediaHub({
     setSelectedSection(next);
     onSectionChange?.(next);
   };
+  const focusHighlight = (highlight: SpotlightHighlight) => {
+    select("all");
+    window.setTimeout(() => {
+      document.getElementById(
+        highlight.sourceType === "video"
+          ? `feed-video-${highlight.postId}`
+          : `feed-post-${highlight.postId}`
+      )?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
+  };
   return (
     <div className="media-hub">
       {showTabs && (
@@ -2371,6 +2466,7 @@ export default function MediaHub({
         }${activeSection === "wheels" ? " media-tab-panel--wheels" : ""}`}
       >
         <div className="wheels-feed-layout">
+          <SpotlightHighlights onSelect={focusHighlight} />
            <HomeFeedPanel
              tab="wheels"
              active={activeSection === "wheels"}
