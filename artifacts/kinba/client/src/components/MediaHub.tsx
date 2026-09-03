@@ -21,6 +21,10 @@ import {
   Loader2,
   MessageCircle,
   Megaphone,
+  Mic,
+  Send,
+  Square,
+  Trash2,
   MoreHorizontal,
   Pause,
   Play,
@@ -47,6 +51,7 @@ import {
   MAX_SHORT_VIDEO_DURATION_SECONDS,
   publishPhoto,
   publishVideo,
+  uploadCommentAudio,
   uploadImage,
   uploadVideo,
   validateImageFile,
@@ -309,6 +314,146 @@ function notifyError(error: unknown) {
       : "The operation could not be completed."
   );
 }
+function formatAudioTime(seconds: number) {
+  const safe = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`;
+}
+
+function useVoiceCommentRecorder() {
+  const [recording, setRecording] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const start = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined")
+      throw new Error("Voice recording is not supported on this device.");
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus"
+      : "audio/webm";
+    const recorder = new MediaRecorder(stream, { mimeType });
+    chunksRef.current = [];
+    streamRef.current = stream;
+    recorderRef.current = recorder;
+    setElapsed(0);
+    setAudioBlob(null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    recorder.ondataavailable = event => {
+      if (event.data.size) chunksRef.current.push(event.data);
+    };
+    recorder.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+      if (blob.size) {
+        setAudioBlob(blob);
+        setPreviewUrl(URL.createObjectURL(blob));
+      }
+      chunksRef.current = [];
+      setRecording(false);
+    };
+    recorder.start();
+    setRecording(true);
+  };
+  const stop = () => {
+    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    streamRef.current = null;
+  };
+  useEffect(() => {
+    if (!recording) return;
+    const timer = window.setInterval(() => {
+      setElapsed(value => {
+        if (value >= 59) {
+          window.setTimeout(stop, 0);
+          return 60;
+        }
+        return value + 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [recording]);
+  const discard = () => {
+    stop();
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setAudioBlob(null);
+    setElapsed(0);
+  };
+  useEffect(() => () => {
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+  return { recording, elapsed, audioBlob, previewUrl, start, stop, discard };
+}
+
+function CommentAudioPlayer({ src, duration }: { src: string; duration?: number | null }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [current, setCurrent] = useState(0);
+  const toggle = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) void audio.play();
+    else audio.pause();
+  };
+  return (
+    <div className="comment-audio-player">
+      <audio ref={audioRef} src={src} preload="metadata" onTimeUpdate={event => setCurrent(event.currentTarget.currentTime)} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); setCurrent(0); }} />
+      <button type="button" onClick={toggle} aria-label={playing ? "Pause voice comment" : "Play voice comment"}>{playing ? <Pause size={14} /> : <Play size={14} />}</button>
+      <div className="comment-audio-wave" aria-hidden="true"><span style={{ width: `${Math.min(100, Math.max(0, (current / Math.max(audioRef.current?.duration || duration || 1, 1)) * 100))}%` }} /></div>
+      <span>{formatAudioTime(current)} / {formatAudioTime(duration ?? audioRef.current?.duration ?? 0)}</span>
+    </div>
+  );
+}
+
+function VoiceCommentComposer({
+  body,
+  onBodyChange,
+  onSend,
+  disabled,
+  placeholder,
+}: {
+  body: string;
+  onBodyChange: (value: string) => void;
+  onSend: (audioUrl: string | null, audioDuration: number | null) => Promise<void>;
+  disabled?: boolean;
+  placeholder: string;
+}) {
+  const recorder = useVoiceCommentRecorder();
+  const [uploading, setUploading] = useState(false);
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (disabled || uploading || (!body.trim() && !recorder.audioBlob)) return;
+    setUploading(true);
+    try {
+      const audioUrl = recorder.audioBlob ? await uploadCommentAudio(recorder.audioBlob) : null;
+      await onSend(audioUrl, recorder.audioBlob ? Math.max(1, recorder.elapsed) : null);
+      recorder.discard();
+      onBodyChange("");
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      setUploading(false);
+    }
+  };
+  return (
+    <form onSubmit={submit} className="comment-form voice-comment-form">
+      <input value={body} onChange={event => onBodyChange(event.target.value)} maxLength={500} placeholder={placeholder} aria-label={placeholder} disabled={disabled || recorder.recording || uploading} />
+      {recorder.recording ? (
+        <button type="button" className="voice-recording-button is-recording" onClick={recorder.stop} aria-label="Stop recording"><Square size={15} /> {formatAudioTime(recorder.elapsed)} / 1:00</button>
+      ) : recorder.audioBlob && recorder.previewUrl ? (
+        <div className="voice-comment-preview"><audio src={recorder.previewUrl} controls preload="metadata" /><button type="button" onClick={recorder.discard} aria-label="Delete and re-record"><Trash2 size={15} /></button></div>
+      ) : (
+        <button type="button" className="voice-record-button" onClick={() => recorder.start().catch(notifyError)} disabled={disabled || uploading} aria-label="Record voice comment"><Mic size={17} /></button>
+      )}
+      <button type="submit" className="primary-btn voice-send-button" disabled={disabled || uploading || (!body.trim() && !recorder.audioBlob)}>{uploading ? <Loader2 className="spin" size={15} /> : <Send size={15} />} {uploading ? "Sending…" : "Send"}</button>
+    </form>
+  );
+}
+
 function useOptimisticEngagement(video: VideoRecord) {
   const auth = useAuth();
   const utils = trpc.useUtils();
@@ -707,17 +852,10 @@ function CommentsPanel({
     { enabled: open, refetchOnWindowFocus: false }
   );
   const createComment = trpc.videos.comments.create.useMutation();
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!body.trim()) return;
+  const submitComment = async (audioUrl: string | null, audioDuration: number | null) => {
     if (!auth.isAuthenticated) return auth.openAuth();
-    try {
-      await createComment.mutateAsync({ videoId, body: body.trim() });
-      setBody("");
-      await commentsQuery.refetch();
-    } catch (error) {
-      notifyError(error);
-    }
+    await createComment.mutateAsync({ videoId, body: body.trim(), audioUrl, audioDuration });
+    await commentsQuery.refetch();
   };
   if (!open) return null;
   return (
@@ -749,7 +887,8 @@ function CommentsPanel({
             <strong>
               {displayName(comment.author.name, comment.author.username)}
             </strong>
-            <span>{comment.body}</span>
+            {comment.body && <span>{comment.body}</span>}
+            {comment.audioUrl && <CommentAudioPlayer src={comment.audioUrl} duration={comment.audioDuration} />}
           </div>
         ))
       ) : (
@@ -757,24 +896,13 @@ function CommentsPanel({
           No comments yet. Start the conversation.
         </div>
       )}
-      <form onSubmit={submit} className="comment-form">
-        <input
-          value={body}
-          onChange={event => setBody(event.target.value)}
-          maxLength={500}
-          placeholder={
-            auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"
-          }
-          aria-label="Write a comment"
-        />
-        <button
-          type="submit"
-          className="primary-btn"
-          disabled={createComment.isPending || !body.trim()}
-        >
-          Post
-        </button>
-      </form>
+      <VoiceCommentComposer
+        body={body}
+        onBodyChange={setBody}
+        onSend={submitComment}
+        disabled={createComment.isPending}
+        placeholder={auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"}
+      />
     </div>
   );
 }
@@ -2020,21 +2148,10 @@ function AnnouncementComments({
     { enabled: open, refetchOnWindowFocus: false }
   );
   const createComment = trpc.community.comments.create.useMutation();
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const trimmed = body.trim();
-    if (!trimmed) return;
+  const submitComment = async (audioUrl: string | null, audioDuration: number | null) => {
     if (!auth.isAuthenticated) return auth.openAuth();
-    try {
-      await createComment.mutateAsync({ announcementId, body: trimmed });
-      setBody("");
-      await Promise.all([
-        commentsQuery.refetch(),
-        utils.community.list.invalidate(),
-      ]);
-    } catch (error) {
-      notifyError(error);
-    }
+    await createComment.mutateAsync({ announcementId, body: body.trim(), audioUrl, audioDuration });
+    await Promise.all([commentsQuery.refetch(), utils.community.list.invalidate()]);
   };
   const visibleCount = commentsQuery.data?.length ?? commentCount;
   return (
@@ -2062,7 +2179,8 @@ function AnnouncementComments({
                 <strong>
                   {displayName(comment.author.name, comment.author.username)}
                 </strong>
-                <span>{comment.body}</span>
+                {comment.body && <span>{comment.body}</span>}
+                {comment.audioUrl && <CommentAudioPlayer src={comment.audioUrl} duration={comment.audioDuration} />}
               </div>
             ))
           ) : (
@@ -2070,24 +2188,13 @@ function AnnouncementComments({
               No comments yet. Start the conversation.
             </div>
           )}
-          <form onSubmit={submit} className="comment-form">
-            <input
-              value={body}
-              onChange={event => setBody(event.target.value)}
-              maxLength={500}
-              placeholder={
-                auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"
-              }
-              aria-label="Write a comment on this post"
-            />
-            <button
-              type="submit"
-              className="primary-btn"
-              disabled={createComment.isPending || !body.trim()}
-            >
-              {createComment.isPending ? "Posting…" : "Post"}
-            </button>
-          </form>
+          <VoiceCommentComposer
+            body={body}
+            onBodyChange={setBody}
+            onSend={submitComment}
+            disabled={createComment.isPending}
+            placeholder={auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"}
+          />
         </div>
       )}
     </div>

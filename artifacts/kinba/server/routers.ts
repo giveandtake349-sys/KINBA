@@ -192,9 +192,25 @@ export const appRouter = router({
         .input(videoIdInput)
         .query(({ input }) => listVideoComments(input.videoId)),
       create: protectedProcedure
-        .input(videoIdInput.extend({ body: z.string().trim().min(1).max(500) }))
+        .input(
+          videoIdInput
+            .extend({
+              body: z.string().trim().max(500).default(""),
+              audioUrl: z.string().url().nullable().optional(),
+              audioDuration: z.number().int().min(1).max(60).nullable().optional(),
+            })
+            .refine(
+              input => input.body.trim().length > 0 || Boolean(input.audioUrl),
+              "Comment text or audio is required."
+            )
+        )
         .mutation(({ ctx, input }) =>
-          createVideoComment(input.videoId, ctx.user.id, input.body)
+          input.audioUrl
+            ? createVideoComment(input.videoId, ctx.user.id, input.body, {
+                audioUrl: input.audioUrl,
+                audioDuration: input.audioDuration,
+              })
+            : createVideoComment(input.videoId, ctx.user.id, input.body)
         ),
     }),
   }),
@@ -304,16 +320,24 @@ export const appRouter = router({
         .query(({ input }) => listAnnouncementComments(input.announcementId)),
       create: protectedProcedure
         .input(
-          announcementIdInput.extend({
-            body: z.string().trim().min(1).max(500),
-          })
+          announcementIdInput
+            .extend({
+              body: z.string().trim().max(500).default(""),
+              audioUrl: z.string().url().nullable().optional(),
+              audioDuration: z.number().int().min(1).max(60).nullable().optional(),
+            })
+            .refine(
+              input => input.body.trim().length > 0 || Boolean(input.audioUrl),
+              "Comment text or audio is required."
+            )
         )
         .mutation(({ ctx, input }) =>
-          createAnnouncementComment(
-            input.announcementId,
-            ctx.user.id,
-            input.body
-          )
+          input.audioUrl
+            ? createAnnouncementComment(input.announcementId, ctx.user.id, input.body, {
+                audioUrl: input.audioUrl,
+                audioDuration: input.audioDuration,
+              })
+            : createAnnouncementComment(input.announcementId, ctx.user.id, input.body)
         ),
     }),
   }),

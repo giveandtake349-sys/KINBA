@@ -1035,13 +1035,14 @@ export async function listVideoComments(videoId: number) {
 export async function createVideoComment(
   videoId: number,
   userId: number,
-  body: string
+  body: string,
+  audio?: { audioUrl?: string | null; audioDuration?: number | null }
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const [comment] = await db
     .insert(videoComments)
-    .values({ videoId, userId, body })
+    .values({ videoId, userId, body: body.trim(), audioUrl: audio?.audioUrl ?? null, audioDuration: audio?.audioDuration ?? null })
     .returning();
   return comment;
 }
@@ -1909,13 +1910,14 @@ export async function listAnnouncementComments(announcementId: number) {
 export async function createAnnouncementComment(
   announcementId: number,
   userId: number,
-  body: string
+  body: string,
+  audio?: { audioUrl?: string | null; audioDuration?: number | null }
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const [comment] = await db
     .insert(communityComments)
-    .values({ announcementId, userId, body: body.trim() })
+    .values({ announcementId, userId, body: body.trim(), audioUrl: audio?.audioUrl ?? null, audioDuration: audio?.audioDuration ?? null })
     .returning();
   return comment;
 }

@@ -361,6 +361,25 @@ export async function uploadVideo(
   return uploadDirectToR2(file, kind, "source", session.access_token);
 }
 
+export async function uploadCommentAudio(blob: Blob): Promise<string> {
+  if (!blob.type.startsWith("audio/")) throw new Error("Choose a valid audio recording.");
+  if (blob.size > 10 * 1024 * 1024) throw new Error("Voice comments must be 10MB or smaller.");
+  const userId = await getSessionUserId("Please sign in before sending a voice comment.");
+  const extension = blob.type.includes("mp4") || blob.type.includes("mpeg") ? "m4a" : "webm";
+  const objectPath = `${userId}/comment-audio-${Date.now()}-${crypto.randomUUID()}.${extension}`;
+  const { error: uploadError } = await supabase.storage
+    .from("comment-media")
+    .upload(objectPath, blob, {
+      cacheControl: "3600",
+      contentType: blob.type,
+      upsert: false,
+    });
+  if (uploadError) throw uploadError;
+  const { data } = supabase.storage.from("comment-media").getPublicUrl(objectPath);
+  if (!data.publicUrl) throw new Error("The recording uploaded, but its public URL could not be created.");
+  return data.publicUrl;
+}
+
 export async function uploadImage(
   kind: MediaKind,
   file: File

@@ -1879,3 +1879,19 @@ body {
 .media-hub .media-tab-panel--wheels .media-fullscreen-frame video { height: 100% !important; }
 .media-hub .media-tab-panel--wheels .media-engagement-actions--overlay { position: static !important; flex-direction: row !important; width: auto !important; padding: 8px 0 0 !important; }
 .media-hub .media-tab-panel--wheels .media-engagement-actions--overlay > button { width: auto !important; min-width: 0 !important; }
+
+.voice-comment-form { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.voice-comment-form > input { flex: 1 1 150px; min-width: 0; }
+.voice-record-button,
+.voice-recording-button,
+.voice-comment-preview > button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 36px; padding: 0 10px; border: 1px solid rgba(37,216,232,.35); border-radius: 10px; color: var(--kinba-cyan); background: rgba(37,216,232,.08); }
+.voice-recording-button.is-recording { color: #ff9b94; border-color: rgba(255,94,86,.55); background: rgba(255,94,86,.12); }
+.voice-comment-preview { display: flex; align-items: center; gap: 6px; flex: 1 1 180px; min-width: 0; }
+.voice-comment-preview audio { width: min(100%, 220px); height: 34px; }
+.voice-send-button { display: inline-flex; align-items: center; gap: 5px; }
+.comment-audio-player { display: flex; align-items: center; gap: 8px; width: min(100%, 330px); padding: 7px 9px; border: 1px solid var(--kinba-line-modern); border-radius: 10px; background: rgba(255,255,255,.04); }
+.comment-audio-player audio { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.comment-audio-player > button { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 28px; border-radius: 999px; color: #fff; background: var(--kinba-coral); }
+.comment-audio-wave { position: relative; height: 6px; flex: 1; overflow: hidden; border-radius: 999px; background: rgba(154,168,191,.28); }
+.comment-audio-wave span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--kinba-cyan), #b9f5ff); }
+.comment-audio-player > span { color: var(--kinba-muted-modern); font-size: 10px; white-space: nowrap; }
