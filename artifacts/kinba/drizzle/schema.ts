@@ -311,6 +311,56 @@ export const videos = pgTable(
   ]
 );
 
+export const rawPulsePolls = pgTable(
+  "raw_pulse_polls",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    videoId: integer("video_id")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    question: text("question").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("raw_pulse_polls_video_unique").on(table.videoId),
+    index("raw_pulse_polls_expires_idx").on(table.expiresAt),
+  ]
+);
+
+export const rawPulseOptions = pgTable(
+  "raw_pulse_options",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    pollId: integer("poll_id")
+      .notNull()
+      .references(() => rawPulsePolls.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  table => [index("raw_pulse_options_poll_idx").on(table.pollId)]
+);
+
+export const rawPulseVotes = pgTable(
+  "raw_pulse_votes",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    pollId: integer("poll_id")
+      .notNull()
+      .references(() => rawPulsePolls.id, { onDelete: "cascade" }),
+    optionId: integer("option_id")
+      .notNull()
+      .references(() => rawPulseOptions.id, { onDelete: "cascade" }),
+    voterKey: text("voter_key").notNull(),
+    userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("raw_pulse_votes_poll_voter_unique").on(table.pollId, table.voterKey),
+    index("raw_pulse_votes_option_idx").on(table.optionId),
+  ]
+);
+
 export const videoSources = pgTable(
   "video_sources",
   {

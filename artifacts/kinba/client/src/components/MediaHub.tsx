@@ -918,6 +918,69 @@ function CommentsPanel({
   );
 }
 
+function getRawPulseVoterKey() {
+  if (typeof window === "undefined") return "server-render-voter-key";
+  const storageKey = "kinba.raw-pulse.voter-key";
+  const existing = window.localStorage.getItem(storageKey);
+  if (existing) return existing;
+  const generated = `anon-${crypto.randomUUID()}`;
+  window.localStorage.setItem(storageKey, generated);
+  return generated;
+}
+
+function RawPulseCard({ videoId }: { videoId: number }) {
+  const voterKey = useMemo(getRawPulseVoterKey, []);
+  const query = trpc.rawPulse.get.useQuery(
+    { videoId, voterKey },
+    { refetchInterval: 5000, refetchOnWindowFocus: true, staleTime: 2000 }
+  );
+  const voteMutation = trpc.rawPulse.vote.useMutation();
+  const [votingOptionId, setVotingOptionId] = useState<number | null>(null);
+  if (!query.data) return null;
+  const pulse = query.data;
+  const vote = async (optionId: number) => {
+    if (pulse.isClosed || voteMutation.isPending) return;
+    setVotingOptionId(optionId);
+    try {
+      await voteMutation.mutateAsync({ pollId: pulse.id, optionId, voterKey });
+      await query.refetch();
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      setVotingOptionId(null);
+    }
+  };
+  return (
+    <section className="raw-pulse" aria-label="Raw Pulse anonymous poll">
+      <div className="raw-pulse__heading">
+        <span className="eyebrow">Raw Pulse</span>
+        <span>{pulse.isClosed ? "Closed" : `${pulse.totalVotes} anonymous votes`}</span>
+      </div>
+      <h3>{pulse.question}</h3>
+      <div className="raw-pulse__options">
+        {pulse.options.map(option => {
+          const percentage = pulse.totalVotes ? Math.round((option.votes / pulse.totalVotes) * 100) : 0;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              className={`raw-pulse__option${option.selected ? " is-selected" : ""}`}
+              onClick={() => void vote(option.id)}
+              disabled={pulse.isClosed || voteMutation.isPending}
+              aria-pressed={option.selected}
+            >
+              <span className="raw-pulse__bar" style={{ width: `${percentage}%` }} />
+              <span className="raw-pulse__label">{option.label}</span>
+              <span className="raw-pulse__result">{votingOptionId === option.id ? "…" : `${percentage}%`}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="raw-pulse__note">Anonymous on this device · You can change your vote.</p>
+    </section>
+  );
+}
+
 function VideoCard({
   video,
   active = true,
@@ -1030,6 +1093,7 @@ function VideoCard({
             />
           )}
         </div>
+        <RawPulseCard videoId={video.id} />
         <EngagementActions
           engagement={current}
           onReact={react}
@@ -1071,6 +1135,7 @@ function VideoCard({
           />
         )}
       </div>
+      <RawPulseCard videoId={video.id} />
       <div className={video.mediaType === "IMAGE" ? "video-card-details photo-card-details" : "video-card-details"}>
         <div className="media-owner">
           <a className="profile-link" href={`/profile/${video.owner.id}`} aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}>

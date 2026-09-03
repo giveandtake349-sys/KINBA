@@ -25,6 +25,9 @@ import {
   videoSources,
   videos,
   transactions,
+  rawPulsePolls,
+  rawPulseOptions,
+  rawPulseVotes,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { resolvePostgresDatabaseUrl } from "./databaseConfig";
@@ -1009,6 +1012,80 @@ export async function recordVideoView(videoId: number) {
     .where(eq(videos.id, videoId))
     .returning({ viewCount: videos.viewCount });
   return { viewCount: Number(updated?.viewCount ?? 0) };
+}
+
+export type RawPulseOption = {
+  id: number;
+  label: string;
+  votes: number;
+  selected: boolean;
+};
+
+export type RawPulse = {
+  id: number;
+  videoId: number;
+  question: string;
+  expiresAt: Date | null;
+  isClosed: boolean;
+  totalVotes: number;
+  selectedOptionId: number | null;
+  options: RawPulseOption[];
+};
+
+export async function getRawPulse(videoId: number, voterKey?: string, userId?: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const [poll] = await db
+    .select()
+    .from(rawPulsePolls)
+    .where(eq(rawPulsePolls.videoId, videoId))
+    .limit(1);
+  if (!poll) return null;
+  const [options, counts, selected] = await Promise.all([
+    db.select().from(rawPulseOptions).where(eq(rawPulseOptions.pollId, poll.id)).orderBy(rawPulseOptions.sortOrder, rawPulseOptions.id),
+    db.select({ optionId: rawPulseVotes.optionId, count: sql<number>`count(*)` }).from(rawPulseVotes).where(eq(rawPulseVotes.pollId, poll.id)).groupBy(rawPulseVotes.optionId),
+    voterKey || userId
+      ? db.select({ optionId: rawPulseVotes.optionId }).from(rawPulseVotes).where(and(eq(rawPulseVotes.pollId, poll.id), voterKey ? eq(rawPulseVotes.voterKey, voterKey) : eq(rawPulseVotes.userId, userId as number))).limit(1)
+      : Promise.resolve([] as { optionId: number }[]),
+  ]);
+  const countByOption = new Map(counts.map(row => [row.optionId, Number(row.count)]));
+  const selectedOptionId = selected[0]?.optionId ?? null;
+  const totalVotes = counts.reduce((sum, row) => sum + Number(row.count), 0);
+  const isClosed = Boolean(poll.expiresAt && poll.expiresAt.getTime() <= Date.now());
+  return {
+    id: poll.id,
+    videoId: poll.videoId,
+    question: poll.question,
+    expiresAt: poll.expiresAt,
+    isClosed,
+    totalVotes,
+    selectedOptionId,
+    options: options.map(option => ({ id: option.id, label: option.label, votes: countByOption.get(option.id) ?? 0, selected: option.id === selectedOptionId })),
+  } satisfies RawPulse;
+}
+
+export async function createRawPulse(videoId: number, userId: number, question: string, optionLabels: string[], expiresAt: Date | null) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [video] = await db.select({ id: videos.id, userId: videos.userId }).from(videos).where(eq(videos.id, videoId)).limit(1);
+  if (!video || video.userId !== userId) throw new Error("Only the post owner can create a Raw Pulse.");
+  return db.transaction(async tx => {
+    const [poll] = await tx.insert(rawPulsePolls).values({ videoId, question: question.trim(), expiresAt }).returning();
+    const options = await tx.insert(rawPulseOptions).values(optionLabels.map((label, index) => ({ pollId: poll.id, label: label.trim(), sortOrder: index }))).returning();
+    return { ...poll, options };
+  });
+}
+
+export async function voteRawPulse(pollId: number, optionId: number, voterKey: string, userId?: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [poll] = await db.select().from(rawPulsePolls).where(eq(rawPulsePolls.id, pollId)).limit(1);
+  if (!poll) throw new Error("Raw Pulse not found.");
+  if (poll.expiresAt && poll.expiresAt.getTime() <= Date.now()) throw new Error("This Raw Pulse is closed.");
+  const [option] = await db.select({ id: rawPulseOptions.id }).from(rawPulseOptions).where(and(eq(rawPulseOptions.id, optionId), eq(rawPulseOptions.pollId, pollId))).limit(1);
+  if (!option) throw new Error("That Raw Pulse option is invalid.");
+  await db.insert(rawPulseVotes).values({ pollId, optionId, voterKey, userId: userId ?? null }).onConflictDoUpdate({ target: [rawPulseVotes.pollId, rawPulseVotes.voterKey], set: { optionId, userId: userId ?? null } });
+  return getRawPulse(poll.videoId, voterKey, userId);
 }
 
 export async function listVideoComments(videoId: number) {

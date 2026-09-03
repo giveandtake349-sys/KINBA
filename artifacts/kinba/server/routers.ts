@@ -49,6 +49,9 @@ import {
   toggleVideoBookmark,
   toggleVideoReaction,
   toggleFollow,
+  getRawPulse,
+  voteRawPulse,
+  createRawPulse,
 } from "./db";
 import { communityAnnouncementInput, videoInput } from "./mediaValidation";
 
@@ -156,6 +159,22 @@ export const appRouter = router({
         })
       )
       .query(({ ctx, input }) => listHomeFeed(input.tab, ctx.user?.id)),
+  }),
+  rawPulse: router({
+    get: publicProcedure
+      .input(videoIdInput.extend({ voterKey: z.string().trim().min(16).max(128).optional() }))
+      .query(({ ctx, input }) => getRawPulse(input.videoId, input.voterKey, ctx.user?.id)),
+    vote: publicProcedure
+      .input(z.object({ pollId: z.number().int().positive(), optionId: z.number().int().positive(), voterKey: z.string().trim().min(16).max(128) }))
+      .mutation(({ ctx, input }) => voteRawPulse(input.pollId, input.optionId, input.voterKey, ctx.user?.id)),
+    create: protectedProcedure
+      .input(z.object({
+        videoId: z.number().int().positive(),
+        question: z.string().trim().min(3).max(180),
+        options: z.array(z.string().trim().min(1).max(80)).min(2).max(6),
+        expiresAt: z.coerce.date().nullable().optional(),
+      }).refine(input => new Set(input.options.map(option => option.toLowerCase())).size === input.options.length, "Raw Pulse options must be unique."))
+      .mutation(({ ctx, input }) => createRawPulse(input.videoId, ctx.user.id, input.question, input.options, input.expiresAt ?? null)),
   }),
   videos: router({
     list: publicProcedure
