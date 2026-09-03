@@ -320,7 +320,7 @@ export const rawPulsePolls = pgTable(
       .references(() => videos.id, { onDelete: "cascade" }),
     question: text("question").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
-    createdAt: createdAt(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   table => [
     uniqueIndex("raw_pulse_polls_video_unique").on(table.videoId),
@@ -353,7 +353,7 @@ export const rawPulseVotes = pgTable(
       .references(() => rawPulseOptions.id, { onDelete: "cascade" }),
     voterKey: text("voter_key").notNull(),
     userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
-    createdAt: createdAt(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   table => [
     uniqueIndex("raw_pulse_votes_poll_voter_unique").on(table.pollId, table.voterKey),
