@@ -1,0 +1,25 @@
+REPOSITORY TARGET: `giveandtake349-sys/KINBA` (branch: `main`)
+
+CRITICAL REPAIR: Restore missing Top Feed Navigation Bar, eliminate click-blocking overlays across the entire viewport, and repair React click handlers & routing for ALL buttons.
+
+Task 1: Restore Top Feed Navigation Bar
+- Fix `Home.tsx` / `MediaHub.tsx` layout so the top feed switcher containing [WHEELS], [ALL FEED], [VIDEOS], and [SHORTS] is explicitly rendered.
+- Position the feed tab bar clearly below the header (or floating cleanly at top) with visible styling, active tab highlighting, and horizontal scroll support if needed.
+- Ensure clicking any feed tab instantly updates the active view state and switches content without freezing or page refresh.
+
+Task 2: Fix Viewport Hit-Testing & Unblock Tap Events (A-to-Z Interactivity)
+- Remove/fix any invisible full-screen transparent `div` overlays or backdrop elements (`pointer-events: auto`) that are intercepting user taps across the screen.
+- Ensure proper CSS layering:
+  * Floating header/footer backdrops must have `pointer-events: none`.
+  * Interactive controls (icons, tabs, buttons, links) inside them must have `pointer-events: auto` and proper `z-index`.
+- Ensure tap targets on mobile screens register `onClick` events on first tap.
+
+Task 3: Fix Side Drawer & Navigation Button Routing
+- Inspect and fix event listeners for every item in the Menu drawer:
+  * Balance, Activity center, Offline videos, QR code, KINBA Studio, Business announcements, Log out.
+- Ensure each item either triggers a working state/modal toggle or performs `react-router-dom` navigation to its corresponding route without failing silently or throwing uncaught JS errors.
+- Verify bottom navigation bar tabs (Home, Search, Create +, Notifications, Menu) correctly execute their route actions.
+
+Task 4: Build & Commit Verification
+- Run local build checks (`npm run build` / `vite build`) to confirm zero JSX/TypeScript syntax or scope errors.
+- Commit all changes and push directly to `giveandtake349-sys/KINBA` main branch.

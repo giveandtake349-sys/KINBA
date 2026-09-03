@@ -1,0 +1,1186 @@
+KINBA — FINAL EMERGENCY FEED REBUILD + VIDEO/SHORTS UPLOAD & PUBLISH FIX
+
+GITHUB REPOSITORY:
+giveandtake349-sys-KINBA
+
+============================================================
+READ THIS ENTIRE INSTRUCTION BEFORE TOUCHING THE CODE
+============================================================
+
+This is an EXISTING KINBA project.
+
+I do NOT want a redesign of the entire website.
+
+I want the EXISTING FEED CONTENT/RENDERING SYSTEM to be properly rebuilt because the current middle feed is broken and does not work as intended.
+
+The four existing top feed tabs MUST REMAIN:
+
+WHEELS
+ALL FEED
+VIDEOS
+SHORTS
+
+DO NOT REMOVE THESE FOUR TABS.
+
+The problem is NOT the top tab/navigation area.
+
+The problem is the ACTUAL CONTENT/VIDEO FEED AREA BELOW THESE TABS.
+
+That feed/content area must be completely renewed and correctly connected to the real backend/database/upload system.
+
+============================================================
+1. ABSOLUTE SCOPE
+============================================================
+
+KEEP THESE FOUR SECTIONS:
+
+1. WHEELS
+2. ALL FEED
+3. VIDEOS
+4. SHORTS
+
+The tabs/navigation for these sections must remain.
+
+DO NOT redesign or remove them unless a tiny feed-related adjustment is technically required.
+
+The MAIN TASK is:
+
+COMPLETELY REBUILD THE CONTENT FEED RENDERING/FEED EXPERIENCE INSIDE THESE SECTIONS.
+
+Do NOT redesign unrelated parts of KINBA.
+
+Do NOT modify unnecessarily:
+
+- Main header
+- Top global navigation
+- Bottom navigation
+- Search
+- Notifications
+- Menu
+- Profile
+- Authentication UI
+- Other pages
+- Other unrelated features
+- Existing global theme
+- Existing business logic unrelated to feeds
+
+Only modify the code that is actually required for:
+
+- Feed rendering
+- Video feed
+- Shorts feed
+- All Feed content
+- Feed data loading
+- Feed interactions
+- Video upload
+- Shorts upload
+- Video publishing
+- Feed/database integration
+
+============================================================
+2. THE CURRENT PROBLEM
+============================================================
+
+The current middle feed is broken.
+
+The current UI shows things such as:
+
+"No Shorts yet."
+
+"Publish a video of 60 seconds or less to start the Shorts feed."
+
+"LATEST MAIN-FEED VIDEOS"
+
+"Watch what matters."
+
+"REAL-TIME DATABASE FEED"
+
+"No videos available yet. Be the first creator!"
+
+"Upload Video"
+
+This current feed architecture is NOT what I want.
+
+Do NOT simply style these existing cards differently.
+
+Do NOT keep stacking these old empty-state sections.
+
+Replace the BROKEN FEED CONTENT SYSTEM with a proper social feed architecture.
+
+============================================================
+3. FINAL KINBA FEED ARCHITECTURE
+============================================================
+
+The four top tabs remain:
+
+WHEELS | ALL FEED | VIDEOS | SHORTS
+
+Each tab has its OWN correct content behavior.
+
+------------------------------------------------------------
+A. WHEELS
+------------------------------------------------------------
+
+Keep the existing WHEELS functionality.
+
+Do not unnecessarily rebuild unrelated WHEELS functionality.
+
+If WHEELS currently works, preserve it.
+
+Only modify it if a change is strictly required for integration with the new feed architecture.
+
+------------------------------------------------------------
+B. ALL FEED
+------------------------------------------------------------
+
+ALL FEED is the MAIN SOCIAL FEED.
+
+ALL FEED must support and display:
+
+- Text posts
+- Image posts
+- Main/normal videos
+- Shorts insertion blocks
+
+Text, images, and normal videos are permanent/main feed content types.
+
+They must appear naturally mixed together in one continuous social feed.
+
+IMPORTANT:
+
+Do NOT create separate visible sections such as:
+
+"Latest Videos"
+
+"Latest Images"
+
+"Text Posts"
+
+"Shorts"
+
+"Video Feed"
+
+etc.
+
+ALL FEED should feel like ONE unified social feed.
+
+For example:
+
+TEXT POST
+↓
+IMAGE POST
+↓
+VIDEO POST
+↓
+TEXT POST
+↓
+IMAGE POST
+↓
+VIDEO POST
+↓
+SHORTS BLOCK
+↓
+TEXT POST
+↓
+IMAGE POST
+↓
+VIDEO POST
+↓
+...
+ 
+The actual ordering must come from the real feed/database logic where applicable.
+
+Do NOT use fake/mock content.
+
+------------------------------------------------------------
+C. VIDEOS
+------------------------------------------------------------
+
+VIDEOS must be the dedicated MAIN VIDEO feed.
+
+This section displays normal/main videos only.
+
+Do NOT mix Shorts into this section.
+
+Do NOT display the old "No Shorts yet" component here.
+
+Do NOT display unnecessary category headings.
+
+This should be a clean video-watching feed.
+
+Each video should include appropriate creator information and social actions.
+
+The VIDEO section must have the functionality required to upload and publish MAIN VIDEOS.
+
+The existing Create/Upload system should be connected correctly.
+
+If the current upload/publish implementation is broken, fix the root cause.
+
+------------------------------------------------------------
+D. SHORTS
+------------------------------------------------------------
+
+SHORTS is the dedicated Shorts feed.
+
+Shorts are short-form videos, such as videos of 60 seconds or less, according to the existing KINBA business rules/schema.
+
+SHORTS must NOT be mixed directly with normal videos inside the same video item.
+
+The Shorts section should have:
+
+- Shorts-only feed
+- Reels-style short-form viewing experience
+- Clean vertical/compact presentation
+- Creator identity
+- Pookie
+- Comment
+- Share
+- Save
+- Shorts upload functionality
+- Shorts publish functionality
+
+The user must be able to upload and publish a Short from the appropriate Shorts flow.
+
+============================================================
+4. SHORTS INSIDE ALL FEED
+============================================================
+
+This is VERY IMPORTANT.
+
+Shorts can appear inside ALL FEED, but NOT as normal full-size video posts.
+
+Shorts must appear as an occasional COMPACT SHORTS/REELS-STYLE BLOCK.
+
+They must NOT appear beside every normal video.
+
+They must NOT be permanently attached to normal videos.
+
+They must NOT take over the entire ALL FEED.
+
+The intended behavior is:
+
+Normal feed content
+↓
+Normal feed content
+↓
+Normal feed content
+↓
+Compact Shorts block
+↓
+Normal feed content
+↓
+Normal feed content
+↓
+Normal feed content
+↓
+Compact Shorts block
+↓
+...
+
+The exact insertion interval should be implemented cleanly and predictably.
+
+For example, an appropriate number of regular feed posts can appear between Shorts blocks.
+
+Do NOT insert a Shorts block after every single post.
+
+Do NOT show multiple Shorts blocks simultaneously.
+
+Do NOT create a permanent "Shorts section" inside ALL FEED.
+
+It should feel like an occasional discovery moment inside the main social feed.
+
+============================================================
+5. SHORTS MUST NOT BE MIXED WITH NORMAL VIDEO ITEMS
+============================================================
+
+IMPORTANT DISTINCTION:
+
+Normal Video:
+→ normal video feed item
+
+Short:
+→ short-form/reels-style compact discovery block
+
+These are DIFFERENT content experiences.
+
+Do not render a Short as if it were a normal long-form video.
+
+Do not render normal videos as Shorts.
+
+Use the existing content/video metadata to correctly determine the type.
+
+If the existing database has a duration/type/content-type field, use it.
+
+Do NOT rely on hardcoded URLs or fake classifications.
+
+============================================================
+6. ALL FEED — NO UNNECESSARY LABELS
+============================================================
+
+ALL FEED should look like a normal modern social feed.
+
+Do NOT add visible labels like:
+
+"IMAGE FEED"
+
+"VIDEO FEED"
+
+"TEXT FEED"
+
+"SHORTS FEED"
+
+"MAIN-FEED VIDEOS"
+
+"REAL-TIME DATABASE FEED"
+
+The content itself should communicate its type.
+
+A text post looks like a text post.
+
+An image post looks like an image post.
+
+A normal video looks like a video post.
+
+A Shorts block looks like a Shorts/Reels discovery block.
+
+Keep it clean.
+
+============================================================
+7. FULL-SCREEN / 1:1 VIDEO PRESENTATION
+============================================================
+
+For the dedicated VIDEO feed:
+
+Use a 1:1 media presentation/container as requested.
+
+The video itself must NEVER be distorted.
+
+If the original video is:
+
+- Portrait
+- Landscape
+- Square
+- Other aspect ratio
+
+preserve the original proportions.
+
+Use correct object-fit behavior.
+
+Do NOT stretch the video.
+
+Do NOT crop important content unnecessarily.
+
+The 1:1 requirement applies to the presentation/media container, not to destroying the video's original aspect ratio.
+
+============================================================
+8. CREATOR INFORMATION
+============================================================
+
+Every video/Short post must show the REAL creator identity.
+
+Use the existing authenticated user/database relationship.
+
+Use the correct existing fields for:
+
+- Avatar/profile image
+- Username
+- User ID
+- Display name where supported
+
+Do NOT hardcode creator names.
+
+Do NOT create fake creator accounts.
+
+Do NOT use placeholder identities in production feed.
+
+============================================================
+9. POOKIE — NOT LIKE
+============================================================
+
+KINBA's user-facing Like interaction is called:
+
+POOKIE
+
+Therefore the UI must say:
+
+POOKIE
+
+NOT:
+
+LIKE
+
+The user-facing feed must not show "Like" as the interaction label.
+
+Example:
+
+♡ Pookie
+💬 Comment
+↗ Share
+🔖 Save
+
+IMPORTANT:
+
+"Pookie" means the Like interaction in KINBA.
+
+It does NOT mean:
+
+- creator name
+- username
+- user ID
+- profile name
+
+If the backend internally uses:
+
+likes
+likeCount
+likedBy
+
+etc., KEEP those technical names if they already work.
+
+Do NOT unnecessarily rename backend/database fields.
+
+Only the USER-FACING terminology must be "Pookie".
+
+============================================================
+10. SOCIAL ACTIONS
+============================================================
+
+Each appropriate video/feed item should support:
+
+- Pookie
+- Comment
+- Share
+- Save
+
+Use existing KINBA backend/API/database functionality whenever available.
+
+Do NOT create fake frontend-only interactions.
+
+Pookie state should persist.
+
+Comments should persist.
+
+Saved state should persist.
+
+Share should point to the correct KINBA content/video.
+
+If an existing implementation is broken, fix the root cause.
+
+============================================================
+11. VIDEO UPLOAD — EMERGENCY BUG
+============================================================
+
+CURRENTLY VIDEO UPLOAD IS NOT WORKING.
+
+THIS MUST BE FIXED.
+
+Do NOT just change the button.
+
+Do NOT fake upload success.
+
+Do NOT make the UI say "Uploaded" when no file was uploaded.
+
+Trace the REAL upload pipeline:
+
+VIDEO PICKER
+→ FRONTEND FILE HANDLING
+→ FORM DATA / REQUEST
+→ API
+→ BACKEND
+→ CLOUDFLARE / EXISTING STORAGE
+→ VIDEO URL / FILE REFERENCE
+→ DATABASE
+→ PUBLISH
+→ FEED
+
+Find exactly where it fails.
+
+Fix the ROOT CAUSE.
+
+Check all relevant code for:
+
+- file picker
+- input accept types
+- MIME validation
+- FormData
+- request headers
+- authentication
+- API endpoint
+- HTTP method
+- backend validation
+- file-size limits
+- Cloudflare configuration
+- storage upload
+- generated URL
+- database fields
+- user ID relationship
+- asynchronous handling
+- CORS
+- environment variables
+- frontend/backend URLs
+- error handling
+
+Do not guess.
+
+Inspect the actual repository.
+
+============================================================
+12. MAIN VIDEO PUBLISH — EMERGENCY BUG
+============================================================
+
+MAIN VIDEO PUBLISH IS ALSO CURRENTLY NOT WORKING.
+
+Fix the complete flow:
+
+SELECT VIDEO
+→ UPLOAD
+→ RECEIVE STORAGE REFERENCE
+→ CREATE PUBLISH DATA
+→ AUTHENTICATED API REQUEST
+→ DATABASE RECORD
+→ PUBLISHED STATUS
+→ FEED QUERY
+→ VIDEO APPEARS
+
+The Publish button must perform a REAL publish.
+
+No fake success.
+
+No local-only state.
+
+No hardcoded feed entry.
+
+============================================================
+13. SHORTS UPLOAD & PUBLISH
+============================================================
+
+Shorts must have their own correct upload/publish flow.
+
+The Shorts section must provide the appropriate upload functionality.
+
+A user should be able to:
+
+1. Open Shorts.
+2. Start Shorts upload/create flow.
+3. Select a Short.
+4. Upload it.
+5. Publish it.
+6. Have it stored correctly.
+7. Have it appear in the Shorts feed.
+8. Have it become eligible for occasional insertion into ALL FEED.
+
+Respect existing KINBA duration/type/business rules.
+
+Do not treat every video as a Short.
+
+============================================================
+14. CREATE SCREEN
+============================================================
+
+DO NOT REDESIGN THE ENTIRE CREATE SCREEN.
+
+Only fix the functionality required for:
+
+- Main video upload
+- Main video publish
+- Shorts upload
+- Shorts publish
+
+If there are existing Create components/routes, reuse them.
+
+Do not unnecessarily change their unrelated UI.
+
+============================================================
+15. EXISTING INFRASTRUCTURE
+============================================================
+
+The project is already connected to:
+
+- Cloudflare
+- Render
+- GitHub
+- Existing database/backend infrastructure
+
+PRESERVE THESE CONNECTIONS.
+
+Do NOT replace Cloudflare.
+
+Do NOT replace Render.
+
+Do NOT replace GitHub.
+
+Do NOT create a new storage architecture.
+
+Do NOT create unnecessary infrastructure.
+
+Inspect the existing integration and make it work.
+
+If Cloudflare is used for storage/delivery, keep using it.
+
+If Render hosts the backend, keep using it.
+
+============================================================
+16. DATABASE SAFETY
+============================================================
+
+DO NOT:
+
+- wipe the database
+- reset the database
+- delete users
+- delete existing videos
+- delete existing posts
+- destroy production data
+
+Do not make destructive migrations.
+
+If schema changes are absolutely required:
+
+- make them safe
+- preserve existing records
+- make them backward-compatible where possible
+
+Reuse existing database models and relationships whenever possible.
+
+============================================================
+17. REAL DATA ONLY
+============================================================
+
+The feed must use REAL KINBA data.
+
+No fake:
+
+- videos
+- images
+- posts
+- users
+- creators
+- video URLs
+- engagement counts
+
+If the database truly has zero content, show a clean minimal empty state.
+
+But after a real video/post is published, it must appear through the actual feed system.
+
+============================================================
+18. EXISTING SCROLL DIRECTION SYSTEM
+============================================================
+
+DO NOT REMOVE:
+
+- Scroll Direction Listener
+- useScrollDirection Hook
+- CSS translate-y animation
+
+These are existing KINBA functionality.
+
+The new feed MUST work with them.
+
+The existing scroll-based header/navigation show/hide behavior must continue working.
+
+Do not replace this system unnecessarily.
+
+============================================================
+19. MOBILE-FIRST EXPERIENCE
+============================================================
+
+The primary target is mobile.
+
+The new feed must work correctly on Android/mobile browsers.
+
+Ensure:
+
+- smooth vertical scrolling
+- touch-friendly controls
+- correct viewport sizing
+- correct video sizing
+- no distorted media
+- no controls hidden behind bottom navigation
+- proper safe-area handling
+- correct playback behavior
+
+Do NOT redesign the bottom navigation.
+
+Only make sure the new feed works correctly with it.
+
+============================================================
+20. VIDEO PLAYBACK
+============================================================
+
+For dedicated VIDEO and SHORTS feeds:
+
+Implement a polished modern viewing experience.
+
+Use viewport-aware playback where appropriate.
+
+Avoid playing every video simultaneously.
+
+Respect browser autoplay restrictions.
+
+Muted autoplay may be used when necessary.
+
+User-initiated sound/playback must continue to work.
+
+Do not create unnecessary performance problems.
+
+============================================================
+21. PERFORMANCE
+============================================================
+
+The feed must be production-ready.
+
+Avoid:
+
+- loading every video simultaneously
+- unnecessary API calls
+- excessive re-renders
+- memory-heavy video handling
+- duplicate requests
+- duplicate uploads
+
+Use appropriate:
+
+- lazy loading
+- pagination/infinite loading
+- viewport awareness
+- caching/refetching strategy
+- existing realtime functionality where appropriate
+
+Do not introduce unnecessary libraries.
+
+============================================================
+22. FEED DATA ARCHITECTURE
+============================================================
+
+Inspect how KINBA currently stores:
+
+- Text posts
+- Images
+- Videos
+- Shorts
+- Creator/user relationships
+- Engagement
+- Published status
+
+Then build the feed using the REAL existing data model.
+
+ALL FEED should be capable of resolving multiple content types into one unified feed representation.
+
+Conceptually:
+
+FeedItem =
+    TEXT
+    OR IMAGE
+    OR VIDEO
+    OR SHORTS_INSERTION
+
+Do NOT duplicate data unnecessarily.
+
+Use the existing APIs if they are suitable.
+
+If existing APIs are broken, fix them.
+
+============================================================
+23. DO NOT BREAK EXISTING FEATURES
+============================================================
+
+Do NOT touch unrelated functionality.
+
+Especially do NOT unnecessarily modify:
+
+- Header
+- Bottom navigation
+- Search
+- Notifications
+- Menu
+- Profile
+- Authentication
+- WHEELS
+- Other pages
+- Existing navigation
+- Existing global animations
+- Existing business logic
+
+The scope is:
+
+FEED CONTENT SYSTEM
++
+VIDEO/SHORTS UPLOAD
++
+VIDEO/SHORTS PUBLISH
++
+FEED DATA INTEGRATION
+
+Nothing more.
+
+============================================================
+24. ROOT-CAUSE DEBUGGING REQUIREMENT
+============================================================
+
+BEFORE IMPLEMENTING:
+
+AUDIT THE REPOSITORY.
+
+Find the actual files/components/services for:
+
+- Feed
+- All Feed
+- Video Feed
+- Shorts Feed
+- Video upload
+- Shorts upload
+- Publish
+- Feed API
+- Video API
+- Storage
+- Cloudflare
+- Database
+- Authentication
+- Scroll Direction Listener
+- useScrollDirection
+- translate-y animation
+
+Then identify the actual reason upload/publish currently fail.
+
+Do NOT make assumptions.
+
+Do NOT simply patch visible symptoms.
+
+Fix the actual root cause.
+
+============================================================
+25. TESTING — MANDATORY
+============================================================
+
+Do NOT declare completion just because the UI looks better.
+
+Test the REAL system.
+
+TEST 1:
+Open Home → WHEELS remains.
+
+TEST 2:
+Open ALL FEED → unified social feed appears.
+
+TEST 3:
+ALL FEED supports:
+- text
+- image
+- normal video
+- occasional compact Shorts block
+
+TEST 4:
+ALL FEED does NOT show separate:
+- Video section
+- Image section
+- Text section
+- Shorts section headings
+
+TEST 5:
+Open VIDEOS → only normal/main videos.
+
+TEST 6:
+Open SHORTS → only Shorts.
+
+TEST 7:
+Shorts are visually different from normal videos.
+
+TEST 8:
+Shorts can be uploaded.
+
+TEST 9:
+Shorts can be published.
+
+TEST 10:
+Main videos can be uploaded.
+
+TEST 11:
+Main videos can be published.
+
+TEST 12:
+Published videos are stored in the database.
+
+TEST 13:
+Published Shorts are stored correctly.
+
+TEST 14:
+Published main videos appear in VIDEO feed.
+
+TEST 15:
+Published Shorts appear in SHORTS feed.
+
+TEST 16:
+Published content becomes available to ALL FEED correctly.
+
+TEST 17:
+Pookie works.
+
+TEST 18:
+Comment works.
+
+TEST 19:
+Share works.
+
+TEST 20:
+Save works.
+
+TEST 21:
+Creator identity is correct.
+
+TEST 22:
+Refresh page → published content remains.
+
+TEST 23:
+Existing Scroll Direction Listener still works.
+
+TEST 24:
+useScrollDirection still works.
+
+TEST 25:
+translate-y animation still works.
+
+TEST 26:
+Mobile scrolling works correctly.
+
+TEST 27:
+No duplicate uploads.
+
+TEST 28:
+No fake success states.
+
+TEST 29:
+No database data is lost.
+
+============================================================
+26. FINAL UI/UX TARGET
+============================================================
+
+The final experience should be:
+
+TOP:
+
+WHEELS | ALL FEED | VIDEOS | SHORTS
+
+THEN:
+
+THE ACTUAL CONTENT FEED.
+
+ALL FEED:
+
+Text
+Image
+Video
+Text
+Image
+Video
+Compact Shorts block
+Text
+Video
+Image
+...
+(Real data/order)
+
+VIDEOS:
+
+Clean dedicated video feed.
+
+SHORTS:
+
+Clean dedicated Shorts/Reels-style feed.
+
+There should NOT be:
+
+"No Shorts yet" giant cards everywhere.
+
+"Latest Main-Feed Videos" section.
+
+"Watch what matters" section.
+
+"Real-Time Database Feed" section.
+
+Huge empty placeholder cards.
+
+Unnecessary feed headings.
+
+The user should feel like they are using a real modern social platform.
+
+============================================================
+27. ABSOLUTE NO-MISTAKE RULE
+============================================================
+
+DO NOT REMOVE THE FOUR TOP TABS:
+
+WHEELS
+ALL FEED
+VIDEOS
+SHORTS
+
+DO NOT redesign the whole website.
+
+DO NOT modify unrelated UI.
+
+DO NOT remove Scroll Direction Listener.
+
+DO NOT remove useScrollDirection.
+
+DO NOT remove translate-y animation.
+
+DO NOT wipe database.
+
+DO NOT delete existing data.
+
+DO NOT replace Cloudflare.
+
+DO NOT replace Render.
+
+DO NOT replace GitHub.
+
+DO NOT use fake data.
+
+DO NOT hardcode videos.
+
+DO NOT hardcode creators.
+
+DO NOT fake upload success.
+
+DO NOT fake publish success.
+
+DO NOT leave upload broken.
+
+DO NOT leave publish broken.
+
+DO NOT mix Shorts directly into normal video items.
+
+DO NOT show Shorts after every post.
+
+DO NOT create unnecessary feed categories inside ALL FEED.
+
+DO NOT distort videos.
+
+DO NOT unnecessarily rename backend/database fields.
+
+DO NOT unnecessarily redesign Create.
+
+DO NOT rewrite unrelated architecture.
+
+============================================================
+28. FINAL IMPLEMENTATION ORDER
+============================================================
+
+FOLLOW THIS ORDER:
+
+STEP 1:
+Audit the existing KINBA repository.
+
+STEP 2:
+Identify the existing feed architecture and all related components.
+
+STEP 3:
+Identify the actual video upload failure.
+
+STEP 4:
+Identify the actual video publish failure.
+
+STEP 5:
+Identify the existing Cloudflare/storage/database integration.
+
+STEP 6:
+Fix the REAL upload pipeline.
+
+STEP 7:
+Fix the REAL publish pipeline.
+
+STEP 8:
+Fix Shorts upload/publish if the existing flow is broken.
+
+STEP 9:
+Build the new unified ALL FEED rendering system.
+
+STEP 10:
+Build/fix dedicated VIDEO feed.
+
+STEP 11:
+Build/fix dedicated SHORTS feed.
+
+STEP 12:
+Implement occasional compact Shorts insertion inside ALL FEED.
+
+STEP 13:
+Connect Pookie / Comment / Share / Save to real functionality.
+
+STEP 14:
+Verify creator identity and real database content.
+
+STEP 15:
+Verify Scroll Direction Listener + useScrollDirection + translate-y remain intact.
+
+STEP 16:
+Run complete end-to-end tests.
+
+STEP 17:
+Only then report completion.
+
+============================================================
+29. DEFINITION OF DONE
+============================================================
+
+THIS TASK IS COMPLETE ONLY IF:
+
+✓ WHEELS tab remains
+✓ ALL FEED tab remains
+✓ VIDEOS tab remains
+✓ SHORTS tab remains
+
+✓ ALL FEED is a unified social feed
+✓ Text posts work
+✓ Image posts work
+✓ Main videos work
+✓ Shorts appear occasionally as compact discovery blocks
+✓ Shorts are NOT mixed directly into normal video items
+✓ VIDEO section contains main videos only
+✓ SHORTS section contains Shorts only
+✓ Video upload works
+✓ Video publish works
+✓ Shorts upload works
+✓ Shorts publish works
+✓ Database persistence works
+✓ Real videos appear in feed
+✓ Real creator information appears
+✓ Pookie works
+✓ Comment works
+✓ Share works
+✓ Save works
+✓ Scroll Direction Listener remains
+✓ useScrollDirection remains
+✓ translate-y animation remains
+✓ Cloudflare remains connected
+✓ Render remains connected
+✓ GitHub remains connected
+✓ Existing data remains safe
+✓ Mobile experience works
+✓ No fake data
+✓ No fake upload
+✓ No fake publish
+✓ No unrelated redesign
+
+FINAL PRINCIPLE:
+
+KEEP THE EXISTING KINBA WEBSITE.
+
+KEEP THE FOUR TOP FEED TABS.
+
+REBUILD ONLY THE BROKEN FEED CONTENT EXPERIENCE.
+
+FIX THE REAL VIDEO/SHORTS UPLOAD AND PUBLISH PIPELINES.
+
+MAKE THE NEW FEED CLEAN, MODERN, SOCIAL, REAL-DATA-DRIVEN, AND PRODUCTION-READY.
+
+FIRST AUDIT.
+THEN FIND ROOT CAUSES.
+THEN FIX.
+THEN REBUILD THE FEED.
+THEN TEST EVERYTHING.
+
+DO NOT TAKE SHORTCUTS.
+
+MAKE NO MISTAKES.

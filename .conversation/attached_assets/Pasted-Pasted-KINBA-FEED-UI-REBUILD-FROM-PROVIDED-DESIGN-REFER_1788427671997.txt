@@ -1,0 +1,256 @@
+Pasted-KINBA-FEED-UI-REBUILD-FROM-PROVIDED-DESIGN-REFERENCE-ST_1788391690852.txt
+KINBA — FEED UI REBUILD FROM PROVIDED DESIGN REFERENCE
+STRICT CODE IMPLEMENTATION PROMPT
+
+Repository:
+giveandtake349-sys-KINBA
+
+IMPORTANT:
+Use the provided KINBA feed design image as the PRIMARY visual reference.
+
+The goal is to implement the FEED UI shown in the reference image into the existing KINBA project.
+
+============================================================
+ABSOLUTE SCOPE
+============================================================
+
+CHANGE ONLY THE FEED.
+
+DO NOT redesign the entire KINBA website.
+
+DO NOT modify unrelated parts of the application.
+
+DO NOT change:
+
+- Existing global header
+- Existing top navigation
+- Existing bottom navigation
+- Search
+- Notifications
+- Menu
+- Profile
+- Authentication
+- WHEELS functionality
+- Other pages
+- Other components
+- Global routing
+- Global theme
+- Existing unrelated animations
+- Existing unrelated APIs
+- Existing unrelated database logic
+
+The ONLY target is the actual social FEED/content experience.
+
+============================================================
+REFERENCE DESIGN
+============================================================
+
+The provided image represents the target visual direction.
+
+Recreate the feed structure as closely as reasonably possible:
+
+- Premium dark KINBA interface
+- Clean modern social feed
+- One post after another vertically
+- Full-width/large media presentation
+- Creator header
+- Avatar
+- Creator name
+- Verification indicator where applicable
+- Follow where applicable
+- Timestamp
+- Privacy/status indicator
+- Three-dot post menu
+- Caption/text
+- Image/video content
+- Engagement row
+- Pookie
+- Comment
+- Share
+- Save
+
+The feed should visually feel like a modern Facebook-style social timeline, but it must remain fully KINBA branded.
+
+DO NOT copy Facebook branding, logo, proprietary assets, or exact visual identity.
+
+Only use the SOCIAL FEED STRUCTURE as inspiration/reference.
+
+============================================================
+1. SINGLE POST VERTICAL FEED
+============================================================
+
+THIS IS THE MOST IMPORTANT REQUIREMENT.
+
+Posts must render:
+
+POST 1
+↓
+POST 2
+↓
+POST 3
+↓
+POST 4
+↓
+POST 5
+↓
+...
+
+ONE POST AT A TIME.
+
+No grid.
+
+No two-column feed.
+
+No masonry.
+
+No horizontal post carousel.
+
+No dashboard-style cards.
+
+No "latest videos" blocks.
+
+No large empty placeholder cards.
+
+The user should continuously scroll through a social timeline.
+
+============================================================
+2. POST DESIGN
+============================================================
+
+Each post should follow this hierarchy:
+
+[Avatar] Creator Name [verification]
+         timestamp · privacy/status
+
+                         [...]
+
+Caption / text
+
+[MEDIA]
+
+Pookie     Comment     Share     Save
+
+--------------------------------------------------
+
+NEXT POST
+
+The post should feel like a complete social-media post while still visually matching KINBA's existing dark premium design.
+
+============================================================
+3. CREATOR HEADER
+============================================================
+
+Each post must show real creator information from the existing KINBA data.
+
+Display where available:
+
+- Real avatar
+- Real creator/display name
+- Real username
+- Verification indicator
+- Follow action if supported
+- Timestamp
+- Existing privacy/status information
+- Existing post options menu
+
+DO NOT hardcode creators.
+
+DO NOT use fake accounts.
+
+============================================================
+4. MEDIA
+============================================================
+
+Support existing KINBA content types:
+
+- Images
+- Normal videos
+- Text posts
+- Shorts
+
+Images and videos must be responsive.
+
+Do not distort media.
+
+Do not unnecessarily crop important content.
+
+Use a clean large media presentation.
+
+For normal video posts, use the requested 1:1 media presentation/container while preserving the video's actual aspect ratio internally.
+
+============================================================
+5. ALL FEED
+============================================================
+
+ALL FEED is the main unified social feed.
+
+It must contain:
+
+- Text posts
+- Image posts
+- Normal video posts
+- Occasional Shorts discovery blocks
+
+All of these appear in ONE continuous feed.
+
+Example:
+
+TEXT POST
+↓
+IMAGE POST
+↓
+VIDEO POST
+↓
+TEXT POST
+↓
+IMAGE POST
+↓
+VIDEO POST
+↓
+SHORTS DISCOVERY BLOCK
+↓
+TEXT POST
+↓
+VIDEO POST
+↓
+IMAGE POST
+
+Do NOT create separate visible categories.
+
+Do NOT show:
+
+"Text Feed"
+
+"Image Feed"
+
+"Video Feed"
+
+"Shorts Feed"
+
+"Latest Videos"
+
+etc.
+
+============================================================
+6. SHORTS IN ALL FEED
+============================================================
+
+Shorts must NOT be rendered as normal video posts inside ALL FEED.
+
+They should appear occasionally as a compact Reels-style discovery element.
+
+Example:
+
+Several normal posts
+↓
+Compact Shorts block
+↓
+Several normal posts
+↓
+Compact Shorts block
+↓
+Several normal posts
+
+Do NOT show Shorts after every post.
+
+Do NOT p...
