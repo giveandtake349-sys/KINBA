@@ -1814,3 +1814,68 @@ body {
 .spotlight-highlight-card > strong { display: -webkit-box; min-height: 30px; overflow: hidden; font-size: 12px; line-height: 1.25; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .spotlight-highlight-card__metrics { color: #aaa6a0; font-size: 10px; white-space: nowrap; }
 @media (max-width: 640px) { .spotlight-highlights { padding-inline: 12px; } .spotlight-highlight-card { flex-basis: 164px; } }
+
+/* Final full-bleed media-first feed treatment. The real-data Spotlight carousel remains above the feed. */
+.media-hub .media-tab-panel,
+.media-hub .wheels-feed-layout,
+.media-hub .home-feed-section,
+.media-hub .unified-feed,
+.media-hub .unified-feed-list,
+.media-hub .long-video-grid,
+.media-hub .feed-media-post,
+.media-hub .feed-text-card,
+.media-hub .long-video-card,
+.media-hub .shorts-insertion-block {
+  width: 100% !important;
+  max-width: none !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+.media-hub .feed-media-post,
+.media-hub .feed-text-card {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+.media-hub .feed-media-post { display: flex !important; flex-direction: column !important; }
+.media-hub .feed-media-post > .feed-post-author { order: 1; padding: 12px 16px 8px; }
+.media-hub .feed-media-post > .feed-media-copy { order: 3; padding: 12px 16px 8px; margin: 0 !important; }
+.media-hub .feed-media-post > .feed-media-content { order: 2; width: 100% !important; margin: 0 !important; }
+.media-hub .feed-media-post > .feed-post-actions { order: 4; padding: 8px 16px 12px; }
+.media-hub .feed-media-content > img,
+.media-hub .feed-media-content > .media-video-frame { width: 100% !important; max-width: none !important; border-radius: 0 !important; }
+.media-hub .feed-text-card .feed-post-author,
+.media-hub .feed-text-card .feed-post-body,
+.media-hub .feed-text-card .feed-post-actions { padding-left: 16px; padding-right: 16px; }
+.media-hub .feed-text-card .feed-post-attachments { width: 100% !important; padding: 0 !important; }
+.media-hub .feed-text-card .feed-photo-button,
+.media-hub .feed-text-card .feed-post-attachments > video { width: 100% !important; border-radius: 0 !important; }
+.media-hub .long-video-grid { display: block !important; padding: 0 !important; }
+.media-hub .long-video-grid > .long-video-card { padding: 0 !important; border-left: 0 !important; border-right: 0 !important; border-radius: 0 !important; }
+.media-hub .long-video-card .media-fullscreen-frame { width: 100% !important; margin: 0 !important; border-radius: 0 !important; }
+.media-hub .media-overlay-copy,
+.media-hub .short-overlay {
+  position: static !important;
+  inset: auto !important;
+  z-index: 1 !important;
+  min-height: 0 !important;
+  padding: 14px 16px 12px !important;
+  color: var(--kinba-text-modern) !important;
+  background: #0b0f17 !important;
+  pointer-events: auto !important;
+}
+.media-hub .media-overlay-details,
+.media-hub .short-overlay-details { width: 100% !important; color: var(--kinba-text-modern) !important; }
+.media-hub .media-overlay-details h3,
+.media-hub .media-overlay-details > p,
+.media-hub .short-title,
+.media-hub .short-overlay-details > p { color: var(--kinba-text-modern) !important; }
+.media-hub .media-tab-panel--wheels,
+.media-hub .media-tab-panel--wheels .home-feed-section,
+.media-hub .media-tab-panel--wheels .home-feed-section .long-video-grid { height: auto !important; min-height: 0 !important; overflow: visible !important; }
+.media-hub .media-tab-panel--wheels .home-feed-section .long-video-card { height: auto !important; min-height: 0 !important; overflow: visible !important; }
+.media-hub .media-tab-panel--wheels .media-fullscreen-frame,
+.media-hub .media-tab-panel--wheels .short-card .media-video-frame { position: relative !important; inset: auto !important; height: min(100dvh, 125vw) !important; min-height: 0 !important; aspect-ratio: 4 / 5 !important; }
+.media-hub .media-tab-panel--wheels .media-fullscreen-frame .media-video-frame,
+.media-hub .media-tab-panel--wheels .media-fullscreen-frame video { height: 100% !important; }
+.media-hub .media-tab-panel--wheels .media-engagement-actions--overlay { position: static !important; flex-direction: row !important; width: auto !important; padding: 8px 0 0 !important; }
+.media-hub .media-tab-panel--wheels .media-engagement-actions--overlay > button { width: auto !important; min-width: 0 !important; }

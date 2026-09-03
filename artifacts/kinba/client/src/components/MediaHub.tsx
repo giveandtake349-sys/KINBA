@@ -931,121 +931,44 @@ function VideoCard({
             onFirstPlay={recordView}
           />
         )}
-
-        {showDetailsOverlay && (
-          <div className="media-overlay-copy">
-            <div className="media-overlay-details">
-              <div className="media-owner">
-                <a className="profile-link" href={`/profile/${video.owner.id}`} aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}>
-                <div className="video-owner-identity">
-                  <div className="video-owner-avatar">
-                    {video.owner.photoUrl ? (
-                      <img src={video.owner.photoUrl} alt="" />
-                    ) : (
-                      <UserRound size={16} />
-                    )}
-                  </div>
-                  <div>
-                    <strong className="video-owner-name">
-                      <span>
-                        {displayName(video.owner.name, video.owner.username)}
-                      </span>
-                      {video.owner.isVerified && (
-                        <BadgeCheck
-                          className="verified-badge"
-                          size={12}
-                          aria-label="Verified profile"
-                        />
-                      )}
-                    </strong>
-                    <span>
-                      {ownerHandle(video.owner.name, video.owner.username)}
-                    </span>
-                  </div>
-                </div>
-              </a>
-            </div>
-              <h3>{video.title}</h3>
-              <p>{video.description}</p>
-              <p className="media-caption-tags">
-                {ownerHandle(video.owner.name, video.owner.username)} · {hashtagsFromDescription(video.description)}
-              </p>
-              {video.mediaType !== "IMAGE" && (
-                <p className="media-sound-track">
-                  <Volume2 size={14} aria-hidden="true" /> Original sound · {ownerHandle(video.owner.name, video.owner.username)}
-                </p>
-              )}
-              <div className="media-meta-line" aria-label="Media metadata">
-                <span>{formatCount(views)} views</span>
-                <span>{relativeTime(video.createdAt)}</span>
-                <span>{video.mediaType === "IMAGE" ? "Photo" : video.kind === "SHORT" ? "Short" : "Video"}</span>
-              </div>
-            </div>
-            <EngagementActions
-              engagement={current}
-              onReact={react}
-              onShare={share}
-              onComments={() => setCommentsOpen(value => !value)}
-              pending={pending}
-              overlay
-              bookmarked={bookmarked}
-              onBookmark={toggleBookmark}
-              owner={video.owner}
-            />
-          </div>
-        )}
       </div>
-      {!showDetailsOverlay && (
-                  <div className={video.mediaType === "IMAGE" ? "video-card-details photo-card-details" : "video-card-details"}>
-
-          <div className="media-owner">
-            <a className="profile-link" href={`/profile/${video.owner.id}`} aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}>
-                <div className="video-owner-identity">
+      <div className={video.mediaType === "IMAGE" ? "video-card-details photo-card-details" : "video-card-details"}>
+        <div className="media-owner">
+          <a className="profile-link" href={`/profile/${video.owner.id}`} aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}>
+            <div className="video-owner-identity">
               <div className="video-owner-avatar">
-                {video.owner.photoUrl ? (
-                  <img src={video.owner.photoUrl} alt="" />
-                ) : (
-                  <UserRound size={16} />
-                )}
+                {video.owner.photoUrl ? <img src={video.owner.photoUrl} alt="" /> : <UserRound size={16} />}
               </div>
               <div>
                 <strong className="video-owner-name">
-                  <span>
-                    {displayName(video.owner.name, video.owner.username)}
-                  </span>
-                  {video.owner.isVerified && (
-                    <BadgeCheck
-                      className="verified-badge"
-                      size={12}
-                      aria-label="Verified profile"
-                    />
-                  )}
+                  <span>{displayName(video.owner.name, video.owner.username)}</span>
+                  {video.owner.isVerified && <BadgeCheck className="verified-badge" size={12} aria-label="Verified profile" />}
                 </strong>
-                <span>
-                  {ownerHandle(video.owner.name, video.owner.username)}
-                </span>
+                <span>{ownerHandle(video.owner.name, video.owner.username)}</span>
               </div>
-                </div>
-              </a>
             </div>
-          <h3>{video.title}</h3>
-          <p>{video.description}</p>
-          <div className="media-meta-line" aria-label="Media metadata">
-            <span>{formatCount(views)} views</span>
-            <span>{relativeTime(video.createdAt)}</span>
-            <span>{video.mediaType === "IMAGE" ? "Photo" : video.kind === "SHORT" ? "Short" : "Video"}</span>
-          </div>
-          <EngagementActions
-            engagement={current}
-            onReact={react}
-            onShare={share}
-            onComments={() => setCommentsOpen(value => !value)}
-            pending={pending}
-            bookmarked={bookmarked}
-            onBookmark={toggleBookmark}
-          />
+          </a>
         </div>
-      )}
+        <h3>{video.title}</h3>
+        <p>{video.description}</p>
+        <p className="media-caption-tags">
+          {ownerHandle(video.owner.name, video.owner.username)} · {hashtagsFromDescription(video.description)}
+        </p>
+        <div className="media-meta-line" aria-label="Media metadata">
+          <span>{formatCount(views)} views</span>
+          <span>{relativeTime(video.createdAt)}</span>
+          <span>{video.mediaType === "IMAGE" ? "Photo" : video.kind === "SHORT" ? "Short" : "Video"}</span>
+        </div>
+        <EngagementActions
+          engagement={current}
+          onReact={react}
+          onShare={share}
+          onComments={() => setCommentsOpen(value => !value)}
+          pending={pending}
+          bookmarked={bookmarked}
+          onBookmark={toggleBookmark}
+        />
+      </div>
       <CommentsPanel
         videoId={video.id}
         open={commentsOpen}
