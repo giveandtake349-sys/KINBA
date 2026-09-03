@@ -1024,6 +1024,13 @@ export async function listVideoComments(videoId: number) {
     .limit(50);
   return rows.map(row => ({
     ...row.comment,
+    body: typeof row.comment.body === "string" ? row.comment.body : "",
+    audioUrl: typeof row.comment.audioUrl === "string" && row.comment.audioUrl.trim()
+      ? row.comment.audioUrl
+      : null,
+    audioDuration: Number.isFinite(Number(row.comment.audioDuration))
+      ? Math.max(1, Math.min(60, Math.round(Number(row.comment.audioDuration))))
+      : null,
     author: {
       id: row.user.id,
       name: row.user.name,
@@ -1897,8 +1904,15 @@ export async function listAnnouncementComments(announcementId: number) {
     .where(eq(communityComments.announcementId, announcementId))
     .orderBy(desc(communityComments.createdAt))
     .limit(50);
-  return rows.map(row => ({
+    return rows.map(row => ({
     ...row.comment,
+    body: typeof row.comment.body === "string" ? row.comment.body : "",
+    audioUrl: typeof row.comment.audioUrl === "string" && row.comment.audioUrl.trim()
+      ? row.comment.audioUrl
+      : null,
+    audioDuration: Number.isFinite(Number(row.comment.audioDuration))
+      ? Math.max(1, Math.min(60, Math.round(Number(row.comment.audioDuration))))
+      : null,
     author: {
       id: row.user.id,
       name: row.user.name,
@@ -1906,7 +1920,6 @@ export async function listAnnouncementComments(announcementId: number) {
     },
   }));
 }
-
 export async function createAnnouncementComment(
   announcementId: number,
   userId: number,

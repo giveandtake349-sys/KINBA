@@ -20,9 +20,27 @@ import {
   MAX_SHORT_VIDEO_DURATION_SECONDS,
 } from "./mediaValidation";
 
+export const SUPPORTED_AUDIO_MIME_TYPES = [
+  "audio/webm",
+  "audio/webm;codecs=opus",
+  "audio/ogg",
+  "audio/mp4",
+  "audio/mpeg",
+  "audio/wav",
+] as const;
+
+const SUPPORTED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+
 const upload = multer({
   dest: path.join(os.tmpdir(), "kinba-video-uploads"),
   limits: { files: 1, fileSize: 500 * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => {
+    const accepted =
+      SUPPORTED_AUDIO_MIME_TYPES.includes(file.mimetype as (typeof SUPPORTED_AUDIO_MIME_TYPES)[number]) ||
+      SUPPORTED_IMAGE_MIME_TYPES.includes(file.mimetype as (typeof SUPPORTED_IMAGE_MIME_TYPES)[number]) ||
+      file.mimetype.startsWith("video/");
+    callback(null, accepted);
+  },
 });
 
 function errorMessage(error: unknown) {
@@ -173,7 +191,7 @@ export function registerVideoUploadRoute(app: Express) {
         return;
       }
       temporaryPath = req.file.path;
-      if (!["image/jpeg", "image/png", "image/webp"].includes(req.file.mimetype)) {
+      if (!SUPPORTED_IMAGE_MIME_TYPES.includes(req.file.mimetype as (typeof SUPPORTED_IMAGE_MIME_TYPES)[number])) {
         res.status(400).json({ error: "Choose a JPG, PNG, or WEBP image." });
         return;
       }

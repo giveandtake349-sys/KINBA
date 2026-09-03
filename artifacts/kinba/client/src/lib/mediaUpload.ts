@@ -361,17 +361,41 @@ export async function uploadVideo(
   return uploadDirectToR2(file, kind, "source", session.access_token);
 }
 
+const supportedCommentAudioTypes = [
+  "audio/webm",
+  "audio/ogg",
+  "audio/mp4",
+  "audio/mpeg",
+  "audio/wav",
+] as const;
+
+function commentAudioType(blob: Blob) {
+  const baseType = blob.type.toLowerCase().split(";", 1)[0];
+  if ((supportedCommentAudioTypes as readonly string[]).includes(baseType)) return baseType;
+  throw new Error("This browser produced an unsupported voice recording format.");
+}
+
+function commentAudioExtension(contentType: string) {
+  if (contentType === "audio/ogg") return "ogg";
+  if (contentType === "audio/mp4") return "m4a";
+  if (contentType === "audio/mpeg") return "mp3";
+  if (contentType === "audio/wav") return "wav";
+  return "webm";
+}
+
 export async function uploadCommentAudio(blob: Blob): Promise<string> {
-  if (!blob.type.startsWith("audio/")) throw new Error("Choose a valid audio recording.");
+  const contentType = commentAudioType(blob);
   if (blob.size > 10 * 1024 * 1024) throw new Error("Voice comments must be 10MB or smaller.");
   const userId = await getSessionUserId("Please sign in before sending a voice comment.");
-  const extension = blob.type.includes("mp4") || blob.type.includes("mpeg") ? "m4a" : "webm";
-  const objectPath = `${userId}/comment-audio-${Date.now()}-${crypto.randomUUID()}.${extension}`;
+  const extension = commentAudioExtension(contentType);
+  const filename = `comment-audio-${Date.now()}-${crypto.randomUUID()}.${extension}`;
+  const objectPath = `${userId}/${filename}`;
+  const file = new File([blob], filename, { type: contentType });
   const { error: uploadError } = await supabase.storage
     .from("comment-media")
-    .upload(objectPath, blob, {
+    .upload(objectPath, file, {
       cacheControl: "3600",
-      contentType: blob.type,
+      contentType,
       upsert: false,
     });
   if (uploadError) throw uploadError;

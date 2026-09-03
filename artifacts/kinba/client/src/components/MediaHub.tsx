@@ -331,10 +331,17 @@ function useVoiceCommentRecorder() {
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined")
       throw new Error("Voice recording is not supported on this device.");
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-      ? "audio/webm;codecs=opus"
-      : "audio/webm";
-    const recorder = new MediaRecorder(stream, { mimeType });
+    const mimeCandidates = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/ogg;codecs=opus",
+      "audio/ogg",
+      "audio/mp4",
+      "audio/mpeg",
+      "audio/wav",
+    ];
+    const mimeType = mimeCandidates.find(type => MediaRecorder.isTypeSupported(type));
+    const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
     chunksRef.current = [];
     streamRef.current = stream;
     recorderRef.current = recorder;
@@ -346,7 +353,11 @@ function useVoiceCommentRecorder() {
       if (event.data.size) chunksRef.current.push(event.data);
     };
     recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+      const recordedType = (recorder.mimeType || "audio/webm").toLowerCase().split(";", 1)[0];
+      const acceptedType = ["audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav"].includes(recordedType)
+        ? recordedType
+        : "audio/webm";
+      const blob = new Blob(chunksRef.current, { type: acceptedType });
       if (blob.size) {
         setAudioBlob(blob);
         setPreviewUrl(URL.createObjectURL(blob));
