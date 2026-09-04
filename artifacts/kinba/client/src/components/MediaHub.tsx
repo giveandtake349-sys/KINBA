@@ -5,7 +5,10 @@ import {
   useMemo,
   useRef,
   useState,
+  memo,
+  type MouseEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 import {
   BadgeCheck,
@@ -19,7 +22,11 @@ import {
   Loader2,
   MessageCircle,
   Megaphone,
-  MoreVertical,
+  Mic,
+  Send,
+  Square,
+  Trash2,
+  MoreHorizontal,
   Pause,
   Play,
   Plus,
@@ -36,6 +43,7 @@ import { toast } from "sonner";
 import Hls from "hls.js";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { apiUrl } from "@/lib/api";
 import {
   getImageDimensions,
   getVideoMetadata,
@@ -44,6 +52,7 @@ import {
   MAX_SHORT_VIDEO_DURATION_SECONDS,
   publishPhoto,
   publishVideo,
+  uploadCommentAudio,
   uploadImage,
   uploadVideo,
   validateImageFile,
@@ -107,6 +116,9 @@ type FeedTextRecord = {
   text: string;
   createdAt: Date | string;
   commentCount: number;
+  reactionCount: number;
+  viewerReacted?: boolean;
+  viewerBookmarked?: boolean;
   author: {
     id: number;
     name: string | null;
@@ -139,7 +151,11 @@ type AnnouncementVideoSelection = {
 
 const tabOptions: { id: HomeTab; label: string; caption: string }[] = [
   { id: "videos", label: "Videos", caption: "Latest main-feed videos" },
-  { id: "wheels", label: "Wheels", caption: "Wheel content only" },
+  {
+    id: "wheels",
+    label: "Spotlight",
+    caption: "Global photo and video spotlight",
+  },
   { id: "trendy", label: "Trendy", caption: "Most reacted-to videos" },
   {
     id: "following",
@@ -210,6 +226,88 @@ function isReportedLegacyMedia(
   return copy.includes("hey, well-connected") && copy.includes("platform");
 }
 
+type SpotlightHighlight = {
+  id: string;
+  sourceType: "video" | "post";
+  postId: number;
+  createdAt: string;
+  title: string;
+  caption: string;
+  mediaType: "VIDEO" | "IMAGE" | "TEXT";
+  mediaUrl: string | null;
+  thumbnailUrl: string | null;
+  score: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  author: { id: number; name: string | null; username: string | null; photoUrl: string | null };
+};
+
+function SpotlightHighlights({ onSelect }: { onSelect: (highlight: SpotlightHighlight) => void }) {
+  const [highlights, setHighlights] = useState<SpotlightHighlight[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(apiUrl("/api/spotlight/highlights"), { credentials: "include" })
+      .then(response => {
+        if (!response.ok) throw new Error(`Highlights request failed: ${response.status}`);
+        return response.json() as Promise<{ highlights?: SpotlightHighlight[] }>;
+      })
+      .then(payload => {
+        if (!cancelled) setHighlights(Array.isArray(payload.highlights) ? payload.highlights : []);
+      })
+      .catch(error => {
+        console.warn("[Spotlight] Highlights unavailable:", error);
+        if (!cancelled) setHighlights([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  if (loading || highlights.length === 0) return null;
+  return (
+    <section className="spotlight-highlights" aria-label="Top Content Highlights">
+      <div className="spotlight-highlights__heading">
+        <div>
+          <span className="eyebrow">Spotlight</span>
+          <h2>Top Content Highlights</h2>
+        </div>
+        <span>Last 48 hours</span>
+      </div>
+      <div className="spotlight-highlights__rail">
+        {highlights.map(highlight => (
+          <button key={highlight.id} type="button" className="spotlight-highlight-card" onClick={() => onSelect(highlight)}>
+            <div className="spotlight-highlight-card__media">
+              {highlight.mediaUrl ? (
+                highlight.mediaType === "VIDEO" ? (
+                  highlight.thumbnailUrl ? (
+                    <img src={highlight.thumbnailUrl} alt="" loading="lazy" />
+                  ) : (
+                    <video src={highlight.mediaUrl} muted playsInline preload="metadata" aria-label="Highlighted video" />
+                  )
+                ) : (
+                  <img src={highlight.mediaUrl} alt="" loading="lazy" />
+                )
+              ) : (
+                <div className="spotlight-highlight-card__text">{highlight.caption.slice(0, 120)}</div>
+              )}
+            </div>
+            <span className="spotlight-highlight-card__author">
+              {highlight.author.photoUrl ? <img src={highlight.author.photoUrl} alt="" /> : <UserRound size={13} />}
+              {displayName(highlight.author.name, highlight.author.username)}
+            </span>
+            <strong>{highlight.title || highlight.caption.slice(0, 80)}</strong>
+            <span className="spotlight-highlight-card__metrics">♥ {highlight.likes} · comments {highlight.comments} · shares {highlight.shares}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function notifyError(error: unknown) {
   toast.error(
     error instanceof Error
@@ -217,6 +315,159 @@ function notifyError(error: unknown) {
       : "The operation could not be completed."
   );
 }
+function formatAudioTime(seconds: number) {
+  const safe = Math.max(0, Math.floor(seconds));
+  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`;
+}
+
+function useVoiceCommentRecorder() {
+  const [recording, setRecording] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const start = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined")
+      throw new Error("Voice recording is not supported on this device.");
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeCandidates = [
+      "audio/webm;codecs=opus",
+      "audio/webm",
+      "audio/ogg;codecs=opus",
+      "audio/ogg",
+      "audio/mp4",
+      "audio/mpeg",
+      "audio/wav",
+    ];
+    const mimeType = mimeCandidates.find(type => MediaRecorder.isTypeSupported(type));
+    const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    chunksRef.current = [];
+    streamRef.current = stream;
+    recorderRef.current = recorder;
+    setElapsed(0);
+    setAudioBlob(null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    recorder.ondataavailable = event => {
+      if (event.data.size) chunksRef.current.push(event.data);
+    };
+    recorder.onstop = () => {
+      const recordedType = (recorder.mimeType || "audio/webm").toLowerCase().split(";", 1)[0];
+      const acceptedType = ["audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav"].includes(recordedType)
+        ? recordedType
+        : "audio/webm";
+      const blob = new Blob(chunksRef.current, { type: acceptedType });
+      if (blob.size) {
+        setAudioBlob(blob);
+        setPreviewUrl(URL.createObjectURL(blob));
+      }
+      chunksRef.current = [];
+      setRecording(false);
+    };
+    recorder.start();
+    setRecording(true);
+  };
+  const stop = () => {
+    if (recorderRef.current?.state === "recording") recorderRef.current.stop();
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    streamRef.current = null;
+  };
+  useEffect(() => {
+    if (!recording) return;
+    const timer = window.setInterval(() => {
+      setElapsed(value => {
+        if (value >= 59) {
+          window.setTimeout(stop, 0);
+          return 60;
+        }
+        return value + 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [recording]);
+  const discard = () => {
+    stop();
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setAudioBlob(null);
+    setElapsed(0);
+  };
+  useEffect(() => () => {
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+  return { recording, elapsed, audioBlob, previewUrl, start, stop, discard };
+}
+
+function CommentAudioPlayer({ src, duration }: { src: string; duration?: number | null }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [current, setCurrent] = useState(0);
+  const toggle = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audio.paused) void audio.play();
+    else audio.pause();
+  };
+  return (
+    <div className="comment-audio-player">
+      <audio ref={audioRef} src={src} preload="metadata" onTimeUpdate={event => setCurrent(event.currentTarget.currentTime)} onPlay={() => setPlaying(true)} onPause={() => setPlaying(false)} onEnded={() => { setPlaying(false); setCurrent(0); }} />
+      <button type="button" onClick={toggle} aria-label={playing ? "Pause voice comment" : "Play voice comment"}>{playing ? <Pause size={14} /> : <Play size={14} />}</button>
+      <div className="comment-audio-wave" aria-hidden="true"><span style={{ width: `${Math.min(100, Math.max(0, (current / Math.max(audioRef.current?.duration || duration || 1, 1)) * 100))}%` }} /></div>
+      <span>{formatAudioTime(current)} / {formatAudioTime(duration ?? audioRef.current?.duration ?? 0)}</span>
+    </div>
+  );
+}
+
+function VoiceCommentComposer({
+  body,
+  onBodyChange,
+  onSend,
+  disabled,
+  inputRef,
+  placeholder,
+}: {
+  body: string;
+  onBodyChange: (value: string) => void;
+  onSend: (audioUrl: string | null, audioDuration: number | null) => Promise<void>;
+  disabled?: boolean;
+  inputRef?: RefObject<HTMLInputElement | null>;
+  placeholder: string;
+}) {
+  const recorder = useVoiceCommentRecorder();
+  const [uploading, setUploading] = useState(false);
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (disabled || uploading || (!body.trim() && !recorder.audioBlob)) return;
+    setUploading(true);
+    try {
+      const audioUrl = recorder.audioBlob ? await uploadCommentAudio(recorder.audioBlob) : null;
+      await onSend(audioUrl, recorder.audioBlob ? Math.max(1, recorder.elapsed) : null);
+      recorder.discard();
+      onBodyChange("");
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      setUploading(false);
+    }
+  };
+  return (
+    <form onSubmit={submit} className="comment-form voice-comment-form">
+      <input ref={inputRef} value={body} onChange={event => onBodyChange(event.target.value)} maxLength={500} placeholder={placeholder} aria-label={placeholder} disabled={disabled || recorder.recording || uploading} />
+      {recorder.recording ? (
+        <button type="button" className="voice-recording-button is-recording" onClick={recorder.stop} aria-label="Stop recording"><Square size={15} /> {formatAudioTime(recorder.elapsed)} / 1:00</button>
+      ) : recorder.audioBlob && recorder.previewUrl ? (
+        <div className="voice-comment-preview"><audio src={recorder.previewUrl} controls preload="metadata" /><button type="button" onClick={recorder.discard} aria-label="Delete and re-record"><Trash2 size={15} /></button></div>
+      ) : (
+        <button type="button" className="voice-record-button" onClick={() => recorder.start().catch(notifyError)} disabled={disabled || uploading} aria-label="Record voice comment"><Mic size={17} /></button>
+      )}
+      <button type="submit" className="primary-btn voice-send-button" disabled={disabled || uploading || (!body.trim() && !recorder.audioBlob)}>{uploading ? <Loader2 className="spin" size={15} /> : <Send size={15} />} {uploading ? "Sending…" : "Send"}</button>
+    </form>
+  );
+}
+
 function useOptimisticEngagement(video: VideoRecord) {
   const auth = useAuth();
   const utils = trpc.useUtils();
@@ -303,6 +554,7 @@ function QualityVideoPlayer({
   const containerRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
   const [isInView, setIsInView] = useState(false);
+  const [isNearViewport, setIsNearViewport] = useState(false);
   const [muted, setMuted] = useState(true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const positionRef = useRef(0);
@@ -326,11 +578,11 @@ function QualityVideoPlayer({
     const observer = new IntersectionObserver(
       entries => {
         const entry = entries[0];
-        setIsInView(
-          Boolean(entry?.isIntersecting && entry.intersectionRatio >= 0.7)
-        );
+        const visible = Boolean(entry?.isIntersecting);
+        setIsNearViewport(visible);
+        setIsInView(Boolean(visible && entry.intersectionRatio >= 0.7));
       },
-      { threshold: 0.7 }
+      { rootMargin: "240px 0px", threshold: [0, 0.7] }
     );
     observer.observe(container);
     return () => observer.disconnect();
@@ -340,6 +592,15 @@ function QualityVideoPlayer({
     const element = ref.current;
     if (!element) return;
 
+    if (!isNearViewport) {
+      element.pause();
+      element.removeAttribute("src");
+      element.load();
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
+      setPlaying(false);
+      return;
+    }
     setPlaybackError(null);
     hlsRef.current?.destroy();
     hlsRef.current = null;
@@ -366,7 +627,7 @@ function QualityVideoPlayer({
       element.removeAttribute("src");
       element.load();
     };
-  }, [sourceUrl]);
+  }, [sourceUrl, isNearViewport]);
 
   const restorePlayback = () => {
     const element = ref.current;
@@ -407,7 +668,8 @@ function QualityVideoPlayer({
         controlsList="nofullscreen noplaybackrate"
         disablePictureInPicture
         playsInline
-        preload="metadata"
+        preload={isNearViewport ? "metadata" : "none"}
+        autoPlay={active && isInView}
         muted={muted}
         onLoadedMetadata={restorePlayback}
         onError={() =>
@@ -464,37 +726,6 @@ function QualityVideoPlayer({
   );
 }
 
-function MediaOptionsMenu({
-  videoId,
-}: {
-  videoId: number;
-}) {
-  const [open, setOpen] = useState(false);
-  const copyLink = async () => {
-    const url = `${window.location.origin}/?video=${videoId}`;
-    try {
-      if (!navigator.clipboard) throw new Error("Clipboard unavailable");
-      await navigator.clipboard.writeText(url);
-      toast.success("Video link copied.");
-      setOpen(false);
-    } catch (error) {
-      notifyError(error);
-    }
-  };
-  return (
-    <div className="media-options-menu">
-      <button type="button" className="media-options-trigger" onClick={() => setOpen(value => !value)} aria-label="Open video options" aria-expanded={open}>
-        <MoreVertical size={20} />
-      </button>
-      {open && (
-        <div className="media-options-popover" role="menu">
-          <button type="button" role="menuitem" onClick={() => void copyLink()}>Copy link</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function EngagementActions({
   engagement,
   onReact,
@@ -502,6 +733,7 @@ function EngagementActions({
   onComments,
   pending,
   overlay = false,
+  feedStyle = false,
   bookmarked = false,
   onBookmark,
   owner,
@@ -512,6 +744,7 @@ function EngagementActions({
   onComments: () => void;
   pending: "react" | "share" | null;
   overlay?: boolean;
+  feedStyle?: boolean;
   bookmarked?: boolean;
   onBookmark?: () => void;
   owner?: VideoRecord["owner"];
@@ -546,7 +779,7 @@ function EngagementActions({
   };
   return (
     <div
-      className={`media-engagement-actions${overlay ? " media-engagement-actions--overlay absolute right-3 bottom-4 z-30 flex flex-col items-center gap-3" : " video-card-actions"}`}
+      className={`media-engagement-actions${overlay ? " media-engagement-actions--overlay right-3 z-30 flex flex-col items-center gap-3" : ""}${feedStyle ? " feed-action-bar" : ""}`}
     >
       {overlay && owner && !isOwnVideo && (
         <button
@@ -586,8 +819,19 @@ function EngagementActions({
         <strong>{formatCount(engagement.reactionCount)}</strong>
       </button>
       <button type="button" onClick={onComments} aria-label="Open comments">
-        <MessageCircle size={overlay ? 27 : 16} /> <span>Comments</span>
+        <MessageCircle size={overlay ? 27 : 16} /> <span>Comment</span>
         <strong>{formatCount(engagement.commentCount)}</strong>
+      </button>
+      <button
+        type="button"
+        className={engagement.viewerShared ? "is-active" : ""}
+        onClick={onShare}
+        disabled={pending === "share"}
+        aria-label="Share video"
+      >
+        <Share2 size={overlay ? 28 : 16} />
+        <span>{pending === "share" ? "Sharing" : "Share"}</span>
+        <strong>{formatCount(engagement.shareCount)}</strong>
       </button>
       {onBookmark && (
         <button
@@ -601,51 +845,142 @@ function EngagementActions({
           <span>{bookmarked ? "Saved" : "Save"}</span>
         </button>
       )}
-      <button
-        type="button"
-        className={engagement.viewerShared ? "is-active" : ""}
-        onClick={onShare}
-        disabled={pending === "share"}
-        aria-label="Share video"
-      >
-        <Share2 size={overlay ? 28 : 16} />
-        <span>{pending === "share" ? "Sharing" : "Share"}</span>
-        <strong>{formatCount(engagement.shareCount)}</strong>
-      </button>
     </div>
   );
 }
 function CommentsPanel({
   videoId,
+  postOwnerId,
   open,
   overlay = false,
   onClose,
 }: {
   videoId: number;
+  postOwnerId: number;
   open: boolean;
   overlay?: boolean;
   onClose?: () => void;
 }) {
   const auth = useAuth();
   const [body, setBody] = useState("");
+  const [replyTo, setReplyTo] = useState<{ id: number; username: string } | null>(null);
+  const [likingId, setLikingId] = useState<number | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const commentsQuery = trpc.videos.comments.list.useQuery(
     { videoId },
     { enabled: open, refetchOnWindowFocus: false }
   );
   const createComment = trpc.videos.comments.create.useMutation();
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!body.trim()) return;
+  const likeComment = trpc.videos.comments.like.useMutation();
+  const deleteComment = trpc.videos.comments.delete.useMutation();
+  const comments = commentsQuery.data ?? [];
+
+  useEffect(() => {
+    if (replyTo) inputRef.current?.focus();
+  }, [replyTo]);
+
+  const submitComment = async (audioUrl: string | null, audioDuration: number | null) => {
     if (!auth.isAuthenticated) return auth.openAuth();
+    await createComment.mutateAsync({
+      videoId,
+      body: body.trim(),
+      audioUrl,
+      audioDuration,
+      parentId: replyTo?.id,
+    });
+    setBody("");
+    setReplyTo(null);
+    await commentsQuery.refetch();
+  };
+
+  const toggleLike = async (commentId: number) => {
+    if (!auth.isAuthenticated) return auth.openAuth();
+    if (likingId !== null) return;
+    setLikingId(commentId);
     try {
-      await createComment.mutateAsync({ videoId, body: body.trim() });
-      setBody("");
+      await likeComment.mutateAsync({ commentId });
+      await commentsQuery.refetch();
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      setLikingId(null);
+    }
+  };
+
+  const removeComment = async (commentId: number) => {
+    if (!auth.isAuthenticated || deleteComment.isPending) return;
+    try {
+      await deleteComment.mutateAsync({ commentId });
+      if (replyTo?.id === commentId) setReplyTo(null);
       await commentsQuery.refetch();
     } catch (error) {
       notifyError(error);
     }
   };
+
+  const renderComment = (comment: (typeof comments)[number], depth = 0): ReactNode => {
+    const username = comment.author.username?.trim() || "member";
+    const canDelete =
+      auth.user?.id === comment.author.id || auth.user?.id === postOwnerId;
+    const replies = comments.filter(reply => reply.parentId === comment.id);
+    return (
+      <div
+        className={depth ? "video-comment-thread video-comment-thread--reply" : "video-comment-thread"}
+        key={comment.id}
+      >
+        <div className="video-comment">
+          <div className="video-comment-heading">
+            <strong>{displayName(comment.author.name, comment.author.username)}</strong>
+            <span className="video-comment-actions">
+              <button
+                type="button"
+                className="video-comment-action"
+                onClick={() => setReplyTo({ id: comment.id, username })}
+                aria-label={`Reply to @${username}`}
+              >
+                Reply
+              </button>
+              {canDelete && (
+                <button
+                  type="button"
+                  className="video-comment-action video-comment-action--danger"
+                  onClick={() => void removeComment(comment.id)}
+                  disabled={deleteComment.isPending}
+                  aria-label="Delete comment"
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </span>
+          </div>
+          {comment.body && <span>{comment.body}</span>}
+          {comment.audioUrl && (
+            <CommentAudioPlayer src={comment.audioUrl} duration={comment.audioDuration} />
+          )}
+          <div className="video-comment-footer">
+            <button
+              type="button"
+              className={`video-comment-like${comment.viewerLiked ? " is-active" : ""}`}
+              onClick={() => void toggleLike(comment.id)}
+              disabled={likingId !== null}
+              aria-pressed={comment.viewerLiked}
+              aria-label={comment.viewerLiked ? "Remove Pookie from comment" : "Pookie this comment"}
+            >
+              <Heart size={14} fill={comment.viewerLiked ? "currentColor" : "none"} />
+              <span>{comment.likeCount}</span>
+            </button>
+            {replyTo?.id === comment.id && (
+              <span className="video-comment-replying">Replying to @{username}</span>
+            )}
+          </div>
+        </div>
+        {replies.map(reply => renderComment(reply, depth + 1))}
+      </div>
+    );
+  };
+
   if (!open) return null;
+  const roots = comments.filter(comment => !comment.parentId);
   return (
     <div
       className={`video-comments${overlay ? " video-comments--overlay" : ""}`}
@@ -666,41 +1001,166 @@ function CommentsPanel({
       {commentsQuery.isPending ? (
         <div className="comment-loading">Loading comments…</div>
       ) : commentsQuery.isError ? (
-        <div className="comment-loading">
-          Comments are temporarily unavailable.
-        </div>
-      ) : commentsQuery.data?.length ? (
-        commentsQuery.data.map(comment => (
-          <div className="video-comment" key={comment.id}>
-            <strong>
-              {displayName(comment.author.name, comment.author.username)}
-            </strong>
-            <span>{comment.body}</span>
-          </div>
-        ))
+        <div className="comment-loading">Comments are temporarily unavailable.</div>
+      ) : roots.length ? (
+        roots.map(comment => renderComment(comment))
       ) : (
-        <div className="comment-loading">
-          No comments yet. Start the conversation.
+        <div className="comment-loading">No comments yet. Start the conversation.</div>
+      )}
+      {replyTo && (
+        <div className="comment-replying-banner">
+          Replying to @{replyTo.username}
+          <button type="button" onClick={() => setReplyTo(null)} aria-label="Cancel reply">
+            <X size={14} />
+          </button>
         </div>
       )}
-      <form onSubmit={submit} className="comment-form">
-        <input
-          value={body}
-          onChange={event => setBody(event.target.value)}
-          maxLength={500}
-          placeholder={
-            auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"
-          }
-          aria-label="Write a comment"
-        />
-        <button
-          type="submit"
-          className="primary-btn"
-          disabled={createComment.isPending || !body.trim()}
-        >
-          Post
-        </button>
-      </form>
+      <VoiceCommentComposer
+        body={body}
+        onBodyChange={setBody}
+        onSend={submitComment}
+        disabled={createComment.isPending}
+        inputRef={inputRef}
+        placeholder={auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"}
+      />
+    </div>
+  );
+}
+
+function getRawPulseVoterKey() {
+  if (typeof window === "undefined") return "server-render-voter-key";
+  const storageKey = "kinba.raw-pulse.voter-key";
+  const existing = window.localStorage.getItem(storageKey);
+  if (existing) return existing;
+  const generated = `anon-${crypto.randomUUID()}`;
+  window.localStorage.setItem(storageKey, generated);
+  return generated;
+}
+
+function RawPulseCard({ videoId }: { videoId: number }) {
+  const voterKey = useMemo(getRawPulseVoterKey, []);
+  const query = trpc.rawPulse.get.useQuery(
+    { videoId, voterKey },
+    { refetchInterval: 5000, refetchOnWindowFocus: true, staleTime: 2000 }
+  );
+  const voteMutation = trpc.rawPulse.vote.useMutation();
+  const [votingOptionId, setVotingOptionId] = useState<number | null>(null);
+  if (!query.data) return null;
+  const pulse = query.data;
+  const vote = async (optionId: number) => {
+    if (pulse.isClosed || voteMutation.isPending) return;
+    setVotingOptionId(optionId);
+    try {
+      await voteMutation.mutateAsync({ pollId: pulse.id, optionId, voterKey });
+      await query.refetch();
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      setVotingOptionId(null);
+    }
+  };
+  return (
+    <section className="raw-pulse" aria-label="Raw Pulse anonymous poll">
+      <div className="raw-pulse__heading">
+        <span className="eyebrow">Raw Pulse</span>
+        <span>{pulse.isClosed ? "Closed" : `${pulse.totalVotes} anonymous votes`}</span>
+      </div>
+      <h3>{pulse.question}</h3>
+      <div className="raw-pulse__options">
+        {pulse.options.map(option => {
+          const percentage = pulse.totalVotes ? Math.round((option.votes / pulse.totalVotes) * 100) : 0;
+          return (
+            <button
+              key={option.id}
+              type="button"
+              className={`raw-pulse__option${option.selected ? " is-selected" : ""}`}
+              onClick={() => void vote(option.id)}
+              disabled={pulse.isClosed || voteMutation.isPending}
+              aria-pressed={option.selected}
+            >
+              <span className="raw-pulse__bar" style={{ width: `${percentage}%` }} />
+              <span className="raw-pulse__label">{option.label}</span>
+              <span className="raw-pulse__result">{votingOptionId === option.id ? "…" : `${percentage}%`}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="raw-pulse__note">Anonymous on this device · You can change your vote.</p>
+    </section>
+  );
+}
+
+function PostManagementMenu({
+  video,
+  onUpdated,
+  onDeleted,
+}: {
+  video: VideoRecord;
+  onUpdated: (description: string) => void;
+  onDeleted: () => void;
+}) {
+  const auth = useAuth();
+  const utils = trpc.useUtils();
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [description, setDescription] = useState(video.description);
+  const updateMutation = trpc.videos.updateDescription.useMutation();
+  const deleteMutation = trpc.videos.delete.useMutation();
+  if (auth.user?.id !== video.owner.id) return null;
+  const saveCaption = async () => {
+    try {
+      const result = await updateMutation.mutateAsync({ videoId: video.id, description });
+      onUpdated(result.description);
+      setEditing(false);
+      setOpen(false);
+      await utils.home.feed.invalidate();
+      toast.success("Caption updated.");
+    } catch (error) {
+      notifyError(error);
+    }
+  };
+  const removePost = async () => {
+    try {
+      await deleteMutation.mutateAsync({ videoId: video.id });
+      await utils.home.feed.invalidate();
+      toast.success("Post deleted.");
+      onDeleted();
+    } catch (error) {
+      notifyError(error);
+    }
+  };
+  return (
+    <div className="post-management" onClick={event => event.stopPropagation()}>
+      <button type="button" className="feed-post-more" aria-label="Post options" onClick={() => setOpen(value => !value)}>
+        <MoreHorizontal size={19} />
+      </button>
+      {open && !editing && !confirming && (
+        <div className="post-management__menu" role="menu">
+          <button type="button" onClick={() => setEditing(true)} role="menuitem">Edit Caption</button>
+          <button type="button" className="is-danger" onClick={() => setConfirming(true)} role="menuitem">Delete Post</button>
+        </div>
+      )}
+      {editing && (
+        <div className="post-management__dialog" role="dialog" aria-label="Edit caption">
+          <strong>Edit Caption</strong>
+          <textarea value={description} maxLength={2000} onChange={event => setDescription(event.target.value)} autoFocus />
+          <div className="post-management__dialog-actions">
+            <button type="button" onClick={() => setEditing(false)} disabled={updateMutation.isPending}>Cancel</button>
+            <button type="button" className="is-primary" onClick={() => void saveCaption()} disabled={updateMutation.isPending}>{updateMutation.isPending ? "Saving…" : "Save"}</button>
+          </div>
+        </div>
+      )}
+      {confirming && (
+        <div className="post-management__dialog" role="alertdialog" aria-label="Confirm post deletion">
+          <strong>Delete this post?</strong>
+          <p>This permanently removes the post and its stored media.</p>
+          <div className="post-management__dialog-actions">
+            <button type="button" onClick={() => setConfirming(false)} disabled={deleteMutation.isPending}>Cancel</button>
+            <button type="button" className="is-danger" onClick={() => void removePost()} disabled={deleteMutation.isPending}>{deleteMutation.isPending ? "Deleting…" : "Delete"}</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -709,13 +1169,19 @@ function VideoCard({
   video,
   active = true,
   showDetailsOverlay = false,
+  socialLayout = false,
+  onOpenViewer,
 }: {
   video: VideoRecord;
   active?: boolean;
   showDetailsOverlay?: boolean;
+  socialLayout?: boolean;
+  onOpenViewer?: () => void;
   showHeader?: boolean;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [description, setDescription] = useState(video.description);
+  const [deleted, setDeleted] = useState(false);
   const auth = useAuth();
   const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
   const bookmarkMutation = trpc.videos.bookmark.useMutation();
@@ -734,6 +1200,16 @@ function VideoCard({
   const [views, setViews] = useState(video.viewCount);
   const viewMutation = trpc.videos.view.useMutation();
   const { current, react, share, pending } = useOptimisticEngagement(video);
+  const openViewer = (event: MouseEvent<HTMLElement>) => {
+    if (!onOpenViewer) return;
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      target.closest("button, a, input, textarea, select")
+    )
+      return;
+    onOpenViewer();
+  };
   const recordView = () => {
     if (viewMutation.isPending) return;
     void viewMutation
@@ -741,8 +1217,91 @@ function VideoCard({
       .then(result => setViews(result.viewCount))
       .catch(() => undefined);
   };
+  if (deleted) return null;
+  if (socialLayout) {
+    return (
+      <article
+        id={`feed-video-${video.id}`}
+        className="feed-media-post"
+        role={onOpenViewer ? "button" : undefined}
+        tabIndex={onOpenViewer ? 0 : undefined}
+        onClick={openViewer}
+      >
+        <header className="feed-post-author">
+          <div className="video-owner-avatar">
+            {video.owner.photoUrl ? (
+              <img src={video.owner.photoUrl} alt="" />
+            ) : (
+              <UserRound size={16} />
+            )}
+          </div>
+          <div className="feed-post-author-info">
+            <strong>
+              {displayName(video.owner.name, video.owner.username)}
+              {video.owner.isVerified && (
+                <BadgeCheck
+                  className="verified-badge"
+                  size={13}
+                  aria-label="Verified profile"
+                />
+              )}
+            </strong>
+            <span>
+              {relativeTime(video.createdAt)} ·{" "}
+              {video.mediaType === "IMAGE" ? "Photo" : "Video"}
+            </span>
+          </div>
+          <PostManagementMenu video={video} onUpdated={setDescription} onDeleted={() => setDeleted(true)} />
+        </header>
+        {(video.title || video.description) && (
+          <div className="feed-media-copy">
+            {video.title && <h3>{video.title}</h3>}
+            {description && <p>{description}</p>}
+          </div>
+        )}
+        <div className={`feed-media-content${video.mediaType === "VIDEO" ? " feed-media-content--video" : ""}`}>
+          {video.mediaType === "IMAGE" ? (
+            <img
+              src={resolveMediaUrl(video.videoUrl) ?? video.videoUrl}
+              alt={video.title || "Post"}
+              loading="lazy"
+            />
+          ) : (
+            <QualityVideoPlayer
+              video={video}
+              active={active}
+              onFirstPlay={recordView}
+            />
+          )}
+        </div>
+        <RawPulseCard videoId={video.id} />
+        <EngagementActions
+          engagement={current}
+          onReact={react}
+          onShare={share}
+          onComments={() => setCommentsOpen(value => !value)}
+          pending={pending}
+          feedStyle
+          bookmarked={bookmarked}
+          onBookmark={toggleBookmark}
+        />
+        <CommentsPanel
+          videoId={video.id}
+          postOwnerId={video.owner.id}
+          open={commentsOpen}
+          onClose={() => setCommentsOpen(false)}
+        />
+      </article>
+    );
+  }
   return (
-    <article className="long-video-card snap-start h-full w-full overflow-hidden box-border">
+    <article
+      id={`feed-video-${video.id}`}
+      className="long-video-card snap-start h-full w-full overflow-hidden box-border"
+      role={onOpenViewer ? "button" : undefined}
+      tabIndex={onOpenViewer ? 0 : undefined}
+      onClick={openViewer}
+    >
               <div className={`media-fullscreen-frame ${video.mediaType === "IMAGE" ? "media-photo-frame" : ""}`}>
         {video.mediaType === "IMAGE" ? (
           <img
@@ -757,122 +1316,49 @@ function VideoCard({
             onFirstPlay={recordView}
           />
         )}
-        <MediaOptionsMenu videoId={video.id} />
-
-        {showDetailsOverlay && (
-          <div className="media-overlay-copy">
-            <div className="media-overlay-details">
-              <div className="media-owner">
-                <div className="video-owner-identity">
-                  <div className="video-owner-avatar">
-                    {video.owner.photoUrl ? (
-                      <img src={video.owner.photoUrl} alt="" />
-                    ) : (
-                      <UserRound size={16} />
-                    )}
-                  </div>
-                  <div>
-                    <strong className="video-owner-name">
-                      <span>
-                        {displayName(video.owner.name, video.owner.username)}
-                      </span>
-                      {video.owner.isVerified && (
-                        <BadgeCheck
-                          className="verified-badge"
-                          size={12}
-                          aria-label="Verified profile"
-                        />
-                      )}
-                    </strong>
-                    <span>
-                      {ownerHandle(video.owner.name, video.owner.username)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <h3>{video.title}</h3>
-              <p>{video.description}</p>
-              <p className="media-caption-tags">
-                {ownerHandle(video.owner.name, video.owner.username)} · {hashtagsFromDescription(video.description)}
-              </p>
-              {video.mediaType !== "IMAGE" && (
-                <p className="media-sound-track">
-                  <Volume2 size={14} aria-hidden="true" /> Original sound · {ownerHandle(video.owner.name, video.owner.username)}
-                </p>
-              )}
-              <div className="media-meta-line" aria-label="Media metadata">
-                <span>{formatCount(views)} views</span>
-                <span>{relativeTime(video.createdAt)}</span>
-                <span>{video.mediaType === "IMAGE" ? "Photo" : video.kind === "SHORT" ? "Short" : "Video"}</span>
-              </div>
-            </div>
-            <EngagementActions
-              engagement={current}
-              onReact={react}
-              onShare={share}
-              onComments={() => setCommentsOpen(value => !value)}
-              pending={pending}
-              overlay
-              bookmarked={bookmarked}
-              onBookmark={toggleBookmark}
-              owner={video.owner}
-            />
-          </div>
-        )}
       </div>
-      {!showDetailsOverlay && (
-                  <div className={video.mediaType === "IMAGE" ? "video-card-details photo-card-details" : "video-card-details"}>
-
-          <div className="media-owner">
+      <RawPulseCard videoId={video.id} />
+      <div className={video.mediaType === "IMAGE" ? "video-card-details photo-card-details" : "video-card-details"}>
+        <PostManagementMenu video={video} onUpdated={setDescription} onDeleted={() => setDeleted(true)} />
+        <div className="media-owner">
+          <a className="profile-link" href={`/profile/${video.owner.id}`} aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}>
             <div className="video-owner-identity">
               <div className="video-owner-avatar">
-                {video.owner.photoUrl ? (
-                  <img src={video.owner.photoUrl} alt="" />
-                ) : (
-                  <UserRound size={16} />
-                )}
+                {video.owner.photoUrl ? <img src={video.owner.photoUrl} alt="" /> : <UserRound size={16} />}
               </div>
               <div>
                 <strong className="video-owner-name">
-                  <span>
-                    {displayName(video.owner.name, video.owner.username)}
-                  </span>
-                  {video.owner.isVerified && (
-                    <BadgeCheck
-                      className="verified-badge"
-                      size={12}
-                      aria-label="Verified profile"
-                    />
-                  )}
+                  <span>{displayName(video.owner.name, video.owner.username)}</span>
+                  {video.owner.isVerified && <BadgeCheck className="verified-badge" size={12} aria-label="Verified profile" />}
                 </strong>
-                <span>
-                  {ownerHandle(video.owner.name, video.owner.username)}
-                </span>
+                <span>{ownerHandle(video.owner.name, video.owner.username)}</span>
               </div>
             </div>
-          </div>
-          <h3>{video.title}</h3>
-          <p className="media-caption-copy">{video.description}</p>
-          <p className="media-caption-tags">{ownerHandle(video.owner.name, video.owner.username)} · {hashtagsFromDescription(video.description)}</p>
-          {video.mediaType !== "IMAGE" && <p className="media-sound-track"><Volume2 size={14} aria-hidden="true" /> Original sound · {ownerHandle(video.owner.name, video.owner.username)}</p>}
-          <div className="media-meta-line" aria-label="Media metadata">
-            <span>{formatCount(views)} views</span>
-            <span>{relativeTime(video.createdAt)}</span>
-            <span>{video.mediaType === "IMAGE" ? "Photo" : video.kind === "SHORT" ? "Short" : "Video"}</span>
-          </div>
-          <EngagementActions
-            engagement={current}
-            onReact={react}
-            onShare={share}
-            onComments={() => setCommentsOpen(value => !value)}
-            pending={pending}
-            bookmarked={bookmarked}
-            onBookmark={toggleBookmark}
-          />
+          </a>
         </div>
-      )}
+        <h3>{video.title}</h3>
+        <p>{description}</p>
+        <p className="media-caption-tags">
+          {ownerHandle(video.owner.name, video.owner.username)} · {hashtagsFromDescription(video.description)}
+        </p>
+        <div className="media-meta-line" aria-label="Media metadata">
+          <span>{formatCount(views)} views</span>
+          <span>{relativeTime(video.createdAt)}</span>
+          <span>{video.mediaType === "IMAGE" ? "Photo" : video.kind === "SHORT" ? "Short" : "Video"}</span>
+        </div>
+        <EngagementActions
+          engagement={current}
+          onReact={react}
+          onShare={share}
+          onComments={() => setCommentsOpen(value => !value)}
+          pending={pending}
+          bookmarked={bookmarked}
+          onBookmark={toggleBookmark}
+        />
+      </div>
       <CommentsPanel
         videoId={video.id}
+        postOwnerId={video.owner.id}
         open={commentsOpen}
         overlay={showDetailsOverlay}
         onClose={() => setCommentsOpen(false)}
@@ -880,6 +1366,8 @@ function VideoCard({
     </article>
   );
 }
+const MemoVideoCard = memo(VideoCard);
+
 function UploadVideoPanel({
   onPublished,
   detailsRef,
@@ -1174,7 +1662,34 @@ function FeedPhotoLightbox({
 }
 
 function TextFeedCard({ post }: { post: FeedTextRecord }) {
+  const auth = useAuth();
+  const [reacted, setReacted] = useState(post.viewerReacted ?? false);
+  const [bookmarked, setBookmarked] = useState(post.viewerBookmarked ?? false);
+  const [reactionCount, setReactionCount] = useState(post.reactionCount ?? 0);
+  const reactMutation = trpc.community.react.useMutation();
+  const bookmarkMutation = trpc.community.bookmark.useMutation();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const toggleReaction = async () => {
+    if (!auth.isAuthenticated) return auth.openAuth();
+    if (reactMutation.isPending) return;
+    try {
+      const result = await reactMutation.mutateAsync({ announcementId: post.id });
+      setReacted(result.viewerReacted);
+      setReactionCount(count => count + (result.viewerReacted ? 1 : -1));
+    } catch (error) {
+      notifyError(error);
+    }
+  };
+  const toggleBookmark = async () => {
+    if (!auth.isAuthenticated) return auth.openAuth();
+    if (bookmarkMutation.isPending) return;
+    try {
+      const result = await bookmarkMutation.mutateAsync({ announcementId: post.id });
+      setBookmarked(result.viewerBookmarked);
+    } catch (error) {
+      notifyError(error);
+    }
+  };
   const share = async () => {
     const url = window.location.origin + "/?announcement=" + post.id;
     try {
@@ -1190,17 +1705,21 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
     }
   };
   return (
-    <article className="feed-text-card">
-      <div className="feed-post-author">
+    <article id={`feed-post-${post.id}`} className="feed-text-card">
+      <a className="feed-post-author profile-link" href={`/profile/${post.author.id}`} aria-label={`Open ${post.author.name ?? "KINBA creator"} profile`}>
         <div className="video-owner-avatar">
           {post.author.photoUrl ? <img src={post.author.photoUrl} alt="" /> : <UserRound size={16} />}
         </div>
-        <div>
-          <strong>{post.author.name ?? "KINBA creator"}</strong>
+         <div className="feed-post-author-info">
+           <strong>
+             {post.author.name ?? "KINBA creator"}
+             {post.author.isVerified && (
+               <BadgeCheck size={13} aria-label="Verified profile" />
+             )}
+           </strong>
           <span>{post.author.accountType} · {relativeTime(post.createdAt)}</span>
         </div>
-        {post.author.isVerified && <BadgeCheck size={14} aria-label="Verified profile" />}
-      </div>
+      </a>
       <p className="feed-post-body">{post.text}</p>
       {post.attachments.length > 0 && (
         <div className={post.attachments.length > 1 ? "feed-post-attachments has-grid" : "feed-post-attachments"}>
@@ -1216,27 +1735,69 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
         </div>
       )}
       <div className="feed-post-actions">
+         <button
+           type="button"
+           className={reacted ? "is-active" : ""}
+           onClick={toggleReaction}
+           disabled={reactMutation.isPending}
+           aria-pressed={reacted}
+           aria-label={reacted ? "Remove Pookie" : "Pookie post"}
+         >
+           <Heart size={15} fill={reacted ? "currentColor" : "none"} />
+           Pookie <strong>{formatCount(reactionCount)}</strong>
+         </button>
         <AnnouncementComments announcementId={post.id} commentCount={post.commentCount} />
         <button type="button" onClick={share} aria-label="Share post"><Share2 size={15} /> Share</button>
+         <button
+           type="button"
+           className={bookmarked ? "is-active" : ""}
+           onClick={toggleBookmark}
+           disabled={bookmarkMutation.isPending}
+           aria-pressed={bookmarked}
+           aria-label={bookmarked ? "Remove saved post" : "Save post"}
+         >
+           <Bookmark size={15} fill={bookmarked ? "currentColor" : "none"} />{" "}
+           {bookmarked ? "Saved" : "Save"}
+         </button>
       </div>
       {lightboxIndex !== null && <FeedPhotoLightbox attachments={post.attachments} index={lightboxIndex} onClose={() => setLightboxIndex(null)} onChange={setLightboxIndex} />}
     </article>
   );
 }
 
-function ShortsInsertionBlock({ video, active }: { video: VideoRecord; active: boolean }) {
+function ShortsInsertionBlock({
+  video,
+  active,
+  onOpenViewer,
+}: {
+  video: VideoRecord;
+  active: boolean;
+  onOpenViewer: () => void;
+}) {
   return (
-    <section className="shorts-insertion-block" aria-label="Shorts discovery">
+    <section id={`feed-video-${video.id}`} className="shorts-insertion-block" aria-label="Shorts discovery">
       <div className="shorts-insertion-heading">
         <div><span className="eyebrow">Shorts</span><strong>Quick discovery</strong></div>
         <span>From the KINBA community</span>
       </div>
-      <ShortVideoCard video={video} index={0} active={active} compact />
+       <MemoShortVideoCard
+         video={video}
+         index={0}
+         active={active}
+         compact
+         onOpenViewer={onOpenViewer}
+       />
     </section>
   );
 }
 
-function UnifiedFeedPanel({ active = true }: { active?: boolean }) {
+function UnifiedFeedPanel({
+  active = true,
+  onOpenShort,
+}: {
+  active?: boolean;
+  onOpenShort: (videoId: number) => void;
+}) {
   const query = trpc.home.feed.useQuery(
     { tab: "all" },
     { retry: 1, throwOnError: false, refetchOnWindowFocus: false, staleTime: 30_000 }
@@ -1248,14 +1809,28 @@ function UnifiedFeedPanel({ active = true }: { active?: boolean }) {
         <div className="unified-feed-list">
           {items.map(item => {
             if (item.feedType === "media")
-              return <VideoCard key={"media-" + item.id} video={item} active={active} />;
+              return (
+                <MemoVideoCard
+                  key={"media-" + item.id}
+                  video={item}
+                  active={active}
+                  socialLayout
+                />
+              );
             if (item.feedType === "text")
               return <TextFeedCard key={"text-" + item.id} post={item} />;
-            return <ShortsInsertionBlock key={item.id} video={item.video} active={active} />;
+             return (
+               <ShortsInsertionBlock
+                 key={item.id}
+                 video={item.video}
+                 active={active}
+                 onOpenViewer={() => onOpenShort(item.video.id)}
+               />
+             );
           })}
         </div>
       ) : (
-        <div className="media-empty" role="status">
+        <div className="media-empty feed-empty-state" role="status">
           <h3>Your feed is quiet.</h3>
           <p>Real posts from the KINBA community will appear here.</p>
         </div>
@@ -1270,12 +1845,14 @@ function HomeFeedPanel({
   autoOpenUpload = false,
   showDetailsOverlay = true,
   showHeader = true,
+  onOpenShort,
 }: {
   tab: HomeTab;
   active?: boolean;
   autoOpenUpload?: boolean;
   showDetailsOverlay?: boolean;
   showHeader?: boolean;
+  onOpenShort?: (videoId: number) => void;
 }) {
   const auth = useAuth();
   const utils = trpc.useUtils();
@@ -1289,9 +1866,7 @@ function HomeFeedPanel({
       staleTime: 30_000,
     }
   );
-  const videos = ((query.data ?? []) as VideoRecord[]).filter(
-    video => !isReportedLegacyMedia(video)
-  );
+   const videos = (query.data ?? []) as VideoRecord[];
   const uploadDetailsRef = useRef<HTMLDetailsElement>(null);
   const openUploader = () => {
     uploadDetailsRef.current?.setAttribute("open", "");
@@ -1336,29 +1911,33 @@ function HomeFeedPanel({
       ) : videos.length ? (
         <div className="unified-feed-list feed-video-list w-full max-w-full box-border">
           {videos.map(video => (
-            <VideoCard
+            <MemoVideoCard
               key={video.id}
               video={video}
               active={active}
               showDetailsOverlay={showDetailsOverlay}
+              socialLayout={tab === "videos"}
+               onOpenViewer={
+                 tab === "wheels" && video.kind === "SHORT" && onOpenShort
+                   ? () => onOpenShort(video.id)
+                   : undefined
+               }
             />
           ))}
         </div>
       ) : (
-        <div className="media-empty">
+        <div className="media-empty feed-empty-state">
           <Play size={18} />
           <h3>
             {tab === "following" && !auth.isAuthenticated
               ? "Sign in to see Following."
-              : "No videos available yet. Be the first creator!"}
+              : "No videos to show yet."}
           </h3>
-          <p>
-            {tabOptions.find(option => option.id === tab)?.caption}. Publish a
-            video and it will appear here.
-          </p>
-          <button type="button" className="primary-btn" onClick={openUploader}>
-            <Upload size={15} /> Upload Video
-          </button>
+           {tab !== "wheels" && (
+             <button type="button" className="primary-btn" onClick={openUploader}>
+               <Upload size={15} /> Upload Video
+             </button>
+           )}
         </div>
       )}
       <UploadVideoPanel
@@ -1378,11 +1957,13 @@ function ShortVideoCard({
   index,
   active,
   compact = false,
+  onOpenViewer,
 }: {
   video: VideoRecord;
   index: number;
   active: boolean;
   compact?: boolean;
+  onOpenViewer?: () => void;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const auth = useAuth();
@@ -1405,21 +1986,39 @@ function ShortVideoCard({
     <article
       className={`short-card${compact ? " short-card--compact" : ""} snap-start h-full w-full overflow-hidden box-border`}
       data-short-index={index}
+      role={onOpenViewer ? "button" : undefined}
+      tabIndex={onOpenViewer ? 0 : undefined}
+      onClick={event => {
+        if (!onOpenViewer) return;
+        const target = event.target;
+        if (
+          target instanceof HTMLElement &&
+          target.closest("button, a, input, textarea, select")
+        )
+          return;
+        onOpenViewer();
+      }}
+      onKeyDown={event => {
+        if (!onOpenViewer || (event.key !== "Enter" && event.key !== " "))
+          return;
+        event.preventDefault();
+        onOpenViewer();
+      }}
     >
       {video.mediaType === "IMAGE" ? (
         <img
-          src={resolveMediaUrl(video.videoUrl) ?? video.videoUrl}
+          src={video.videoUrl}
           className="w-full h-auto object-cover rounded-lg"
           alt={video.title || "Post"}
         />
       ) : (
         <QualityVideoPlayer video={video} vertical active={active} />
       )}
-      <MediaOptionsMenu videoId={video.id} />
       <div className="short-overlay">
         <div className="short-overlay-details">
           <div className="media-owner">
-            <div className="video-owner-identity">
+            <a className="profile-link" href={`/profile/${video.owner.id}`} aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}>
+                <div className="video-owner-identity">
               <div className="video-owner-avatar">
                 {video.owner.photoUrl ? (
                   <img src={video.owner.photoUrl} alt="" />
@@ -1445,6 +2044,7 @@ function ShortVideoCard({
                 </span>
               </div>
             </div>
+            </a>
           </div>
           <strong className="short-title">{video.title}</strong>
           <p>{video.description}</p>
@@ -1469,6 +2069,7 @@ function ShortVideoCard({
       </div>
       <CommentsPanel
         videoId={video.id}
+        postOwnerId={video.owner.id}
         open={commentsOpen}
         overlay
         onClose={() => setCommentsOpen(false)}
@@ -1477,7 +2078,15 @@ function ShortVideoCard({
   );
 }
 
-function ShortsFeed({ active = true }: { active?: boolean }) {
+const MemoShortVideoCard = memo(ShortVideoCard);
+
+function ShortsFeed({
+  active = true,
+  initialVideoId,
+}: {
+  active?: boolean;
+  initialVideoId?: number;
+}) {
   const query = trpc.home.feed.useQuery(
     { tab: "shorts" },
     {
@@ -1495,9 +2104,20 @@ function ShortsFeed({ active = true }: { active?: boolean }) {
     uploadDetailsRef.current?.setAttribute("open", "");
     uploadDetailsRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
-  const videos = ((query.data ?? []) as VideoRecord[]).filter(
-    video => !isReportedLegacyMedia(video)
-  );
+  const videos = (query.data ?? []) as VideoRecord[];
+  useEffect(() => {
+    if (initialVideoId === undefined || !videos.length) return;
+    const nextIndex = Math.max(
+      0,
+      videos.findIndex(video => video.id === initialVideoId)
+    );
+    setActiveIndex(nextIndex);
+    requestAnimationFrame(() => {
+      viewportRef.current
+        ?.querySelector<HTMLElement>(`[data-short-index="${nextIndex}"]`)
+        ?.scrollIntoView({ behavior: "auto", block: "start" });
+    });
+  }, [initialVideoId, videos.length]);
   const goTo = (index: number) => {
     const clamped = Math.max(
       0,
@@ -1565,19 +2185,18 @@ function ShortsFeed({ active = true }: { active?: boolean }) {
           onScroll={onScroll}
         >
           {videos.map((video, index) => (
-            <ShortVideoCard
+            <MemoShortVideoCard
               key={video.id}
               video={video}
               index={index}
-              active={active}
+              active={active && index === activeIndex}
             />
           ))}
         </div>
       ) : (
-        <div className="media-empty">
+        <div className="media-empty feed-empty-state">
           <Play size={18} />
-          <h3>No Shorts yet.</h3>
-          <p>Publish a video of 60 seconds or less to start the Shorts feed.</p>
+          <h3>No Shorts to show yet.</h3>
         </div>
       )}
       <UploadVideoPanel
@@ -1790,21 +2409,10 @@ function AnnouncementComments({
     { enabled: open, refetchOnWindowFocus: false }
   );
   const createComment = trpc.community.comments.create.useMutation();
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const trimmed = body.trim();
-    if (!trimmed) return;
+  const submitComment = async (audioUrl: string | null, audioDuration: number | null) => {
     if (!auth.isAuthenticated) return auth.openAuth();
-    try {
-      await createComment.mutateAsync({ announcementId, body: trimmed });
-      setBody("");
-      await Promise.all([
-        commentsQuery.refetch(),
-        utils.community.list.invalidate(),
-      ]);
-    } catch (error) {
-      notifyError(error);
-    }
+    await createComment.mutateAsync({ announcementId, body: body.trim(), audioUrl, audioDuration });
+    await Promise.all([commentsQuery.refetch(), utils.community.list.invalidate()]);
   };
   const visibleCount = commentsQuery.data?.length ?? commentCount;
   return (
@@ -1816,7 +2424,7 @@ function AnnouncementComments({
         aria-expanded={open}
       >
         <MessageCircle size={15} />
-        Comments <strong>{formatCount(visibleCount)}</strong>
+         Comment <strong>{formatCount(visibleCount)}</strong>
       </button>
       {open && (
         <div className="announcement-comments__panel" aria-live="polite">
@@ -1832,7 +2440,8 @@ function AnnouncementComments({
                 <strong>
                   {displayName(comment.author.name, comment.author.username)}
                 </strong>
-                <span>{comment.body}</span>
+                {comment.body && <span>{comment.body}</span>}
+                {comment.audioUrl && <CommentAudioPlayer src={comment.audioUrl} duration={comment.audioDuration} />}
               </div>
             ))
           ) : (
@@ -1840,24 +2449,13 @@ function AnnouncementComments({
               No comments yet. Start the conversation.
             </div>
           )}
-          <form onSubmit={submit} className="comment-form">
-            <input
-              value={body}
-              onChange={event => setBody(event.target.value)}
-              maxLength={500}
-              placeholder={
-                auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"
-              }
-              aria-label="Write a comment on this post"
-            />
-            <button
-              type="submit"
-              className="primary-btn"
-              disabled={createComment.isPending || !body.trim()}
-            >
-              {createComment.isPending ? "Posting…" : "Post"}
-            </button>
-          </form>
+          <VoiceCommentComposer
+            body={body}
+            onBodyChange={setBody}
+            onSend={submitComment}
+            disabled={createComment.isPending}
+            placeholder={auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"}
+          />
         </div>
       )}
     </div>
@@ -2053,7 +2651,7 @@ export function SearchFeed() {
       ) : results.length ? (
         <div className="long-video-grid media-feed-scroll h-[100dvh] overflow-y-scroll scrollbar-hide snap-y snap-mandatory w-full max-w-full box-border">
           {results.map(video => (
-            <VideoCard key={video.id} video={video} />
+            <MemoVideoCard key={video.id} video={video} />
           ))}
         </div>
       ) : (
@@ -2078,10 +2676,25 @@ export default function MediaHub({
   wheels?: ReactNode;
 }) {
   const [selectedSection, setSelectedSection] = useState<FeedSection>(section);
+  const [shortsViewerId, setShortsViewerId] = useState<number | null>(null);
 
   useEffect(() => {
     setSelectedSection(section);
   }, [section]);
+
+  useEffect(() => {
+    if (shortsViewerId === null) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShortsViewerId(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [shortsViewerId]);
 
   const activeSection =
     selectedSection === "publish" || selectedSection === "search"
@@ -2091,6 +2704,16 @@ export default function MediaHub({
     // Update the visual state immediately, then let the parent synchronize the URL.
     setSelectedSection(next);
     onSectionChange?.(next);
+  };
+  const focusHighlight = (highlight: SpotlightHighlight) => {
+    select("all");
+    window.setTimeout(() => {
+      document.getElementById(
+        highlight.sourceType === "video"
+          ? `feed-video-${highlight.postId}`
+          : `feed-post-${highlight.postId}`
+      )?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
   };
   return (
     <div className="media-hub">
@@ -2102,7 +2725,7 @@ export default function MediaHub({
         >
           {(
             [
-              ["wheels", "Wheels"],
+               ["wheels", "Spotlight"],
               ["all", "All Feed"],
               ["videos", "Videos"],
               ["shorts", "Shorts"],
@@ -2128,11 +2751,20 @@ export default function MediaHub({
       <div
         hidden={activeSection !== "wheels"}
         className={`media-tab-panel${
-          activeSection === "wheels" ? " media-tab-panel--wheels" : ""
-        }`}
+          activeSection === "wheels" || activeSection === "shorts"
+            ? " media-tab-panel--fullscreen"
+            : ""
+        }${activeSection === "wheels" ? " media-tab-panel--wheels" : ""}`}
       >
         <div className="wheels-feed-layout">
-          <HomeFeedPanel tab="wheels" active={activeSection === "wheels"} showDetailsOverlay showHeader={false} />
+          <SpotlightHighlights onSelect={focusHighlight} />
+           <HomeFeedPanel
+             tab="wheels"
+             active={activeSection === "wheels"}
+             showDetailsOverlay
+             showHeader={false}
+             onOpenShort={setShortsViewerId}
+           />
           <div className="wheels-sponsor-panel">
             {wheels ?? (
               <div className="media-empty">
@@ -2144,7 +2776,10 @@ export default function MediaHub({
       </div>
       <div hidden={activeSection !== "all"} className="media-tab-panel">
         <ErrorBoundary fallback={<FeedRecovery />}>
-          <UnifiedFeedPanel active={activeSection === "all"} />
+           <UnifiedFeedPanel
+             active={activeSection === "all"}
+             onOpenShort={setShortsViewerId}
+           />
         </ErrorBoundary>
       </div>
       <div hidden={activeSection !== "videos"} className="media-tab-panel">
@@ -2158,12 +2793,33 @@ export default function MediaHub({
            />
         </ErrorBoundary>
       </div>
-      <div hidden={activeSection !== "shorts"} className="media-tab-panel">
+      <div
+        hidden={activeSection !== "shorts"}
+        className="media-tab-panel media-tab-panel--fullscreen"
+      >
         <ErrorBoundary fallback={<FeedRecovery />}>
           <ShortsFeed active={activeSection === "shorts"} />
         </ErrorBoundary>
       </div>
       {activeSection === "announcements" && <CommunityAnnouncements />}
+      {shortsViewerId !== null && (
+        <div
+          className="shorts-viewer-layer"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Shorts viewer"
+        >
+          <button
+            type="button"
+            className="shorts-viewer-close"
+            onClick={() => setShortsViewerId(null)}
+            aria-label="Close Shorts viewer"
+          >
+            <X size={22} />
+          </button>
+          <ShortsFeed active initialVideoId={shortsViewerId} />
+        </div>
+      )}
     </div>
   );
 }
