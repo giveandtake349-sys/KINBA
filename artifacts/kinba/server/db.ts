@@ -1126,7 +1126,13 @@ export async function createVideoComment(
   if (!db) throw new Error("Database unavailable");
   const [comment] = await db
     .insert(videoComments)
-    .values({ videoId, userId, body: body.trim(), audioUrl: audio?.audioUrl ?? null, audioDuration: audio?.audioDuration ?? null })
+    .values({
+      videoId,
+      userId,
+      body: body.trim() || null,
+      audioUrl: audio?.audioUrl ?? null,
+      audioDuration: audio?.audioDuration ?? null,
+    })
     .returning();
   return comment;
 }

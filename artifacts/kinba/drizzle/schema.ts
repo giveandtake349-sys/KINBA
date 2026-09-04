@@ -448,7 +448,7 @@ export const videoComments = pgTable(
     userId: integer("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    body: text("body").notNull(),
+    body: text("body"),
     audioUrl: text("audio_url"),
     audioDuration: integer("audio_duration"),
     createdAt: createdAt(),
