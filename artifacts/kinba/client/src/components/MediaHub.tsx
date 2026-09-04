@@ -981,6 +981,81 @@ function RawPulseCard({ videoId }: { videoId: number }) {
   );
 }
 
+function PostManagementMenu({
+  video,
+  onUpdated,
+  onDeleted,
+}: {
+  video: VideoRecord;
+  onUpdated: (description: string) => void;
+  onDeleted: () => void;
+}) {
+  const auth = useAuth();
+  const utils = trpc.useUtils();
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [description, setDescription] = useState(video.description);
+  const updateMutation = trpc.videos.updateDescription.useMutation();
+  const deleteMutation = trpc.videos.delete.useMutation();
+  if (auth.user?.id !== video.owner.id) return null;
+  const saveCaption = async () => {
+    try {
+      const result = await updateMutation.mutateAsync({ videoId: video.id, description });
+      onUpdated(result.description);
+      setEditing(false);
+      setOpen(false);
+      await utils.home.feed.invalidate();
+      toast.success("Caption updated.");
+    } catch (error) {
+      notifyError(error);
+    }
+  };
+  const removePost = async () => {
+    try {
+      await deleteMutation.mutateAsync({ videoId: video.id });
+      await utils.home.feed.invalidate();
+      toast.success("Post deleted.");
+      onDeleted();
+    } catch (error) {
+      notifyError(error);
+    }
+  };
+  return (
+    <div className="post-management" onClick={event => event.stopPropagation()}>
+      <button type="button" className="feed-post-more" aria-label="Post options" onClick={() => setOpen(value => !value)}>
+        <MoreHorizontal size={19} />
+      </button>
+      {open && !editing && !confirming && (
+        <div className="post-management__menu" role="menu">
+          <button type="button" onClick={() => setEditing(true)} role="menuitem">Edit Caption</button>
+          <button type="button" className="is-danger" onClick={() => setConfirming(true)} role="menuitem">Delete Post</button>
+        </div>
+      )}
+      {editing && (
+        <div className="post-management__dialog" role="dialog" aria-label="Edit caption">
+          <strong>Edit Caption</strong>
+          <textarea value={description} maxLength={2000} onChange={event => setDescription(event.target.value)} autoFocus />
+          <div className="post-management__dialog-actions">
+            <button type="button" onClick={() => setEditing(false)} disabled={updateMutation.isPending}>Cancel</button>
+            <button type="button" className="is-primary" onClick={() => void saveCaption()} disabled={updateMutation.isPending}>{updateMutation.isPending ? "Saving…" : "Save"}</button>
+          </div>
+        </div>
+      )}
+      {confirming && (
+        <div className="post-management__dialog" role="alertdialog" aria-label="Confirm post deletion">
+          <strong>Delete this post?</strong>
+          <p>This permanently removes the post and its stored media.</p>
+          <div className="post-management__dialog-actions">
+            <button type="button" onClick={() => setConfirming(false)} disabled={deleteMutation.isPending}>Cancel</button>
+            <button type="button" className="is-danger" onClick={() => void removePost()} disabled={deleteMutation.isPending}>{deleteMutation.isPending ? "Deleting…" : "Delete"}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function VideoCard({
   video,
   active = true,
@@ -996,6 +1071,8 @@ function VideoCard({
   showHeader?: boolean;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [description, setDescription] = useState(video.description);
+  const [deleted, setDeleted] = useState(false);
   const auth = useAuth();
   const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
   const bookmarkMutation = trpc.videos.bookmark.useMutation();
@@ -1031,6 +1108,7 @@ function VideoCard({
       .then(result => setViews(result.viewCount))
       .catch(() => undefined);
   };
+  if (deleted) return null;
   if (socialLayout) {
     return (
       <article
@@ -1064,18 +1142,12 @@ function VideoCard({
               {video.mediaType === "IMAGE" ? "Photo" : "Video"}
             </span>
           </div>
-          <button
-            type="button"
-            className="feed-post-more"
-            aria-label="More post options"
-          >
-            <MoreHorizontal size={19} />
-          </button>
+          <PostManagementMenu video={video} onUpdated={setDescription} onDeleted={() => setDeleted(true)} />
         </header>
         {(video.title || video.description) && (
           <div className="feed-media-copy">
             {video.title && <h3>{video.title}</h3>}
-            {video.description && <p>{video.description}</p>}
+            {description && <p>{description}</p>}
           </div>
         )}
         <div className="feed-media-content">
@@ -1137,6 +1209,7 @@ function VideoCard({
       </div>
       <RawPulseCard videoId={video.id} />
       <div className={video.mediaType === "IMAGE" ? "video-card-details photo-card-details" : "video-card-details"}>
+        <PostManagementMenu video={video} onUpdated={setDescription} onDeleted={() => setDeleted(true)} />
         <div className="media-owner">
           <a className="profile-link" href={`/profile/${video.owner.id}`} aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}>
             <div className="video-owner-identity">
@@ -1154,7 +1227,7 @@ function VideoCard({
           </a>
         </div>
         <h3>{video.title}</h3>
-        <p>{video.description}</p>
+        <p>{description}</p>
         <p className="media-caption-tags">
           {ownerHandle(video.owner.name, video.owner.username)} · {hashtagsFromDescription(video.description)}
         </p>

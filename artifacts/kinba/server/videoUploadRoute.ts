@@ -6,7 +6,9 @@ import path from "node:path";
 import {
   createPhotoPost,
   createVideo,
+  deleteVideo,
   getUserByOpenId,
+  updateVideoDescription,
   upsertUser,
 } from "./db";
 import { storageCreateUploadUrl, storagePut } from "./storage";
@@ -99,6 +101,48 @@ async function authenticate(request: Request) {
 }
 
 export function registerVideoUploadRoute(app: Express) {
+  app.patch("/api/videos/:id", async (req, res) => {
+    try {
+      const user = await authenticate(req);
+      if (!user) {
+        res.status(401).json({ error: "Please sign in before editing a post." });
+        return;
+      }
+      const videoId = Number(req.params.id);
+      const description = String(req.body?.description ?? "").trim();
+      if (!Number.isInteger(videoId) || videoId < 1 || description.length > 2000) {
+        res.status(400).json({ error: "The caption is invalid." });
+        return;
+      }
+      const updated = await updateVideoDescription(videoId, user.id, description);
+      res.json({ post: updated });
+    } catch (error) {
+      logUploadFailure("video-update", req, error);
+      const message = errorMessage(error);
+      res.status(message.includes("not found") ? 404 : 500).json({ error: message });
+    }
+  });
+
+  app.delete("/api/videos/:id", async (req, res) => {
+    try {
+      const user = await authenticate(req);
+      if (!user) {
+        res.status(401).json({ error: "Please sign in before deleting a post." });
+        return;
+      }
+      const videoId = Number(req.params.id);
+      if (!Number.isInteger(videoId) || videoId < 1) {
+        res.status(400).json({ error: "The post ID is invalid." });
+        return;
+      }
+      res.json(await deleteVideo(videoId, user.id));
+    } catch (error) {
+      logUploadFailure("video-delete", req, error);
+      const message = errorMessage(error);
+      res.status(message.includes("not found") ? 404 : 500).json({ error: message });
+    }
+  });
+
   // Video bytes never pass through Node. The browser uploads directly to R2
   // with this short-lived signed URL, then posts only metadata here.
   app.post("/api/videos/upload-url", async (req, res) => {

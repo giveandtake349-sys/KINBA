@@ -32,6 +32,7 @@ import {
 import { ENV } from "./_core/env";
 import { resolvePostgresDatabaseUrl } from "./databaseConfig";
 import { selectNomineeIds, selectSecondaryWinnerId } from "./sponsorBidsDraw";
+import { storageDelete } from "./storage";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: Pool | null = null;
@@ -915,6 +916,32 @@ export async function createPhotoPost(
     })
     .returning();
   return created;
+}
+
+export async function updateVideoDescription(videoId: number, userId: number, description: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [updated] = await db
+    .update(videos)
+    .set({ description: description.trim(), updatedAt: new Date() })
+    .where(and(eq(videos.id, videoId), eq(videos.userId, userId)))
+    .returning({ id: videos.id, description: videos.description, updatedAt: videos.updatedAt });
+  if (!updated) throw new Error("Post not found or you are not the author.");
+  return updated;
+}
+
+export async function deleteVideo(videoId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [video] = await db.select().from(videos).where(and(eq(videos.id, videoId), eq(videos.userId, userId))).limit(1);
+  if (!video) throw new Error("Post not found or you are not the author.");
+  const sources = await db.select({ videoUrl: videoSources.videoUrl }).from(videoSources).where(eq(videoSources.videoId, videoId));
+  const mediaUrls = [video.videoUrl, video.thumbnailUrl, video.hlsMasterUrl, ...sources.map(source => source.videoUrl)].filter((url): url is string => Boolean(url));
+  await db.delete(videos).where(and(eq(videos.id, videoId), eq(videos.userId, userId)));
+  await Promise.all(mediaUrls.map(url => storageDelete(url).catch(error => {
+    console.warn(`[Storage] Failed to clean up deleted post media: ${url}`, error);
+  })));
+  return { deleted: true, videoId };
 }
 
 export async function updateVideoProcessing(

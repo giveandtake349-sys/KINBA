@@ -12,6 +12,8 @@ import {
   toggleCommunityBookmark,
   toggleCommunityReaction,
   createVideo,
+  updateVideoDescription,
+  deleteVideo,
   createVideoComment,
   ensureProfile,
   getOwnProfile,
@@ -185,6 +187,12 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         return createVideo(ctx.user.id, input);
       }),
+    updateDescription: protectedProcedure
+      .input(videoIdInput.extend({ description: z.string().max(2000) }))
+      .mutation(({ ctx, input }) => updateVideoDescription(input.videoId, ctx.user.id, input.description)),
+    delete: protectedProcedure
+      .input(videoIdInput)
+      .mutation(({ ctx, input }) => deleteVideo(input.videoId, ctx.user.id)),
     react: protectedProcedure
       .input(videoIdInput)
       .mutation(({ ctx, input }) =>

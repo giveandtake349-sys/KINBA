@@ -1,4 +1,5 @@
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -148,6 +149,18 @@ function keyFromStoredUrl(sourceUrl: string) {
     // Non-URL values are handled by the normal public fetch fallback below.
   }
   return null;
+}
+
+export async function storageDelete(sourceUrl: string): Promise<void> {
+  const key = keyFromStoredUrl(sourceUrl);
+  if (!key) return;
+  const config = getR2Config();
+  try {
+    await getR2Client().send(new DeleteObjectCommand({ Bucket: config.bucket, Key: key }));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown R2 error";
+    throw new Error(`Cloudflare R2 delete failed: ${message}`);
+  }
 }
 
 export async function storageGetSignedUrl(relKey: string): Promise<string> {
