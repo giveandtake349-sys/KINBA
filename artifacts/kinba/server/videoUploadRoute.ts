@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   createPhotoPost,
   createVideo,
+  deleteComment,
   deleteVideo,
   getUserByOpenId,
   updateVideoDescription,
@@ -101,6 +102,26 @@ async function authenticate(request: Request) {
 }
 
 export function registerVideoUploadRoute(app: Express) {
+  app.delete("/api/comments/:id", async (req, res) => {
+    try {
+      const user = await authenticate(req);
+      if (!user) {
+        res.status(401).json({ error: "Please sign in before deleting a comment." });
+        return;
+      }
+      const commentId = Number(req.params.id);
+      if (!Number.isInteger(commentId) || commentId < 1) {
+        res.status(400).json({ error: "The comment ID is invalid." });
+        return;
+      }
+      res.json(await deleteComment(commentId, user.id));
+    } catch (error) {
+      logUploadFailure("comment-delete", req, error);
+      const message = errorMessage(error);
+      res.status(message.includes("not authorized") || message.includes("not found") ? 403 : 500).json({ error: message });
+    }
+  });
+
   app.patch("/api/videos/:id", async (req, res) => {
     try {
       const user = await authenticate(req);

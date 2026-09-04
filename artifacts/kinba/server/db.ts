@@ -1115,6 +1115,34 @@ export async function voteRawPulse(pollId: number, optionId: number, voterKey: s
   return getRawPulse(poll.videoId, voterKey, userId);
 }
 
+export async function deleteComment(commentId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [videoMatch] = await db
+    .select({ comment: videoComments, postUserId: videos.userId })
+    .from(videoComments)
+    .innerJoin(videos, eq(videoComments.videoId, videos.id))
+    .where(eq(videoComments.id, commentId))
+    .limit(1);
+  if (videoMatch && (videoMatch.comment.userId === userId || videoMatch.postUserId === userId)) {
+    await db.delete(videoComments).where(eq(videoComments.id, commentId));
+    if (videoMatch.comment.audioUrl) await storageDelete(videoMatch.comment.audioUrl).catch(error => console.warn("[Storage] Failed to clean up deleted comment audio", error));
+    return { deleted: true, commentId, type: "video" as const };
+  }
+  const [communityMatch] = await db
+    .select({ comment: communityComments, postUserId: communityAnnouncements.userId })
+    .from(communityComments)
+    .innerJoin(communityAnnouncements, eq(communityComments.announcementId, communityAnnouncements.id))
+    .where(eq(communityComments.id, commentId))
+    .limit(1);
+  if (communityMatch && (communityMatch.comment.userId === userId || communityMatch.postUserId === userId)) {
+    await db.delete(communityComments).where(eq(communityComments.id, commentId));
+    if (communityMatch.comment.audioUrl) await storageDelete(communityMatch.comment.audioUrl).catch(error => console.warn("[Storage] Failed to clean up deleted comment audio", error));
+    return { deleted: true, commentId, type: "community" as const };
+  }
+  throw new Error("Comment not found or you are not authorized to delete it.");
+}
+
 export async function listVideoComments(videoId: number) {
   const db = await getDb();
   if (!db) return [];
