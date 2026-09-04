@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -450,15 +451,42 @@ export const videoComments = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     body: text("body"),
     audioUrl: text("audio_url"),
-    audioDuration: integer("audio_duration"),
+        audioDuration: integer("audio_duration"),
+    parentId: integer("parentId"),
     createdAt: createdAt(),
   },
   table => [
     index("video_comments_video_idx").on(table.videoId, table.createdAt),
     index("video_comments_user_idx").on(table.userId),
+    index("video_comments_parent_idx").on(table.parentId),
+    foreignKey({
+      name: "video_comments_parentId_video_comments_id_fk",
+      columns: [table.parentId],
+      foreignColumns: [table.id],
+    }).onDelete("cascade"),
   ]
 );
-
+export const commentLikes = pgTable(
+  "comment_likes",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    commentId: integer("commentId")
+      .notNull()
+      .references(() => videoComments.id, { onDelete: "cascade" }),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("comment_likes_comment_user_unique").on(
+      table.commentId,
+      table.userId
+    ),
+    index("comment_likes_comment_idx").on(table.commentId),
+    index("comment_likes_user_idx").on(table.userId),
+  ]
+);
 export const communityAnnouncements = pgTable(
   "community_announcements",
   {

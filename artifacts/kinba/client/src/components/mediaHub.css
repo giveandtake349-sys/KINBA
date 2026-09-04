@@ -823,6 +823,69 @@
   font-size: 10px;
   padding: 8px 12px;
 }
+.video-comment-thread {
+  display: grid;
+  gap: 8px;
+}
+.video-comment-thread--reply {
+  border-left: 2px solid rgba(59, 130, 246, 0.35);
+  margin-left: 16px;
+  padding-left: 12px;
+}
+.video-comment-heading,
+.video-comment-footer,
+.video-comment-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+.video-comment-heading {
+  justify-content: space-between;
+}
+.video-comment-actions {
+  margin-left: auto;
+}
+.video-comment-action,
+.video-comment-like {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 11px;
+  gap: 4px;
+  padding: 3px;
+}
+.video-comment-action:hover,
+.video-comment-like:hover,
+.video-comment-like.is-active {
+  color: #3b82f6;
+}
+.video-comment-action--danger:hover {
+  color: #f87171;
+}
+.video-comment-footer {
+  justify-content: flex-start;
+}
+.video-comment-replying,
+.comment-replying-banner {
+  color: #3b82f6;
+  font-size: 11px;
+}
+.comment-replying-banner {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 5px 0;
+}
+.comment-replying-banner button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+}
 @keyframes feed-pulse {
   0%,
   100% {

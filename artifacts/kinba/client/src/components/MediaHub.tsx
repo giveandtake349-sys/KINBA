@@ -8,6 +8,7 @@ import {
   memo,
   type MouseEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 import {
   BadgeCheck,
@@ -425,12 +426,14 @@ function VoiceCommentComposer({
   onBodyChange,
   onSend,
   disabled,
+  inputRef,
   placeholder,
 }: {
   body: string;
   onBodyChange: (value: string) => void;
   onSend: (audioUrl: string | null, audioDuration: number | null) => Promise<void>;
   disabled?: boolean;
+  inputRef?: RefObject<HTMLInputElement | null>;
   placeholder: string;
 }) {
   const recorder = useVoiceCommentRecorder();
@@ -452,7 +455,7 @@ function VoiceCommentComposer({
   };
   return (
     <form onSubmit={submit} className="comment-form voice-comment-form">
-      <input value={body} onChange={event => onBodyChange(event.target.value)} maxLength={500} placeholder={placeholder} aria-label={placeholder} disabled={disabled || recorder.recording || uploading} />
+      <input ref={inputRef} value={body} onChange={event => onBodyChange(event.target.value)} maxLength={500} placeholder={placeholder} aria-label={placeholder} disabled={disabled || recorder.recording || uploading} />
       {recorder.recording ? (
         <button type="button" className="voice-recording-button is-recording" onClick={recorder.stop} aria-label="Stop recording"><Square size={15} /> {formatAudioTime(recorder.elapsed)} / 1:00</button>
       ) : recorder.audioBlob && recorder.previewUrl ? (
@@ -847,28 +850,137 @@ function EngagementActions({
 }
 function CommentsPanel({
   videoId,
+  postOwnerId,
   open,
   overlay = false,
   onClose,
 }: {
   videoId: number;
+  postOwnerId: number;
   open: boolean;
   overlay?: boolean;
   onClose?: () => void;
 }) {
   const auth = useAuth();
   const [body, setBody] = useState("");
+  const [replyTo, setReplyTo] = useState<{ id: number; username: string } | null>(null);
+  const [likingId, setLikingId] = useState<number | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const commentsQuery = trpc.videos.comments.list.useQuery(
     { videoId },
     { enabled: open, refetchOnWindowFocus: false }
   );
   const createComment = trpc.videos.comments.create.useMutation();
+  const likeComment = trpc.videos.comments.like.useMutation();
+  const deleteComment = trpc.videos.comments.delete.useMutation();
+  const comments = commentsQuery.data ?? [];
+
+  useEffect(() => {
+    if (replyTo) inputRef.current?.focus();
+  }, [replyTo]);
+
   const submitComment = async (audioUrl: string | null, audioDuration: number | null) => {
     if (!auth.isAuthenticated) return auth.openAuth();
-    await createComment.mutateAsync({ videoId, body: body.trim(), audioUrl, audioDuration });
+    await createComment.mutateAsync({
+      videoId,
+      body: body.trim(),
+      audioUrl,
+      audioDuration,
+      parentId: replyTo?.id,
+    });
+    setBody("");
+    setReplyTo(null);
     await commentsQuery.refetch();
   };
+
+  const toggleLike = async (commentId: number) => {
+    if (!auth.isAuthenticated) return auth.openAuth();
+    if (likingId !== null) return;
+    setLikingId(commentId);
+    try {
+      await likeComment.mutateAsync({ commentId });
+      await commentsQuery.refetch();
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      setLikingId(null);
+    }
+  };
+
+  const removeComment = async (commentId: number) => {
+    if (!auth.isAuthenticated || deleteComment.isPending) return;
+    try {
+      await deleteComment.mutateAsync({ commentId });
+      if (replyTo?.id === commentId) setReplyTo(null);
+      await commentsQuery.refetch();
+    } catch (error) {
+      notifyError(error);
+    }
+  };
+
+  const renderComment = (comment: (typeof comments)[number], depth = 0): ReactNode => {
+    const username = comment.author.username?.trim() || "member";
+    const canDelete =
+      auth.user?.id === comment.author.id || auth.user?.id === postOwnerId;
+    const replies = comments.filter(reply => reply.parentId === comment.id);
+    return (
+      <div
+        className={depth ? "video-comment-thread video-comment-thread--reply" : "video-comment-thread"}
+        key={comment.id}
+      >
+        <div className="video-comment">
+          <div className="video-comment-heading">
+            <strong>{displayName(comment.author.name, comment.author.username)}</strong>
+            <span className="video-comment-actions">
+              <button
+                type="button"
+                className="video-comment-action"
+                onClick={() => setReplyTo({ id: comment.id, username })}
+                aria-label={`Reply to @${username}`}
+              >
+                Reply
+              </button>
+              {canDelete && (
+                <button
+                  type="button"
+                  className="video-comment-action video-comment-action--danger"
+                  onClick={() => void removeComment(comment.id)}
+                  disabled={deleteComment.isPending}
+                  aria-label="Delete comment"
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </span>
+          </div>
+          {comment.body && <span>{comment.body}</span>}
+          {comment.audioUrl && (
+            <CommentAudioPlayer src={comment.audioUrl} duration={comment.audioDuration} />
+          )}
+          <div className="video-comment-footer">
+            <button
+              type="button"
+              className={`video-comment-like${comment.viewerLiked ? " is-active" : ""}`}
+              onClick={() => void toggleLike(comment.id)}
+              disabled={likingId !== null}
+              aria-pressed={comment.viewerLiked}
+              aria-label={comment.viewerLiked ? "Remove Pookie from comment" : "Pookie this comment"}
+            >
+              <Heart size={14} fill={comment.viewerLiked ? "currentColor" : "none"} />
+              <span>{comment.likeCount}</span>
+            </button>
+            {replyTo?.id === comment.id && (
+              <span className="video-comment-replying">Replying to @{username}</span>
+            )}
+          </div>
+        </div>
+        {replies.map(reply => renderComment(reply, depth + 1))}
+      </div>
+    );
+  };
+
   if (!open) return null;
+  const roots = comments.filter(comment => !comment.parentId);
   return (
     <div
       className={`video-comments${overlay ? " video-comments--overlay" : ""}`}
@@ -889,22 +1001,18 @@ function CommentsPanel({
       {commentsQuery.isPending ? (
         <div className="comment-loading">Loading comments…</div>
       ) : commentsQuery.isError ? (
-        <div className="comment-loading">
-          Comments are temporarily unavailable.
-        </div>
-      ) : commentsQuery.data?.length ? (
-        commentsQuery.data.map(comment => (
-          <div className="video-comment" key={comment.id}>
-            <strong>
-              {displayName(comment.author.name, comment.author.username)}
-            </strong>
-            {comment.body && <span>{comment.body}</span>}
-            {comment.audioUrl && <CommentAudioPlayer src={comment.audioUrl} duration={comment.audioDuration} />}
-          </div>
-        ))
+        <div className="comment-loading">Comments are temporarily unavailable.</div>
+      ) : roots.length ? (
+        roots.map(comment => renderComment(comment))
       ) : (
-        <div className="comment-loading">
-          No comments yet. Start the conversation.
+        <div className="comment-loading">No comments yet. Start the conversation.</div>
+      )}
+      {replyTo && (
+        <div className="comment-replying-banner">
+          Replying to @{replyTo.username}
+          <button type="button" onClick={() => setReplyTo(null)} aria-label="Cancel reply">
+            <X size={14} />
+          </button>
         </div>
       )}
       <VoiceCommentComposer
@@ -912,6 +1020,7 @@ function CommentsPanel({
         onBodyChange={setBody}
         onSend={submitComment}
         disabled={createComment.isPending}
+        inputRef={inputRef}
         placeholder={auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"}
       />
     </div>
@@ -1178,6 +1287,7 @@ function VideoCard({
         />
         <CommentsPanel
           videoId={video.id}
+          postOwnerId={video.owner.id}
           open={commentsOpen}
           onClose={() => setCommentsOpen(false)}
         />
@@ -1248,6 +1358,7 @@ function VideoCard({
       </div>
       <CommentsPanel
         videoId={video.id}
+        postOwnerId={video.owner.id}
         open={commentsOpen}
         overlay={showDetailsOverlay}
         onClose={() => setCommentsOpen(false)}
@@ -1958,6 +2069,7 @@ function ShortVideoCard({
       </div>
       <CommentsPanel
         videoId={video.id}
+        postOwnerId={video.owner.id}
         open={commentsOpen}
         overlay
         onClose={() => setCommentsOpen(false)}

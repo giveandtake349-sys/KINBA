@@ -8,6 +8,7 @@ import { createContext } from "./context";
 import { isAllowedCorsOrigin, parseAllowedOrigins } from "../httpSecurity";
 import { serveStatic, setupVite } from "./vite";
 import { registerVideoUploadRoute } from "../videoUploadRoute";
+import { registerCommentRoutes } from "../commentRoutes";
 import { listSpotlightHighlights } from "../db";
 
 async function startServer() {
@@ -65,6 +66,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerVideoUploadRoute(app);
+  registerCommentRoutes(app);
   // tRPC API
   app.use(
     "/api/trpc",

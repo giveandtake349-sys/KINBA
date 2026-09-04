@@ -20,6 +20,7 @@ import {
   users,
   videoBookmarks,
   videoComments,
+  commentLikes,
   videoReactions,
   videoShares,
   videoSources,
@@ -1143,17 +1144,34 @@ export async function deleteComment(commentId: number, userId: number) {
   throw new Error("Comment not found or you are not authorized to delete it.");
 }
 
-export async function listVideoComments(videoId: number) {
+export async function listVideoComments(videoId: number, viewerId?: number) {
   const db = await getDb();
   if (!db) return [];
+  const likeCount = sql<number>`(
+    select count(*) from comment_likes
+    where comment_likes."commentId" = ${videoComments.id}
+  )`;
+  const viewerLiked = viewerId
+    ? sql<boolean>`exists (
+        select 1 from comment_likes
+        where comment_likes."commentId" = ${videoComments.id}
+          and comment_likes."userId" = ${viewerId}
+      )`
+    : sql<boolean>`false`;
   const rows = await db
-    .select({ comment: videoComments, user: users, profile: profiles })
+    .select({
+      comment: videoComments,
+      user: users,
+      profile: profiles,
+      likeCount,
+      viewerLiked,
+    })
     .from(videoComments)
     .innerJoin(users, eq(videoComments.userId, users.id))
     .leftJoin(profiles, eq(videoComments.userId, profiles.userId))
     .where(eq(videoComments.videoId, videoId))
     .orderBy(desc(videoComments.createdAt))
-    .limit(50);
+    .limit(100);
   return rows.map(row => ({
     ...row.comment,
     body: typeof row.comment.body === "string" ? row.comment.body : "",
@@ -1163,6 +1181,8 @@ export async function listVideoComments(videoId: number) {
     audioDuration: Number.isFinite(Number(row.comment.audioDuration))
       ? Math.max(1, Math.min(60, Math.round(Number(row.comment.audioDuration))))
       : null,
+    likeCount: Number(row.likeCount ?? 0),
+    viewerLiked: Boolean(row.viewerLiked),
     author: {
       id: row.user.id,
       name: row.user.name,
@@ -1175,10 +1195,24 @@ export async function createVideoComment(
   videoId: number,
   userId: number,
   body: string,
-  audio?: { audioUrl?: string | null; audioDuration?: number | null }
+  audio?: {
+    audioUrl?: string | null;
+    audioDuration?: number | null;
+    parentId?: number | null;
+  }
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
+  if (audio?.parentId != null) {
+    const [parent] = await db
+      .select({ id: videoComments.id })
+      .from(videoComments)
+      .where(
+        and(eq(videoComments.id, audio.parentId), eq(videoComments.videoId, videoId))
+      )
+      .limit(1);
+    if (!parent) throw new Error("The comment you are replying to was not found.");
+  }
   const [comment] = await db
     .insert(videoComments)
     .values({
@@ -1187,9 +1221,43 @@ export async function createVideoComment(
       body: body.trim() || null,
       audioUrl: audio?.audioUrl ?? null,
       audioDuration: audio?.audioDuration ?? null,
+      parentId: audio?.parentId ?? null,
     })
     .returning();
   return comment;
+}
+
+export async function toggleCommentLike(commentId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [comment] = await db
+    .select({ id: videoComments.id })
+    .from(videoComments)
+    .where(eq(videoComments.id, commentId))
+    .limit(1);
+  if (!comment) throw new Error("Comment not found.");
+  const [existing] = await db
+    .select({ id: commentLikes.id })
+    .from(commentLikes)
+    .where(
+      and(
+        eq(commentLikes.commentId, commentId),
+        eq(commentLikes.userId, userId)
+      )
+    )
+    .limit(1);
+  if (existing)
+    await db.delete(commentLikes).where(eq(commentLikes.id, existing.id));
+  else await db.insert(commentLikes).values({ commentId, userId });
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(commentLikes)
+    .where(eq(commentLikes.commentId, commentId));
+  return {
+    commentId,
+    likeCount: Number(count ?? 0),
+    viewerLiked: !existing,
+  };
 }
 
 export async function toggleVideoReaction(videoId: number, userId: number) {

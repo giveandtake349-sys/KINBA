@@ -15,6 +15,8 @@ import {
   updateVideoDescription,
   deleteVideo,
   createVideoComment,
+  deleteComment,
+  toggleCommentLike,
   ensureProfile,
   getOwnProfile,
   getPublicProfile,
@@ -217,7 +219,7 @@ export const appRouter = router({
     comments: router({
       list: publicProcedure
         .input(videoIdInput)
-        .query(({ input }) => listVideoComments(input.videoId)),
+        .query(({ ctx, input }) => listVideoComments(input.videoId, ctx.user?.id)),
       create: protectedProcedure
         .input(
           videoIdInput
@@ -225,20 +227,29 @@ export const appRouter = router({
               body: z.string().trim().max(500).default(""),
               audioUrl: z.string().url().nullable().optional(),
               audioDuration: z.number().int().min(1).max(60).nullable().optional(),
+              parentId: z.number().int().positive().nullable().optional(),
             })
             .refine(
               input => input.body.trim().length > 0 || Boolean(input.audioUrl),
               "Comment text or audio is required."
             )
         )
-        .mutation(({ ctx, input }) =>
-          input.audioUrl
-            ? createVideoComment(input.videoId, ctx.user.id, input.body, {
-                audioUrl: input.audioUrl,
-                audioDuration: input.audioDuration,
-              })
-            : createVideoComment(input.videoId, ctx.user.id, input.body)
-        ),
+        .mutation(({ ctx, input }) => {
+          const options = {
+            audioUrl: input.audioUrl,
+            audioDuration: input.audioDuration,
+            parentId: input.parentId,
+          };
+          return input.audioUrl || input.parentId !== undefined
+            ? createVideoComment(input.videoId, ctx.user.id, input.body, options)
+            : createVideoComment(input.videoId, ctx.user.id, input.body);
+        }),
+      delete: protectedProcedure
+        .input(z.object({ commentId: z.number().int().positive() }))
+        .mutation(({ ctx, input }) => deleteComment(input.commentId, ctx.user.id)),
+      like: protectedProcedure
+        .input(z.object({ commentId: z.number().int().positive() }))
+        .mutation(({ ctx, input }) => toggleCommentLike(input.commentId, ctx.user.id)),
     }),
   }),
   payments: router({

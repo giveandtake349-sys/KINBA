@@ -87,7 +87,7 @@ function logUploadStage(route: string, stage: string, details: Record<string, un
 
 
 
-async function authenticate(request: Request) {
+export async function authenticate(request: Request) {
   const supabaseUser = await verifySupabaseAccessToken(request);
   if (!supabaseUser) return null;
   const openId = supabaseOpenId(supabaseUser.id);
