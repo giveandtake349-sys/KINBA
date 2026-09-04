@@ -1253,18 +1253,13 @@ function VideoCard({
           </div>
           <PostManagementMenu video={video} onUpdated={setDescription} onDeleted={() => setDeleted(true)} />
         </header>
-        {(video.title || video.description) && (
-          <div className="feed-media-copy">
-            {video.title && <h3>{video.title}</h3>}
-            {description && <p>{description}</p>}
-          </div>
-        )}
-        <div className="feed-media-content">
+        <div className={`feed-media-content${video.mediaType === "VIDEO" ? " feed-media-content--video" : ""}`}>
           {video.mediaType === "IMAGE" ? (
             <img
               src={resolveMediaUrl(video.videoUrl) ?? video.videoUrl}
               alt={video.title || "Post"}
               loading="lazy"
+              className="w-full h-auto object-cover"
             />
           ) : (
             <QualityVideoPlayer
@@ -1274,7 +1269,6 @@ function VideoCard({
             />
           )}
         </div>
-        <RawPulseCard videoId={video.id} />
         <EngagementActions
           engagement={current}
           onReact={react}
@@ -1285,6 +1279,13 @@ function VideoCard({
           bookmarked={bookmarked}
           onBookmark={toggleBookmark}
         />
+        {(video.title || video.description) && (
+          <div className="feed-media-copy">
+            {video.title && <h3>{video.title}</h3>}
+            {description && <p>{description}</p>}
+          </div>
+        )}
+        <RawPulseCard videoId={video.id} />
         <CommentsPanel
           videoId={video.id}
           postOwnerId={video.owner.id}
@@ -1302,10 +1303,23 @@ function VideoCard({
       tabIndex={onOpenViewer ? 0 : undefined}
       onClick={openViewer}
     >
-              <div className={`media-fullscreen-frame ${video.mediaType === "IMAGE" ? "media-photo-frame" : ""}`}>
+      <header className="feed-post-author">
+        <div className="video-owner-avatar">
+          {video.owner.photoUrl ? <img src={video.owner.photoUrl} alt="" /> : <UserRound size={16} />}
+        </div>
+        <div className="feed-post-author-info">
+          <strong>
+            {displayName(video.owner.name, video.owner.username)}
+            {video.owner.isVerified && <BadgeCheck className="verified-badge" size={13} aria-label="Verified profile" />}
+          </strong>
+          <span>{relativeTime(video.createdAt)} · {video.mediaType === "IMAGE" ? "Photo" : video.kind === "SHORT" ? "Short" : "Video"}</span>
+        </div>
+        <PostManagementMenu video={video} onUpdated={setDescription} onDeleted={() => setDeleted(true)} />
+      </header>
+      <div className={`feed-media-content${video.mediaType === "VIDEO" ? " feed-media-content--video" : ""}`}>
         {video.mediaType === "IMAGE" ? (
           <img
-            className="w-full h-auto object-cover rounded-lg media-photo"
+            className="w-full h-auto object-cover"
             src={resolveMediaUrl(video.videoUrl) ?? video.videoUrl}
             alt={video.title || "Post"}
           />
@@ -1317,45 +1331,27 @@ function VideoCard({
           />
         )}
       </div>
-      <RawPulseCard videoId={video.id} />
+      <EngagementActions
+        engagement={current}
+        onReact={react}
+        onShare={share}
+        onComments={() => setCommentsOpen(value => !value)}
+        pending={pending}
+        feedStyle
+        bookmarked={bookmarked}
+        onBookmark={toggleBookmark}
+      />
       <div className={video.mediaType === "IMAGE" ? "video-card-details photo-card-details" : "video-card-details"}>
-        <PostManagementMenu video={video} onUpdated={setDescription} onDeleted={() => setDeleted(true)} />
-        <div className="media-owner">
-          <a className="profile-link" href={`/profile/${video.owner.id}`} aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}>
-            <div className="video-owner-identity">
-              <div className="video-owner-avatar">
-                {video.owner.photoUrl ? <img src={video.owner.photoUrl} alt="" /> : <UserRound size={16} />}
-              </div>
-              <div>
-                <strong className="video-owner-name">
-                  <span>{displayName(video.owner.name, video.owner.username)}</span>
-                  {video.owner.isVerified && <BadgeCheck className="verified-badge" size={12} aria-label="Verified profile" />}
-                </strong>
-                <span>{ownerHandle(video.owner.name, video.owner.username)}</span>
-              </div>
-            </div>
-          </a>
-        </div>
-        <h3>{video.title}</h3>
+        {video.title && <h3>{video.title}</h3>}
         <p>{description}</p>
-        <p className="media-caption-tags">
-          {ownerHandle(video.owner.name, video.owner.username)} · {hashtagsFromDescription(video.description)}
-        </p>
+        <p className="media-caption-tags">{ownerHandle(video.owner.name, video.owner.username)} · {hashtagsFromDescription(video.description)}</p>
         <div className="media-meta-line" aria-label="Media metadata">
           <span>{formatCount(views)} views</span>
           <span>{relativeTime(video.createdAt)}</span>
           <span>{video.mediaType === "IMAGE" ? "Photo" : video.kind === "SHORT" ? "Short" : "Video"}</span>
         </div>
-        <EngagementActions
-          engagement={current}
-          onReact={react}
-          onShare={share}
-          onComments={() => setCommentsOpen(value => !value)}
-          pending={pending}
-          bookmarked={bookmarked}
-          onBookmark={toggleBookmark}
-        />
       </div>
+      <RawPulseCard videoId={video.id} />
       <CommentsPanel
         videoId={video.id}
         postOwnerId={video.owner.id}

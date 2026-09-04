@@ -1900,6 +1900,62 @@ body {
 .raw-pulse__heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--kinba-muted-modern); font-size: 11px; }
 .raw-pulse__heading .eyebrow { color: var(--kinba-cyan); letter-spacing: .12em; }
 .raw-pulse h3 { margin: 6px 0 11px; color: #fff; font-size: 15px; line-height: 1.3; }
+
+/* Stable post-card hierarchy: header → media → actions → caption/details. */
+.media-hub .feed-media-post,
+.media-hub .long-video-card {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+.media-hub .feed-media-post > .feed-post-author,
+.media-hub .long-video-card > .feed-post-author { order: 1 !important; }
+.media-hub .feed-media-post > .feed-media-content,
+.media-hub .long-video-card > .feed-media-content { order: 2 !important; }
+.media-hub .feed-media-post > .feed-action-bar,
+.media-hub .long-video-card > .feed-action-bar { order: 3 !important; }
+.media-hub .feed-media-post > .feed-media-copy,
+.media-hub .long-video-card > .video-card-details { order: 4 !important; }
+.media-hub .feed-media-post > .raw-pulse,
+.media-hub .long-video-card > .raw-pulse { order: 5 !important; }
+.media-hub .feed-media-content {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+.media-hub .feed-media-content > img,
+.media-hub .feed-media-content > video,
+.media-hub .feed-media-content > .media-video-frame,
+.media-hub .feed-media-content > .media-video-frame video {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  min-width: 0 !important;
+  object-fit: cover !important;
+}
+.media-hub .feed-media-content--video,
+.media-hub .feed-media-content--video > .media-video-frame {
+  aspect-ratio: 16 / 9 !important;
+}
+.media-hub .feed-media-content--video > .media-video-frame video {
+  height: 100% !important;
+}
+.media-hub .feed-action-bar {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-x: auto !important;
+}
+
 .raw-pulse__options { display: grid; gap: 7px; }
 .raw-pulse__option { position: relative; display: flex; align-items: center; gap: 9px; min-height: 38px; overflow: hidden; padding: 0 11px; border: 1px solid rgba(154,168,191,.22); border-radius: 9px; color: #edf8ff; background: rgba(255,255,255,.04); text-align: left; }
 .raw-pulse__option:not(:disabled) { cursor: pointer; }
