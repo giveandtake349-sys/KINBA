@@ -1,6 +1,7 @@
 import { useEffect, useState, type ComponentType } from "react";
 
 import { modules as discoveredModules } from "./.generated/mockup-components";
+import KINBAFeed from "./components/KINBAFeed";
 
 type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 
@@ -88,7 +89,8 @@ function PreviewRenderer({
 }
 
 function getBasePath(): string {
-  return import.meta.env.BASE_URL.replace(/\/$/, "");
+  const env = (import.meta as unknown as { env?: { BASE_URL?: string } }).env;
+  return (env?.BASE_URL ?? "/").replace(/\/$/, "");
 }
 
 function getPreviewExamplePath(): string {
@@ -140,7 +142,7 @@ function App() {
     );
   }
 
-  return <Gallery />;
+  return <KINBAFeed />;
 }
 
 export default App;
