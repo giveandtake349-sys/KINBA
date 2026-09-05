@@ -1990,7 +1990,7 @@ export async function adminSetSponsorStatus(
   return updated;
 }
 
-export async function listCommunityAnnouncements() {
+export async function listCommunityAnnouncements(userId?: number) {
   const db = await getDb();
   if (!db) return [];
   const commentCount = sql<number>`(
@@ -2012,6 +2012,7 @@ export async function listCommunityAnnouncements() {
     .from(communityAnnouncements)
     .innerJoin(users, eq(communityAnnouncements.userId, users.id))
     .leftJoin(profiles, eq(communityAnnouncements.userId, profiles.userId))
+    .where(userId ? eq(communityAnnouncements.userId, userId) : undefined)
     .orderBy(desc(communityAnnouncements.createdAt))
     .limit(60);
   if (!rows.length) return [];

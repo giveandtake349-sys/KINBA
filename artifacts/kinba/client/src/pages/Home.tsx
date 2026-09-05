@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -11,6 +12,8 @@ import {
   BadgeCheck,
   Bell,
   Check,
+  FileText,
+  Radio,
   Clock3,
   Copy,
   Coins,
@@ -1425,6 +1428,91 @@ function ActionModal({
   );
 }
 
+type CreateUploaderMode = "menu" | "media" | "text" | "thread";
+type UploaderHistoryItem = {
+  key: string;
+  title: string;
+  createdAt: Date | string;
+  imageUrl: string | null;
+  kind: "IMAGE" | "VIDEO" | "TEXT";
+};
+
+function UploaderHistory({
+  media,
+  textPosts,
+}: {
+  media: Array<{
+    id: number;
+    title: string;
+    createdAt: Date | string;
+    mediaType: "IMAGE" | "VIDEO";
+    videoUrl: string;
+    thumbnailUrl: string | null;
+  }>;
+  textPosts: Array<{
+    id: number;
+    body: string;
+    createdAt: Date | string;
+    attachments: Array<{ mediaType: "IMAGE" | "VIDEO"; mediaUrl: string }>;
+  }>;
+}) {
+  const items = useMemo<UploaderHistoryItem[]>(() => {
+    const mediaItems = media.map(item => ({
+      key: `media-${item.id}`,
+      title: item.title || "Untitled post",
+      createdAt: item.createdAt,
+      imageUrl:
+        item.mediaType === "IMAGE"
+          ? resolveMediaUrl(item.videoUrl) ?? null
+          : resolveMediaUrl(item.thumbnailUrl) ?? null,
+      kind: item.mediaType,
+    }));
+    const textItems = textPosts.map(item => ({
+      key: `text-${item.id}`,
+      title: item.body.trim() || "Text post",
+      createdAt: item.createdAt,
+      imageUrl: resolveMediaUrl(item.attachments[0]?.mediaUrl) ?? null,
+      kind: item.attachments[0]?.mediaType ?? "TEXT",
+    }));
+    return [...mediaItems, ...textItems]
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+      .slice(0, 3);
+  }, [media, textPosts]);
+
+  return (
+    <section className="uploader-history" aria-labelledby="uploader-history-heading">
+      <div className="uploader-history-heading">
+        <div>
+          <p className="eyebrow">Your activity</p>
+          <h3 id="uploader-history-heading">Recent upload History</h3>
+        </div>
+        <Clock3 size={17} aria-hidden="true" />
+      </div>
+      {items.length ? (
+        <div className="uploader-history-grid">
+          {items.map(item => (
+            <article className="uploader-history-card" key={item.key}>
+              {item.imageUrl ? (
+                <img src={item.imageUrl} alt="" />
+              ) : (
+                <div className="uploader-history-placeholder" aria-hidden="true">
+                  {item.kind === "VIDEO" ? <Video size={22} /> : <FileText size={22} />}
+                </div>
+              )}
+              <div>
+                <strong>{item.title}</strong>
+                <span>{item.kind === "TEXT" ? "Text post" : item.kind === "IMAGE" ? "Image post" : "Video upload"}</span>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="uploader-history-empty">Your completed uploads and posts will appear here.</p>
+      )}
+    </section>
+  );
+}
+
 function UploadVideoModal({
   open,
   onClose,
@@ -1434,6 +1522,7 @@ function UploadVideoModal({
   onClose: () => void;
   onPublished: () => Promise<void>;
 }) {
+  const [mode, setMode] = useState<CreateUploaderMode>("menu");
   const [mediaMode, setMediaMode] = useState<"video" | "photo">("video");
   const [kind, setKind] = useState<"LONG" | "SHORT">("LONG");
   const [title, setTitle] = useState("");
@@ -1441,7 +1530,45 @@ function UploadVideoModal({
   const [file, setFile] = useState<File | null>(null);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [busy, setBusy] = useState(false);
+  const auth = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
+  const mediaHistory = trpc.profile.videos.useQuery(undefined, {
+    enabled: open && auth.isAuthenticated,
+    refetchOnWindowFocus: false,
+    staleTime: 15_000,
+  });
+  const textHistory = trpc.community.mine.useQuery(undefined, {
+    enabled: open && auth.isAuthenticated,
+    refetchOnWindowFocus: false,
+    staleTime: 15_000,
+  });
+
+  useEffect(() => {
+    if (!open) setMode("menu");
+  }, [open]);
+
+  const close = () => {
+    setMode("menu");
+    setFile(null);
+    setImageDimensions(null);
+    setTitle("");
+    setDescription("");
+    onClose();
+  };
+  const chooseMode = (next: CreateUploaderMode) => {
+    if (!auth.isAuthenticated) {
+      auth.openAuth();
+      return;
+    }
+    setMode(next);
+  };
+  const chooseMedia = (nextMode: "photo" | "video", nextKind: "LONG" | "SHORT" = "LONG") => {
+    setMediaMode(nextMode);
+    setKind(nextKind);
+    setFile(null);
+    setImageDimensions(null);
+    chooseMode("media");
+  };
   const selectFile = async (event: ChangeEvent<HTMLInputElement>) => {
     event.preventDefault();
     event.stopPropagation();
@@ -1456,16 +1583,12 @@ function UploadVideoModal({
       }
       await getVideoMetadata(nextFile, {
         maxDurationSeconds:
-          kind === "LONG"
-            ? MAX_LONG_VIDEO_DURATION_SECONDS
-            : MAX_SHORT_VIDEO_DURATION_SECONDS,
+          kind === "LONG" ? MAX_LONG_VIDEO_DURATION_SECONDS : MAX_SHORT_VIDEO_DURATION_SECONDS,
       });
       setImageDimensions(null);
       setFile(nextFile);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "This video cannot be uploaded."
-      );
+      toast.error(error instanceof Error ? error.message : "This media cannot be uploaded.");
     }
   };
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -1482,125 +1605,65 @@ function UploadVideoModal({
       } else {
         await publishVideo(file, kind, title.trim(), description.trim());
       }
-      try {
-        await onPublished();
-      } catch (refreshError) {
-        console.error("[MediaPublish] Published successfully but feed refresh failed:", refreshError);
-        toast.info("Published successfully. Refresh the feed if it is not visible yet.");
-      }
-      setFile(null);
-      setImageDimensions(null);
-      setTitle("");
-      setDescription("");
-      toast.success(mediaMode === "photo" ? "Photo published to your feed." : "Video published to your feed.");
-      onClose();
+      await onPublished();
+      await Promise.all([mediaHistory.refetch(), textHistory.refetch()]);
+      toast.success(mediaMode === "photo" ? "Photo published to your feed." : kind === "SHORT" ? "Short uploaded to your feed." : "Video published to your feed.");
+      close();
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "The video could not be uploaded."
-      );
+      toast.error(error instanceof Error ? error.message : "The upload could not be completed.");
     } finally {
       setBusy(false);
     }
   };
+
+  const modalTitle = mode === "menu" ? "Create" : mode === "text" ? "Post Text" : mode === "thread" ? "Start a Thread" : mediaMode === "photo" ? "Post Image" : kind === "SHORT" ? "Upload Shorts" : "Post Video";
   return (
-    <ActionModal title="Create a video" open={open} onClose={onClose} className="upload-video-modal">
-      <form className="modal-form" onSubmit={submit}>
-        <div className="modal-kind-switch" role="tablist" aria-label="Media type">
-          <button
-            type="button"
-            className={mediaMode === "video" ? "active" : ""}
-            onClick={event => {
-              event.preventDefault();
-              event.stopPropagation();
-              setMediaMode("video");
-              setFile(null);
-              setImageDimensions(null);
-            }}
-          >
-            Video
-          </button>
-          <button
-            type="button"
-            className={mediaMode === "photo" ? "active" : ""}
-            onClick={event => {
-              event.preventDefault();
-              event.stopPropagation();
-              setMediaMode("photo");
-              setFile(null);
-              setImageDimensions(null);
-            }}
-          >
-            Photo
-          </button>
-        </div>
-        {mediaMode === "video" && (
-          <div className="modal-kind-switch" role="tablist" aria-label="Video type">
-            <button
-              type="button"
-              className={kind === "LONG" ? "active" : ""}
-              onClick={event => {
-                event.preventDefault();
-                event.stopPropagation();
-                setKind("LONG");
-              }}
-            >
-              Video · up to 30 min
-            </button>
-            <button
-              type="button"
-              className={kind === "SHORT" ? "active" : ""}
-              onClick={event => {
-                event.preventDefault();
-                event.stopPropagation();
-                setKind("SHORT");
-              }}
-            >
-              Short · up to 1 min
-            </button>
+    <ActionModal title={modalTitle} open={open} onClose={close} className="upload-video-modal create-uploader-modal">
+      <button type="button" className="create-uploader-close" onClick={safeClick(close)} aria-label="Close Create uploader">
+        <X size={25} />
+      </button>
+      {mode === "menu" ? (
+        <>
+          <div className="create-uploader-intro">
+            <p className="eyebrow">Share something new</p>
+            <h2>Create on KINBA</h2>
+            <p>Choose a format and continue directly into its publishing workflow.</p>
           </div>
-        )}
-        <label>
-          Title
-          <input
-            value={title}
-            onChange={event => setTitle(event.target.value)}
-            placeholder="Give your video a title"
-            maxLength={180}
-            required
-          />
-        </label>
-        <label>
-          Caption
-          <textarea
-            value={description}
-            onChange={event => setDescription(event.target.value)}
-            placeholder="Tell viewers what this is about"
-            maxLength={2400}
-            rows={4}
-          />
-        </label>
-        <input
-          ref={inputRef}
-          type="file"
-          accept={mediaMode === "photo" ? "image/jpeg,image/png,image/webp" : "video/*"}
-          className="sr-only"
-          onChange={selectFile}
-        />
-        <button
-          type="button"
-          className="modal-file-button"
-          onClick={event => {
-            event.preventDefault();
-            event.stopPropagation();
-            inputRef.current?.click();
-          }}
-        >
-          {mediaMode === "photo" ? <ImagePlus size={18} /> : <Video size={18} />} {file ? file.name : mediaMode === "photo" ? "Choose JPG, PNG, or WEBP image" : "Choose original video"}
-        </button>
-        <button className="primary-btn" type="submit" disabled={busy}>
-          {busy ? "Uploading…" : mediaMode === "photo" ? "Upload photo" : "Upload video"}
-        </button>
-      </form>
+          <div className="create-uploader-wheel" aria-label="Create options">
+            <div className="create-uploader-wheel-core"><Plus size={25} /><span>Create</span></div>
+            <button type="button" className="create-uploader-option create-uploader-option--image" onClick={safeClick(() => chooseMedia("photo"))}><ImagePlus size={20} /><span>Post Image</span></button>
+            <button type="button" className="create-uploader-option create-uploader-option--video" onClick={safeClick(() => chooseMedia("video", "LONG"))}><Video size={20} /><span>Post Video</span></button>
+            <button type="button" className="create-uploader-option create-uploader-option--shorts" onClick={safeClick(() => chooseMedia("video", "SHORT"))}><Film size={20} /><span>Upload Shorts</span></button>
+            <button type="button" className="create-uploader-option create-uploader-option--text" onClick={safeClick(() => chooseMode("text"))}><FileText size={20} /><span>Post Text</span></button>
+            <button type="button" className="create-uploader-option create-uploader-option--thread" onClick={safeClick(() => chooseMode("thread"))}><MessageCircle size={20} /><span>Start a Thread</span></button>
+            <button type="button" className="create-uploader-option create-uploader-option--live" onClick={safeClick(() => chooseMedia("video", "LONG"))}><Radio size={20} /><span>Go Live</span></button>
+          </div>
+          <UploaderHistory media={mediaHistory.data ?? []} textPosts={textHistory.data ?? []} />
+        </>
+      ) : mode === "text" || mode === "thread" ? (
+        <div className="create-uploader-composer">
+          <p className="modal-intro">{mode === "thread" ? "Start a conversation with your community." : "Publish a text update to your KINBA history."}</p>
+          <CommunityAnnouncements />
+        </div>
+      ) : (
+        <form className="modal-form" onSubmit={submit}>
+          <div className="modal-kind-switch" role="tablist" aria-label="Media type">
+            <button type="button" className={mediaMode === "video" ? "active" : ""} onClick={safeClick(() => chooseMedia("video", kind))}>Video</button>
+            <button type="button" className={mediaMode === "photo" ? "active" : ""} onClick={safeClick(() => chooseMedia("photo"))}>Photo</button>
+          </div>
+          {mediaMode === "video" && (
+            <div className="modal-kind-switch" role="tablist" aria-label="Video type">
+              <button type="button" className={kind === "LONG" ? "active" : ""} onClick={safeClick(() => setKind("LONG"))}>Video · up to 30 min</button>
+              <button type="button" className={kind === "SHORT" ? "active" : ""} onClick={safeClick(() => setKind("SHORT"))}>Short · up to 1 min</button>
+            </div>
+          )}
+          <label>Title<input value={title} onChange={event => setTitle(event.target.value)} placeholder={kind === "SHORT" ? "Give your Short a title" : "Give your post a title"} maxLength={180} required /></label>
+          <label>Caption<textarea value={description} onChange={event => setDescription(event.target.value)} placeholder="Tell viewers what this is about" maxLength={2400} rows={4} /></label>
+          <input ref={inputRef} type="file" accept={mediaMode === "photo" ? "image/jpeg,image/png,image/webp" : "video/*"} className="sr-only" onChange={selectFile} />
+          <button type="button" className="modal-file-button" onClick={safeClick(() => inputRef.current?.click())}>{mediaMode === "photo" ? <ImagePlus size={18} /> : <Video size={18} />} {file ? file.name : mediaMode === "photo" ? "Choose JPG, PNG, or WEBP image" : "Choose original video"}</button>
+          <div className="create-uploader-form-actions"><button type="button" className="muted-btn" onClick={safeClick(() => setMode("menu"))}>Back</button><button className="primary-btn" type="submit" disabled={busy}>{busy ? "Uploading…" : mediaMode === "photo" ? "Publish image" : kind === "SHORT" ? "Upload Short" : "Publish video"}</button></div>
+        </form>
+      )}
     </ActionModal>
   );
 }

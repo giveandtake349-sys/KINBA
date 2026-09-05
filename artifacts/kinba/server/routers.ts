@@ -337,6 +337,7 @@ export const appRouter = router({
   }),
   community: router({
     list: publicProcedure.query(() => listCommunityAnnouncements()),
+    mine: protectedProcedure.query(({ ctx }) => listCommunityAnnouncements(ctx.user.id)),
     create: protectedProcedure
       .input(communityAnnouncementInput)
       .mutation(({ ctx, input }) =>
