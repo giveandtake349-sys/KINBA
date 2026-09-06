@@ -10,6 +10,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   BadgeCheck,
   Bookmark,
@@ -1013,17 +1014,15 @@ function EngagementActions({
     </div>
   );
 }
-function CommentsPanel({
-  videoId,
+function CommentDrawer({
+  postId,
   postOwnerId,
   open,
-  overlay = false,
   onClose,
 }: {
-  videoId: number;
+  postId: number;
   postOwnerId: number;
   open: boolean;
-  overlay?: boolean;
   onClose?: () => void;
 }) {
   const auth = useAuth();
@@ -1035,7 +1034,7 @@ function CommentsPanel({
   const [likingId, setLikingId] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const commentsQuery = trpc.videos.comments.list.useQuery(
-    { videoId },
+    { videoId: postId },
     { enabled: open, refetchOnWindowFocus: false }
   );
   const createComment = trpc.videos.comments.create.useMutation();
@@ -1053,7 +1052,7 @@ function CommentsPanel({
   ) => {
     if (!auth.isAuthenticated) return auth.openAuth();
     await createComment.mutateAsync({
-      videoId,
+      videoId: postId,
       body: body.trim(),
       audioUrl,
       audioDuration,
@@ -1171,17 +1170,45 @@ function CommentsPanel({
     );
   };
 
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    const visualViewport = window.visualViewport;
+    const updateKeyboardOffset = () => {
+      const viewportHeight = visualViewport?.height ?? window.innerHeight;
+      const viewportTop = visualViewport?.offsetTop ?? 0;
+      const keyboardOffset = Math.max(0, window.innerHeight - viewportHeight - viewportTop);
+      document.documentElement.style.setProperty("--kinba-keyboard-offset", `${keyboardOffset}px`);
+    };
+    document.body.style.overflow = "hidden";
+    updateKeyboardOffset();
+    visualViewport?.addEventListener("resize", updateKeyboardOffset);
+    visualViewport?.addEventListener("scroll", updateKeyboardOffset);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      visualViewport?.removeEventListener("resize", updateKeyboardOffset);
+      visualViewport?.removeEventListener("scroll", updateKeyboardOffset);
+      document.documentElement.style.removeProperty("--kinba-keyboard-offset");
+    };
+  }, [open]);
+
   if (!open) return null;
   const roots = comments.filter(comment => !comment.parentId);
-  return (
-    <div
-      className={`video-comments${overlay ? " video-comments--overlay" : ""}`}
-      aria-live="polite"
-      role={overlay ? "dialog" : undefined}
-      aria-modal={overlay || undefined}
-      aria-label={overlay ? "Comments" : undefined}
-    >
-      {overlay && (
+  return createPortal(
+    <div className="comment-drawer-layer" role="presentation">
+      <button
+        type="button"
+        className="comment-drawer-backdrop"
+        aria-label="Close comments"
+        onClick={onClose}
+      />
+      <section
+        className="comment-drawer"
+        aria-live="polite"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Comments"
+      >
         <div className="comment-sheet-header">
           <span aria-hidden="true" />
           <strong>Comments</strong>
@@ -1189,20 +1216,17 @@ function CommentsPanel({
             <X size={19} />
           </button>
         </div>
-      )}
-      {commentsQuery.isPending ? (
-        <div className="comment-loading">Loading comments…</div>
-      ) : commentsQuery.isError ? (
-        <div className="comment-loading">
-          Comments are temporarily unavailable.
+        <div className="comment-drawer-list">
+          {commentsQuery.isPending ? (
+            <div className="comment-loading">Loading comments…</div>
+          ) : commentsQuery.isError ? (
+            <div className="comment-loading">Comments are temporarily unavailable.</div>
+          ) : roots.length ? (
+            roots.map(comment => renderComment(comment))
+          ) : (
+            <div className="comment-loading">No comments yet. Start the conversation.</div>
+          )}
         </div>
-      ) : roots.length ? (
-        roots.map(comment => renderComment(comment))
-      ) : (
-        <div className="comment-loading">
-          No comments yet. Start the conversation.
-        </div>
-      )}
       {replyTo && (
         <div className="comment-replying-banner">
           Replying to @{replyTo.username}
@@ -1215,17 +1239,17 @@ function CommentsPanel({
           </button>
         </div>
       )}
-      <VoiceCommentComposer
-        body={body}
-        onBodyChange={setBody}
-        onSend={submitComment}
-        disabled={createComment.isPending}
-        inputRef={inputRef}
-        placeholder={
-          auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"
-        }
-      />
-    </div>
+        <VoiceCommentComposer
+          body={body}
+          onBodyChange={setBody}
+          onSend={submitComment}
+          disabled={createComment.isPending}
+          inputRef={inputRef}
+          placeholder={auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"}
+        />
+      </section>
+    </div>,
+    document.body
   );
 }
 
@@ -1568,8 +1592,8 @@ function VideoCard({
           </div>
         )}
         <RawPulseCard videoId={video.id} />
-        <CommentsPanel
-          videoId={video.id}
+        <CommentDrawer
+          postId={video.id}
           postOwnerId={video.owner.id}
           open={commentsOpen}
           onClose={() => setCommentsOpen(false)}
@@ -1675,11 +1699,10 @@ function VideoCard({
         </div>
       </div>
       <RawPulseCard videoId={video.id} />
-      <CommentsPanel
-        videoId={video.id}
+      <CommentDrawer
+        postId={video.id}
         postOwnerId={video.owner.id}
         open={commentsOpen}
-        overlay={showDetailsOverlay}
         onClose={() => setCommentsOpen(false)}
       />
     </article>
@@ -2578,11 +2601,10 @@ function ShortVideoCard({
           owner={video.owner}
         />
       </div>
-      <CommentsPanel
-        videoId={video.id}
+      <CommentDrawer
+        postId={video.id}
         postOwnerId={video.owner.id}
         open={commentsOpen}
-        overlay
         onClose={() => setCommentsOpen(false)}
       />
     </article>
