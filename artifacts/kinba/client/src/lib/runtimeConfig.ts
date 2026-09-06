@@ -25,31 +25,50 @@ export const publicMediaConfig = {
     clean(runtimeConfig?.r2PublicBaseUrl),
 };
 
-export function resolveMediaUrl(value: string | null | undefined) {
+export function resolveMediaUrl(
+  value: string | null | undefined,
+  bucket = "post-media",
+) {
   const source = clean(value);
   if (!source) return undefined;
+  const supabaseUrl = clean(import.meta.env.VITE_SUPABASE_URL) ?? clean(runtimeConfig?.supabaseUrl);
   try {
-    const parsed = new URL(source, typeof window !== "undefined" ? window.location.origin : "http://localhost");
+    const parsed = new URL(
+      source,
+      typeof window !== "undefined" ? window.location.origin : "http://localhost",
+    );
     if (parsed.hostname.endsWith(".r2.dev")) {
       return `/api/media/${parsed.pathname.replace(/^\/+/, "")}`;
     }
-    if (/^https?:$/i.test(parsed.protocol)) return parsed.toString();
+    if (/^https?:$/i.test(parsed.protocol)) {
+      const normalized = parsed.toString();
+      return /^http:/i.test(normalized) && supabaseUrl && normalized.startsWith(supabaseUrl)
+        ? normalized.replace(/^http:/i, "https:")
+        : normalized;
+    }
   } catch {
     // Treat non-URL values as object keys below.
   }
   if (/^(blob:|data:)/i.test(source)) return source;
+  const storageMarker = "/storage/v1/object/public/";
+  if (source.includes(storageMarker) && supabaseUrl) {
+    return `${supabaseUrl.replace(/\/+$/, "")}${source.slice(source.indexOf(storageMarker))}`;
+  }
   if (source.startsWith("/")) return source;
-  const base = publicMediaConfig.r2PublicBaseUrl;
-  if (base) {
+  const r2Base = publicMediaConfig.r2PublicBaseUrl;
+  if (r2Base) {
     try {
-      const parsedBase = new URL(base);
+      const parsedBase = new URL(r2Base);
       if (parsedBase.hostname.endsWith(".r2.dev")) {
         return `/api/media/${source.replace(/^\/+/, "")}`;
       }
     } catch {
-      // Fall back to the raw key if the configured base is malformed.
+      // Fall through to Supabase or the raw source if the R2 base is malformed.
     }
-    return `${base.replace(/\/+$/, "")}/${source.replace(/^\/+/, "")}`;
+    return `${r2Base.replace(/\/+$/, "")}/${source.replace(/^\/+/, "")}`;
+  }
+  if (supabaseUrl) {
+    return `${supabaseUrl.replace(/\/+$/, "")}/storage/v1/object/public/${bucket}/${source.replace(/^\/+/, "")}`;
   }
   return source;
 }

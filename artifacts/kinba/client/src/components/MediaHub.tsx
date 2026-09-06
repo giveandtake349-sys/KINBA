@@ -284,19 +284,27 @@ function SpotlightHighlights({ onSelect }: { onSelect: (highlight: SpotlightHigh
               {highlight.mediaUrl ? (
                 highlight.mediaType === "VIDEO" ? (
                   highlight.thumbnailUrl ? (
-                    <img src={highlight.thumbnailUrl} alt="" loading="lazy" />
+                    <img src={resolveMediaUrl(highlight.thumbnailUrl)} alt="" loading="lazy" />
                   ) : (
-                    <video src={highlight.mediaUrl} muted playsInline preload="metadata" aria-label="Highlighted video" />
+                    <video
+                      src={resolveMediaUrl(highlight.mediaUrl)}
+                      muted
+                      playsInline
+                      {...({ "webkit-playsinline": "true" } as Record<string, string>)}
+                      preload="metadata"
+                      crossOrigin="anonymous"
+                      aria-label="Highlighted video"
+                    />
                   )
                 ) : (
-                  <img src={highlight.mediaUrl} alt="" loading="lazy" />
+                    <img src={resolveMediaUrl(highlight.mediaUrl)} alt="" loading="lazy" />
                 )
               ) : (
                 <div className="spotlight-highlight-card__text">{highlight.caption.slice(0, 120)}</div>
               )}
             </div>
             <span className="spotlight-highlight-card__author">
-              {highlight.author.photoUrl ? <img src={highlight.author.photoUrl} alt="" /> : <UserRound size={13} />}
+              {highlight.author.photoUrl ? <img src={resolveMediaUrl(highlight.author.photoUrl, "avatars")} alt="" /> : <UserRound size={13} />}
               {displayName(highlight.author.name, highlight.author.username)}
             </span>
             <strong>{highlight.title || highlight.caption.slice(0, 80)}</strong>
@@ -660,10 +668,12 @@ function QualityVideoPlayer({
       }
     >
       <video
+        src={sourceUrl}
         poster={showPoster ? posterUrl : undefined}
         className={`w-full h-full object-cover ${vertical ? "aspect-[9/16]" : ""}`}
         ref={ref}
         crossOrigin="anonymous"
+        {...({ "webkit-playsinline": "true" } as Record<string, string>)}
         controls
         controlsList="nofullscreen noplaybackrate"
         disablePictureInPicture
@@ -792,7 +802,7 @@ function EngagementActions({
         >
           <span className="creator-follow-avatar">
             {owner.photoUrl ? (
-              <img src={owner.photoUrl} alt="" />
+              <img src={resolveMediaUrl(owner.photoUrl, "avatars")} alt="" />
             ) : (
               <UserRound size={19} />
             )}
@@ -1230,7 +1240,7 @@ function VideoCard({
         <header className="feed-post-author">
           <div className="video-owner-avatar">
             {video.owner.photoUrl ? (
-              <img src={video.owner.photoUrl} alt="" />
+              <img src={resolveMediaUrl(video.owner.photoUrl, "avatars")} alt="" />
             ) : (
               <UserRound size={16} />
             )}
@@ -1305,7 +1315,7 @@ function VideoCard({
     >
       <header className="feed-post-author">
         <div className="video-owner-avatar">
-          {video.owner.photoUrl ? <img src={video.owner.photoUrl} alt="" /> : <UserRound size={16} />}
+          {video.owner.photoUrl ? <img src={resolveMediaUrl(video.owner.photoUrl, "avatars")} alt="" /> : <UserRound size={16} />}
         </div>
         <div className="feed-post-author-info">
           <strong>
@@ -1706,7 +1716,7 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
     <article id={`feed-post-${post.id}`} className="feed-text-card">
       <a className="feed-post-author profile-link" href={`/profile/${post.author.id}`} aria-label={`Open ${post.author.name ?? "KINBA creator"} profile`}>
         <div className="video-owner-avatar">
-          {post.author.photoUrl ? <img src={post.author.photoUrl} alt="" /> : <UserRound size={16} />}
+          {post.author.photoUrl ? <img src={resolveMediaUrl(post.author.photoUrl, "avatars")} alt="" /> : <UserRound size={16} />}
         </div>
          <div className="feed-post-author-info">
            <strong>
@@ -1727,7 +1737,15 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
                 <img src={resolveMediaUrl(attachment.mediaUrl)} alt="Post attachment" loading="lazy" />
               </button>
             ) : (
-              <video key={attachment.id} src={resolveMediaUrl(attachment.mediaUrl)} controls playsInline preload="metadata" />
+              <video
+                key={attachment.id}
+                src={resolveMediaUrl(attachment.mediaUrl)}
+                controls
+                playsInline
+                {...({ "webkit-playsinline": "true" } as Record<string, string>)}
+                preload="metadata"
+                crossOrigin="anonymous"
+              />
             )
           )}
         </div>
@@ -2005,7 +2023,7 @@ function ShortVideoCard({
     >
       {video.mediaType === "IMAGE" ? (
         <img
-          src={video.videoUrl}
+          src={resolveMediaUrl(video.videoUrl)}
           className="w-full h-auto object-cover rounded-lg"
           alt={video.title || "Post"}
         />
@@ -2019,7 +2037,7 @@ function ShortVideoCard({
                 <div className="video-owner-identity">
               <div className="video-owner-avatar">
                 {video.owner.photoUrl ? (
-                  <img src={video.owner.photoUrl} alt="" />
+                  <img src={resolveMediaUrl(video.owner.photoUrl, "avatars")} alt="" />
                 ) : (
                   <UserRound size={16} />
                 )}
@@ -2518,7 +2536,7 @@ export function CommunityAnnouncements() {
               <div className="announcement-author">
                 <div className="announcement-author-avatar">
                   {announcement.author.photoUrl ? (
-                    <img src={announcement.author.photoUrl} alt="" />
+                    <img src={resolveMediaUrl(announcement.author.photoUrl, "avatars")} alt="" />
                   ) : (
                     <Megaphone size={16} />
                   )}
@@ -2548,19 +2566,21 @@ export function CommunityAnnouncements() {
                   attachment.mediaType === "IMAGE" ? (
                     <img
                       key={attachment.id}
-                      src={attachment.mediaUrl}
+                      src={resolveMediaUrl(attachment.mediaUrl)}
                       alt="Community announcement attachment"
                       loading="lazy"
                     />
                   ) : (
                     <video
                       key={attachment.id}
-                      src={attachment.mediaUrl}
+                      src={resolveMediaUrl(attachment.mediaUrl)}
                       controls
                       controlsList="nofullscreen noplaybackrate"
                       disablePictureInPicture
                       playsInline
+                      {...({ "webkit-playsinline": "true" } as Record<string, string>)}
                       preload="metadata"
+                      crossOrigin="anonymous"
                     />
                   )
                 )}
