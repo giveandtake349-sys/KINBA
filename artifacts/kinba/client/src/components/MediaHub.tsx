@@ -1443,6 +1443,8 @@ function UploadVideoPanel({
       setImagePreviewUrl(null);
       toast.success(mode === "photo" ? "Photo published to your feed." : "Video published to your feed.");
     } catch (error) {
+      const err = error instanceof Error ? error : new Error(JSON.stringify(error));
+      alert("Upload Error: " + (err.message || JSON.stringify(err)));
       notifyError(error);
     } finally {
       setBusy(false);

@@ -7,6 +7,11 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
     allowNavigation: ['*.supabase.co', '*.onrender.com'],
+  },
+  plugins: {
+    CapacitorHttp: {
+      enabled: true,
+    },
   }
 };
 

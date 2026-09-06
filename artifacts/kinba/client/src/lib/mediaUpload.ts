@@ -78,6 +78,21 @@ export async function getVideoMetadata(
   });
 }
 
+function readBlobAsUint8Array(blob: Blob): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (!(reader.result instanceof ArrayBuffer)) {
+        reject(new Error("The selected file could not be read as binary data."));
+        return;
+      }
+      resolve(new Uint8Array(reader.result));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("The selected file could not be read."));
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
 function logUploadRequest(kind: "video" | "photo", url: string, fields: Record<string, string>, file: File) {
   console.info("[MediaPublish] request", {
     kind,
@@ -247,11 +262,11 @@ async function uploadDirectToR2(
   const uploadUrl = signed.uploadUrl ?? signed.url;
   if (!signResponse.ok || !uploadUrl || !signed.publicUrl)
     throw new Error(uploadFailureMessage(signResponse, signed, "Media"));
-  const buffer = await file.arrayBuffer();
+  const bytes = await readBlobAsUint8Array(file);
   const uploadResponse = await fetch(uploadUrl, {
     method: "PUT",
     headers: { "Content-Type": file.type },
-    body: new Uint8Array(buffer),
+    body: bytes,
   });
   if (!uploadResponse.ok)
     throw new Error(`R2 media upload failed with HTTP ${uploadResponse.status}.`);
@@ -391,10 +406,10 @@ export async function uploadCommentAudio(blob: Blob): Promise<string> {
   const extension = commentAudioExtension(contentType);
   const filename = `comment-audio-${Date.now()}-${crypto.randomUUID()}.${extension}`;
   const objectPath = `${userId}/${filename}`;
-  const buffer = await blob.arrayBuffer();
+  const bytes = await readBlobAsUint8Array(blob);
   const { error: uploadError } = await supabase.storage
     .from("comment-media")
-    .upload(objectPath, new Uint8Array(buffer), {
+    .upload(objectPath, bytes, {
       cacheControl: "3600",
       contentType,
       upsert: false,
@@ -421,10 +436,10 @@ export async function uploadImage(
       : kind === "comment"
         ? "comment-media"
         : "post-media";
-  const buffer = await file.arrayBuffer();
+  const bytes = await readBlobAsUint8Array(file);
   const { error: uploadError } = await supabase.storage
     .from(bucket)
-    .upload(objectPath, new Uint8Array(buffer), {
+    .upload(objectPath, bytes, {
       cacheControl: "3600",
       contentType: file.type,
       upsert: false,
