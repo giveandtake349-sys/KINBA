@@ -83,17 +83,25 @@ function readBlobAsUint8Array(blob: Blob): Promise<Uint8Array> {
     const reader = new FileReader();
     reader.onload = () => {
       if (!(reader.result instanceof ArrayBuffer)) {
-        reject(new Error("The selected file could not be read as binary data."));
+        reject(
+          new Error("The selected file could not be read as binary data.")
+        );
         return;
       }
       resolve(new Uint8Array(reader.result));
     };
-    reader.onerror = () => reject(reader.error ?? new Error("The selected file could not be read."));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("The selected file could not be read."));
     reader.readAsArrayBuffer(blob);
   });
 }
 
-function logUploadRequest(kind: "video" | "photo", url: string, fields: Record<string, string>, file: File) {
+function logUploadRequest(
+  kind: "video" | "photo",
+  url: string,
+  fields: Record<string, string>,
+  file: File
+) {
   console.info("[MediaPublish] request", {
     kind,
     url,
@@ -111,15 +119,22 @@ async function fetchUploadWithRetry(
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     try {
       const response = await fetch(url, init);
-      if (![502, 503, 504].includes(response.status) || attempt === attempts - 1)
+      if (
+        ![502, 503, 504].includes(response.status) ||
+        attempt === attempts - 1
+      )
         return response;
     } catch (error) {
       lastError = error;
       if (attempt === attempts - 1) throw lastError;
     }
-    await new Promise(resolve => window.setTimeout(resolve, 500 * (attempt + 1)));
+    await new Promise(resolve =>
+      window.setTimeout(resolve, 500 * (attempt + 1))
+    );
   }
-  throw lastError instanceof Error ? lastError : new Error("Upload request failed.");
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Upload request failed.");
 }
 
 type UploadPayload = {
@@ -140,17 +155,29 @@ async function readUploadPayload(response: Response): Promise<UploadPayload> {
   if (!text.trim()) return {};
   try {
     const parsed: unknown = JSON.parse(text);
-    return parsed && typeof parsed === "object" ? (parsed as UploadPayload) : {};
+    return parsed && typeof parsed === "object"
+      ? (parsed as UploadPayload)
+      : {};
   } catch {
     return { error: text.trim().slice(0, 240) };
   }
 }
 
-function uploadFailureMessage(response: Response, payload: UploadPayload, resource: string) {
+function uploadFailureMessage(
+  response: Response,
+  payload: UploadPayload,
+  resource: string
+) {
   if (response.status === 404) {
-    return resource + " upload endpoint was not found. Check that the Render domain is attached to the KINBA API service, not a static-only deployment.";
+    return (
+      resource +
+      " upload endpoint was not found. Check that the Render domain is attached to the KINBA API service, not a static-only deployment."
+    );
   }
-  return payload.error || resource + " publish failed with HTTP " + response.status + ".";
+  return (
+    payload.error ||
+    resource + " publish failed with HTTP " + response.status + "."
+  );
 }
 
 async function getUploadSession(message: string) {
@@ -177,7 +204,9 @@ async function getSessionUserId(message: string) {
   return sessionData.session.user.id;
 }
 
-export async function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
+export async function getImageDimensions(
+  file: File
+): Promise<{ width: number; height: number }> {
   validatePhotoFile(file);
   const previewUrl = URL.createObjectURL(file);
   const image = new Image();
@@ -188,7 +217,10 @@ export async function getImageDimensions(file: File): Promise<{ width: number; h
       image.remove();
     };
     image.onload = () => {
-      const dimensions = { width: image.naturalWidth, height: image.naturalHeight };
+      const dimensions = {
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+      };
       cleanup();
       if (!dimensions.width || !dimensions.height)
         return reject(new Error("The image dimensions could not be read."));
@@ -209,31 +241,75 @@ export async function publishPhoto(
   dimensions: { width: number; height: number }
 ): Promise<{ postId: number; status: string; imageUrl: string }> {
   validatePhotoFile(file);
-  const session = await getUploadSession("Please sign in before uploading a photo.");
+  const session = await getUploadSession(
+    "Please sign in before uploading a photo."
+  );
+  const extension = allowedImageTypes[file.type as AllowedImageType];
+  const objectPath = `${session.user.id}/post-${Date.now()}-${crypto.randomUUID()}.${extension}`;
 
-  const body = new FormData();
-  body.append("photo", file, file.name);
-  body.append("title", title);
-  body.append("description", description);
-  body.append("width", String(dimensions.width));
-  body.append("height", String(dimensions.height));
-  const endpoint = apiUrl("/api/photos/upload");
-  logUploadRequest("photo", endpoint, { title, description, width: String(dimensions.width), height: String(dimensions.height) }, file);
+  const { error: uploadError } = await supabase.storage
+    .from("post-media")
+    .upload(objectPath, file, {
+      cacheControl: "3600",
+      contentType: file.type,
+      upsert: false,
+    });
+  if (uploadError) {
+    console.error(
+      "[MediaPublish] Supabase photo storage upload failed",
+      uploadError
+    );
+    throw new Error(`Photo upload failed: ${uploadError.message}`);
+  }
+
+  const { data: publicUrlData } = supabase.storage
+    .from("post-media")
+    .getPublicUrl(objectPath);
+  const imageUrl = publicUrlData.publicUrl.trim();
+  if (!/^https?:\/\//i.test(imageUrl)) {
+    throw new Error("Photo upload did not return a valid public URL.");
+  }
+
+  const endpoint = apiUrl("/api/photos/create");
+  logUploadRequest(
+    "photo",
+    endpoint,
+    {
+      title,
+      description,
+      width: String(dimensions.width),
+      height: String(dimensions.height),
+    },
+    file
+  );
   let response: Response;
   try {
     response = await fetchUploadWithRetry(endpoint, {
       method: "POST",
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json",
+      },
       credentials: "include",
-      body,
+      body: JSON.stringify({ title, description, imageUrl, ...dimensions }),
     });
   } catch (error) {
-    console.error("[MediaPublish] photo network failure", error);
-    throw new Error(`Photo upload request failed: ${error instanceof Error ? error.message : "network error"}`);
+    console.error("[MediaPublish] photo publication network failure", error);
+    throw new Error(
+      `Photo publication failed: ${error instanceof Error ? error.message : "network error"}`
+    );
   }
   const payload = await readUploadPayload(response);
-  if (!response.ok || !payload.postId || !payload.imageUrl) {
-    console.error("[MediaPublish] photo API rejection", { status: response.status, payload });
+  if (
+    !response.ok ||
+    !payload.postId ||
+    !payload.imageUrl ||
+    !/^https?:\/\//i.test(payload.imageUrl)
+  ) {
+    console.error("[MediaPublish] photo publication rejected", {
+      status: response.status,
+      payload,
+    });
     throw new Error(uploadFailureMessage(response, payload, "Photo"));
   }
   return {
@@ -249,15 +325,18 @@ async function uploadDirectToR2(
   mediaRole: "source" | "thumbnail",
   accessToken: string
 ): Promise<string> {
-  const signResponse = await fetchUploadWithRetry(apiUrl("/api/videos/upload-url"), {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    credentials: "include",
-    body: JSON.stringify({ contentType: file.type, kind, mediaRole }),
-  });
+  const signResponse = await fetchUploadWithRetry(
+    apiUrl("/api/videos/upload-url"),
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({ contentType: file.type, kind, mediaRole }),
+    }
+  );
   const signed = await readUploadPayload(signResponse);
   const uploadUrl = signed.uploadUrl ?? signed.url;
   if (!signResponse.ok || !uploadUrl || !signed.publicUrl)
@@ -266,10 +345,12 @@ async function uploadDirectToR2(
   const uploadResponse = await fetch(uploadUrl, {
     method: "PUT",
     headers: { "Content-Type": file.type },
-    body: bytes,
+    body: bytes as unknown as BodyInit,
   });
   if (!uploadResponse.ok)
-    throw new Error(`R2 media upload failed with HTTP ${uploadResponse.status}.`);
+    throw new Error(
+      `R2 media upload failed with HTTP ${uploadResponse.status}.`
+    );
   return signed.publicUrl;
 }
 
@@ -322,11 +403,23 @@ export async function publishVideo(
 ): Promise<{ videoId: number; status: string; videoUrl: string }> {
   if (!file.type.startsWith("video/"))
     throw new Error("Choose a supported video file.");
-  const session = await getUploadSession("Please sign in before uploading video.");
-  const resolvedMetadata = metadata ?? await getVideoMetadata(file, {
-    maxDurationSeconds: kind === "SHORT" ? MAX_SHORT_VIDEO_DURATION_SECONDS : MAX_LONG_VIDEO_DURATION_SECONDS,
-  });
-  const videoUrl = await uploadDirectToR2(file, kind, "source", session.access_token);
+  const session = await getUploadSession(
+    "Please sign in before uploading video."
+  );
+  const resolvedMetadata =
+    metadata ??
+    (await getVideoMetadata(file, {
+      maxDurationSeconds:
+        kind === "SHORT"
+          ? MAX_SHORT_VIDEO_DURATION_SECONDS
+          : MAX_LONG_VIDEO_DURATION_SECONDS,
+    }));
+  const videoUrl = await uploadDirectToR2(
+    file,
+    kind,
+    "source",
+    session.access_token
+  );
   let thumbnailUrl: string | null = null;
   try {
     const thumbnail = await captureVideoThumbnail(file);
@@ -362,7 +455,11 @@ export async function publishVideo(
   const payload = await readUploadPayload(response);
   if (!response.ok || !payload.videoId || !payload.videoUrl)
     throw new Error(uploadFailureMessage(response, payload, "Video"));
-  return { videoId: payload.videoId, status: payload.status || "PUBLISHED", videoUrl: payload.videoUrl };
+  return {
+    videoId: payload.videoId,
+    status: payload.status || "PUBLISHED",
+    videoUrl: payload.videoUrl,
+  };
 }
 
 export async function uploadVideo(
@@ -371,7 +468,9 @@ export async function uploadVideo(
 ): Promise<string> {
   if (!file.type.startsWith("video/"))
     throw new Error("Choose a supported video file.");
-  const session = await getUploadSession("Please sign in before uploading video.");
+  const session = await getUploadSession(
+    "Please sign in before uploading video."
+  );
   // Keep announcement attachments on the same signed Cloudflare R2 path as
   // published videos. This avoids the removed legacy multipart route.
   return uploadDirectToR2(file, kind, "source", session.access_token);
@@ -387,8 +486,11 @@ const supportedCommentAudioTypes = [
 
 function commentAudioType(blob: Blob) {
   const baseType = blob.type.toLowerCase().split(";", 1)[0];
-  if ((supportedCommentAudioTypes as readonly string[]).includes(baseType)) return baseType;
-  throw new Error("This browser produced an unsupported voice recording format.");
+  if ((supportedCommentAudioTypes as readonly string[]).includes(baseType))
+    return baseType;
+  throw new Error(
+    "This browser produced an unsupported voice recording format."
+  );
 }
 
 function commentAudioExtension(contentType: string) {
@@ -401,8 +503,11 @@ function commentAudioExtension(contentType: string) {
 
 export async function uploadCommentAudio(blob: Blob): Promise<string> {
   const contentType = commentAudioType(blob);
-  if (blob.size > 10 * 1024 * 1024) throw new Error("Voice comments must be 10MB or smaller.");
-  const userId = await getSessionUserId("Please sign in before sending a voice comment.");
+  if (blob.size > 10 * 1024 * 1024)
+    throw new Error("Voice comments must be 10MB or smaller.");
+  const userId = await getSessionUserId(
+    "Please sign in before sending a voice comment."
+  );
   const extension = commentAudioExtension(contentType);
   const filename = `comment-audio-${Date.now()}-${crypto.randomUUID()}.${extension}`;
   const objectPath = `${userId}/${filename}`;
@@ -415,8 +520,13 @@ export async function uploadCommentAudio(blob: Blob): Promise<string> {
       upsert: false,
     });
   if (uploadError) throw uploadError;
-  const { data } = supabase.storage.from("comment-media").getPublicUrl(objectPath);
-  if (!data.publicUrl) throw new Error("The recording uploaded, but its public URL could not be created.");
+  const { data } = supabase.storage
+    .from("comment-media")
+    .getPublicUrl(objectPath);
+  if (!data.publicUrl)
+    throw new Error(
+      "The recording uploaded, but its public URL could not be created."
+    );
   return data.publicUrl;
 }
 

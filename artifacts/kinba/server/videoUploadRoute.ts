@@ -32,15 +32,23 @@ export const SUPPORTED_AUDIO_MIME_TYPES = [
   "audio/wav",
 ] as const;
 
-const SUPPORTED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+const SUPPORTED_IMAGE_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+] as const;
 
 const upload = multer({
   dest: path.join(os.tmpdir(), "kinba-video-uploads"),
   limits: { files: 1, fileSize: 500 * 1024 * 1024 },
   fileFilter: (_req, file, callback) => {
     const accepted =
-      SUPPORTED_AUDIO_MIME_TYPES.includes(file.mimetype as (typeof SUPPORTED_AUDIO_MIME_TYPES)[number]) ||
-      SUPPORTED_IMAGE_MIME_TYPES.includes(file.mimetype as (typeof SUPPORTED_IMAGE_MIME_TYPES)[number]) ||
+      SUPPORTED_AUDIO_MIME_TYPES.includes(
+        file.mimetype as (typeof SUPPORTED_AUDIO_MIME_TYPES)[number]
+      ) ||
+      SUPPORTED_IMAGE_MIME_TYPES.includes(
+        file.mimetype as (typeof SUPPORTED_IMAGE_MIME_TYPES)[number]
+      ) ||
       file.mimetype.startsWith("video/");
     callback(null, accepted);
   },
@@ -54,7 +62,10 @@ function errorMessage(error: unknown) {
 function uploadSingle(field: "video" | "photo") {
   return (req: Request, res: Response, next: NextFunction) => {
     upload.single(field)(req, res, error => {
-      if (!error) { next(); return; }
+      if (!error) {
+        next();
+        return;
+      }
       const message =
         error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE"
           ? "The file is too large. Maximum upload size is 500MB."
@@ -70,7 +81,6 @@ function uploadSingle(field: "video" | "photo") {
   };
 }
 
-
 function logUploadFailure(route: string, request: Request, error: unknown) {
   const detail = error instanceof Error ? error : new Error(String(error));
   console.error(`[MediaUpload] ${route} failed`, {
@@ -81,11 +91,13 @@ function logUploadFailure(route: string, request: Request, error: unknown) {
   });
 }
 
-function logUploadStage(route: string, stage: string, details: Record<string, unknown>) {
+function logUploadStage(
+  route: string,
+  stage: string,
+  details: Record<string, unknown>
+) {
   console.info(`[MediaUpload] ${route} ${stage}`, details);
 }
-
-
 
 export async function authenticate(request: Request) {
   const supabaseUser = await verifySupabaseAccessToken(request);
@@ -106,7 +118,9 @@ export function registerVideoUploadRoute(app: Express) {
     try {
       const user = await authenticate(req);
       if (!user) {
-        res.status(401).json({ error: "Please sign in before deleting a comment." });
+        res
+          .status(401)
+          .json({ error: "Please sign in before deleting a comment." });
         return;
       }
       const commentId = Number(req.params.id);
@@ -118,7 +132,13 @@ export function registerVideoUploadRoute(app: Express) {
     } catch (error) {
       logUploadFailure("comment-delete", req, error);
       const message = errorMessage(error);
-      res.status(message.includes("not authorized") || message.includes("not found") ? 403 : 500).json({ error: message });
+      res
+        .status(
+          message.includes("not authorized") || message.includes("not found")
+            ? 403
+            : 500
+        )
+        .json({ error: message });
     }
   });
 
@@ -126,21 +146,33 @@ export function registerVideoUploadRoute(app: Express) {
     try {
       const user = await authenticate(req);
       if (!user) {
-        res.status(401).json({ error: "Please sign in before editing a post." });
+        res
+          .status(401)
+          .json({ error: "Please sign in before editing a post." });
         return;
       }
       const videoId = Number(req.params.id);
       const description = String(req.body?.description ?? "").trim();
-      if (!Number.isInteger(videoId) || videoId < 1 || description.length > 2000) {
+      if (
+        !Number.isInteger(videoId) ||
+        videoId < 1 ||
+        description.length > 2000
+      ) {
         res.status(400).json({ error: "The caption is invalid." });
         return;
       }
-      const updated = await updateVideoDescription(videoId, user.id, description);
+      const updated = await updateVideoDescription(
+        videoId,
+        user.id,
+        description
+      );
       res.json({ post: updated });
     } catch (error) {
       logUploadFailure("video-update", req, error);
       const message = errorMessage(error);
-      res.status(message.includes("not found") ? 404 : 500).json({ error: message });
+      res
+        .status(message.includes("not found") ? 404 : 500)
+        .json({ error: message });
     }
   });
 
@@ -148,7 +180,9 @@ export function registerVideoUploadRoute(app: Express) {
     try {
       const user = await authenticate(req);
       if (!user) {
-        res.status(401).json({ error: "Please sign in before deleting a post." });
+        res
+          .status(401)
+          .json({ error: "Please sign in before deleting a post." });
         return;
       }
       const videoId = Number(req.params.id);
@@ -160,7 +194,9 @@ export function registerVideoUploadRoute(app: Express) {
     } catch (error) {
       logUploadFailure("video-delete", req, error);
       const message = errorMessage(error);
-      res.status(message.includes("not found") ? 404 : 500).json({ error: message });
+      res
+        .status(message.includes("not found") ? 404 : 500)
+        .json({ error: message });
     }
   });
 
@@ -174,11 +210,13 @@ export function registerVideoUploadRoute(app: Express) {
         return;
       }
       const contentType = String(req.body?.contentType ?? "");
-      const mediaRole = req.body?.mediaRole === "thumbnail" ? "thumbnail" : "source";
+      const mediaRole =
+        req.body?.mediaRole === "thumbnail" ? "thumbnail" : "source";
       const kind = req.body?.kind === "SHORT" ? "SHORT" : "LONG";
-      const validType = mediaRole === "thumbnail"
-        ? ["image/jpeg", "image/png", "image/webp"].includes(contentType)
-        : contentType.startsWith("video/");
+      const validType =
+        mediaRole === "thumbnail"
+          ? ["image/jpeg", "image/png", "image/webp"].includes(contentType)
+          : contentType.startsWith("video/");
       if (!validType) {
         res.status(400).json({ error: "Choose a supported media file." });
         return;
@@ -210,8 +248,20 @@ export function registerVideoUploadRoute(app: Express) {
       const durationSeconds = Number(body.durationSeconds);
       const width = Number(body.width);
       const height = Number(body.height);
-      const maximum = kind === "SHORT" ? MAX_SHORT_VIDEO_DURATION_SECONDS : MAX_LONG_VIDEO_DURATION_SECONDS;
-      if (title.length < 3 || title.length > 180 || !videoUrl || !Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds > maximum || !Number.isInteger(width) || !Number.isInteger(height)) {
+      const maximum =
+        kind === "SHORT"
+          ? MAX_SHORT_VIDEO_DURATION_SECONDS
+          : MAX_LONG_VIDEO_DURATION_SECONDS;
+      if (
+        title.length < 3 ||
+        title.length > 180 ||
+        !videoUrl ||
+        !Number.isFinite(durationSeconds) ||
+        durationSeconds <= 0 ||
+        durationSeconds > maximum ||
+        !Number.isInteger(width) ||
+        !Number.isInteger(height)
+      ) {
         res.status(400).json({ error: "The video metadata is invalid." });
         return;
       }
@@ -226,13 +276,75 @@ export function registerVideoUploadRoute(app: Express) {
         height,
         sources: [{ quality: "ORIGINAL", videoUrl }],
       });
-      res.status(201).json({ videoId: video.id, status: "PUBLISHED", videoUrl, thumbnailUrl });
+      res.status(201).json({
+        videoId: video.id,
+        status: "PUBLISHED",
+        videoUrl,
+        thumbnailUrl,
+      });
     } catch (error) {
       logUploadFailure("video-complete", req, error);
       res.status(500).json({ error: errorMessage(error) });
     }
   });
 
+  app.post("/api/photos/create", async (req, res) => {
+    try {
+      const user = await authenticate(req);
+      if (!user) {
+        res
+          .status(401)
+          .json({ error: "Please sign in before publishing a photo." });
+        return;
+      }
+      const title = String(req.body?.title ?? "").trim();
+      const description = String(req.body?.description ?? "").trim();
+      const imageUrl = String(req.body?.imageUrl ?? "").trim();
+      const width = Number(req.body?.width);
+      const height = Number(req.body?.height);
+      if (title.length < 3 || title.length > 180) {
+        res
+          .status(400)
+          .json({ error: "Title must be between 3 and 180 characters." });
+        return;
+      }
+      if (description.length > 2000) {
+        res.status(400).json({ error: "The caption is too long." });
+        return;
+      }
+      if (!/^https?:\/\//i.test(imageUrl)) {
+        res.status(400).json({ error: "The uploaded image URL is invalid." });
+        return;
+      }
+      if (
+        !Number.isInteger(width) ||
+        !Number.isInteger(height) ||
+        width < 1 ||
+        height < 1
+      ) {
+        res
+          .status(400)
+          .json({ error: "The image dimensions could not be read." });
+        return;
+      }
+      const post = await createPhotoPost(user.id, {
+        title,
+        description,
+        imageUrl,
+        width,
+        height,
+      });
+      res.status(201).json({
+        postId: post.id,
+        mediaType: "IMAGE",
+        status: "PUBLISHED",
+        imageUrl,
+      });
+    } catch (error) {
+      logUploadFailure("photo-create", req, error);
+      res.status(500).json({ error: errorMessage(error) });
+    }
+  });
 
   app.post("/api/photos/upload", uploadSingle("photo"), async (req, res) => {
     let temporaryPath: string | undefined;
@@ -242,7 +354,12 @@ export function registerVideoUploadRoute(app: Express) {
         hasAuthorization: Boolean(req.headers.authorization),
         bodyKeys: Object.keys(req.body ?? {}),
         file: req.file
-          ? { field: req.file.fieldname, name: req.file.originalname, type: req.file.mimetype, size: req.file.size }
+          ? {
+              field: req.file.fieldname,
+              name: req.file.originalname,
+              type: req.file.mimetype,
+              size: req.file.size,
+            }
           : null,
       });
       const user = await authenticate(req);
@@ -256,7 +373,11 @@ export function registerVideoUploadRoute(app: Express) {
         return;
       }
       temporaryPath = req.file.path;
-      if (!SUPPORTED_IMAGE_MIME_TYPES.includes(req.file.mimetype as (typeof SUPPORTED_IMAGE_MIME_TYPES)[number])) {
+      if (
+        !SUPPORTED_IMAGE_MIME_TYPES.includes(
+          req.file.mimetype as (typeof SUPPORTED_IMAGE_MIME_TYPES)[number]
+        )
+      ) {
         res.status(400).json({ error: "Choose a JPG, PNG, or WEBP image." });
         return;
       }
@@ -269,14 +390,28 @@ export function registerVideoUploadRoute(app: Express) {
       const width = Number(req.body.width);
       const height = Number(req.body.height);
       if (title.length < 3 || title.length > 180) {
-        res.status(400).json({ error: "Title must be between 3 and 180 characters." });
+        res
+          .status(400)
+          .json({ error: "Title must be between 3 and 180 characters." });
         return;
       }
-      if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
-        res.status(400).json({ error: "The image dimensions could not be read." });
+      if (
+        !Number.isInteger(width) ||
+        !Number.isInteger(height) ||
+        width < 1 ||
+        height < 1
+      ) {
+        res
+          .status(400)
+          .json({ error: "The image dimensions could not be read." });
         return;
       }
-      logUploadStage("photo", "validated", { userId: user.id, titleLength: title.length, width, height });
+      logUploadStage("photo", "validated", {
+        userId: user.id,
+        titleLength: title.length,
+        width,
+        height,
+      });
       const uploaded = await storagePut(
         `photos/${user.id}/photo-${Date.now()}-${req.file.originalname}`,
         await fs.readFile(temporaryPath),
@@ -290,14 +425,17 @@ export function registerVideoUploadRoute(app: Express) {
         width,
         height,
       });
-      logUploadStage("photo", "published", { userId: user.id, postId: post.id });
+      logUploadStage("photo", "published", {
+        userId: user.id,
+        postId: post.id,
+      });
       res.status(201).json({
         postId: post.id,
         mediaType: "IMAGE",
         status: "PUBLISHED",
         imageUrl: uploaded.url,
       });
-        } catch (error) {
+    } catch (error) {
       logUploadFailure("photo", req, error);
       res.status(500).json({ error: errorMessage(error) });
     } finally {

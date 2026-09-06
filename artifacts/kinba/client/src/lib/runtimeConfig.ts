@@ -27,22 +27,28 @@ export const publicMediaConfig = {
 
 export function resolveMediaUrl(
   value: string | null | undefined,
-  bucket = "post-media",
+  bucket = "post-media"
 ) {
   const source = clean(value);
   if (!source) return undefined;
-  const supabaseUrl = clean(import.meta.env.VITE_SUPABASE_URL) ?? clean(runtimeConfig?.supabaseUrl);
+  const supabaseUrl =
+    clean(import.meta.env.VITE_SUPABASE_URL) ??
+    clean(runtimeConfig?.supabaseUrl);
   try {
     const parsed = new URL(
       source,
-      typeof window !== "undefined" ? window.location.origin : "http://localhost",
+      typeof window !== "undefined"
+        ? window.location.origin
+        : "http://localhost"
     );
     if (parsed.hostname.endsWith(".r2.dev")) {
       return `/api/media/${parsed.pathname.replace(/^\/+/, "")}`;
     }
     if (/^https?:$/i.test(parsed.protocol)) {
       const normalized = parsed.toString();
-      return /^http:/i.test(normalized) && supabaseUrl && normalized.startsWith(supabaseUrl)
+      return /^http:/i.test(normalized) &&
+        supabaseUrl &&
+        normalized.startsWith(supabaseUrl)
         ? normalized.replace(/^http:/i, "https:")
         : normalized;
     }
@@ -73,9 +79,22 @@ export function resolveMediaUrl(
   return source;
 }
 
+export function isAbsoluteHttpUrl(
+  value: string | null | undefined
+): value is string {
+  if (!value?.trim()) return false;
+  try {
+    const parsed = new URL(value.trim());
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export const publicSupabaseConfig = {
   url:
-    clean(import.meta.env.VITE_SUPABASE_URL) ?? clean(runtimeConfig?.supabaseUrl),
+    clean(import.meta.env.VITE_SUPABASE_URL) ??
+    clean(runtimeConfig?.supabaseUrl),
   anonKey:
     clean(import.meta.env.VITE_SUPABASE_ANON_KEY) ??
     clean(runtimeConfig?.supabaseAnonKey),
