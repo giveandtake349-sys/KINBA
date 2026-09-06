@@ -47,3 +47,7 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Local Android signing credentials
+artifacts/kinba/android/key.properties
+artifacts/kinba/android/*.jks
