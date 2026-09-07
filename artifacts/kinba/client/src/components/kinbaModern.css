@@ -2185,3 +2185,52 @@ body {
 .post-management__dialog-actions .is-danger { color: #fff !important; background: rgba(255,94,86,.22); }
 .video-card-details > .post-management { position: absolute; top: 8px; right: 10px; }
 .video-card-details { position: relative; }
+
+/* Final card separation and Shorts cleanup overrides. */
+.media-hub .feed-card-list,
+.media-hub .unified-feed-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+}
+.media-hub .feed-card-list > .feed-media-post,
+.media-hub .feed-card-list > .long-video-card,
+.media-hub .feed-card-list > .feed-text-card {
+  margin-bottom: 0 !important;
+  border: 1px solid rgba(38, 38, 38, 0.95) !important;
+  border-radius: 12px !important;
+  background: rgba(23, 23, 23, 0.8) !important;
+  overflow: hidden !important;
+}
+.media-tab-panel--wheels .feed-video-list {
+  gap: 16px !important;
+}
+.media-tab-panel--wheels .feed-video-list > .feed-media-post,
+.media-tab-panel--wheels .feed-video-list > .long-video-card {
+  border: 1px solid rgba(38, 38, 38, 0.95) !important;
+  border-radius: 12px !important;
+  background: rgba(23, 23, 23, 0.8) !important;
+  overflow: hidden !important;
+}
+.media-tab-panel--fullscreen,
+.media-tab-panel--fullscreen .shorts-section,
+.media-tab-panel--fullscreen .shorts-viewport,
+.media-tab-panel--fullscreen .short-card {
+  background: #000 !important;
+}
+.media-tab-panel--fullscreen .shorts-viewport {
+  isolation: isolate !important;
+  overscroll-behavior: contain !important;
+}
+.media-tab-panel--fullscreen .short-card {
+  position: relative !important;
+  z-index: 1 !important;
+}
+.shorts-overlay-actions {
+  position: relative !important;
+  z-index: 30 !important;
+  padding-bottom: max(80px, calc(80px + env(safe-area-inset-bottom))) !important;
+}
+.shorts-overlay-actions .media-engagement-actions--overlay {
+  z-index: 30 !important;
+}

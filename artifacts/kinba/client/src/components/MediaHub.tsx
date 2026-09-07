@@ -2327,7 +2327,7 @@ function UnifiedFeedPanel({
       {query.isPending ? (
         <FeedSkeleton />
       ) : items.length ? (
-        <div className="unified-feed-list">
+        <div className="unified-feed-list feed-card-list space-y-4">
           {items.map(item => {
             if (item.feedType === "media")
               return (
@@ -2430,7 +2430,7 @@ function HomeFeedPanel({
       {query.isPending ? (
         <FeedSkeleton />
       ) : videos.length ? (
-        <div className="unified-feed-list feed-video-list w-full max-w-full box-border">
+        <div className="unified-feed-list feed-video-list feed-card-list space-y-4 w-full max-w-full box-border">
           {videos.map(video => (
             <MemoVideoCard
               key={video.id}
@@ -2589,17 +2589,19 @@ function ShortVideoCard({
             {ownerHandle(video.owner.name, video.owner.username)}
           </p>
         </div>
-        <EngagementActions
-          engagement={current}
-          onReact={react}
-          onShare={share}
-          onComments={() => setCommentsOpen(value => !value)}
-          pending={pending}
-          overlay
-          bookmarked={bookmarked}
-          onBookmark={toggleBookmark}
-          owner={video.owner}
-        />
+        <div className="shorts-overlay-actions z-30 pb-20">
+          <EngagementActions
+            engagement={current}
+            onReact={react}
+            onShare={share}
+            onComments={() => setCommentsOpen(value => !value)}
+            pending={pending}
+            overlay
+            bookmarked={bookmarked}
+            onBookmark={toggleBookmark}
+            owner={video.owner}
+          />
+        </div>
       </div>
       <CommentDrawer
         postId={video.id}

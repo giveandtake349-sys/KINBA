@@ -2543,7 +2543,7 @@ export default function Home() {
       toast.error(error instanceof Error ? error.message : "Unable to log out.");
     }
   };
-  const authDialog = auth.authDialogOpen ? (
+  const authDialog = auth.authDialogOpen && !auth.isAuthenticated ? (
     <SupabaseAuthDialog
       open
       onOpenChange={open => (open ? auth.openAuth() : auth.closeAuth())}
