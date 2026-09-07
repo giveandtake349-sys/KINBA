@@ -2393,3 +2393,65 @@
 @media (prefers-reduced-motion: reduce) {
   .comment-drawer { animation: none; }
 }
+
+/* Scoped mobile clearance and Facebook-style feed separation. */
+@media (max-width: 760px) {
+  .app-main-content,
+  .media-hub {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .media-hub .media-tab-panel--wheels,
+  .media-hub .shorts-section {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .media-hub .unified-feed-list,
+  .media-hub .media-tab-panel:not(.media-tab-panel--wheels) .feed-video-list {
+    gap: 16px !important;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* Keep each social-feed item visually independent without changing fullscreen Wheels/Shorts cards. */
+.media-hub .unified-feed-list > .feed-media-post,
+.media-hub .unified-feed-list > .feed-text-card,
+.media-hub .unified-feed-list > .long-video-card,
+.media-hub .unified-feed-list > .shorts-insertion-block,
+.media-hub .media-tab-panel:not(.media-tab-panel--wheels) .feed-video-list > .long-video-card {
+  margin-bottom: 16px !important;
+  border: 1px solid rgba(154, 168, 191, 0.18) !important;
+  border-bottom-color: rgba(154, 168, 191, 0.38) !important;
+  border-radius: 14px !important;
+  background: rgba(11, 15, 23, 0.72) !important;
+  overflow: hidden !important;
+}
+
+.media-hub .unified-feed-list > .feed-media-post:last-child,
+.media-hub .unified-feed-list > .feed-text-card:last-child,
+.media-hub .unified-feed-list > .long-video-card:last-child,
+.media-hub .unified-feed-list > .shorts-insertion-block:last-child,
+.media-hub .media-tab-panel:not(.media-tab-panel--wheels) .feed-video-list > .long-video-card:last-child {
+  margin-bottom: 0 !important;
+}
+
+@media (min-width: 761px) {
+  .app-main-content,
+  .media-hub {
+    padding-bottom: 0 !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .media-hub .shorts-viewport {
+    height: calc(100dvh - 96px) !important;
+    min-height: calc(100dvh - 96px) !important;
+    padding-bottom: 96px !important;
+    scroll-padding-bottom: 96px !important;
+  }
+
+  .media-hub .shorts-viewport > .short-card {
+    height: calc(100dvh - 96px) !important;
+    min-height: calc(100dvh - 96px) !important;
+  }
+}
