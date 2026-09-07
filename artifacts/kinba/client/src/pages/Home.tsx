@@ -2543,12 +2543,12 @@ export default function Home() {
       toast.error(error instanceof Error ? error.message : "Unable to log out.");
     }
   };
-  const authDialog = (
+  const authDialog = auth.authDialogOpen ? (
     <SupabaseAuthDialog
-      open={auth.authDialogOpen}
+      open
       onOpenChange={open => (open ? auth.openAuth() : auth.closeAuth())}
     />
-  );
+  ) : null;
   if (screen === "landing")
     return (
       <>
@@ -2618,61 +2618,52 @@ export default function Home() {
             />
           )}
         </main>
-        <MobileDrawer
-          open={menuOpen}
-          onClose={() => setMenuOpen(false)}
-          profile={profile}
-          onNavigate={selectDrawerAction}
-          onLogout={logout}
-        />
-        <WalletModal
-          open={activeModal === "wallet"}
-          onClose={() => setActiveModal(null)}
-        />
-        <UploadVideoModal
-          open={activeModal === "upload"}
-          onClose={() => setActiveModal(null)}
-          onPublished={async () => {
-            await Promise.all([
-              utils.home.feed.invalidate(),
-              utils.videos.list.invalidate(),
-            ]);
-          }}
-        />
-        <SearchModal
-          open={activeModal === "search"}
-          onClose={() => setActiveModal(null)}
-        />
-        <NotificationDrawer
-          open={activeModal === "notifications"}
-          onClose={() => setActiveModal(null)}
-          enabled={auth.isAuthenticated}
-        />
-        <ActivityModal
-          open={activeModal === "activity"}
-          onClose={() => setActiveModal(null)}
-          enabled={auth.isAuthenticated}
-        />
-        <OfflineVideosModal
-          open={activeModal === "offline"}
-          onClose={() => setActiveModal(null)}
-          onBrowse={() => showFeed("all")}
-        />
-        <QRCodeModal
-          open={activeModal === "qr"}
-          onClose={() => setActiveModal(null)}
-          profile={profile}
-        />
-        <CreatorStudioModal
-          open={activeModal === "studio"}
-          onClose={() => setActiveModal(null)}
-          profile={profile}
-          onCreate={() => openModal("upload")}
-        />
-        <AnnouncementsModal
-          open={activeModal === "announcements"}
-          onClose={() => setActiveModal(null)}
-        />
+        {menuOpen && (
+          <MobileDrawer
+            open
+            onClose={() => setMenuOpen(false)}
+            profile={profile}
+            onNavigate={selectDrawerAction}
+            onLogout={logout}
+          />
+        )}
+        {activeModal === "wallet" && <WalletModal open onClose={() => setActiveModal(null)} />}
+        {activeModal === "upload" && (
+          <UploadVideoModal
+            open
+            onClose={() => setActiveModal(null)}
+            onPublished={async () => {
+              await Promise.all([
+                utils.home.feed.invalidate(),
+                utils.videos.list.invalidate(),
+              ]);
+            }}
+          />
+        )}
+        {activeModal === "search" && <SearchModal open onClose={() => setActiveModal(null)} />}
+        {activeModal === "notifications" && (
+          <NotificationDrawer open onClose={() => setActiveModal(null)} enabled={auth.isAuthenticated} />
+        )}
+        {activeModal === "activity" && (
+          <ActivityModal open onClose={() => setActiveModal(null)} enabled={auth.isAuthenticated} />
+        )}
+        {activeModal === "offline" && (
+          <OfflineVideosModal open onClose={() => setActiveModal(null)} onBrowse={() => showFeed("all")} />
+        )}
+        {activeModal === "qr" && (
+          <QRCodeModal open onClose={() => setActiveModal(null)} profile={profile} />
+        )}
+        {activeModal === "studio" && (
+          <CreatorStudioModal
+            open
+            onClose={() => setActiveModal(null)}
+            profile={profile}
+            onCreate={() => openModal("upload")}
+          />
+        )}
+        {activeModal === "announcements" && (
+          <AnnouncementsModal open onClose={() => setActiveModal(null)} />
+        )}
         <BottomNavigation
           className={
             screen === "dashboard" && isScrollingDown

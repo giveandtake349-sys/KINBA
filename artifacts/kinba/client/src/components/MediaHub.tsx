@@ -2509,7 +2509,7 @@ function ShortVideoCard({
   const { current, react, share, pending } = useOptimisticEngagement(video);
   return (
     <article
-      className={`short-card${compact ? " short-card--compact" : ""} snap-start h-full w-full overflow-hidden box-border`}
+      className={`short-card${compact ? " short-card--compact" : ""} snap-start h-[100dvh] w-full relative overflow-hidden box-border`}
       data-short-index={index}
       role={onOpenViewer ? "button" : undefined}
       tabIndex={onOpenViewer ? 0 : undefined}
@@ -2720,7 +2720,7 @@ function ShortsFeed({
         <FeedSkeleton short />
       ) : videos.length ? (
         <div
-          className="shorts-viewport media-feed-scroll h-[100dvh] overflow-y-scroll scrollbar-hide snap-y snap-mandatory w-full max-w-full box-border"
+          className="shorts-viewport media-feed-scroll h-[100dvh] overflow-y-scroll scrollbar-hide snap-y snap-mandatory bg-black w-full max-w-full box-border relative"
           ref={viewportRef}
           onScroll={onScroll}
         >
@@ -3322,59 +3322,55 @@ export default function MediaHub({
           ))}
         </nav>
       )}
-      <div
-        hidden={activeSection !== "wheels"}
-        className={`media-tab-panel${
-          activeSection === "wheels" || activeSection === "shorts"
-            ? " media-tab-panel--fullscreen"
-            : ""
-        }${activeSection === "wheels" ? " media-tab-panel--wheels" : ""}`}
-      >
-        <div className="wheels-feed-layout">
-          <SpotlightHighlights onSelect={focusHighlight} />
-          <HomeFeedPanel
-            tab="wheels"
-            active={activeSection === "wheels"}
-            showDetailsOverlay
-            showHeader={false}
-            onOpenShort={setShortsViewerId}
-          />
-          <div className="wheels-sponsor-panel">
-            {wheels ?? (
-              <div className="media-empty">
-                <h3>Wheels are unavailable.</h3>
-              </div>
-            )}
+      {activeSection === "wheels" && (
+        <div className="media-tab-panel media-tab-panel--fullscreen media-tab-panel--wheels">
+          <div className="wheels-feed-layout relative h-[100dvh] w-full overflow-hidden">
+            <SpotlightHighlights onSelect={focusHighlight} />
+            <HomeFeedPanel
+              tab="wheels"
+              active
+              showDetailsOverlay
+              showHeader={false}
+              onOpenShort={setShortsViewerId}
+            />
+            <div className="wheels-sponsor-panel">
+              {wheels ?? (
+                <div className="media-empty">
+                  <h3>Wheels are unavailable.</h3>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-      <div hidden={activeSection !== "all"} className="media-tab-panel">
-        <ErrorBoundary fallback={<FeedRecovery />}>
-          <UnifiedFeedPanel
-            active={activeSection === "all"}
-            onOpenShort={setShortsViewerId}
-          />
-        </ErrorBoundary>
-      </div>
-      <div hidden={activeSection !== "videos"} className="media-tab-panel">
-        <ErrorBoundary fallback={<FeedRecovery />}>
-          <HomeFeedPanel
-            tab="videos"
-            active={activeSection === "videos"}
-            autoOpenUpload={section === "publish"}
-            showDetailsOverlay={false}
-            showHeader={false}
-          />
-        </ErrorBoundary>
-      </div>
-      <div
-        hidden={activeSection !== "shorts"}
-        className="media-tab-panel media-tab-panel--fullscreen"
-      >
-        <ErrorBoundary fallback={<FeedRecovery />}>
-          <ShortsFeed active={activeSection === "shorts"} />
-        </ErrorBoundary>
-      </div>
+      )}
+      {activeSection === "all" && (
+        <div className="media-tab-panel">
+          <ErrorBoundary fallback={<FeedRecovery />}>
+            <UnifiedFeedPanel active onOpenShort={setShortsViewerId} />
+          </ErrorBoundary>
+        </div>
+      )}
+      {activeSection === "videos" && (
+        <div className="media-tab-panel">
+          <ErrorBoundary fallback={<FeedRecovery />}>
+            <HomeFeedPanel
+              tab="videos"
+              active
+              autoOpenUpload={section === "publish"}
+              showDetailsOverlay={false}
+              showHeader={false}
+            />
+          </ErrorBoundary>
+        </div>
+      )}
+      {activeSection === "shorts" && (
+        <div className="media-tab-panel media-tab-panel--fullscreen">
+          <ErrorBoundary fallback={<FeedRecovery />}>
+            <ShortsFeed active />
+          </ErrorBoundary>
+        </div>
+      )}
+
       {activeSection === "announcements" && <CommunityAnnouncements />}
       {shortsViewerId !== null && (
         <div
