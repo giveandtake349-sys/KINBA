@@ -2500,3 +2500,141 @@ body {
     background: #242526 !important;
   }
 }
+
+
+/* Shorts list and single-item viewer isolation overrides. These selectors intentionally
+   sit last so legacy fullscreen/feed rules cannot collapse the requested gutters. */
+.media-hub .shorts-tab-panel,
+.media-hub .shorts-tab-panel .shorts-list-feed,
+.media-hub .shorts-tab-panel .shorts-list-viewport {
+  width: 100% !important;
+  max-width: none !important;
+  background: #000 !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-list-feed {
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-list-feed > .media-section-heading {
+  display: flex !important;
+  background: #000 !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-list-viewport {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 0 calc(96px + env(safe-area-inset-bottom)) !important;
+  overflow: visible !important;
+  scroll-snap-type: none !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-list-viewport > .short-card {
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  flex: 0 0 auto !important;
+  margin: 0 0 16px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #242526 !important;
+  scroll-snap-align: none !important;
+  scroll-snap-stop: normal !important;
+}
+
+/* A detail viewer is a sealed layer above app chrome and the feed. */
+.media-hub .shorts-viewer-layer {
+  position: fixed !important;
+  z-index: 2000 !important;
+  inset: 0 !important;
+  display: block !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  isolation: isolate !important;
+  background: #000 !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed,
+.media-hub .shorts-viewer-layer .shorts-detail-viewport {
+  width: 100% !important;
+  max-width: none !important;
+  background: #000 !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed {
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.media-hub .shorts-viewer-layer .media-section-heading,
+.media-hub .shorts-viewer-layer .media-publish-panel,
+.media-hub .shorts-viewer-layer .shorts-controls,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .upload-video-panel {
+  display: none !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 12px 0 calc(12px + env(safe-area-inset-bottom)) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scroll-snap-type: y mandatory !important;
+  background: #000 !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card {
+  width: 100% !important;
+  height: auto !important;
+  min-height: calc(100dvh - 24px) !important;
+  max-height: none !important;
+  flex: 0 0 auto !important;
+  margin: 0 0 12px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #242526 !important;
+  scroll-snap-align: start !important;
+  scroll-snap-stop: always !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-viewer-close {
+  z-index: 2050 !important;
+}
+
+@media (max-width: 760px) {
+  .media-hub .shorts-tab-panel .shorts-list-viewport {
+    gap: 16px !important;
+  }
+
+  .media-hub .shorts-tab-panel .shorts-list-viewport > .short-card {
+    margin-bottom: 16px !important;
+  }
+
+  .media-hub .shorts-viewer-layer .shorts-detail-viewport {
+    gap: 12px !important;
+  }
+}

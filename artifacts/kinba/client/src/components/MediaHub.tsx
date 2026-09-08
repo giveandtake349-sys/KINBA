@@ -2653,9 +2653,11 @@ const MemoShortVideoCard = memo(ShortVideoCard);
 function ShortsFeed({
   active = true,
   initialVideoId,
+  viewerMode = false,
 }: {
   active?: boolean;
   initialVideoId?: number;
+  viewerMode?: boolean;
 }) {
   const query = trpc.home.feed.useQuery(
     { tab: "shorts" },
@@ -2716,7 +2718,7 @@ function ShortsFeed({
   };
   return (
     <section
-      className="media-section shorts-section w-full max-w-full overflow-hidden box-border"
+      className={`media-section shorts-section ${viewerMode ? "shorts-detail-feed" : "shorts-list-feed"} w-full max-w-full overflow-hidden box-border`}
       aria-labelledby="shorts-heading"
     >
       <div className="media-section-heading">
@@ -2757,7 +2759,7 @@ function ShortsFeed({
         <FeedSkeleton short />
       ) : videos.length ? (
         <div
-          className="shorts-viewport space-y-6 media-feed-scroll h-[100dvh] overflow-y-scroll scrollbar-hide snap-y snap-mandatory bg-black w-full max-w-full box-border relative"
+          className={`shorts-viewport ${viewerMode ? "shorts-detail-viewport" : "shorts-list-viewport"} space-y-6 media-feed-scroll h-[100dvh] overflow-y-scroll scrollbar-hide snap-y snap-mandatory bg-black w-full max-w-full box-border relative`}
           ref={viewportRef}
           onScroll={onScroll}
         >
@@ -3404,7 +3406,7 @@ export default function MediaHub({
         </div>
       )}
       {activeSection === "shorts" && (
-        <div className="media-tab-panel media-tab-panel--fullscreen">
+        <div className="media-tab-panel shorts-tab-panel">
           <ErrorBoundary fallback={<FeedRecovery />}>
             <ShortsFeed active />
           </ErrorBoundary>
@@ -3427,7 +3429,7 @@ export default function MediaHub({
           >
             <X size={22} />
           </button>
-          <ShortsFeed active initialVideoId={shortsViewerId} />
+          <ShortsFeed active initialVideoId={shortsViewerId} viewerMode />
         </div>
       )}
     </div>
