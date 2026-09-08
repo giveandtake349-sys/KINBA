@@ -3,13 +3,13 @@ import { isAllowedCorsOrigin, parseAllowedOrigins } from "./httpSecurity";
 
 describe("Render CORS origin controls", () => {
   it("allows only configured HTTPS frontend origins", () => {
-    const allowed = parseAllowedOrigins("https://nivo.onrender.com, https://app.example.com");
-    expect(isAllowedCorsOrigin("https://nivo.onrender.com", allowed)).toBe(true);
+    const allowed = parseAllowedOrigins("https://kinba.onrender.com, https://app.example.com");
+    expect(isAllowedCorsOrigin("https://kinba.onrender.com", allowed)).toBe(true);
     expect(isAllowedCorsOrigin("https://evil.example", allowed)).toBe(false);
   });
 
   it("does not enable cross-origin credentials without an explicit trusted origin", () => {
     const allowed = parseAllowedOrigins(undefined);
-    expect(isAllowedCorsOrigin("https://nivo.onrender.com", allowed)).toBe(false);
+    expect(isAllowedCorsOrigin("https://kinba.onrender.com", allowed)).toBe(false);
   });
 });

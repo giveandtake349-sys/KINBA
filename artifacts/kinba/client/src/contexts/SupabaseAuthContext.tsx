@@ -20,6 +20,10 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
   const closeAuth = useCallback(() => setAuthDialogOpen(false), []);
 
   useEffect(() => {
+    if (session) setAuthDialogOpen(false);
+  }, [session]);
+
+  useEffect(() => {
     let mounted = true;
     void supabase.auth
       .getSession()

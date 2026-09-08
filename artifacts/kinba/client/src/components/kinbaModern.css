@@ -2333,3 +2333,170 @@ body {
     bottom: 64px !important;
   }
 }
+
+
+/* Strict Facebook-style feed contract: black gutters, full-width dark cards, and no mobile card rounding. */
+.kinba-app,
+.app-main-content.has-feed-tabs,
+.app-main-content.has-feed-tabs .home-page,
+.media-hub,
+.media-hub .media-tab-panel,
+.media-hub .unified-feed,
+.media-hub .home-feed-section,
+.media-hub .wheels-feed-layout {
+  background: #000 !important;
+}
+
+.media-hub .feed-card-list,
+.media-hub .unified-feed-list,
+.media-hub .feed-video-list {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  max-width: none !important;
+  gap: 24px !important;
+  margin: 0 !important;
+  padding: 0 0 24px !important;
+  background: #000 !important;
+}
+
+.media-hub .feed-card-list > .feed-media-post,
+.media-hub .feed-card-list > .feed-text-card,
+.media-hub .feed-card-list > .long-video-card,
+.media-hub .feed-card-list > .shorts-insertion-block,
+.media-hub .unified-feed-list > .feed-media-post,
+.media-hub .unified-feed-list > .feed-text-card,
+.media-hub .unified-feed-list > .long-video-card,
+.media-hub .unified-feed-list > .shorts-insertion-block,
+.media-hub .feed-video-list > .long-video-card {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 0 !important;
+  margin: 0 0 24px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #242526 !important;
+  box-shadow: none !important;
+}
+
+.media-hub .feed-card-list > :last-child,
+.media-hub .unified-feed-list > :last-child,
+.media-hub .feed-video-list > :last-child {
+  margin-bottom: 0 !important;
+}
+
+/* The normal feed order ends with a horizontal, touch-friendly action bar. */
+.media-hub .feed-media-post > .feed-action-bar,
+.media-hub .long-video-card > .feed-action-bar {
+  order: 6 !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-around !important;
+  gap: 4px !important;
+  width: 100% !important;
+  margin: 12px 0 0 !important;
+  padding: 0 12px 12px !important;
+  overflow: visible !important;
+  background: transparent !important;
+}
+
+.media-hub .feed-media-post > .feed-media-copy,
+.media-hub .long-video-card > .video-card-details {
+  order: 3 !important;
+}
+
+.media-hub .feed-media-post > .raw-pulse,
+.media-hub .long-video-card > .raw-pulse {
+  order: 4 !important;
+}
+
+.media-hub .feed-action-bar > button,
+.media-hub .feed-text-card .feed-post-actions > button,
+.media-hub .feed-text-card .announcement-comment-toggle {
+  flex: 1 1 0 !important;
+  justify-content: center !important;
+  min-width: 0 !important;
+}
+
+.media-hub .feed-text-card .feed-post-actions {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-around !important;
+  gap: 4px !important;
+  margin-top: 12px !important;
+  padding: 0 12px 12px !important;
+}
+
+.media-hub .shorts-insertion-block .short-card--compact {
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #000 !important;
+}
+
+/* Shorts alone remains an immersive TikTok-style stage with vertical floating actions. */
+.media-hub .media-tab-panel--fullscreen,
+.media-hub .media-tab-panel--fullscreen .shorts-section,
+.media-hub .media-tab-panel--fullscreen .shorts-viewport,
+.media-hub .media-tab-panel--fullscreen .short-card {
+  background: #000 !important;
+}
+
+.media-hub .shorts-viewport {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  width: 100% !important;
+  background: #000 !important;
+}
+
+.media-hub .shorts-viewport > .short-card {
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #000 !important;
+}
+
+.media-hub .shorts-viewport > .short-card .media-engagement-actions--overlay {
+  position: absolute !important;
+  right: 12px !important;
+  bottom: calc(84px + env(safe-area-inset-bottom)) !important;
+  z-index: 40 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 16px !important;
+  width: 52px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+@media (max-width: 760px) {
+  .media-hub .feed-card-list,
+  .media-hub .unified-feed-list,
+  .media-hub .feed-video-list {
+    gap: 24px !important;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .media-hub .feed-card-list > .feed-media-post,
+  .media-hub .feed-card-list > .feed-text-card,
+  .media-hub .feed-card-list > .long-video-card,
+  .media-hub .feed-card-list > .shorts-insertion-block,
+  .media-hub .unified-feed-list > .feed-media-post,
+  .media-hub .unified-feed-list > .feed-text-card,
+  .media-hub .unified-feed-list > .long-video-card,
+  .media-hub .unified-feed-list > .shorts-insertion-block,
+  .media-hub .feed-video-list > .long-video-card {
+    margin-bottom: 24px !important;
+    border-radius: 0 !important;
+    background: #242526 !important;
+  }
+}

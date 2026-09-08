@@ -12,9 +12,9 @@ SET
   file_size_limit = EXCLUDED.file_size_limit,
   allowed_mime_types = EXCLUDED.allowed_mime_types;
 --> statement-breakpoint
-DROP POLICY IF EXISTS "NIVO members can upload their post media" ON storage.objects;
+DROP POLICY IF EXISTS "KINBA members can upload their post media" ON storage.objects;
 --> statement-breakpoint
-CREATE POLICY "NIVO members can upload their post media"
+CREATE POLICY "KINBA members can upload their post media"
 ON storage.objects
 FOR INSERT
 TO authenticated
@@ -23,9 +23,9 @@ WITH CHECK (
   AND (storage.foldername(name))[1] = (select auth.jwt()->>'sub')
 );
 --> statement-breakpoint
-DROP POLICY IF EXISTS "NIVO members can upload their chat media" ON storage.objects;
+DROP POLICY IF EXISTS "KINBA members can upload their chat media" ON storage.objects;
 --> statement-breakpoint
-CREATE POLICY "NIVO members can upload their chat media"
+CREATE POLICY "KINBA members can upload their chat media"
 ON storage.objects
 FOR INSERT
 TO authenticated

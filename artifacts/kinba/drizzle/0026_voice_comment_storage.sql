@@ -16,7 +16,7 @@ SET
   file_size_limit = EXCLUDED.file_size_limit,
   allowed_mime_types = EXCLUDED.allowed_mime_types;
 --> statement-breakpoint
-DROP POLICY IF EXISTS "NIVO members can upload their comment media" ON storage.objects;
+DROP POLICY IF EXISTS "KINBA members can upload their comment media" ON storage.objects;
 --> statement-breakpoint
 DROP POLICY IF EXISTS "KINBA members can upload their comment media" ON storage.objects;
 --> statement-breakpoint

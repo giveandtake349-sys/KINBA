@@ -2483,7 +2483,7 @@ export default function Home() {
   const notificationCount = Math.min(notificationQuery.data?.length ?? 0, 99);
   const profile = (publicProfileId ? publicProfileQuery.data : profileQuery.data) as ProfileSnapshot | undefined;
   const screen: Screen =
-    location === "/login" || (!auth.isAuthenticated && !publicProfileId)
+    location === "/login"
       ? "landing"
       : publicProfileId || profileOpen
         ? "profile"
@@ -2538,7 +2538,6 @@ export default function Home() {
       setProfileOpen(false);
       setActiveView("all");
       navigate("/login");
-      auth.openAuth();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to log out.");
     }

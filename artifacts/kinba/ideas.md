@@ -1,4 +1,4 @@
-# NIVO Design Direction
+# KINBA Design Direction
 
 ## Approach 1
 
@@ -20,7 +20,7 @@
 
 **Theme Name:** Orbital Commons
 
-**Very Brief Intro:** A dark atmospheric platform with soft orbital geometry, restrained blue-violet light, and spatial composition. It positions NIVO as a calm global layer connecting people across distance.
+**Very Brief Intro:** A dark atmospheric platform with soft orbital geometry, restrained blue-violet light, and spatial composition. It positions KINBA as a calm global layer connecting people across distance.
 
 **Probability:** 0.09
 
@@ -35,7 +35,7 @@
 3. Prefer asymmetric composition, editorial hierarchy, and purposeful whitespace over dashboard density.
 4. Make every interaction feel trustworthy, legible, and lightweight on a one-handed mobile device.
 
-**Color Philosophy:** NIVO uses near-black navy as a stable, quiet surface that lets human intent stand out. Cyan represents possibility and forward motion; a muted blue-violet atmosphere provides depth without the visual aggression of neon. Warm off-white text keeps the experience human and readable.
+**Color Philosophy:** KINBA uses near-black navy as a stable, quiet surface that lets human intent stand out. Cyan represents possibility and forward motion; a muted blue-violet atmosphere provides depth without the visual aggression of neon. Warm off-white text keeps the experience human and readable.
 
 **Layout Paradigm:** A vertically paced narrative with a left-anchored editorial rail on larger screens and a stacked signal flow on mobile. The hero uses offset cards and a central connection path rather than a centered marketing block. Product surfaces remain close to the thumb zone, with a persistent mobile navigation bar.
 
@@ -51,7 +51,7 @@
 
 **Typography System:** Use Space Grotesk for headlines and labels, paired with DM Sans for body copy and controls. Headlines use tight tracking and strong weight contrast. Small labels use uppercase lettering with generous tracking. Body text stays between 15px and 18px for mobile readability.
 
-**Brand Essence:** NIVO is a global human matching layer for people who need something and people who can provide it; it is distinct because it starts from mutual usefulness rather than feeds, followers, or listings.
+**Brand Essence:** KINBA is a global human matching layer for people who need something and people who can provide it; it is distinct because it starts from mutual usefulness rather than feeds, followers, or listings.
 
 **Personality Adjectives:** Precise, open, quietly ambitious.
 
@@ -62,7 +62,7 @@ Example lines:
 - “Put the need into words. Let the right person find it.”
 - “Your capability is useful somewhere.”
 
-**Wordmark & Logo:** Use the exact supplied NIVO logo asset as the official mark without altering its shape, adding text, or substituting an icon. Until the source image is available in the project assets, the implementation should reserve the logo placement and avoid inventing a replacement.
+**Wordmark & Logo:** Use the exact supplied KINBA logo asset as the official mark without altering its shape, adding text, or substituting an icon. Until the source image is available in the project assets, the implementation should reserve the logo placement and avoid inventing a replacement.
 
 **Signature Brand Color:** Signal Cyan `#63E6FF`.
 
@@ -72,7 +72,7 @@ The first delivery will be a polished client-side prototype of the primary produ
 
 ## Style Decisions
 
-- The first viewport must show a legible NEED → NIVO signal layer → CAN loop as the hero’s primary visual signature.
+- The first viewport must show a legible NEED → KINBA signal layer → CAN loop as the hero’s primary visual signature.
 - Signal Cyan `#63E6FF` is reserved for primary actions, NEED/CAN emphasis, connection paths, nodes, and match states; it is not a general-purpose headline highlight.
 - Network imagery should include human-intent cues wherever possible, including silhouettes, profile fragments, NEED/CAN cards, or connection paths.
 - The official logo placement is framed as a deliberate brand anchor and remains ready for the exact user-supplied image asset; no replacement symbol is invented.

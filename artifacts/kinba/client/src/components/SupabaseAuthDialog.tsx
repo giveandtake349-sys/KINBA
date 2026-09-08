@@ -70,8 +70,8 @@ export function SupabaseAuthDialog({
         >
           <X size={18} />
         </button>
-        <img src="/logo.png" alt="Kinba" className="auth-brand-logo" />
-        <p className="eyebrow">Kinba account</p>
+        <img src="/logo.png" alt="KINBA" className="auth-brand-logo" />
+        <p className="eyebrow">KINBA ACCOUNT</p>
         <h2 id="auth-title">
           {mode === "sign-in" ? "Welcome back." : "Join the network."}
         </h2>

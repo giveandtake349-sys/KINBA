@@ -942,7 +942,7 @@ function EngagementActions({
   };
   return (
     <div
-      className={`media-engagement-actions${overlay ? " media-engagement-actions--overlay absolute right-3 bottom-16 z-20 flex flex-col items-center gap-4" : ""}${feedStyle ? " feed-action-bar" : ""}`}
+      className={`media-engagement-actions${overlay ? " media-engagement-actions--overlay absolute right-3 bottom-16 z-20 flex flex-col items-center gap-4" : ""}${feedStyle ? " feed-action-bar flex flex-row justify-around mt-3 pb-3" : ""}`}
     >
       {overlay && owner && !isOwnVideo && (
         <button
@@ -1599,16 +1599,6 @@ function VideoCard({
             />
           )}
         </div>
-        <EngagementActions
-          engagement={current}
-          onReact={react}
-          onShare={share}
-          onComments={() => setCommentsOpen(value => !value)}
-          pending={pending}
-          feedStyle
-          bookmarked={bookmarked}
-          onBookmark={toggleBookmark}
-        />
         {(video.title || video.description) && (
           <div className="feed-media-copy">
             {video.title && <h3>{video.title}</h3>}
@@ -1616,6 +1606,19 @@ function VideoCard({
           </div>
         )}
         <RawPulseCard videoId={video.id} />
+        <EngagementActions
+          engagement={current}
+          onReact={react}
+          onShare={share}
+          onComments={() => {
+            if (!auth.isAuthenticated) return auth.openAuth();
+            setCommentsOpen(value => !value);
+          }}
+          pending={pending}
+          feedStyle
+          bookmarked={bookmarked}
+          onBookmark={toggleBookmark}
+        />
         <CommentDrawer
           postId={video.id}
           postOwnerId={video.owner.id}
@@ -1687,16 +1690,6 @@ function VideoCard({
           />
         )}
       </div>
-      <EngagementActions
-        engagement={current}
-        onReact={react}
-        onShare={share}
-        onComments={() => setCommentsOpen(value => !value)}
-        pending={pending}
-        feedStyle
-        bookmarked={bookmarked}
-        onBookmark={toggleBookmark}
-      />
       <div
         className={
           video.mediaType === "IMAGE"
@@ -1723,6 +1716,19 @@ function VideoCard({
         </div>
       </div>
       <RawPulseCard videoId={video.id} />
+      <EngagementActions
+        engagement={current}
+        onReact={react}
+        onShare={share}
+        onComments={() => {
+          if (!auth.isAuthenticated) return auth.openAuth();
+          setCommentsOpen(value => !value);
+        }}
+        pending={pending}
+        feedStyle
+        bookmarked={bookmarked}
+        onBookmark={toggleBookmark}
+      />
       <CommentDrawer
         postId={video.id}
         postOwnerId={video.owner.id}
@@ -2164,6 +2170,7 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
     }
   };
   const share = async () => {
+    if (!auth.isAuthenticated) return auth.openAuth();
     const url = window.location.origin + "/?announcement=" + post.id;
     try {
       if (navigator.share) {
@@ -2253,7 +2260,7 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
           )}
         </div>
       )}
-      <div className="feed-post-actions">
+      <div className="feed-post-actions flex flex-row justify-around mt-3 pb-3">
         <button
           type="button"
           className={reacted ? "is-active" : ""}
@@ -2351,7 +2358,7 @@ function UnifiedFeedPanel({
       {query.isPending ? (
         <FeedSkeleton />
       ) : items.length ? (
-        <div className="unified-feed-list feed-card-list space-y-6">
+        <div className="unified-feed-list feed-card-list gap-6">
           {items.map(item => {
             if (item.feedType === "media")
               return (
@@ -2454,7 +2461,7 @@ function HomeFeedPanel({
       {query.isPending ? (
         <FeedSkeleton />
       ) : videos.length ? (
-        <div className="unified-feed-list feed-video-list feed-card-list space-y-6 w-full max-w-full box-border">
+        <div className="unified-feed-list feed-video-list feed-card-list gap-6 w-full max-w-full box-border">
           {videos.map(video => (
             <MemoVideoCard
               key={video.id}
@@ -2557,7 +2564,7 @@ function ShortVideoCard({
       {video.mediaType === "IMAGE" ? (
         <img
           src={resolveMediaUrl(video.videoUrl)}
-          className="w-full h-auto object-cover rounded-lg"
+          className="w-full h-auto object-cover"
           alt={video.title || "Post"}
         />
       ) : (
@@ -2618,9 +2625,13 @@ function ShortVideoCard({
             engagement={current}
             onReact={react}
             onShare={share}
-            onComments={() => setCommentsOpen(value => !value)}
+            onComments={() => {
+              if (!auth.isAuthenticated) return auth.openAuth();
+              setCommentsOpen(value => !value);
+            }}
             pending={pending}
-            overlay
+            overlay={!compact}
+            feedStyle={compact}
             bookmarked={bookmarked}
             onBookmark={toggleBookmark}
             owner={video.owner}
@@ -3000,7 +3011,10 @@ function AnnouncementComments({
       <button
         type="button"
         className={`announcement-comment-toggle${open ? " is-active" : ""}`}
-        onClick={() => setOpen(value => !value)}
+        onClick={() => {
+          if (!auth.isAuthenticated) return auth.openAuth();
+          setOpen(value => !value);
+        }}
         aria-expanded={open}
       >
         <MessageCircle size={15} />
@@ -3349,13 +3363,13 @@ export default function MediaHub({
         </nav>
       )}
       {activeSection === "wheels" && (
-        <div className="media-tab-panel media-tab-panel--fullscreen media-tab-panel--wheels">
-          <div className="wheels-feed-layout relative h-[100dvh] w-full overflow-hidden">
+        <div className="media-tab-panel">
+          <div className="wheels-feed-layout w-full">
             <SpotlightHighlights onSelect={focusHighlight} />
             <HomeFeedPanel
               tab="wheels"
               active
-              showDetailsOverlay
+              showDetailsOverlay={false}
               showHeader={false}
               onOpenShort={setShortsViewerId}
             />
