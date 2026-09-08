@@ -2718,10 +2718,10 @@ function ShortsFeed({
   };
   return (
     <section
-      className={`media-section shorts-section ${viewerMode ? "shorts-detail-feed" : "shorts-list-feed"} w-full max-w-full overflow-hidden box-border`}
+      className={`media-section shorts-section shorts-surface ${viewerMode ? "shorts-detail-feed" : "shorts-list-feed"} w-full max-w-full overflow-hidden box-border`}
       aria-labelledby="shorts-heading"
     >
-      <div className="media-section-heading">
+      <div className="media-section-heading shorts-header">
         <div>
           <p className="eyebrow">Shorts</p>
           <h2 id="shorts-heading">Shorts</h2>

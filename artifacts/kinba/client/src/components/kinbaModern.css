@@ -2817,3 +2817,237 @@ body:has(.shorts-viewer-layer) .action-modal-layer {
     border-radius: 8px !important;
   }
 }
+
+
+/* Final professional Shorts repair: strict card heights, explicit header flex, and sealed stacking. */
+.media-hub .shorts-surface {
+  position: relative !important;
+  z-index: 999 !important;
+  width: 100% !important;
+  max-width: none !important;
+  background: #000 !important;
+  isolation: isolate !important;
+}
+
+.media-hub .shorts-list-feed > .shorts-header {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  min-height: 72px !important;
+  box-sizing: border-box !important;
+  gap: 16px !important;
+  margin: 0 !important;
+  padding: 16px !important;
+  background: #000 !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+.media-hub .shorts-list-feed > .shorts-header > :first-child {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+
+.media-hub .shorts-list-feed > .shorts-header .shorts-controls {
+  display: flex !important;
+  flex: 0 1 auto !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+}
+
+.media-hub .shorts-list-feed > .shorts-header .shorts-controls > button,
+.media-hub .shorts-list-feed > .shorts-header .shorts-controls > span {
+  flex: 0 0 auto !important;
+  position: static !important;
+  transform: none !important;
+}
+
+.media-hub .shorts-list-feed > .shorts-list-viewport {
+  position: relative !important;
+  z-index: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
+  padding: 0 0 calc(96px + env(safe-area-inset-bottom)) !important;
+  background: #000 !important;
+}
+
+.media-hub .shorts-list-feed > .shorts-list-viewport > .short-card {
+  display: flex !important;
+  flex: 0 0 80vh !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: 80vh !important;
+  min-height: 560px !important;
+  max-height: 900px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  border: 1px solid #3a3b3c !important;
+  border-radius: 12px !important;
+  background: #242526 !important;
+  overflow: hidden !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.media-hub .shorts-list-feed > .shorts-list-viewport > .short-card > .media-video-frame,
+.media-hub .shorts-list-feed > .shorts-list-viewport > .short-card > img {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  object-fit: cover !important;
+}
+
+.media-hub .shorts-list-feed > .shorts-list-viewport > .short-card > .media-video-frame video {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  object-fit: cover !important;
+}
+
+.media-hub .shorts-list-feed > .shorts-list-viewport > .short-card .short-overlay {
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  max-height: 36% !important;
+  overflow: auto !important;
+}
+
+/* Detail mode: one full-height card at a time, with no collapsed children or feed bleed. */
+.media-hub .shorts-viewer-layer {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483000 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
+  background: #000 !important;
+  isolation: isolate !important;
+  contain: strict !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-surface,
+.media-hub .shorts-viewer-layer .shorts-detail-feed,
+.media-hub .shorts-viewer-layer .shorts-detail-viewport {
+  position: relative !important;
+  z-index: 999 !important;
+  width: 100% !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  background: #000 !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  padding: 8px 0 calc(8px + env(safe-area-inset-bottom)) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  scroll-snap-type: y mandatory !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card {
+  display: flex !important;
+  flex: 0 0 calc(100dvh - 16px) !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: calc(100dvh - 16px) !important;
+  min-height: 560px !important;
+  max-height: none !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  border: 1px solid #3a3b3c !important;
+  border-radius: 10px !important;
+  background: #242526 !important;
+  overflow: hidden !important;
+  position: relative !important;
+  z-index: 1000 !important;
+  scroll-snap-align: start !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card > .media-video-frame,
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card > img {
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  object-fit: cover !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card > .media-video-frame video {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  object-fit: cover !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .short-overlay {
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  max-height: 32% !important;
+  overflow: auto !important;
+}
+
+/* Hide all known app chrome and modal surfaces while the detail screen is mounted. */
+body:has(.shorts-viewer-layer) .topbar,
+body:has(.shorts-viewer-layer) .top-navigation-wrapper,
+body:has(.shorts-viewer-layer) .home-feed-tabs,
+body:has(.shorts-viewer-layer) .bottom-navigation,
+body:has(.shorts-viewer-layer) .mobile-drawer,
+body:has(.shorts-viewer-layer) .action-modal-layer,
+body:has(.shorts-viewer-layer) .auth-dialog,
+body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+@media (max-width: 760px) {
+  .media-hub .shorts-list-feed > .shorts-header {
+    min-height: 68px !important;
+    gap: 8px !important;
+    padding: 12px !important;
+  }
+
+  .media-hub .shorts-list-feed > .shorts-header .shorts-controls {
+    gap: 4px !important;
+  }
+
+  .media-hub .shorts-list-feed > .shorts-header .shorts-upload-button {
+    max-width: 116px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .media-hub .shorts-list-feed > .shorts-list-viewport > .short-card {
+    flex-basis: 80vh !important;
+    height: 80vh !important;
+    min-height: 480px !important;
+    border-radius: 10px !important;
+  }
+
+  .media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card {
+    flex-basis: calc(100dvh - 12px) !important;
+    height: calc(100dvh - 12px) !important;
+    min-height: 480px !important;
+    border-radius: 8px !important;
+  }
+}
