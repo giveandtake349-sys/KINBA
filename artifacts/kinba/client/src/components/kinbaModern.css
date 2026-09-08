@@ -2234,3 +2234,102 @@ body {
 .shorts-overlay-actions .media-engagement-actions--overlay {
   z-index: 30 !important;
 }
+
+
+/* Final requested feed treatment: separated Facebook-style cards across all tabs. */
+.media-hub .feed-card-list,
+.media-hub .unified-feed-list,
+.media-hub .shorts-viewport {
+  gap: 24px !important;
+}
+
+.media-hub .feed-card-list > .feed-media-post,
+.media-hub .feed-card-list > .long-video-card,
+.media-hub .feed-card-list > .feed-text-card,
+.media-hub .unified-feed-list > .feed-media-post,
+.media-hub .unified-feed-list > .long-video-card,
+.media-hub .unified-feed-list > .feed-text-card,
+.media-hub .unified-feed-list > .shorts-insertion-block,
+.media-hub .shorts-viewport > .short-card {
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: 12px !important;
+  overflow: hidden !important;
+  border: 1px solid #262b36 !important;
+  border-radius: 1rem !important;
+  background: rgba(23, 23, 23, 0.9) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24) !important;
+}
+
+/* Keep the intentional full-screen Wheels mode edge-to-edge. */
+.media-tab-panel--wheels .feed-video-list,
+.media-tab-panel--wheels .feed-video-list > .feed-media-post,
+.media-tab-panel--wheels .feed-video-list > .long-video-card {
+  gap: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Shorts actions are anchored to the current short card, below its content and above the bottom safe area. */
+.media-hub .shorts-viewport > .short-card {
+  position: relative !important;
+  isolation: isolate;
+}
+.media-hub .shorts-viewport > .short-card .shorts-overlay-actions {
+  position: static !important;
+  z-index: 20 !important;
+  pointer-events: none !important;
+}
+.media-hub .shorts-viewport > .short-card .media-engagement-actions--overlay {
+  position: absolute !important;
+  right: 12px !important;
+  bottom: 64px !important;
+  z-index: 20 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 16px !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: auto !important;
+}
+.media-hub .shorts-viewport > .short-card .media-engagement-actions--overlay > button {
+  position: relative !important;
+  width: 48px !important;
+  min-width: 48px !important;
+  min-height: 48px !important;
+  padding: 7px 4px !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: 999px !important;
+  color: #fff !important;
+  background: rgba(8, 12, 20, 0.72) !important;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28) !important;
+  pointer-events: auto !important;
+}
+.media-hub .shorts-viewport > .short-card .media-engagement-actions--overlay > button > span {
+  display: none !important;
+}
+.media-hub .shorts-viewport > .short-card .media-engagement-actions--overlay > button > strong {
+  position: absolute;
+  top: calc(100% + 2px);
+  color: #fff;
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .media-hub .feed-card-list,
+  .media-hub .unified-feed-list,
+  .media-hub .shorts-viewport {
+    gap: 24px !important;
+  }
+  .media-hub .shorts-viewport > .short-card .media-engagement-actions--overlay {
+    right: 12px !important;
+    bottom: 64px !important;
+  }
+}

@@ -942,13 +942,17 @@ function EngagementActions({
   };
   return (
     <div
-      className={`media-engagement-actions${overlay ? " media-engagement-actions--overlay right-3 z-30 flex flex-col items-center gap-3" : ""}${feedStyle ? " feed-action-bar" : ""}`}
+      className={`media-engagement-actions${overlay ? " media-engagement-actions--overlay absolute right-3 bottom-16 z-20 flex flex-col items-center gap-4" : ""}${feedStyle ? " feed-action-bar" : ""}`}
     >
       {overlay && owner && !isOwnVideo && (
         <button
           type="button"
           className={`creator-follow-action${following ? " is-following" : ""}`}
-          onClick={followOwner}
+          onClick={event => {
+            event.preventDefault();
+            event.stopPropagation();
+            void followOwner();
+          }}
           disabled={toggleFollow.isPending}
           aria-label={following ? "Unfollow creator" : "Follow creator"}
           aria-pressed={following}
@@ -969,7 +973,11 @@ function EngagementActions({
       <button
         type="button"
         className={engagement.viewerReacted ? "is-active" : ""}
-        onClick={onReact}
+        onClick={event => {
+          event.preventDefault();
+          event.stopPropagation();
+          onReact();
+        }}
         disabled={pending === "react"}
         aria-pressed={engagement.viewerReacted}
         aria-label={engagement.viewerReacted ? "Remove Pookie" : "Pookie video"}
@@ -981,14 +989,26 @@ function EngagementActions({
         <span>{engagement.viewerReacted ? "Pookied" : "Pookie"}</span>
         <strong>{formatCount(engagement.reactionCount)}</strong>
       </button>
-      <button type="button" onClick={onComments} aria-label="Open comments">
+      <button
+        type="button"
+        onClick={event => {
+          event.preventDefault();
+          event.stopPropagation();
+          onComments();
+        }}
+        aria-label="Open comments"
+      >
         <MessageCircle size={overlay ? 27 : 16} /> <span>Comment</span>
         <strong>{formatCount(engagement.commentCount)}</strong>
       </button>
       <button
         type="button"
         className={engagement.viewerShared ? "is-active" : ""}
-        onClick={onShare}
+        onClick={event => {
+          event.preventDefault();
+          event.stopPropagation();
+          onShare();
+        }}
         disabled={pending === "share"}
         aria-label="Share video"
       >
@@ -1000,7 +1020,11 @@ function EngagementActions({
         <button
           type="button"
           className={bookmarked ? "is-active" : ""}
-          onClick={onBookmark}
+          onClick={event => {
+            event.preventDefault();
+            event.stopPropagation();
+            onBookmark();
+          }}
           aria-pressed={bookmarked}
           aria-label={bookmarked ? "Remove saved video" : "Save video"}
         >
@@ -2327,7 +2351,7 @@ function UnifiedFeedPanel({
       {query.isPending ? (
         <FeedSkeleton />
       ) : items.length ? (
-        <div className="unified-feed-list feed-card-list space-y-4">
+        <div className="unified-feed-list feed-card-list space-y-6">
           {items.map(item => {
             if (item.feedType === "media")
               return (
@@ -2430,7 +2454,7 @@ function HomeFeedPanel({
       {query.isPending ? (
         <FeedSkeleton />
       ) : videos.length ? (
-        <div className="unified-feed-list feed-video-list feed-card-list space-y-4 w-full max-w-full box-border">
+        <div className="unified-feed-list feed-video-list feed-card-list space-y-6 w-full max-w-full box-border">
           {videos.map(video => (
             <MemoVideoCard
               key={video.id}
@@ -2509,7 +2533,7 @@ function ShortVideoCard({
   const { current, react, share, pending } = useOptimisticEngagement(video);
   return (
     <article
-      className={`short-card${compact ? " short-card--compact" : ""} snap-start h-[100dvh] w-full relative overflow-hidden box-border`}
+      className={`short-card feed-card-item${compact ? " short-card--compact" : ""} snap-start h-[100dvh] w-full relative overflow-hidden box-border`}
       data-short-index={index}
       role={onOpenViewer ? "button" : undefined}
       tabIndex={onOpenViewer ? 0 : undefined}
@@ -2722,7 +2746,7 @@ function ShortsFeed({
         <FeedSkeleton short />
       ) : videos.length ? (
         <div
-          className="shorts-viewport media-feed-scroll h-[100dvh] overflow-y-scroll scrollbar-hide snap-y snap-mandatory bg-black w-full max-w-full box-border relative"
+          className="shorts-viewport space-y-6 media-feed-scroll h-[100dvh] overflow-y-scroll scrollbar-hide snap-y snap-mandatory bg-black w-full max-w-full box-border relative"
           ref={viewportRef}
           onScroll={onScroll}
         >
