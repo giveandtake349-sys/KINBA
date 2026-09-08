@@ -2638,3 +2638,182 @@ body {
     gap: 12px !important;
   }
 }
+
+
+/* Critical Shorts spacing and detail isolation guard. Keep this block last in the cascade. */
+.media-hub .shorts-tab-panel .shorts-list-viewport > .short-card {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin: 0 0 16px !important;
+  border: 1px solid #3a3b3c !important;
+  border-radius: 12px !important;
+  background: #242526 !important;
+  overflow: hidden !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-list-viewport > .short-card:last-child {
+  margin-bottom: 0 !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-list-viewport > .short-card > .media-video-frame,
+.media-hub .shorts-tab-panel .shorts-list-viewport > .short-card > img {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: 16 / 9 !important;
+  object-fit: cover !important;
+  position: relative !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-list-viewport > .short-card > .media-video-frame video {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-list-viewport > .short-card .short-overlay {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  position: static !important;
+  inset: auto !important;
+  min-height: 0 !important;
+  padding: 12px 14px 10px !important;
+  color: #e4e6eb !important;
+  background: #242526 !important;
+  z-index: 1 !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-list-viewport > .short-card .shorts-overlay-actions {
+  position: static !important;
+  inset: auto !important;
+  z-index: 2 !important;
+  width: 100% !important;
+  padding: 0 !important;
+}
+
+/* The detail viewer is a sealed screen, not another layer in the feed flow. */
+.media-hub .shorts-viewer-layer {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483000 !important;
+  display: block !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  isolation: isolate !important;
+  contain: strict !important;
+  background: #000 !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed,
+.media-hub .shorts-viewer-layer .shorts-detail-viewport {
+  position: relative !important;
+  z-index: 1 !important;
+  width: 100% !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  background: #000 !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .media-section-heading,
+.media-hub .shorts-viewer-layer .shorts-controls,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .upload-video-panel,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .media-publish-panel {
+  display: none !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  padding: 8px 0 calc(8px + env(safe-area-inset-bottom)) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  scroll-snap-type: y mandatory !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card {
+  position: relative !important;
+  z-index: 1 !important;
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin: 0 0 8px !important;
+  border: 1px solid #3a3b3c !important;
+  border-radius: 10px !important;
+  background: #242526 !important;
+  overflow: hidden !important;
+  scroll-snap-align: start !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card > .media-video-frame,
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card > img {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: 16 / 9 !important;
+  object-fit: cover !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .short-overlay {
+  position: static !important;
+  inset: auto !important;
+  min-height: 0 !important;
+  padding: 10px 12px 8px !important;
+  background: #242526 !important;
+  z-index: 1 !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .shorts-overlay-actions {
+  position: static !important;
+  inset: auto !important;
+  width: 100% !important;
+  padding: 0 !important;
+  z-index: 2 !important;
+}
+
+/* Do not allow app chrome or an older modal layer to paint over the sealed viewer. */
+body:has(.shorts-viewer-layer) .topbar,
+body:has(.shorts-viewer-layer) .top-navigation-wrapper,
+body:has(.shorts-viewer-layer) .home-feed-tabs,
+body:has(.shorts-viewer-layer) .bottom-navigation,
+body:has(.shorts-viewer-layer) .mobile-drawer,
+body:has(.shorts-viewer-layer) .action-modal-layer {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+@media (max-width: 760px) {
+  .media-hub .shorts-tab-panel .shorts-list-viewport > .short-card {
+    margin-bottom: 16px !important;
+    border-radius: 10px !important;
+  }
+
+  .media-hub .shorts-viewer-layer .shorts-detail-viewport {
+    gap: 6px !important;
+    padding-top: 6px !important;
+  }
+
+  .media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card {
+    margin-bottom: 6px !important;
+    border-radius: 8px !important;
+  }
+}
