@@ -703,3 +703,14 @@ body { color: var(--kinba-text); }
 .profile-follow-trigger {
   width: min(100%, 320px) !important;
 }
+
+/* Bottom navigation must remain tappable after any feed-to-profile transition. */
+.bottom-navigation {
+  z-index: 2147483000 !important;
+  pointer-events: auto !important;
+}
+.bottom-navigation > button {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto !important;
+}

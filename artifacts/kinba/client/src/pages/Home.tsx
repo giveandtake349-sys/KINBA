@@ -2530,6 +2530,7 @@ export default function Home() {
   };
   const goHome = () => {
     showFeed("all");
+    setMenuOpen(false);
     if (location !== "/") navigate("/");
   };
   const openModal = (modal: Exclude<AppModal, null>) => {

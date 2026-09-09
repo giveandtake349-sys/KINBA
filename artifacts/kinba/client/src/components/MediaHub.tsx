@@ -69,6 +69,14 @@ type HomeTab = "videos" | "trendy" | "following" | "icons" | "wheels";
 type VideoKind = "LONG" | "SHORT" | "WHEEL";
 type Quality = "ORIGINAL" | "1080P" | "720P" | "480P" | "240P";
 type VideoSource = { quality: Quality; videoUrl: string };
+
+function navigateToProfile(event: MouseEvent<HTMLAnchorElement>, userId: number) {
+  event.preventDefault();
+  event.stopPropagation();
+  window.history.pushState({}, "", `/profile/${userId}`);
+  window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
 type VideoRecord = {
   id: number;
   title: string;
@@ -1581,7 +1589,7 @@ function VideoCard({
           <a
             className="profile-link feed-post-author-identity"
             href={`/profile/${video.owner.id}`}
-            onClick={event => event.stopPropagation()}
+            onClick={event => navigateToProfile(event, video.owner.id)}
             aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}
           >
           <div className="video-owner-avatar">
@@ -1676,7 +1684,7 @@ function VideoCard({
         <a
           className="profile-link feed-post-author-identity"
           href={`/profile/${video.owner.id}`}
-          onClick={event => event.stopPropagation()}
+          onClick={event => navigateToProfile(event, video.owner.id)}
           aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}
         >
         <div className="video-owner-avatar">
@@ -2266,6 +2274,7 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
       <a
         className="feed-post-author profile-link"
         href={`/profile/${post.author.id}`}
+        onClick={event => navigateToProfile(event, post.author.id)}
         aria-label={`Open ${post.author.name ?? "KINBA creator"} profile`}
       >
         <div className="video-owner-avatar">
@@ -2654,6 +2663,7 @@ function ShortVideoCard({
             <a
               className="profile-link"
               href={`/profile/${video.owner.id}`}
+              onClick={event => navigateToProfile(event, video.owner.id)}
               aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}
             >
               <div className="video-owner-identity">
@@ -3113,7 +3123,7 @@ function AnnouncementComments({
                 <a
                   className="profile-link"
                   href={`/profile/${comment.author.id}`}
-                  onClick={event => event.stopPropagation()}
+                  onClick={event => navigateToProfile(event, comment.author.id)}
                   aria-label={`Open ${displayName(comment.author.name, comment.author.username)} profile`}
                 >
                   <strong>
@@ -3208,6 +3218,7 @@ export function CommunityAnnouncements() {
                 <a
                   className="profile-link announcement-author-identity"
                   href={`/profile/${announcement.author.id}`}
+                  onClick={event => navigateToProfile(event, announcement.author.id)}
                   aria-label={`Open ${announcement.author.name ?? "KINBA organization"} profile`}
                 >
                 <div className="announcement-author-avatar">
