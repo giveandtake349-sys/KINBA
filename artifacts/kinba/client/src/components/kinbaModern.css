@@ -3280,3 +3280,26 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
     max-height: calc(100dvh - 120px) !important;
   }
 }
+
+
+/* Profile links must preserve the existing identity-row layout everywhere. */
+.media-hub .feed-post-author-identity,
+.media-hub .announcement-author-identity {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-width: 0 !important;
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+.media-hub .feed-post-author-identity > .feed-post-author-info,
+.media-hub .announcement-author-identity > div:not(.announcement-author-avatar) {
+  min-width: 0 !important;
+}
+
+.media-hub .feed-post-author-identity:hover strong,
+.media-hub .announcement-author-identity:hover strong,
+.media-hub .video-comment-heading > .profile-link:hover strong {
+  color: var(--kinba-accent) !important;
+}

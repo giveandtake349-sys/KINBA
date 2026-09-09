@@ -345,18 +345,10 @@ function SpotlightHighlights({
                 </div>
               )}
             </div>
-            <span
+            <a
               className="spotlight-highlight-card__author profile-link"
-              role="link"
-              tabIndex={0}
+              href={`/profile/${highlight.author.id}`}
               onClick={event => {
-                event.preventDefault();
-                event.stopPropagation();
-                window.history.pushState({}, "", `/profile/${highlight.author.id}`);
-                window.dispatchEvent(new PopStateEvent("popstate"));
-              }}
-              onKeyDown={event => {
-                if (event.key !== "Enter" && event.key !== " ") return;
                 event.preventDefault();
                 event.stopPropagation();
                 window.history.pushState({}, "", `/profile/${highlight.author.id}`);
@@ -372,7 +364,7 @@ function SpotlightHighlights({
                 <UserRound size={13} />
               )}
               {displayName(highlight.author.name, highlight.author.username)}
-            </span>
+            </a>
             <strong>{highlight.title || highlight.caption.slice(0, 80)}</strong>
             <span className="spotlight-highlight-card__metrics">
               ♥ {highlight.likes} · comments {highlight.comments} · shares{" "}
@@ -1161,9 +1153,16 @@ function CommentDrawer({
       >
         <div className="video-comment">
           <div className="video-comment-heading">
-            <strong>
-              {displayName(comment.author.name, comment.author.username)}
-            </strong>
+            <a
+              className="profile-link"
+              href={`/profile/${comment.author.id}`}
+              onClick={event => event.stopPropagation()}
+              aria-label={`Open ${displayName(comment.author.name, comment.author.username)} profile`}
+            >
+              <strong>
+                {displayName(comment.author.name, comment.author.username)}
+              </strong>
+            </a>
             <span className="video-comment-actions">
               <button
                 type="button"
@@ -1579,6 +1578,12 @@ function VideoCard({
         onClick={openViewer}
       >
         <header className="feed-post-author">
+          <a
+            className="profile-link feed-post-author-identity"
+            href={`/profile/${video.owner.id}`}
+            onClick={event => event.stopPropagation()}
+            aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}
+          >
           <div className="video-owner-avatar">
             {video.owner.photoUrl ? (
               <img
@@ -1605,6 +1610,7 @@ function VideoCard({
               {video.mediaType === "IMAGE" ? "Photo" : "Video"}
             </span>
           </div>
+          </a>
           <PostManagementMenu
             video={video}
             onUpdated={setDescription}
@@ -1667,6 +1673,12 @@ function VideoCard({
       onClick={openViewer}
     >
       <header className="feed-post-author">
+        <a
+          className="profile-link feed-post-author-identity"
+          href={`/profile/${video.owner.id}`}
+          onClick={event => event.stopPropagation()}
+          aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}
+        >
         <div className="video-owner-avatar">
           {video.owner.photoUrl ? (
             <img
@@ -1697,6 +1709,7 @@ function VideoCard({
                 : "Video"}
           </span>
         </div>
+        </a>
         <PostManagementMenu
           video={video}
           onUpdated={setDescription}
@@ -3097,9 +3110,16 @@ function AnnouncementComments({
           ) : commentsQuery.data?.length ? (
             commentsQuery.data.map(comment => (
               <div className="video-comment" key={comment.id}>
-                <strong>
-                  {displayName(comment.author.name, comment.author.username)}
-                </strong>
+                <a
+                  className="profile-link"
+                  href={`/profile/${comment.author.id}`}
+                  onClick={event => event.stopPropagation()}
+                  aria-label={`Open ${displayName(comment.author.name, comment.author.username)} profile`}
+                >
+                  <strong>
+                    {displayName(comment.author.name, comment.author.username)}
+                  </strong>
+                </a>
                 {comment.body && <span>{comment.body}</span>}
                 {comment.audioUrl && (
                   <CommentAudioPlayer
@@ -3185,6 +3205,11 @@ export function CommunityAnnouncements() {
           {announcements.map(announcement => (
             <article className="announcement-card" key={announcement.id}>
               <div className="announcement-author">
+                <a
+                  className="profile-link announcement-author-identity"
+                  href={`/profile/${announcement.author.id}`}
+                  aria-label={`Open ${announcement.author.name ?? "KINBA organization"} profile`}
+                >
                 <div className="announcement-author-avatar">
                   {announcement.author.photoUrl ? (
                     <img
@@ -3211,6 +3236,7 @@ export function CommunityAnnouncements() {
                   </strong>
                   <span>{announcement.author.accountType} · verified</span>
                 </div>
+                </a>
                 <time dateTime={new Date(announcement.createdAt).toISOString()}>
                   {new Date(announcement.createdAt).toLocaleDateString()}
                 </time>
