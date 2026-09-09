@@ -994,19 +994,13 @@ function ProfileStats({
   profile,
   isOwner,
   isAuthenticated,
-  authLoading,
-  profileLoading,
   isAdmin,
-  onSignIn,
   userId,
 }: {
   profile?: ProfileSnapshot;
   isOwner: boolean;
   isAuthenticated: boolean;
-  authLoading: boolean;
-  profileLoading: boolean;
   isAdmin: boolean;
-  onSignIn: () => void;
   userId?: number;
 }) {
   const [gridTab, setGridTab] = useState<"videos" | "shorts" | "liked">(
@@ -1100,10 +1094,6 @@ function ProfileStats({
             disabled={toggleFollow.isPending || followState.isPending}
           >
             {followState.data?.following ? "Following" : "Follow"}
-          </button>
-        ) : !authLoading && !profileLoading ? (
-          <button type="button" className="primary-btn" onClick={onSignIn}>
-            Sign in to edit profile
           </button>
         ) : null}
       </section>
@@ -2516,9 +2506,6 @@ export default function Home() {
   });
   const notificationCount = Math.min(notificationQuery.data?.length ?? 0, 99);
   const profile = (publicProfileId ? publicProfileQuery.data : profileQuery.data) as ProfileSnapshot | undefined;
-  const profileLoading = publicProfileId
-    ? publicProfileQuery.isLoading
-    : profileQuery.isLoading;
   const isOwner = Boolean(
     auth.user?.id && profile?.user?.id && auth.user.id === profile.user.id
   );
@@ -2652,10 +2639,7 @@ export default function Home() {
               profile={profile}
               isOwner={isOwner}
               isAuthenticated={auth.isAuthenticated}
-              authLoading={auth.loading}
-              profileLoading={profileLoading}
               isAdmin={auth.user?.role === "admin"}
-              onSignIn={auth.openAuth}
               userId={publicProfileId}
             />
           )}
