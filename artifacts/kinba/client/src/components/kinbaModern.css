@@ -3128,3 +3128,155 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
     height: calc(100dvh - 12px) !important;
   }
 }
+
+
+/* Final photo viewer and fullscreen detail polish. */
+.media-hub .feed-post-attachments img,
+.media-hub .feed-photo-button img {
+  width: 100% !important;
+  height: auto !important;
+  max-height: 560px !important;
+  aspect-ratio: auto !important;
+  object-fit: contain !important;
+  background: #050505 !important;
+}
+
+.media-hub .feed-photo-lightbox {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483000 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  padding: 64px 24px !important;
+  background: #000 !important;
+  isolation: isolate !important;
+}
+
+.media-hub .feed-photo-lightbox > img {
+  display: block !important;
+  width: auto !important;
+  max-width: min(100%, 1400px) !important;
+  height: auto !important;
+  max-height: calc(100dvh - 128px) !important;
+  object-fit: contain !important;
+  background: #000 !important;
+}
+
+.media-hub .feed-photo-lightbox-close {
+  top: max(16px, env(safe-area-inset-top)) !important;
+  right: max(16px, env(safe-area-inset-right)) !important;
+  left: auto !important;
+  z-index: 10 !important;
+}
+
+.media-hub .feed-photo-lightbox-owner {
+  position: absolute !important;
+  left: max(18px, env(safe-area-inset-left)) !important;
+  bottom: max(18px, env(safe-area-inset-bottom)) !important;
+  z-index: 10 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  max-width: min(80vw, 340px) !important;
+  padding: 8px 12px 8px 8px !important;
+  border: 1px solid rgba(255,255,255,.2) !important;
+  border-radius: 999px !important;
+  color: #fff !important;
+  background: rgba(20,20,20,.84) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+.media-hub .feed-photo-lightbox-owner > span:last-child {
+  display: grid !important;
+  gap: 2px !important;
+  min-width: 0 !important;
+}
+
+.media-hub .feed-photo-lightbox-owner strong,
+.media-hub .feed-photo-lightbox-owner small {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.media-hub .feed-photo-lightbox-owner small {
+  color: rgba(255,255,255,.68) !important;
+  font-size: 11px !important;
+}
+
+/* Video/Shorts detail: close is top-right; owner identity is bottom-left. */
+.media-hub .shorts-viewer-layer .shorts-viewer-close {
+  top: max(16px, env(safe-area-inset-top)) !important;
+  right: max(16px, env(safe-area-inset-right)) !important;
+  left: auto !important;
+  z-index: 2147483001 !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .short-overlay {
+  position: absolute !important;
+  inset: auto 0 0 0 !important;
+  display: block !important;
+  max-height: none !important;
+  padding: 18px 84px 20px 18px !important;
+  color: #fff !important;
+  background: linear-gradient(transparent, rgba(0,0,0,.9)) !important;
+  pointer-events: none !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .short-overlay-details {
+  position: static !important;
+  width: min(100%, 520px) !important;
+  padding: 0 !important;
+  color: #fff !important;
+  pointer-events: auto !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .shorts-overlay-actions {
+  position: absolute !important;
+  right: 14px !important;
+  bottom: max(20px, env(safe-area-inset-bottom)) !important;
+  width: 52px !important;
+  padding: 0 !important;
+  pointer-events: auto !important;
+}
+
+/* Keep the Shorts tab compact: one title, no phantom top gap, full media area. */
+.media-hub .shorts-list-feed > .shorts-header {
+  min-height: 56px !important;
+  padding: 8px 12px !important;
+  gap: 12px !important;
+}
+
+.media-hub .shorts-list-feed > .shorts-list-viewport {
+  height: calc(100dvh - 56px) !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding-top: 0 !important;
+}
+
+.media-hub .shorts-list-feed > .shorts-list-viewport > .short-card {
+  margin-top: 0 !important;
+}
+
+@media (max-width: 760px) {
+  .media-hub .shorts-list-feed > .shorts-header {
+    min-height: 52px !important;
+    padding: 6px 10px !important;
+  }
+
+  .media-hub .shorts-list-feed > .shorts-list-viewport {
+    height: calc(100dvh - 52px) !important;
+  }
+
+  .media-hub .feed-photo-lightbox {
+    padding: 60px 10px !important;
+  }
+
+  .media-hub .feed-photo-lightbox > img {
+    max-height: calc(100dvh - 120px) !important;
+  }
+}

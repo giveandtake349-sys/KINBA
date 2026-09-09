@@ -255,6 +255,7 @@ function SpotlightHighlights({
   onSelect: (highlight: SpotlightHighlight) => void;
 }) {
   const [highlights, setHighlights] = useState<SpotlightHighlight[]>([]);
+  const [photoViewer, setPhotoViewer] = useState<SpotlightHighlight | null>(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let cancelled = false;
@@ -302,7 +303,11 @@ function SpotlightHighlights({
             key={highlight.id}
             type="button"
             className="spotlight-highlight-card"
-            onClick={() => onSelect(highlight)}
+            onClick={() =>
+              highlight.mediaType === "IMAGE"
+                ? setPhotoViewer(highlight)
+                : onSelect(highlight)
+            }
           >
             <div className="spotlight-highlight-card__media">
               {highlight.mediaUrl ? (
@@ -340,7 +345,24 @@ function SpotlightHighlights({
                 </div>
               )}
             </div>
-            <span className="spotlight-highlight-card__author">
+            <span
+              className="spotlight-highlight-card__author profile-link"
+              role="link"
+              tabIndex={0}
+              onClick={event => {
+                event.preventDefault();
+                event.stopPropagation();
+                window.history.pushState({}, "", `/profile/${highlight.author.id}`);
+                window.dispatchEvent(new PopStateEvent("popstate"));
+              }}
+              onKeyDown={event => {
+                if (event.key !== "Enter" && event.key !== " ") return;
+                event.preventDefault();
+                event.stopPropagation();
+                window.history.pushState({}, "", `/profile/${highlight.author.id}`);
+                window.dispatchEvent(new PopStateEvent("popstate"));
+              }}
+            >
               {highlight.author.photoUrl ? (
                 <img
                   src={resolveMediaUrl(highlight.author.photoUrl, "avatars")}
@@ -359,6 +381,14 @@ function SpotlightHighlights({
           </button>
         ))}
       </div>
+      {photoViewer && (
+        <FeedPhotoLightbox
+          imageUrl={photoViewer.mediaUrl}
+          alt={photoViewer.title || "Spotlight photo"}
+          owner={photoViewer.author}
+          onClose={() => setPhotoViewer(null)}
+        />
+      )}
     </section>
   );
 }
@@ -2051,35 +2081,47 @@ function FeedRecovery() {
 }
 
 function FeedPhotoLightbox({
-  attachments,
+  attachments = [],
   index,
   onClose,
   onChange,
+  imageUrl,
+  alt = "Expanded photo",
+  owner,
 }: {
-  attachments: FeedAttachment[];
-  index: number;
+  attachments?: FeedAttachment[];
+  index?: number;
   onClose: () => void;
-  onChange: (index: number) => void;
+  onChange?: (index: number) => void;
+  imageUrl?: string | null;
+  alt?: string;
+  owner?: {
+    id: number;
+    name: string | null;
+    username?: string | null;
+    photoUrl: string | null;
+  };
 }) {
   const imageAttachments = attachments.filter(
     item => item.mediaType === "IMAGE"
   );
-  const current = imageAttachments[index];
+  const current = imageAttachments[index ?? 0];
   useEffect(() => {
     if (!current) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
-      if (event.key === "ArrowLeft")
+      if (event.key === "ArrowLeft" && onChange)
         onChange(
-          (index - 1 + imageAttachments.length) % imageAttachments.length
+          ((index ?? 0) - 1 + imageAttachments.length) % imageAttachments.length
         );
-      if (event.key === "ArrowRight")
-        onChange((index + 1) % imageAttachments.length);
+      if (event.key === "ArrowRight" && onChange)
+        onChange(((index ?? 0) + 1) % imageAttachments.length);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [current, imageAttachments.length, index, onChange, onClose]);
-  if (!current) return null;
+  if (!current && !imageUrl) return null;
+  const photoUrl = imageUrl ?? current?.mediaUrl;
   return (
     <div
       className="feed-photo-lightbox"
@@ -2096,17 +2138,19 @@ function FeedPhotoLightbox({
       >
         <X size={22} />
       </button>
-      <span className="feed-photo-lightbox-counter">
-        {index + 1} of {imageAttachments.length}
-      </span>
       {imageAttachments.length > 1 && (
+        <span className="feed-photo-lightbox-counter">
+          {(index ?? 0) + 1} of {imageAttachments.length}
+        </span>
+      )}
+      {imageAttachments.length > 1 && onChange && (
         <button
           type="button"
           className="feed-photo-lightbox-nav feed-photo-lightbox-nav--prev"
           onClick={event => {
             event.stopPropagation();
             onChange(
-              (index - 1 + imageAttachments.length) % imageAttachments.length
+              ((index ?? 0) - 1 + imageAttachments.length) % imageAttachments.length
             );
           }}
           aria-label="Previous photo"
@@ -2115,17 +2159,37 @@ function FeedPhotoLightbox({
         </button>
       )}
       <img
-        src={resolveMediaUrl(current.mediaUrl)}
-        alt="Expanded post attachment"
+        src={resolveMediaUrl(photoUrl ?? "")}
+        alt={alt}
         onClick={event => event.stopPropagation()}
       />
-      {imageAttachments.length > 1 && (
+      {owner && (
+        <a
+          className="feed-photo-lightbox-owner profile-link"
+          href={`/profile/${owner.id}`}
+          onClick={event => event.stopPropagation()}
+          aria-label={`Open ${displayName(owner.name, owner.username)} profile`}
+        >
+          <span className="video-owner-avatar">
+            {owner.photoUrl ? (
+              <img src={resolveMediaUrl(owner.photoUrl, "avatars")} alt="" />
+            ) : (
+              <UserRound size={18} />
+            )}
+          </span>
+          <span>
+            <strong>{displayName(owner.name, owner.username)}</strong>
+            <small>{owner.username ? `@${owner.username}` : "KINBA member"}</small>
+          </span>
+        </a>
+      )}
+      {imageAttachments.length > 1 && onChange && (
         <button
           type="button"
           className="feed-photo-lightbox-nav feed-photo-lightbox-nav--next"
           onClick={event => {
             event.stopPropagation();
-            onChange((index + 1) % imageAttachments.length);
+            onChange(((index ?? 0) + 1) % imageAttachments.length);
           }}
           aria-label="Next photo"
         >
@@ -2297,6 +2361,7 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
           index={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
           onChange={setLightboxIndex}
+          owner={post.author}
         />
       )}
     </article>
@@ -2723,7 +2788,6 @@ function ShortsFeed({
     >
       <div className="media-section-heading shorts-header">
         <div>
-          <p className="eyebrow">Shorts</p>
           <h2 id="shorts-heading">Shorts</h2>
         </div>
         <div className="shorts-controls">
