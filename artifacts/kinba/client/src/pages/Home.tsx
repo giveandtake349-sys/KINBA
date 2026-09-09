@@ -2528,6 +2528,10 @@ export default function Home() {
     setActiveView(next);
     setActiveModal(null);
   };
+  const goHome = () => {
+    showFeed("all");
+    if (location !== "/") navigate("/");
+  };
   const openModal = (modal: Exclude<AppModal, null>) => {
     setMenuOpen(false);
     setActiveModal(modal);
@@ -2698,7 +2702,7 @@ export default function Home() {
           }
           activePanel={activeView}
           menuOpen={menuOpen}
-          onHome={() => showFeed("all")}
+          onHome={goHome}
           onSearch={() => openModal("search")}
           onPublish={() => openModal("upload")}
           onNotifications={showNotifications}
