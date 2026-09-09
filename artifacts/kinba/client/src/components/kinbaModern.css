@@ -3303,3 +3303,86 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
 .media-hub .video-comment-heading > .profile-link:hover strong {
   color: var(--kinba-accent) !important;
 }
+
+/* Final user-requested UI contract: anchored Shorts actions, separated cards, and no-crop images. */
+.media-hub .feed-card-list,
+.media-hub .unified-feed-list,
+.media-hub .feed-video-list,
+.media-hub .shorts-viewport,
+.media-hub .shorts-list-viewport {
+  gap: 24px !important;
+}
+.media-hub .feed-card-list > .feed-media-post,
+.media-hub .feed-card-list > .feed-text-card,
+.media-hub .feed-card-list > .long-video-card,
+.media-hub .feed-card-list > .shorts-insertion-block,
+.media-hub .unified-feed-list > .feed-media-post,
+.media-hub .unified-feed-list > .feed-text-card,
+.media-hub .unified-feed-list > .long-video-card,
+.media-hub .unified-feed-list > .shorts-insertion-block,
+.media-hub .feed-video-list > .feed-media-post,
+.media-hub .feed-video-list > .long-video-card,
+.media-hub .shorts-list-viewport > .short-card,
+.media-hub .shorts-viewport > .short-card {
+  box-sizing: border-box !important;
+  margin-bottom: 24px !important;
+  padding: 12px !important;
+  border: 1px solid rgb(38 38 38) !important;
+  border-radius: 16px !important;
+  background: rgb(23 23 23 / 90%) !important;
+  overflow: hidden !important;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 24%) !important;
+}
+.media-hub .shorts-viewport > .short-card,
+.media-hub .shorts-list-viewport > .short-card {
+  position: relative !important;
+  background: #000 !important;
+}
+.media-hub .shorts-overlay-actions,
+.media-hub .shorts-tab-panel .shorts-list-viewport > .short-card .shorts-overlay-actions,
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .shorts-overlay-actions {
+  position: absolute !important;
+  right: 12px !important;
+  bottom: 64px !important;
+  z-index: 20 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 16px !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: auto !important;
+}
+.media-hub .shorts-overlay-actions .media-engagement-actions--overlay,
+.media-hub .shorts-tab-panel .shorts-list-viewport > .short-card .shorts-overlay-actions .media-engagement-actions--overlay,
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .shorts-overlay-actions .media-engagement-actions--overlay {
+  position: static !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: 20 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 16px !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.media-hub .feed-media-content > img,
+.media-hub .feed-text-card .feed-photo-button img,
+.media-hub .short-card > img,
+.media-hub .shorts-list-viewport .short-card img:not(.video-owner-avatar img) {
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: none !important;
+  object-fit: contain !important;
+}
+.media-hub .feed-photo-lightbox > img {
+  width: auto !important;
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: 90vh !important;
+  object-fit: contain !important;
+}

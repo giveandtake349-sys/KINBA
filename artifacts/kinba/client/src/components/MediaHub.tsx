@@ -2202,6 +2202,7 @@ function FeedPhotoLightbox({
         </button>
       )}
       <img
+        className="max-w-full max-h-[90vh] object-contain"
         src={resolveMediaUrl(photoUrl ?? "")}
         alt={alt}
         onClick={event => event.stopPropagation()}
@@ -2675,7 +2676,7 @@ function ShortVideoCard({
       {video.mediaType === "IMAGE" ? (
         <img
           src={resolveMediaUrl(video.videoUrl)}
-          className="w-full h-auto object-cover"
+          className="w-full h-auto object-contain"
           alt={video.title || "Post"}
         />
       ) : (
@@ -2732,7 +2733,7 @@ function ShortVideoCard({
             {ownerHandle(video.owner.name, video.owner.username)}
           </p>
         </div>
-        <div className="shorts-overlay-actions z-30 pb-20">
+        <div className="shorts-overlay-actions absolute right-3 bottom-16 z-20 flex flex-col items-center gap-4">
           <EngagementActions
             engagement={current}
             onReact={react}
