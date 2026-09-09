@@ -673,3 +673,33 @@ body { color: var(--kinba-text); }
     padding-top: 104px !important;
   }
 }
+
+/* Ownership actions: clear owner affordances and guest-safe profile actions. */
+.profile-edit-trigger {
+  display: block !important;
+  width: 100% !important;
+  background: #e53935 !important;
+  border-color: #e53935 !important;
+  color: #fff !important;
+  font-weight: 800 !important;
+}
+.profile-edit-trigger:hover,
+.profile-edit-trigger:focus-visible {
+  background: #c62828 !important;
+  border-color: #c62828 !important;
+}
+.profile-handle-edit {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-left: 8px;
+  border: 1px solid rgba(229, 57, 53, .55);
+  border-radius: 50%;
+  color: #fff;
+  background: #e53935;
+  vertical-align: middle;
+}
+.profile-follow-trigger {
+  width: min(100%, 320px) !important;
+}

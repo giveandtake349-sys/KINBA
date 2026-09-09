@@ -93,7 +93,7 @@ function guardNonSubmitNavigation(event: ReactMouseEvent<HTMLElement>) {
 }
 
 type ProfileSnapshot = {
-  user?: { name: string | null } | null;
+  user?: { id: number; name: string | null } | null;
   profile?: {
     username?: string | null;
     photoUrl?: string | null;
@@ -992,13 +992,19 @@ function Landing({ onLogin }: { onLogin: () => void }) {
 
 function ProfileStats({
   profile,
-  enabled,
+  isOwner,
+  isAuthenticated,
+  authLoading,
+  profileLoading,
   isAdmin,
   onSignIn,
   userId,
 }: {
   profile?: ProfileSnapshot;
-  enabled: boolean;
+  isOwner: boolean;
+  isAuthenticated: boolean;
+  authLoading: boolean;
+  profileLoading: boolean;
   isAdmin: boolean;
   onSignIn: () => void;
   userId?: number;
@@ -1006,8 +1012,18 @@ function ProfileStats({
   const [gridTab, setGridTab] = useState<"videos" | "shorts" | "liked">(
     "videos"
   );
+  const followState = trpc.profile.followState.useQuery(
+    { userId: userId as number },
+    {
+      enabled: isAuthenticated && !isOwner && Boolean(userId),
+      refetchOnWindowFocus: false,
+    }
+  );
+  const toggleFollow = trpc.profile.toggleFollow.useMutation({
+    onSuccess: () => void followState.refetch(),
+  });
   const videosQuery = trpc.profile.videos.useQuery(undefined, {
-    enabled: enabled && !userId,
+    enabled: isOwner,
     refetchOnWindowFocus: false,
   });
   const publicVideosQuery = trpc.profile.videosById.useQuery(
@@ -1040,7 +1056,7 @@ function ProfileStats({
               <UserRound size={42} />
             )}
           </div>
-          {enabled && (
+          {isOwner && (
             <span
               className="profile-avatar-edit"
               aria-label="Edit profile picture"
@@ -1050,7 +1066,14 @@ function ProfileStats({
           )}
         </div>
         <h1 id="profile-heading">{displayName}</h1>
-        <p className="profile-handle">{handle}</p>
+        <p className="profile-handle">
+          {handle}
+          {isOwner && (
+            <span className="profile-handle-edit" aria-label="Edit profile">
+              <PenLine size={13} />
+            </span>
+          )}
+        </p>
         <div className="profile-stat-line" aria-label="Profile statistics">
           <span>
             <strong>{stats?.followingCount ?? 0}</strong> Following
@@ -1062,16 +1085,27 @@ function ProfileStats({
             <strong>{stats?.reactionsReceived ?? 0}</strong> Pookies
           </span>
         </div>
-        {enabled ? (
+        {isOwner ? (
           <details className="profile-edit-details">
-            <summary className="primary-btn">Edit Profile</summary>
+            <summary className="primary-btn profile-edit-trigger">Edit Profile</summary>
             <ProfileEditor profile={profile} />
           </details>
-        ) : (
+        ) : isAuthenticated && userId ? (
+          <button
+            type="button"
+            className="primary-btn profile-follow-trigger"
+            onClick={() =>
+              void toggleFollow.mutateAsync({ userId })
+            }
+            disabled={toggleFollow.isPending || followState.isPending}
+          >
+            {followState.data?.following ? "Following" : "Follow"}
+          </button>
+        ) : !authLoading && !profileLoading ? (
           <button type="button" className="primary-btn" onClick={onSignIn}>
             Sign in to edit profile
           </button>
-        )}
+        ) : null}
       </section>
       <section
         className="profile-content"
@@ -1152,7 +1186,7 @@ function ProfileStats({
           </div>
         )}
       </section>
-      {enabled && (
+      {isOwner && (
         <section className="profile-secondary-tools">
           <GetVerifiedPanel />
           {isAdmin && <AdminVerificationPanel />}
@@ -2482,6 +2516,12 @@ export default function Home() {
   });
   const notificationCount = Math.min(notificationQuery.data?.length ?? 0, 99);
   const profile = (publicProfileId ? publicProfileQuery.data : profileQuery.data) as ProfileSnapshot | undefined;
+  const profileLoading = publicProfileId
+    ? publicProfileQuery.isLoading
+    : profileQuery.isLoading;
+  const isOwner = Boolean(
+    auth.user?.id && profile?.user?.id && auth.user.id === profile.user.id
+  );
   const screen: Screen =
     location === "/login"
       ? "landing"
@@ -2608,9 +2648,12 @@ export default function Home() {
               )}
             </section>
           ) : (
-              <ProfileStats
+            <ProfileStats
               profile={profile}
-              enabled={auth.isAuthenticated && !publicProfileId}
+              isOwner={isOwner}
+              isAuthenticated={auth.isAuthenticated}
+              authLoading={auth.loading}
+              profileLoading={profileLoading}
               isAdmin={auth.user?.role === "admin"}
               onSignIn={auth.openAuth}
               userId={publicProfileId}
