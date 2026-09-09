@@ -3051,3 +3051,80 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
     border-radius: 8px !important;
   }
 }
+
+
+/* Final Shorts gesture repair: the viewport owns vertical scrolling and native swipes. */
+.media-hub .shorts-list-feed {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  overflow: hidden !important;
+  background: #000 !important;
+}
+
+.media-hub .shorts-list-feed > .shorts-header {
+  flex: 0 0 auto !important;
+}
+
+.media-hub .shorts-list-feed > .shorts-list-viewport {
+  flex: 1 1 auto !important;
+  height: calc(100dvh - 72px) !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: contain !important;
+  scroll-snap-type: y mandatory !important;
+  scroll-behavior: smooth !important;
+  touch-action: pan-y !important;
+}
+
+.media-hub .shorts-list-feed > .shorts-list-viewport > .short-card {
+  flex: 0 0 80vh !important;
+  height: 80vh !important;
+  min-height: 480px !important;
+  scroll-snap-align: start !important;
+  scroll-snap-stop: always !important;
+  touch-action: pan-y !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport {
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  max-height: 100dvh !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: contain !important;
+  scroll-snap-type: y mandatory !important;
+  scroll-behavior: smooth !important;
+  touch-action: pan-y !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card {
+  flex: 0 0 calc(100dvh - 16px) !important;
+  height: calc(100dvh - 16px) !important;
+  min-height: 480px !important;
+  scroll-snap-align: start !important;
+  scroll-snap-stop: always !important;
+  touch-action: pan-y !important;
+}
+
+@media (max-width: 760px) {
+  .media-hub .shorts-list-feed > .shorts-list-viewport {
+    height: calc(100dvh - 68px) !important;
+  }
+
+  .media-hub .shorts-list-feed > .shorts-list-viewport > .short-card {
+    flex-basis: 80vh !important;
+    height: 80vh !important;
+  }
+
+  .media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card {
+    flex-basis: calc(100dvh - 12px) !important;
+    height: calc(100dvh - 12px) !important;
+  }
+}
