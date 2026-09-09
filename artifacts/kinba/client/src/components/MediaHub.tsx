@@ -70,7 +70,10 @@ type VideoKind = "LONG" | "SHORT" | "WHEEL";
 type Quality = "ORIGINAL" | "1080P" | "720P" | "480P" | "240P";
 type VideoSource = { quality: Quality; videoUrl: string };
 
-function navigateToProfile(event: MouseEvent<HTMLAnchorElement>, userId: number) {
+function navigateToProfile(
+  event: MouseEvent<HTMLAnchorElement>,
+  userId: number
+) {
   event.preventDefault();
   event.stopPropagation();
   window.history.pushState({}, "", `/profile/${userId}`);
@@ -263,7 +266,9 @@ function SpotlightHighlights({
   onSelect: (highlight: SpotlightHighlight) => void;
 }) {
   const [highlights, setHighlights] = useState<SpotlightHighlight[]>([]);
-  const [photoViewer, setPhotoViewer] = useState<SpotlightHighlight | null>(null);
+  const [photoViewer, setPhotoViewer] = useState<SpotlightHighlight | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let cancelled = false;
@@ -359,7 +364,11 @@ function SpotlightHighlights({
               onClick={event => {
                 event.preventDefault();
                 event.stopPropagation();
-                window.history.pushState({}, "", `/profile/${highlight.author.id}`);
+                window.history.pushState(
+                  {},
+                  "",
+                  `/profile/${highlight.author.id}`
+                );
                 window.dispatchEvent(new PopStateEvent("popstate"));
               }}
             >
@@ -1238,8 +1247,14 @@ function CommentDrawer({
     const updateKeyboardOffset = () => {
       const viewportHeight = visualViewport?.height ?? window.innerHeight;
       const viewportTop = visualViewport?.offsetTop ?? 0;
-      const keyboardOffset = Math.max(0, window.innerHeight - viewportHeight - viewportTop);
-      document.documentElement.style.setProperty("--kinba-keyboard-offset", `${keyboardOffset}px`);
+      const keyboardOffset = Math.max(
+        0,
+        window.innerHeight - viewportHeight - viewportTop
+      );
+      document.documentElement.style.setProperty(
+        "--kinba-keyboard-offset",
+        `${keyboardOffset}px`
+      );
     };
     document.body.style.overflow = "hidden";
     updateKeyboardOffset();
@@ -1281,32 +1296,38 @@ function CommentDrawer({
           {commentsQuery.isPending ? (
             <div className="comment-loading">Loading comments…</div>
           ) : commentsQuery.isError ? (
-            <div className="comment-loading">Comments are temporarily unavailable.</div>
+            <div className="comment-loading">
+              Comments are temporarily unavailable.
+            </div>
           ) : roots.length ? (
             roots.map(comment => renderComment(comment))
           ) : (
-            <div className="comment-loading">No comments yet. Start the conversation.</div>
+            <div className="comment-loading">
+              No comments yet. Start the conversation.
+            </div>
           )}
         </div>
-      {replyTo && (
-        <div className="comment-replying-banner">
-          Replying to @{replyTo.username}
-          <button
-            type="button"
-            onClick={() => setReplyTo(null)}
-            aria-label="Cancel reply"
-          >
-            <X size={14} />
-          </button>
-        </div>
-      )}
+        {replyTo && (
+          <div className="comment-replying-banner">
+            Replying to @{replyTo.username}
+            <button
+              type="button"
+              onClick={() => setReplyTo(null)}
+              aria-label="Cancel reply"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
         <VoiceCommentComposer
           body={body}
           onBodyChange={setBody}
           onSend={submitComment}
           disabled={createComment.isPending}
           inputRef={inputRef}
-          placeholder={auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"}
+          placeholder={
+            auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"
+          }
         />
       </section>
     </div>,
@@ -1592,32 +1613,32 @@ function VideoCard({
             onClick={event => navigateToProfile(event, video.owner.id)}
             aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}
           >
-          <div className="video-owner-avatar">
-            {video.owner.photoUrl ? (
-              <img
-                src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
-                alt=""
-              />
-            ) : (
-              <UserRound size={16} />
-            )}
-          </div>
-          <div className="feed-post-author-info">
-            <strong>
-              {displayName(video.owner.name, video.owner.username)}
-              {video.owner.isVerified && (
-                <BadgeCheck
-                  className="verified-badge"
-                  size={13}
-                  aria-label="Verified profile"
+            <div className="video-owner-avatar">
+              {video.owner.photoUrl ? (
+                <img
+                  src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
+                  alt=""
                 />
+              ) : (
+                <UserRound size={16} />
               )}
-            </strong>
-            <span>
-              {relativeTime(video.createdAt)} ·{" "}
-              {video.mediaType === "IMAGE" ? "Photo" : "Video"}
-            </span>
-          </div>
+            </div>
+            <div className="feed-post-author-info">
+              <strong>
+                {displayName(video.owner.name, video.owner.username)}
+                {video.owner.isVerified && (
+                  <BadgeCheck
+                    className="verified-badge"
+                    size={13}
+                    aria-label="Verified profile"
+                  />
+                )}
+              </strong>
+              <span>
+                {relativeTime(video.createdAt)} ·{" "}
+                {video.mediaType === "IMAGE" ? "Photo" : "Video"}
+              </span>
+            </div>
           </a>
           <PostManagementMenu
             video={video}
@@ -1687,36 +1708,36 @@ function VideoCard({
           onClick={event => navigateToProfile(event, video.owner.id)}
           aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}
         >
-        <div className="video-owner-avatar">
-          {video.owner.photoUrl ? (
-            <img
-              src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
-              alt=""
-            />
-          ) : (
-            <UserRound size={16} />
-          )}
-        </div>
-        <div className="feed-post-author-info">
-          <strong>
-            {displayName(video.owner.name, video.owner.username)}
-            {video.owner.isVerified && (
-              <BadgeCheck
-                className="verified-badge"
-                size={13}
-                aria-label="Verified profile"
+          <div className="video-owner-avatar">
+            {video.owner.photoUrl ? (
+              <img
+                src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
+                alt=""
               />
+            ) : (
+              <UserRound size={16} />
             )}
-          </strong>
-          <span>
-            {relativeTime(video.createdAt)} ·{" "}
-            {video.mediaType === "IMAGE"
-              ? "Photo"
-              : video.kind === "SHORT"
-                ? "Short"
-                : "Video"}
-          </span>
-        </div>
+          </div>
+          <div className="feed-post-author-info">
+            <strong>
+              {displayName(video.owner.name, video.owner.username)}
+              {video.owner.isVerified && (
+                <BadgeCheck
+                  className="verified-badge"
+                  size={13}
+                  aria-label="Verified profile"
+                />
+              )}
+            </strong>
+            <span>
+              {relativeTime(video.createdAt)} ·{" "}
+              {video.mediaType === "IMAGE"
+                ? "Photo"
+                : video.kind === "SHORT"
+                  ? "Short"
+                  : "Video"}
+            </span>
+          </div>
         </a>
         <PostManagementMenu
           video={video}
@@ -2145,7 +2166,7 @@ function FeedPhotoLightbox({
   const photoUrl = imageUrl ?? current?.mediaUrl;
   return (
     <div
-      className="feed-photo-lightbox"
+      className="fixed inset-0 z-[9999] bg-black flex items-center justify-center feed-photo-lightbox"
       role="dialog"
       aria-modal="true"
       aria-label="Photo viewer"
@@ -2153,7 +2174,7 @@ function FeedPhotoLightbox({
     >
       <button
         type="button"
-        className="feed-photo-lightbox-close"
+        className="absolute top-4 right-4 feed-photo-lightbox-close"
         onClick={onClose}
         aria-label="Close photo viewer"
       >
@@ -2171,7 +2192,8 @@ function FeedPhotoLightbox({
           onClick={event => {
             event.stopPropagation();
             onChange(
-              ((index ?? 0) - 1 + imageAttachments.length) % imageAttachments.length
+              ((index ?? 0) - 1 + imageAttachments.length) %
+                imageAttachments.length
             );
           }}
           aria-label="Previous photo"
@@ -2186,7 +2208,7 @@ function FeedPhotoLightbox({
       />
       {owner && (
         <a
-          className="feed-photo-lightbox-owner profile-link"
+          className="absolute bottom-8 left-4 feed-photo-lightbox-owner profile-link"
           href={`/profile/${owner.id}`}
           onClick={event => event.stopPropagation()}
           aria-label={`Open ${displayName(owner.name, owner.username)} profile`}
@@ -2200,7 +2222,9 @@ function FeedPhotoLightbox({
           </span>
           <span>
             <strong>{displayName(owner.name, owner.username)}</strong>
-            <small>{owner.username ? `@${owner.username}` : "KINBA member"}</small>
+            <small>
+              {owner.username ? `@${owner.username}` : "KINBA member"}
+            </small>
           </span>
         </a>
       )}
@@ -3218,35 +3242,37 @@ export function CommunityAnnouncements() {
                 <a
                   className="profile-link announcement-author-identity"
                   href={`/profile/${announcement.author.id}`}
-                  onClick={event => navigateToProfile(event, announcement.author.id)}
+                  onClick={event =>
+                    navigateToProfile(event, announcement.author.id)
+                  }
                   aria-label={`Open ${announcement.author.name ?? "KINBA organization"} profile`}
                 >
-                <div className="announcement-author-avatar">
-                  {announcement.author.photoUrl ? (
-                    <img
-                      src={resolveMediaUrl(
-                        announcement.author.photoUrl,
-                        "avatars"
-                      )}
-                      alt=""
-                    />
-                  ) : (
-                    <Megaphone size={16} />
-                  )}
-                </div>
-                <div>
-                  <strong className="announcement-author-name">
-                    <span>
-                      {announcement.author.name ?? "KINBA organization"}
-                    </span>
-                    <BadgeCheck
-                      className="verified-badge"
-                      size={13}
-                      aria-label="Verified profile"
-                    />
-                  </strong>
-                  <span>{announcement.author.accountType} · verified</span>
-                </div>
+                  <div className="announcement-author-avatar">
+                    {announcement.author.photoUrl ? (
+                      <img
+                        src={resolveMediaUrl(
+                          announcement.author.photoUrl,
+                          "avatars"
+                        )}
+                        alt=""
+                      />
+                    ) : (
+                      <Megaphone size={16} />
+                    )}
+                  </div>
+                  <div>
+                    <strong className="announcement-author-name">
+                      <span>
+                        {announcement.author.name ?? "KINBA organization"}
+                      </span>
+                      <BadgeCheck
+                        className="verified-badge"
+                        size={13}
+                        aria-label="Verified profile"
+                      />
+                    </strong>
+                    <span>{announcement.author.accountType} · verified</span>
+                  </div>
                 </a>
                 <time dateTime={new Date(announcement.createdAt).toISOString()}>
                   {new Date(announcement.createdAt).toLocaleDateString()}
