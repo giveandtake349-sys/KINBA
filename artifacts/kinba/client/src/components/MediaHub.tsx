@@ -350,6 +350,7 @@ function SpotlightHighlights({
                     src={resolveMediaUrl(highlight.mediaUrl)}
                     alt=""
                     loading="lazy"
+                    className="object-contain w-full h-auto max-h-[60vh] bg-black"
                   />
                 )
               ) : (
@@ -1647,14 +1648,14 @@ function VideoCard({
           />
         </header>
         <div
-          className={`feed-media-content${video.mediaType === "VIDEO" ? " feed-media-content--video" : ""}`}
+          className={`feed-media-content${video.mediaType === "VIDEO" ? " feed-media-content--video" : " feed-media-content--image"}`}
         >
           {video.mediaType === "IMAGE" ? (
             <img
               src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
               alt={video.title || "Post"}
               loading="lazy"
-              className="w-full h-auto object-cover"
+              className="object-contain w-full h-auto max-h-[60vh] bg-black"
             />
           ) : (
             <QualityVideoPlayer
@@ -1746,11 +1747,11 @@ function VideoCard({
         />
       </header>
       <div
-        className={`feed-media-content${video.mediaType === "VIDEO" ? " feed-media-content--video" : ""}`}
+        className={`feed-media-content${video.mediaType === "VIDEO" ? " feed-media-content--video" : " feed-media-content--image"}`}
       >
         {video.mediaType === "IMAGE" ? (
           <img
-            className="w-full h-auto object-cover"
+            className="object-contain w-full h-auto max-h-[60vh] bg-black"
             src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
             alt={video.title || "Post"}
           />
