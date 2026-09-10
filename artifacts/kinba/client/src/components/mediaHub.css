@@ -2733,3 +2733,36 @@
     min-height: calc(100dvh - 96px) !important;
   }
 }
+
+/* Full-width natural-ratio media across All Feed, Spotlight, Videos, and Shorts. */
+.media-hub .feed-media-content,
+.media-hub .feed-post-attachments,
+.media-hub .media-photo-frame,
+.media-hub .feed-media-content > img,
+.media-hub .feed-media-content > video,
+.media-hub .feed-media-content .media-video-frame,
+.media-hub .feed-media-content .media-video-frame video,
+.media-hub .feed-post-attachments > img,
+.media-hub .feed-post-attachments > video {
+  width: 100% !important;
+  max-width: none !important;
+  margin-inline: 0 !important;
+  padding-inline: 0 !important;
+}
+.media-hub .feed-media-content > img,
+.media-hub .feed-media-content > video,
+.media-hub .feed-media-content .media-video-frame video,
+.media-hub .feed-post-attachments > img,
+.media-hub .feed-post-attachments > video {
+  height: auto !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  object-fit: contain !important;
+}
+.media-hub .feed-post-attachments {
+  gap: 0;
+  border-radius: 0;
+}
+.media-hub .feed-post-attachments.has-grid {
+  gap: 2px;
+}

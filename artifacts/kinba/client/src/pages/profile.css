@@ -724,9 +724,14 @@ body { color: var(--kinba-text); }
   gap: 0;
 }
 .profile-page .profile-video-tile {
+  aspect-ratio: auto;
   border-radius: 0;
 }
 .profile-page .profile-video-tile > img,
 .profile-page .profile-video-tile-fallback {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: none;
   object-fit: contain;
 }
