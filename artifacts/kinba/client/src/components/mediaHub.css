@@ -2735,6 +2735,16 @@
 }
 
 /* Full-width natural-ratio media across All Feed, Spotlight, Videos, and Shorts. */
+.media-hub,
+.media-hub .media-tab-panel,
+.media-hub .wheels-feed-layout,
+.media-hub .home-feed-section,
+.media-hub .long-video-grid,
+.media-hub .feed-video-list,
+.media-hub .unified-feed,
+.media-hub .unified-feed-list,
+.media-hub .shorts-section,
+.media-hub .shorts-viewport,
 .media-hub .feed-media-content,
 .media-hub .feed-post-attachments,
 .media-hub .media-photo-frame,
@@ -2744,25 +2754,89 @@
 .media-hub .feed-media-content .media-video-frame video,
 .media-hub .feed-post-attachments > img,
 .media-hub .feed-post-attachments > video {
-  width: 100% !important;
-  max-width: none !important;
-  margin-inline: 0 !important;
-  padding-inline: 0 !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
+
+.media-hub .unified-feed-list,
+.media-hub .feed-video-list,
+.media-hub .long-video-grid {
+  gap: 0 !important;
+}
+
 .media-hub .feed-media-content > img,
 .media-hub .feed-media-content > video,
 .media-hub .feed-media-content .media-video-frame video,
 .media-hub .feed-post-attachments > img,
-.media-hub .feed-post-attachments > video {
+.media-hub .feed-post-attachments > video,
+.media-hub .feed-photo-button img,
+.media-hub .media-fullscreen-frame video,
+.media-hub .short-card .media-video-frame video {
+  display: block !important;
+  width: 100% !important;
   height: auto !important;
+  max-width: 100% !important;
   max-height: none !important;
   aspect-ratio: auto !important;
   object-fit: contain !important;
+  object-position: center center !important;
+  border-radius: 0 !important;
+  background: transparent !important;
 }
+
+.media-hub .feed-media-post,
+.media-hub .feed-text-card,
+.media-hub .long-video-card,
+.media-hub .short-card,
+.media-hub .shorts-insertion-block,
+.media-hub .media-fullscreen-frame,
+.media-hub .media-video-frame,
+.media-hub .feed-media-content,
+.media-hub .feed-photo-button,
 .media-hub .feed-post-attachments {
-  gap: 0;
-  border-radius: 0;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  border-radius: 0 !important;
+}
+
+.media-hub .unified-feed-list > .feed-media-post,
+.media-hub .unified-feed-list > .feed-text-card,
+.media-hub .unified-feed-list > .long-video-card,
+.media-hub .unified-feed-list > .shorts-insertion-block,
+.media-hub .media-tab-panel:not(.media-tab-panel--wheels) .feed-video-list > .long-video-card {
+  margin-bottom: 0 !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.media-hub .feed-post-attachments {
+  gap: 0 !important;
+  border-radius: 0 !important;
 }
 .media-hub .feed-post-attachments.has-grid {
-  gap: 2px;
+  gap: 0 !important;
+}
+
+.media-hub .media-fullscreen-frame,
+.media-hub .short-card .media-video-frame {
+  height: auto !important;
+  min-height: 0 !important;
+  aspect-ratio: auto !important;
+  background: transparent !important;
+}
+
+.feed-photo-lightbox img {
+  width: auto !important;
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: 90vh !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+  border-radius: 0 !important;
 }
