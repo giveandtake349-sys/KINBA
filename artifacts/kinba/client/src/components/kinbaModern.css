@@ -3386,3 +3386,52 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
   max-height: 90vh !important;
   object-fit: contain !important;
 }
+
+/* Edge-to-edge media contract across feed, Spotlight, Videos, and Profile cards. */
+.media-hub .feed-media-content,
+.media-hub .feed-post-attachments,
+.media-hub .media-photo-frame {
+  width: 100% !important;
+  max-width: none !important;
+  margin-inline: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+.media-hub .feed-media-post > .feed-media-content,
+.media-hub .long-video-card > .feed-media-content {
+  width: calc(100% + 24px) !important;
+  max-width: none !important;
+  margin-left: -12px !important;
+  margin-right: -12px !important;
+}
+.media-hub .feed-media-content > img,
+.media-hub .feed-media-content > video,
+.media-hub .feed-media-content .media-video-frame,
+.media-hub .feed-media-content .media-video-frame video,
+.media-hub .feed-post-attachments > img,
+.media-hub .feed-post-attachments > video {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: auto !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+.media-hub .feed-media-content > img,
+.media-hub .feed-post-attachments > img {
+  object-fit: contain !important;
+}
+.media-hub .feed-media-content > video,
+.media-hub .feed-media-content .media-video-frame video,
+.media-hub .feed-post-attachments > video {
+  object-fit: contain !important;
+}
+/* Preserve the existing scroll-driven nav behavior and animation contract. */
+.bottom-navigation {
+  bottom: 0 !important;
+  transition: transform 300ms ease-in-out !important;
+  will-change: transform;
+}
+.bottom-navigation.translate-y-full {
+  pointer-events: none !important;
+}
