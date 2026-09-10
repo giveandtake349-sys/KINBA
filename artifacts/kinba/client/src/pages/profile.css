@@ -714,3 +714,19 @@ body { color: var(--kinba-text); }
   z-index: 1;
   pointer-events: auto !important;
 }
+
+/* Edge-to-edge profile media: preserve complete thumbnails without crop or side gutters. */
+.profile-page .profile-video-grid {
+  width: 100vw;
+  max-width: none;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  gap: 0;
+}
+.profile-page .profile-video-tile {
+  border-radius: 0;
+}
+.profile-page .profile-video-tile > img,
+.profile-page .profile-video-tile-fallback {
+  object-fit: contain;
+}
