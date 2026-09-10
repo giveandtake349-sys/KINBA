@@ -1602,7 +1602,7 @@ function VideoCard({
     return (
       <article
         id={`feed-video-${video.id}`}
-        className="feed-media-post"
+        className="feed-media-post w-full rounded-none"
         role={onOpenViewer ? "button" : undefined}
         tabIndex={onOpenViewer ? 0 : undefined}
         onClick={openViewer}
@@ -1648,7 +1648,7 @@ function VideoCard({
           />
         </header>
         <div
-          className={`feed-media-content${video.mediaType === "VIDEO" ? " feed-media-content--video" : " feed-media-content--image"}`}
+          className={`feed-media-content w-full rounded-none${video.mediaType === "VIDEO" ? " feed-media-content--video" : " feed-media-content--image"}`}
         >
           {video.mediaType === "IMAGE" ? (
             <img
@@ -1697,7 +1697,7 @@ function VideoCard({
   return (
     <article
       id={`feed-video-${video.id}`}
-      className="long-video-card snap-start h-full w-full overflow-hidden box-border"
+      className="long-video-card snap-start h-full w-full rounded-none overflow-hidden box-border"
       role={onOpenViewer ? "button" : undefined}
       tabIndex={onOpenViewer ? 0 : undefined}
       onClick={openViewer}
@@ -1747,7 +1747,7 @@ function VideoCard({
         />
       </header>
       <div
-        className={`feed-media-content${video.mediaType === "VIDEO" ? " feed-media-content--video" : " feed-media-content--image"}`}
+        className={`feed-media-content w-full rounded-none${video.mediaType === "VIDEO" ? " feed-media-content--video" : " feed-media-content--image"}`}
       >
         {video.mediaType === "IMAGE" ? (
           <img
@@ -2471,7 +2471,7 @@ function UnifiedFeedPanel({
       {query.isPending ? (
         <FeedSkeleton />
       ) : items.length ? (
-        <div className="unified-feed-list feed-card-list gap-6">
+        <div className="unified-feed-list feed-card-list w-full">
           {items.map(item => {
             if (item.feedType === "media")
               return (
@@ -2574,7 +2574,7 @@ function HomeFeedPanel({
       {query.isPending ? (
         <FeedSkeleton />
       ) : videos.length ? (
-        <div className="unified-feed-list feed-video-list feed-card-list gap-6 w-full max-w-full box-border">
+        <div className="unified-feed-list feed-video-list feed-card-list w-full max-w-full box-border">
           {videos.map(video => (
             <MemoVideoCard
               key={video.id}

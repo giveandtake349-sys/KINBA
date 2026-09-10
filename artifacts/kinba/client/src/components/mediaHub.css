@@ -2577,7 +2577,7 @@
   position: fixed !important;
   inset: 0 !important;
   z-index: 0;
-  width: 100vw !important;
+  width: 100% !important;
   height: 100dvh !important;
   min-height: 100dvh !important;
   max-height: 100dvh !important;
@@ -2754,8 +2754,8 @@
 .media-hub .feed-media-content .media-video-frame video,
 .media-hub .feed-post-attachments > img,
 .media-hub .feed-post-attachments > video {
-  width: 100vw !important;
-  max-width: 100vw !important;
+  width: 100% !important;
+  max-width: 100% !important;
   margin-left: 0 !important;
   margin-right: 0 !important;
   padding-left: 0 !important;
