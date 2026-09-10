@@ -64,6 +64,7 @@ import ErrorBoundary from "./ErrorBoundary";
 import { isAbsoluteHttpUrl, resolveMediaUrl } from "@/lib/runtimeConfig";
 import "./mediaHub.css";
 import "./kinbaModern.css";
+import "./feedUi.css";
 
 type HomeTab = "videos" | "trendy" | "following" | "icons" | "wheels";
 type VideoKind = "LONG" | "SHORT" | "WHEEL";
