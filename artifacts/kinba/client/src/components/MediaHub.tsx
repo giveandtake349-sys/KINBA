@@ -2485,11 +2485,7 @@ function UnifiedFeedPanel({
               );
             if (item.feedType === "text")
               return <TextFeedCard key={"text-" + item.id} post={item} />;
-            if (
-              item.feedType === "shorts" &&
-              item.video?.kind === "SHORT" &&
-              item.video.mediaType === "VIDEO"
-            ) {
+            if (item.feedType === "shorts" && item.video) {
               return (
                 <ShortsInsertionBlock
                   key={item.id}
