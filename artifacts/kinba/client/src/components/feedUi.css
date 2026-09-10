@@ -466,12 +466,6 @@
 /* ---------- MOBILE ---------- */
 
 @media (max-width: 767px) {
-  .feed-media-post {
-    width: 100vw !important;
-    max-width: 100vw !important;
-    margin-left: 50% !important;
-    transform: translateX(-50%);
-  }
 
   .feed-media-post > .feed-media-content--image > img {
     max-height: calc(100svh - 150px) !important;
