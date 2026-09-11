@@ -519,3 +519,154 @@
     margin-inline: auto;
   }
 }
+
+/* Match the legacy cascade's specificity so all feed variants share one media layout. */
+.media-hub .media-tab-panel,
+.media-hub .wheels-feed-layout,
+.media-hub .home-feed-section,
+.media-hub .unified-feed,
+.media-hub .feed-card-list,
+.media-hub .unified-feed-list,
+.media-hub .feed-video-list,
+.media-hub .feed-card-list > article,
+.media-hub .unified-feed-list > article,
+.media-hub .feed-video-list > article,
+.media-hub .shorts-insertion-block {
+  width: 100% !important;
+  max-width: none !important;
+  margin-inline: 0 !important;
+  padding-inline: 0 !important;
+  border-inline: 0 !important;
+  border-radius: 0 !important;
+}
+
+.media-hub .feed-media-content,
+.media-hub .feed-media-content > .media-video-frame,
+.media-hub .feed-media-content > .media-video-frame video,
+.media-hub .feed-post-attachments > video {
+  border-radius: 0 !important;
+  object-fit: cover !important;
+}
+
+.media-hub .feed-media-content > img {
+  max-height: none !important;
+  width: 100% !important;
+  height: auto !important;
+}
+
+.media-hub .feed-media-post > .feed-media-content--image {
+  min-height: 0 !important;
+}
+
+.media-hub :is(.shorts-insertion-block, .shorts-list-feed, .shorts-viewer-layer) .short-card.media-short-stage {
+  display: block !important;
+  position: relative !important;
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: min(177.78vw, 80dvh) !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card.media-short-stage {
+  height: 100dvh !important;
+  flex-basis: 100dvh !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-viewport {
+  padding: 0 !important;
+  gap: 0 !important;
+}
+
+.media-hub :is(.shorts-insertion-block, .shorts-list-feed, .shorts-viewer-layer) .short-card.media-short-stage > :is(.media-video-frame, img),
+.media-hub :is(.shorts-insertion-block, .shorts-list-feed, .shorts-viewer-layer) .short-card.media-short-stage .media-video-frame video {
+  position: absolute !important;
+  inset: 0 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  object-fit: cover !important;
+  border-radius: 0 !important;
+}
+
+.media-hub :is(.shorts-insertion-block, .shorts-list-feed, .shorts-viewer-layer) .short-card.media-short-stage .short-overlay {
+  position: absolute !important;
+  inset: auto 0 0 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 52px;
+  align-items: end !important;
+  gap: 12px !important;
+  max-height: calc(100% - 64px) !important;
+  padding: 32px 12px max(16px, env(safe-area-inset-bottom)) !important;
+  background: linear-gradient(transparent, rgba(0, 0, 0, .8)) !important;
+  color: #fff !important;
+  overflow-y: auto !important;
+  pointer-events: none !important;
+  z-index: 20 !important;
+}
+
+.media-hub .short-card.media-short-stage .short-overlay-details,
+.media-hub :is(.shorts-insertion-block, .shorts-list-feed, .shorts-viewer-layer) .short-card.media-short-stage .shorts-overlay-actions,
+.media-hub :is(.shorts-insertion-block, .shorts-list-feed, .shorts-viewer-layer) .short-card.media-short-stage .media-engagement-actions--overlay {
+  position: static !important;
+  inset: auto !important;
+  transform: none !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: auto !important;
+}
+
+.media-hub .short-card.media-short-stage .short-overlay-details {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+
+.media-hub .short-card.media-short-stage .short-overlay-details :is(.short-title, p) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  margin: 0;
+  color: #fff !important;
+}
+
+.media-hub .short-card.media-short-stage .video-owner-identity > div:last-child {
+  min-width: 0;
+}
+
+.media-hub .short-card.media-short-stage .media-video-controls {
+  top: 12px !important;
+  bottom: auto !important;
+  z-index: 25 !important;
+}
+
+.media-hub .shorts-insertion-block .short-card.media-short-stage .short-overlay {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.media-hub .shorts-insertion-block .short-card.media-short-stage .feed-action-bar {
+  margin: 0 !important;
+  padding: 8px 0 0 !important;
+  gap: 4px !important;
+  flex-wrap: wrap !important;
+  overflow: visible !important;
+  background: transparent !important;
+}
+
+.media-hub .shorts-insertion-block .short-card.media-short-stage .media-caption-tags {
+  display: none !important;
+}

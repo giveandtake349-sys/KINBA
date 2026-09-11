@@ -759,13 +759,16 @@ function QualityVideoPlayer({
   const positionRef = useRef(0);
   const resumeRef = useRef(false);
   const viewedRef = useRef(false);
-  const sourceMap = useMemo(
-    () =>
-      new Map(video.sources.map(source => [source.quality, source.videoUrl])),
-    [video.sources]
+  const sourceUrl = useMemo(
+    () => [
+      video.sources?.find(source => source.quality === "ORIGINAL")?.videoUrl,
+      video.videoUrl,
+      ...(video.sources ?? []).map(source => source.videoUrl),
+      video.hlsMasterUrl,
+    ].map(source => resolveMediaUrl(source)).find(Boolean),
+    [video.sources, video.videoUrl, video.hlsMasterUrl]
   );
-  const sourceUrl =
-    resolveMediaUrl(sourceMap.get("ORIGINAL") ?? video.videoUrl) ?? "";
+  const useHls = Boolean(sourceUrl && /\.m3u8(?:$|[?#])/i.test(sourceUrl) && Hls.isSupported());
   const posterUrl =
     resolveMediaUrl(video.thumbnailUrl) ?? `/api/videos/${video.id}/thumbnail`;
 
@@ -775,61 +778,41 @@ function QualityVideoPlayer({
     const container = containerRef.current;
     if (!container) return;
     const observer = new IntersectionObserver(
-      entries => {
-        const entry = entries[0];
-        const visible = Boolean(entry?.isIntersecting);
-        setIsNearViewport(visible);
-        setIsInView(Boolean(visible && entry.intersectionRatio >= 0.7));
-      },
-      { rootMargin: "240px 0px", threshold: [0, 0.7] }
+      ([entry]) => setIsInView(Boolean(entry?.isIntersecting && entry.intersectionRatio >= 0.15)),
+      { threshold: [0, 0.15] }
+    );
+    const preloadObserver = new IntersectionObserver(
+      ([entry]) => setIsNearViewport(Boolean(entry?.isIntersecting)),
+      { rootMargin: "240px 0px" }
     );
     observer.observe(container);
-    return () => observer.disconnect();
+    preloadObserver.observe(container);
+    return () => {
+      observer.disconnect();
+      preloadObserver.disconnect();
+    };
   }, []);
 
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
 
-    if (!isNearViewport) {
-      element.pause();
-      element.removeAttribute("src");
-      element.load();
-      hlsRef.current?.destroy();
-      hlsRef.current = null;
-      setPlaying(false);
-      return;
-    }
-    setPlaybackError(null);
-    hlsRef.current?.destroy();
-    hlsRef.current = null;
-    if (!sourceUrl) {
-      setPlaybackError("This video has no playable source.");
-      return;
-    }
-    const isHls = /\.m3u8(?:$|\?)/i.test(sourceUrl);
-    if (isHls && Hls.isSupported()) {
-      const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
-      hlsRef.current = hls;
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal)
-          setPlaybackError(
-            "This video stream could not be loaded. Please try again."
-          );
-      });
-      hls.loadSource(sourceUrl);
-      hls.attachMedia(element);
-    } else {
-      element.src = sourceUrl;
-      element.load();
-    }
+    setPlaybackError(sourceUrl ? null : "This video has no playable source.");
+    if (!sourceUrl || !useHls || !isNearViewport) return;
+
+    // Only HLS owns an imperative source; React keeps native media URLs attached.
+    const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+    hlsRef.current = hls;
+    hls.on(Hls.Events.ERROR, (_event, data) => {
+      if (data.fatal) setPlaybackError("This video stream could not be loaded. Please try again.");
+    });
+    hls.loadSource(sourceUrl);
+    hls.attachMedia(element);
     return () => {
-      hlsRef.current?.destroy();
+      hls.destroy();
       hlsRef.current = null;
-      element.removeAttribute("src");
-      element.load();
     };
-  }, [sourceUrl, isNearViewport]);
+  }, [sourceUrl, useHls, isNearViewport]);
 
   const restorePlayback = () => {
     const element = ref.current;
@@ -862,20 +845,24 @@ function QualityVideoPlayer({
       }
     >
       <video
-        src={sourceUrl}
+        src={useHls ? undefined : sourceUrl}
         poster={showPoster ? posterUrl : undefined}
         className={`w-full h-full object-cover ${vertical ? "aspect-[9/16]" : ""}`}
         ref={ref}
-        crossOrigin="anonymous"
         {...({ "webkit-playsinline": "true" } as Record<string, string>)}
-        controls
+        controls={!vertical}
         controlsList="nofullscreen noplaybackrate"
         disablePictureInPicture
         playsInline
-        preload={isNearViewport ? "metadata" : "none"}
-        autoPlay={active && isInView}
+        loop
+        preload={isNearViewport ? "auto" : "none"}
+        autoPlay={shouldPlay}
         muted={muted}
         onLoadedMetadata={restorePlayback}
+        onCanPlay={() => {
+          setPlaybackError(null);
+          if (shouldPlay) void ref.current?.play().catch(() => undefined);
+        }}
         onError={() =>
           setPlaybackError(
             "This video stream could not be loaded. Please try again."
@@ -897,7 +884,7 @@ function QualityVideoPlayer({
           onClick={() => {
             const element = ref.current;
             if (!element) return;
-            if (element.paused) void element.play();
+            if (element.paused) void element.play().catch(() => undefined);
             else element.pause();
           }}
           aria-label={playing ? "Pause video" : "Play video"}
@@ -1653,7 +1640,7 @@ function VideoCard({
         >
           {video.mediaType === "IMAGE" ? (
             <img
-              src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
+              src={resolveMediaUrl(video.videoUrl)}
               alt={video.title || "Post"}
               loading="lazy"
               className="object-contain w-full h-auto max-h-[60vh] bg-black"
@@ -1753,7 +1740,7 @@ function VideoCard({
         {video.mediaType === "IMAGE" ? (
           <img
             className="object-contain w-full h-auto max-h-[60vh] bg-black"
-            src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
+            src={resolveMediaUrl(video.videoUrl)}
             alt={video.title || "Post"}
           />
         ) : (
@@ -2367,7 +2354,10 @@ function TextFeedCard({ post }: { post: FeedTextRecord }) {
                   string
                 >)}
                 preload="metadata"
-                crossOrigin="anonymous"
+                autoPlay
+                muted
+                loop
+                className="w-full object-cover rounded-none"
               />
             )
           )}
@@ -2657,7 +2647,7 @@ function ShortVideoCard({
   const { current, react, share, pending } = useOptimisticEngagement(video);
   return (
     <article
-      className={`short-card feed-card-item${compact ? " short-card--compact" : ""} snap-start h-[100dvh] w-full relative overflow-hidden box-border`}
+      className={`short-card media-short-stage feed-card-item${compact ? " short-card--compact" : ""} snap-start h-[100dvh] w-full px-0 mx-0 rounded-none relative overflow-hidden box-border`}
       data-short-index={index}
       role={onOpenViewer ? "button" : undefined}
       tabIndex={onOpenViewer ? 0 : undefined}
@@ -2738,7 +2728,7 @@ function ShortVideoCard({
             {ownerHandle(video.owner.name, video.owner.username)}
           </p>
         </div>
-        <div className="shorts-overlay-actions absolute right-3 bottom-16 z-20 flex flex-col items-center gap-4">
+        <div className="shorts-overlay-actions">
           <EngagementActions
             engagement={current}
             onReact={react}

@@ -34,31 +34,28 @@ export function resolveMediaUrl(
   const supabaseUrl =
     clean(import.meta.env.VITE_SUPABASE_URL) ??
     clean(runtimeConfig?.supabaseUrl);
-  try {
-    const parsed = new URL(
-      source,
-      typeof window !== "undefined"
-        ? window.location.origin
-        : "http://localhost"
-    );
-    if (parsed.hostname.endsWith(".r2.dev")) {
-      return `/api/media/${parsed.pathname.replace(/^\/+/, "")}`;
-    }
-    if (/^https?:$/i.test(parsed.protocol)) {
-      const normalized = parsed.toString();
-      return /^http:/i.test(normalized) &&
-        supabaseUrl &&
-        normalized.startsWith(supabaseUrl)
-        ? normalized.replace(/^http:/i, "https:")
-        : normalized;
-    }
-  } catch {
-    // Treat non-URL values as object keys below.
-  }
   if (/^(blob:|data:)/i.test(source)) return source;
-  const storageMarker = "/storage/v1/object/public/";
-  if (source.includes(storageMarker) && supabaseUrl) {
-    return `${supabaseUrl.replace(/\/+$/, "")}${source.slice(source.indexOf(storageMarker))}`;
+  if (/^https?:\/\//i.test(source) || source.startsWith("//")) {
+    try {
+      const parsed = new URL(source.startsWith("//") ? `https:${source}` : source);
+      if (parsed.hostname.endsWith(".r2.dev")) {
+        return `/api/media/${parsed.pathname.replace(/^\/+/, "")}${parsed.search}`;
+      }
+      if (parsed.protocol === "http:" && supabaseUrl &&
+          parsed.host === new URL(supabaseUrl).host) {
+        parsed.protocol = "https:";
+      }
+      return parsed.toString();
+    } catch {
+      return undefined;
+    }
+  }
+  if (/^[a-z][a-z\d+.-]*:/i.test(source)) return undefined;
+  const storagePath = source.replace(/^\/+/, "");
+  if (storagePath.startsWith("storage/v1/object/")) {
+    return supabaseUrl
+      ? `${supabaseUrl.replace(/\/+$/, "")}/${storagePath}`
+      : undefined;
   }
   if (source.startsWith("/")) return source;
   const r2Base = publicMediaConfig.r2PublicBaseUrl;
@@ -74,9 +71,10 @@ export function resolveMediaUrl(
     return `${r2Base.replace(/\/+$/, "")}/${source.replace(/^\/+/, "")}`;
   }
   if (supabaseUrl) {
-    return `${supabaseUrl.replace(/\/+$/, "")}/storage/v1/object/public/${bucket}/${source.replace(/^\/+/, "")}`;
+    const objectPath = source.startsWith(`${bucket}/`) ? source : `${bucket}/${source}`;
+    return new URL(`/storage/v1/object/public/${objectPath}`, supabaseUrl).toString();
   }
-  return source;
+  return undefined;
 }
 
 export function isAbsoluteHttpUrl(
