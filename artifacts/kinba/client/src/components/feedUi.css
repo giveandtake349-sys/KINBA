@@ -304,7 +304,14 @@
 .feed-media-post > .feed-media-content--video {
   min-height: 0 !important;
 }
-
+.feed-media-post > .feed-media-content--video > .media-video-frame {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  aspect-ratio: auto !important;
+}
 .feed-media-post > .feed-media-content--video video {
   display: block;
   width: 100% !important;

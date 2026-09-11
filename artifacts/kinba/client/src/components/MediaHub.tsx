@@ -2485,14 +2485,17 @@ function UnifiedFeedPanel({
               );
             if (item.feedType === "text")
               return <TextFeedCard key={"text-" + item.id} post={item} />;
-            return (
-              <ShortsInsertionBlock
-                key={item.id}
-                video={item.video}
-                active={active}
-                onOpenViewer={() => onOpenShort(item.video.id)}
-              />
-            );
+            if (item.feedType === "shorts" && item.video) {
+              return (
+                <ShortsInsertionBlock
+                  key={item.id}
+                  video={item.video}
+                  active={active}
+                  onOpenViewer={() => onOpenShort(item.video.id)}
+                />
+              );
+            }
+            return null;
           })}
         </div>
       ) : (

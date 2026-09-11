@@ -715,28 +715,34 @@ export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
 
 /** Resolve real persisted media and text posts into one chronological feed. */
 async function listUnifiedHomeFeed(viewerId?: number) {
-  const [media, shorts, textPosts] = await Promise.all([
-    // All public video kinds belong in All Feed; Shorts are also surfaced as
-    // their discovery insertion below.
-    selectVideos([eq(videos.kind, "LONG")], viewerId, "recent"),
-    selectVideos([eq(videos.kind, "SHORT"), eq(videos.mediaType, "VIDEO")], viewerId, "recent"),
+  const [mediaAndShorts, textPosts] = await Promise.all([
+    // Fetch both production video kinds together so All Feed cannot drop one
+    // branch while assembling the unified response.
+    selectVideos(
+      [or(eq(videos.kind, "LONG"), eq(videos.kind, "SHORT"))],
+      viewerId,
+      "recent"
+    ),
     listCommunityAnnouncements().catch(error => {
       console.error("[Feed] Community posts unavailable:", error);
       return [];
     }),
   ]);
   const chronological = [
-    ...media.map(video => ({ ...video, feedType: "media" as const })),
+    ...mediaAndShorts.flatMap(video =>
+      video.kind === "SHORT" && video.mediaType === "VIDEO"
+        ? [{
+            feedType: "shorts" as const,
+            id: "shorts-" + video.id,
+            video,
+            createdAt: video.createdAt,
+          }]
+        : [{ ...video, feedType: "media" as const }]
+    ),
     ...textPosts.map(post => ({
       ...post,
       text: post.body,
       feedType: "text" as const,
-    })),
-    ...shorts.map(video => ({
-      feedType: "shorts" as const,
-      id: "shorts-" + video.id,
-      video,
-      createdAt: video.createdAt,
     })),
   ].sort(
     (left, right) =>

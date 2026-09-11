@@ -2141,10 +2141,14 @@ body {
 }
 .media-hub .feed-media-content--video,
 .media-hub .feed-media-content--video > .media-video-frame {
-  aspect-ratio: 16 / 9 !important;
+  aspect-ratio: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
 }
 .media-hub .feed-media-content--video > .media-video-frame video {
-  height: 100% !important;
+  height: auto !important;
+  aspect-ratio: auto !important;
+  object-fit: contain !important;
 }
 .media-hub .feed-action-bar {
   display: flex !important;
@@ -2432,10 +2436,30 @@ body {
 }
 
 .media-hub .shorts-insertion-block .short-card--compact {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  flex: 0 0 auto !important;
   margin: 0 !important;
   border: 0 !important;
   border-radius: 0 !important;
   background: #000 !important;
+}
+.media-hub .shorts-insertion-block .short-card--compact .media-video-frame {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  aspect-ratio: auto !important;
+}
+.media-hub .shorts-insertion-block .short-card--compact .media-video-frame video {
+  width: 100% !important;
+  height: auto !important;
+  aspect-ratio: auto !important;
+  object-fit: contain !important;
 }
 
 /* Shorts alone remains an immersive TikTok-style stage with vertical floating actions. */
