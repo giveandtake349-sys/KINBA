@@ -764,8 +764,15 @@ function QualityVideoPlayer({
       new Map(video.sources.map(source => [source.quality, source.videoUrl])),
     [video.sources]
   );
+  // Prefer a persisted direct media file. Android WebView cannot render an HLS
+  // manifest as a normal video source when MediaSource support is unavailable.
+  const directSourceUrl = resolveMediaUrl(video.videoUrl) ?? "";
+  const originalSourceUrl = resolveMediaUrl(sourceMap.get("ORIGINAL")) ?? "";
+  const isHlsSource = (value: string) => /\\.m3u8(?:$|\\?)/i.test(value);
   const sourceUrl =
-    resolveMediaUrl(sourceMap.get("ORIGINAL") ?? video.videoUrl) ?? "";
+    directSourceUrl && !isHlsSource(directSourceUrl)
+      ? directSourceUrl
+      : originalSourceUrl || directSourceUrl;
   const posterUrl =
     resolveMediaUrl(video.thumbnailUrl) ?? `/api/videos/${video.id}/thumbnail`;
 
@@ -868,7 +875,8 @@ function QualityVideoPlayer({
         ref={ref}
         crossOrigin="anonymous"
         {...({ "webkit-playsinline": "true" } as Record<string, string>)}
-        controls
+        controls={false}
+        loop
         controlsList="nofullscreen noplaybackrate"
         disablePictureInPicture
         playsInline
@@ -876,11 +884,18 @@ function QualityVideoPlayer({
         autoPlay={active && isInView}
         muted={muted}
         onLoadedMetadata={restorePlayback}
-        onError={() =>
+        onError={() => {
+          const element = ref.current;
+          if (element && directSourceUrl && sourceUrl !== directSourceUrl) {
+            element.src = directSourceUrl;
+            element.load();
+            setPlaybackError(null);
+            return;
+          }
           setPlaybackError(
             "This video stream could not be loaded. Please try again."
-          )
-        }
+          );
+        }}
         onPlay={() => {
           setPlaying(true);
           if (!viewedRef.current) {
