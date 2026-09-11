@@ -2840,3 +2840,40 @@
   object-position: center center !important;
   border-radius: 0 !important;
 }
+
+/* All Feed media sizing fix: restore visible video/Shorts frames after global feed overrides. */
+.media-hub .unified-feed-list > .long-video-card .media-fullscreen-frame,
+.media-hub .unified-feed-list > .long-video-card .media-video-frame {
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  aspect-ratio: 16 / 9 !important;
+  background: #050505 !important;
+}
+
+.media-hub .unified-feed-list > .long-video-card .media-video-frame video {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  aspect-ratio: 16 / 9 !important;
+  object-fit: contain !important;
+}
+
+.media-hub .unified-feed-list > .shorts-insertion-block .short-card--compact .media-video-frame--short {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  aspect-ratio: 16 / 9 !important;
+  background: #050505 !important;
+}
+
+.media-hub .unified-feed-list > .shorts-insertion-block .short-card--compact .media-video-frame--short video {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  aspect-ratio: 16 / 9 !important;
+  object-fit: cover !important;
+}
