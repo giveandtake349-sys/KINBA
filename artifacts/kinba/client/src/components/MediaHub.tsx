@@ -761,7 +761,12 @@ function QualityVideoPlayer({
   const viewedRef = useRef(false);
   const sourceMap = useMemo(
     () =>
-      new Map(video.sources.map(source => [source.quality, source.videoUrl])),
+      new Map(
+        (Array.isArray(video.sources) ? video.sources : []).map(source => [
+          source.quality,
+          source.videoUrl,
+        ])
+      ),
     [video.sources]
   );
   // Prefer a persisted direct media file. Android WebView cannot render an HLS
@@ -798,24 +803,14 @@ function QualityVideoPlayer({
     const element = ref.current;
     if (!element) return;
 
-    if (!isNearViewport) {
-      element.pause();
-      element.removeAttribute("src");
-      element.load();
-      hlsRef.current?.destroy();
-      hlsRef.current = null;
-      setPlaying(false);
+    if (!sourceUrl) {
+      setPlaybackError("This video has no playable source.");
       return;
     }
     setPlaybackError(null);
     hlsRef.current?.destroy();
     hlsRef.current = null;
-    if (!sourceUrl) {
-      setPlaybackError("This video has no playable source.");
-      return;
-    }
-    const isHls = /\.m3u8(?:$|\?)/i.test(sourceUrl);
-    if (isHls && Hls.isSupported()) {
+    if (isHlsSource && Hls.isSupported()) {
       const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
       hlsRef.current = hls;
       hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -833,10 +828,8 @@ function QualityVideoPlayer({
     return () => {
       hlsRef.current?.destroy();
       hlsRef.current = null;
-      element.removeAttribute("src");
-      element.load();
     };
-  }, [sourceUrl, isNearViewport]);
+  }, [sourceUrl, isHlsSource]);
 
   const restorePlayback = () => {
     const element = ref.current;
