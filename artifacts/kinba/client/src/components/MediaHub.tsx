@@ -71,6 +71,19 @@ type VideoKind = "LONG" | "SHORT" | "WHEEL";
 type Quality = "ORIGINAL" | "1080P" | "720P" | "480P" | "240P";
 type VideoSource = { quality: Quality; videoUrl: string };
 
+function isHlsMediaUrl(value: string) {
+  return /\.m3u8(?:$|\?)/i.test(value);
+}
+
+function resolvePlaybackUrl(value: string | null | undefined) {
+  const raw = value?.trim();
+  if (!raw) return "";
+  // Public R2/Supabase URLs are already browser-playable. Do not rewrite them
+  // to /api/media/*, because this production app has no media proxy route.
+  if (isAbsoluteHttpUrl(raw)) return raw;
+  return resolveMediaUrl(raw) ?? "";
+}
+
 function navigateToProfile(
   event: MouseEvent<HTMLAnchorElement>,
   userId: number
@@ -771,11 +784,10 @@ function QualityVideoPlayer({
   );
   // Prefer a persisted direct media file. Android WebView cannot render an HLS
   // manifest as a normal video source when MediaSource support is unavailable.
-  const directSourceUrl = resolveMediaUrl(video.videoUrl) ?? "";
-  const originalSourceUrl = resolveMediaUrl(sourceMap.get("ORIGINAL")) ?? "";
-  const isHlsSource = (value: string) => /\\.m3u8(?:$|\\?)/i.test(value);
+  const directSourceUrl = resolvePlaybackUrl(video.videoUrl);
+  const originalSourceUrl = resolvePlaybackUrl(sourceMap.get("ORIGINAL"));
   const sourceUrl =
-    directSourceUrl && !isHlsSource(directSourceUrl)
+    directSourceUrl && !isHlsMediaUrl(directSourceUrl)
       ? directSourceUrl
       : originalSourceUrl || directSourceUrl;
   const posterUrl =
@@ -810,7 +822,7 @@ function QualityVideoPlayer({
     setPlaybackError(null);
     hlsRef.current?.destroy();
     hlsRef.current = null;
-    if (isHlsSource(sourceUrl) && Hls.isSupported()) {
+    if (isHlsMediaUrl(sourceUrl) && Hls.isSupported()) {
       const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
       hlsRef.current = hls;
       hls.on(Hls.Events.ERROR, (_event, data) => {
@@ -829,7 +841,7 @@ function QualityVideoPlayer({
       hlsRef.current?.destroy();
       hlsRef.current = null;
     };
-  }, [sourceUrl, isHlsSource]);
+  }, [sourceUrl]);
 
   const restorePlayback = () => {
     const element = ref.current;
