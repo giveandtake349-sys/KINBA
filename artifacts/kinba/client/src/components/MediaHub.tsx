@@ -810,7 +810,7 @@ function QualityVideoPlayer({
     setPlaybackError(null);
     hlsRef.current?.destroy();
     hlsRef.current = null;
-    if (isHlsSource && Hls.isSupported()) {
+    if (isHlsSource(sourceUrl) && Hls.isSupported()) {
       const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
       hlsRef.current = hls;
       hls.on(Hls.Events.ERROR, (_event, data) => {
