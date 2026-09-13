@@ -878,7 +878,6 @@ function QualityVideoPlayer({
         poster={showPoster ? posterUrl : undefined}
         className={`w-full h-full object-cover ${vertical ? "aspect-[9/16]" : ""}`}
         ref={ref}
-        crossOrigin="anonymous"
         {...({ "webkit-playsinline": "true" } as Record<string, string>)}
         controls={false}
         loop
