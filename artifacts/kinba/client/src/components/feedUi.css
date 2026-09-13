@@ -470,6 +470,26 @@
   z-index: 41 !important;
 }
 
+/* Keep existing positions; only restore the interaction layer above media/card clipping. */
+.media-hub .feed-media-post > .feed-action-bar,
+.media-hub .unified-feed-list > .shorts-insertion-block .feed-action-bar,
+.media-hub .shorts-insertion-block .short-card .media-engagement-actions {
+  position: relative !important;
+  z-index: 100 !important;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.media-hub .shorts-list-viewport > .short-card .shorts-overlay-actions,
+.media-hub .shorts-insertion-block .short-card .shorts-overlay-actions {
+  z-index: 100 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
 /* ---------- MOBILE ---------- */
 
 @media (max-width: 767px) {
