@@ -2486,13 +2486,17 @@ function UnifiedFeedPanel({
     }
   );
   const items = (query.data ?? []) as unknown as UnifiedFeedItem[];
+  const visibleItems = items.filter(
+    (item, index) =>
+      item.feedType !== "shorts" || items[index - 1]?.feedType !== "shorts"
+  );
   return (
     <section className="unified-feed" aria-label="All Feed">
       {query.isPending ? (
         <FeedSkeleton />
-      ) : items.length ? (
+      ) : visibleItems.length ? (
         <div className="unified-feed-list feed-card-list gap-6">
-          {items.map(item => {
+          {visibleItems.map(item => {
             if (item.feedType === "media")
               return (
                 <MemoVideoCard
@@ -2658,6 +2662,8 @@ function ShortVideoCard({
   onOpenViewer?: () => void;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [description, setDescription] = useState(video.description);
+  const [deleted, setDeleted] = useState(false);
   const auth = useAuth();
   const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
   const bookmarkMutation = trpc.videos.bookmark.useMutation();
@@ -2674,6 +2680,7 @@ function ShortVideoCard({
     }
   };
   const { current, react, share, pending } = useOptimisticEngagement(video);
+  if (deleted) return null;
   return (
     <article
       className={`short-card feed-card-item${compact ? " short-card--compact" : ""} snap-start h-[100dvh] w-full relative overflow-hidden box-border`}
@@ -2697,6 +2704,11 @@ function ShortVideoCard({
         onOpenViewer();
       }}
     >
+      <PostManagementMenu
+        video={video}
+        onUpdated={setDescription}
+        onDeleted={() => setDeleted(true)}
+      />
       {video.mediaType === "IMAGE" ? (
         <img
           src={resolveMediaUrl(video.videoUrl)}
@@ -2747,7 +2759,7 @@ function ShortVideoCard({
             </a>
           </div>
           <strong className="short-title">{video.title}</strong>
-          <p>{video.description}</p>
+          <p>{description}</p>
           <p className="media-caption-tags">
             {ownerHandle(video.owner.name, video.owner.username)} ·{" "}
             {hashtagsFromDescription(video.description)}
@@ -2757,23 +2769,23 @@ function ShortVideoCard({
             {ownerHandle(video.owner.name, video.owner.username)}
           </p>
         </div>
-        <div className="shorts-overlay-actions absolute right-3 bottom-16 z-20 flex flex-col items-center gap-4">
-          <EngagementActions
-            engagement={current}
-            onReact={react}
-            onShare={share}
-            onComments={() => {
-              if (!auth.isAuthenticated) return auth.openAuth();
-              setCommentsOpen(value => !value);
-            }}
-            pending={pending}
-            overlay={!compact}
-            feedStyle={compact}
-            bookmarked={bookmarked}
-            onBookmark={toggleBookmark}
-            owner={video.owner}
-          />
-        </div>
+      </div>
+      <div className="shorts-overlay-actions absolute right-3 bottom-16 z-20 flex flex-col items-center gap-4">
+        <EngagementActions
+          engagement={current}
+          onReact={react}
+          onShare={share}
+          onComments={() => {
+            if (!auth.isAuthenticated) return auth.openAuth();
+            setCommentsOpen(value => !value);
+          }}
+          pending={pending}
+          overlay={!compact}
+          feedStyle={compact}
+          bookmarked={bookmarked}
+          onBookmark={toggleBookmark}
+          owner={video.owner}
+        />
       </div>
       <CommentDrawer
         postId={video.id}
