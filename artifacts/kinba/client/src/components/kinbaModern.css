@@ -3466,3 +3466,4 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
 .bottom-navigation.translate-y-full {
   pointer-events: none !important;
 }
+
