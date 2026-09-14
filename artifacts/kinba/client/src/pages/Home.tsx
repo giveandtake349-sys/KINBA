@@ -865,7 +865,6 @@ function FeedTabs({
 }) {
   const tabs = [
     ["wheels", "Spotlight"],
-    ["all", "All Feed"],
     ["videos", "Videos"],
     ["shorts", "Shorts"],
   ] as const;
@@ -907,7 +906,7 @@ function BottomNavigation({
   onNotifications: () => void;
   onMenu: () => void;
 }) {
-  const isHome = ["all", "videos", "shorts", "wheels"].includes(activePanel);
+  const isHome = ["videos", "shorts", "wheels"].includes(activePanel);
   return (
     <nav
       className={`bottom-navigation fixed left-0 right-0 z-50 transition-transform duration-300 ease-in-out ${className ?? ""}`}
@@ -2486,7 +2485,7 @@ export default function Home() {
   const publicProfileMatch = location.match(/^\/profile\/(\d+)$/);
   const publicProfileId = publicProfileMatch ? Number(publicProfileMatch[1]) : undefined;
   const { theme } = useTheme();
-  const [activeView, setActiveView] = useState<FeedSection>("all");
+  const [activeView, setActiveView] = useState<FeedSection>("wheels");
   const [activeModal, setActiveModal] = useState<AppModal>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(() => location === "/profile");
@@ -2523,13 +2522,13 @@ export default function Home() {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
-  const showFeed = (next: FeedSection = "all") => {
+  const showFeed = (next: FeedSection = "wheels") => {
     setProfileOpen(false);
     setActiveView(next);
     setActiveModal(null);
   };
   const goHome = () => {
-    showFeed("all");
+    showFeed("wheels");
     setMenuOpen(false);
     if (location !== "/") navigate("/");
   };
@@ -2568,7 +2567,7 @@ export default function Home() {
       setMenuOpen(false);
       setActiveModal(null);
       setProfileOpen(false);
-      setActiveView("all");
+      setActiveView("wheels");
       navigate("/login");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to log out.");
@@ -2679,7 +2678,7 @@ export default function Home() {
           <ActivityModal open onClose={() => setActiveModal(null)} enabled={auth.isAuthenticated} />
         )}
         {activeModal === "offline" && (
-          <OfflineVideosModal open onClose={() => setActiveModal(null)} onBrowse={() => showFeed("all")} />
+          <OfflineVideosModal open onClose={() => setActiveModal(null)} onBrowse={() => showFeed("videos")} />
         )}
         {activeModal === "qr" && (
           <QRCodeModal open onClose={() => setActiveModal(null)} profile={profile} />
