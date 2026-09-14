@@ -2607,7 +2607,7 @@ export default function Home() {
           <AppHeader
             profile={profile}
             notificationCount={notificationCount}
-            onHome={() => showFeed("all")}
+            onHome={() => showFeed("wheels")}
             onSelectFeed={showFeed}
             onOpenModal={openModal}
             onMenu={() => setMenuOpen(value => !value)}
