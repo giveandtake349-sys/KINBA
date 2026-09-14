@@ -3467,3 +3467,25 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
   pointer-events: none !important;
 }
 
+/* Shorts gesture contract: one snap-sized card, no nested spacing, and vertical touch ownership. */
+.media-hub .shorts-viewport,
+.media-hub .shorts-list-viewport,
+.media-hub .shorts-detail-viewport {
+  gap: 0 !important;
+  touch-action: pan-y !important;
+  overscroll-behavior-y: contain !important;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: y mandatory !important;
+}
+.media-hub .shorts-viewport > .short-card,
+.media-hub .shorts-list-viewport > .short-card,
+.media-hub .shorts-detail-viewport > .short-card {
+  flex: 0 0 100% !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  max-height: 100% !important;
+  margin: 0 !important;
+  scroll-snap-align: start !important;
+  scroll-snap-stop: always !important;
+}

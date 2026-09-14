@@ -7,6 +7,7 @@ import {
   useState,
   memo,
   type MouseEvent,
+  type PointerEvent,
   type ReactNode,
   type RefObject,
 } from "react";
@@ -2529,6 +2530,14 @@ function ShortsFeed({
   );
   const viewportRef = useRef<HTMLDivElement>(null);
   const uploadDetailsRef = useRef<HTMLDetailsElement>(null);
+  const gestureRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    tracking: boolean;
+  } | null>(null);
+  const gestureLockRef = useRef(false);
+  const gestureUnlockTimerRef = useRef<number | null>(null);
   const utils = trpc.useUtils();
   const [activeIndex, setActiveIndex] = useState(0);
   const openUploader = () => {
@@ -2552,28 +2561,92 @@ function ShortsFeed({
         ?.scrollIntoView({ behavior: "auto", block: "start" });
     });
   }, [initialVideoId, videos.length]);
-  const goTo = (index: number) => {
+  const goTo = (index: number, behavior: ScrollBehavior = "smooth") => {
+    const viewport = viewportRef.current;
     const clamped = Math.max(
       0,
       Math.min(index, Math.max(videos.length - 1, 0))
     );
-    viewportRef.current
-      ?.querySelector<HTMLElement>(`[data-short-index="${clamped}"]`)
-      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const card = viewport?.querySelector<HTMLElement>(
+      `[data-short-index="${clamped}"]`
+    );
+    if (viewport && card) {
+      viewport.scrollTo({ top: card.offsetTop, behavior });
+    }
     setActiveIndex(clamped);
   };
+  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === "mouse") return;
+    const target = event.target;
+    if (
+      target instanceof Element &&
+      target.closest(
+        "button, a, input, textarea, select, video, [data-short-no-swipe]"
+      )
+    )
+      return;
+    gestureRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      tracking: true,
+    };
+  };
+  const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const gesture = gestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    const deltaX = event.clientX - gesture.startX;
+    const deltaY = event.clientY - gesture.startY;
+    if (Math.abs(deltaY) > 8 && Math.abs(deltaY) > Math.abs(deltaX)) {
+      gesture.tracking = true;
+    }
+  };
+  const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    const gesture = gestureRef.current;
+    gestureRef.current = null;
+    if (!gesture || gesture.pointerId !== event.pointerId || !gesture.tracking)
+      return;
+    const deltaX = event.clientX - gesture.startX;
+    const deltaY = event.clientY - gesture.startY;
+    const isVerticalSwipe =
+      Math.abs(deltaY) >= 56 && Math.abs(deltaY) > Math.abs(deltaX) * 1.15;
+    if (!isVerticalSwipe || gestureLockRef.current) return;
+    event.preventDefault();
+    gestureLockRef.current = true;
+    goTo(activeIndex + (deltaY < 0 ? 1 : -1));
+    if (gestureUnlockTimerRef.current !== null)
+      window.clearTimeout(gestureUnlockTimerRef.current);
+    gestureUnlockTimerRef.current = window.setTimeout(() => {
+      gestureLockRef.current = false;
+      gestureUnlockTimerRef.current = null;
+    }, 650);
+  };
+  const onPointerCancel = () => {
+    gestureRef.current = null;
+  };
+  useEffect(
+    () => () => {
+      if (gestureUnlockTimerRef.current !== null)
+        window.clearTimeout(gestureUnlockTimerRef.current);
+    },
+    []
+  );
   const onScroll = () => {
     const viewport = viewportRef.current;
-    if (!viewport) return;
-    setActiveIndex(
-      Math.max(
-        0,
-        Math.min(
-          Math.round(viewport.scrollTop / Math.max(viewport.clientHeight, 1)),
-          Math.max(videos.length - 1, 0)
-        )
-      )
+    if (!viewport || gestureLockRef.current) return;
+    const cards = Array.from(
+      viewport.querySelectorAll<HTMLElement>("[data-short-index]")
     );
+    if (!cards.length) return;
+    const nextIndex = cards.reduce(
+      (closest, card, index) =>
+        Math.abs(card.offsetTop - viewport.scrollTop) <
+        Math.abs(cards[closest].offsetTop - viewport.scrollTop)
+          ? index
+          : closest,
+      0
+    );
+    setActiveIndex(nextIndex);
   };
   return (
     <section
@@ -2620,6 +2693,10 @@ function ShortsFeed({
           className={`shorts-viewport ${viewerMode ? "shorts-detail-viewport" : "shorts-list-viewport"} space-y-6 media-feed-scroll h-[100dvh] overflow-y-scroll scrollbar-hide snap-y snap-mandatory bg-black w-full max-w-full box-border relative`}
           ref={viewportRef}
           onScroll={onScroll}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
         >
           {videos.map((video, index) => (
             <MemoShortVideoCard
