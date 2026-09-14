@@ -135,32 +135,6 @@ type FeedAttachment = {
   height?: number | null;
   durationSeconds?: number | null;
 };
-type FeedTextRecord = {
-  feedType: "text";
-  id: number;
-  body: string;
-  text: string;
-  createdAt: Date | string;
-  commentCount: number;
-  reactionCount: number;
-  viewerReacted?: boolean;
-  viewerBookmarked?: boolean;
-  author: {
-    id: number;
-    name: string | null;
-    photoUrl: string | null;
-    accountType: "member" | "creator" | "company";
-    isVerified: boolean;
-  };
-  attachments: FeedAttachment[];
-};
-type FeedMediaRecord = VideoRecord & { feedType: "media" };
-type FeedShortsInsertion = {
-  feedType: "shorts";
-  id: string;
-  video: VideoRecord;
-};
-type UnifiedFeedItem = FeedMediaRecord | FeedTextRecord | FeedShortsInsertion;
 type Engagement = {
   reactionCount: number;
   shareCount: number;
@@ -2267,270 +2241,6 @@ function FeedPhotoLightbox({
   );
 }
 
-function TextFeedCard({ post }: { post: FeedTextRecord }) {
-  const auth = useAuth();
-  const [reacted, setReacted] = useState(post.viewerReacted ?? false);
-  const [bookmarked, setBookmarked] = useState(post.viewerBookmarked ?? false);
-  const [reactionCount, setReactionCount] = useState(post.reactionCount ?? 0);
-  const reactMutation = trpc.community.react.useMutation();
-  const bookmarkMutation = trpc.community.bookmark.useMutation();
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const toggleReaction = async () => {
-    if (!auth.isAuthenticated) return auth.openAuth();
-    if (reactMutation.isPending) return;
-    try {
-      const result = await reactMutation.mutateAsync({
-        announcementId: post.id,
-      });
-      setReacted(result.viewerReacted);
-      setReactionCount(count => count + (result.viewerReacted ? 1 : -1));
-    } catch (error) {
-      notifyError(error);
-    }
-  };
-  const toggleBookmark = async () => {
-    if (!auth.isAuthenticated) return auth.openAuth();
-    if (bookmarkMutation.isPending) return;
-    try {
-      const result = await bookmarkMutation.mutateAsync({
-        announcementId: post.id,
-      });
-      setBookmarked(result.viewerBookmarked);
-    } catch (error) {
-      notifyError(error);
-    }
-  };
-  const share = async () => {
-    if (!auth.isAuthenticated) return auth.openAuth();
-    const url = window.location.origin + "/?announcement=" + post.id;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: "KINBA post", text: post.body, url });
-      } else if (navigator.clipboard) {
-        await navigator.clipboard.writeText(url);
-        toast.success("Post link copied.");
-      }
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      notifyError(error);
-    }
-  };
-  return (
-    <article id={`feed-post-${post.id}`} className="feed-text-card">
-      <a
-        className="feed-post-author profile-link"
-        href={`/profile/${post.author.id}`}
-        onClick={event => navigateToProfile(event, post.author.id)}
-        aria-label={`Open ${post.author.name ?? "KINBA creator"} profile`}
-      >
-        <div className="video-owner-avatar">
-          {post.author.photoUrl ? (
-            <img
-              src={resolveMediaUrl(post.author.photoUrl, "avatars")}
-              alt=""
-            />
-          ) : (
-            <UserRound size={16} />
-          )}
-        </div>
-        <div className="feed-post-author-info">
-          <strong>
-            {post.author.name ?? "KINBA creator"}
-            {post.author.isVerified && (
-              <BadgeCheck size={13} aria-label="Verified profile" />
-            )}
-          </strong>
-          <span>
-            {post.author.accountType} · {relativeTime(post.createdAt)}
-          </span>
-        </div>
-      </a>
-      <p className="feed-post-body">{post.text}</p>
-      {post.attachments.length > 0 && (
-        <div
-          className={
-            post.attachments.length > 1
-              ? "feed-post-attachments has-grid"
-              : "feed-post-attachments"
-          }
-        >
-          {post.attachments.map(attachment =>
-            attachment.mediaType === "IMAGE" ? (
-              <button
-                key={attachment.id}
-                type="button"
-                className="feed-photo-button"
-                onClick={() =>
-                  setLightboxIndex(
-                    post.attachments
-                      .filter(item => item.mediaType === "IMAGE")
-                      .findIndex(item => item.id === attachment.id)
-                  )
-                }
-                aria-label="Open photo"
-              >
-                <img
-                  src={resolveMediaUrl(attachment.mediaUrl)}
-                  alt="Post attachment"
-                  loading="lazy"
-                />
-              </button>
-            ) : (
-              <video
-                key={attachment.id}
-                src={resolveMediaUrl(attachment.mediaUrl)}
-                controls
-                playsInline
-                {...({ "webkit-playsinline": "true" } as Record<
-                  string,
-                  string
-                >)}
-                preload="metadata"
-                crossOrigin="anonymous"
-              />
-            )
-          )}
-        </div>
-      )}
-      <div className="feed-post-actions flex flex-row justify-around mt-3 pb-3">
-        <button
-          type="button"
-          className={reacted ? "is-active" : ""}
-          onClick={toggleReaction}
-          disabled={reactMutation.isPending}
-          aria-pressed={reacted}
-          aria-label={reacted ? "Remove Pookie" : "Pookie post"}
-        >
-          <Heart size={15} fill={reacted ? "currentColor" : "none"} />
-          Pookie <strong>{formatCount(reactionCount)}</strong>
-        </button>
-        <AnnouncementComments
-          announcementId={post.id}
-          commentCount={post.commentCount}
-        />
-        <button type="button" onClick={share} aria-label="Share post">
-          <Share2 size={15} /> Share
-        </button>
-        <button
-          type="button"
-          className={bookmarked ? "is-active" : ""}
-          onClick={toggleBookmark}
-          disabled={bookmarkMutation.isPending}
-          aria-pressed={bookmarked}
-          aria-label={bookmarked ? "Remove saved post" : "Save post"}
-        >
-          <Bookmark size={15} fill={bookmarked ? "currentColor" : "none"} />{" "}
-          {bookmarked ? "Saved" : "Save"}
-        </button>
-      </div>
-      {lightboxIndex !== null && (
-        <FeedPhotoLightbox
-          attachments={post.attachments}
-          index={lightboxIndex}
-          onClose={() => setLightboxIndex(null)}
-          onChange={setLightboxIndex}
-          owner={post.author}
-        />
-      )}
-    </article>
-  );
-}
-
-function ShortsInsertionBlock({
-  video,
-  active,
-  onOpenViewer,
-}: {
-  video: VideoRecord;
-  active: boolean;
-  onOpenViewer: () => void;
-}) {
-  return (
-    <section
-      id={`feed-video-${video.id}`}
-      className="shorts-insertion-block"
-      aria-label="Shorts discovery"
-    >
-      <div className="shorts-insertion-heading">
-        <div>
-          <span className="eyebrow">Shorts</span>
-          <strong>Quick discovery</strong>
-        </div>
-        <span>From the KINBA community</span>
-      </div>
-      <MemoShortVideoCard
-        video={video}
-        index={0}
-        active={active}
-        compact
-        onOpenViewer={onOpenViewer}
-      />
-    </section>
-  );
-}
-
-function UnifiedFeedPanel({
-  active = true,
-  onOpenShort,
-}: {
-  active?: boolean;
-  onOpenShort: (videoId: number) => void;
-}) {
-  const query = trpc.home.feed.useQuery(
-    { tab: "all" },
-    {
-      retry: 1,
-      throwOnError: false,
-      refetchOnWindowFocus: false,
-      staleTime: 30_000,
-    }
-  );
-  const items = (query.data ?? []) as unknown as UnifiedFeedItem[];
-  const visibleItems = items.filter(
-    (item, index) =>
-      item.feedType !== "shorts" || items[index - 1]?.feedType !== "shorts"
-  );
-  return (
-    <section className="unified-feed" aria-label="All Feed">
-      {query.isPending ? (
-        <FeedSkeleton />
-      ) : visibleItems.length ? (
-        <div className="unified-feed-list feed-card-list gap-6">
-          {visibleItems.map(item => {
-            if (item.feedType === "media")
-              return (
-                <MemoVideoCard
-                  key={"media-" + item.id}
-                  video={item}
-                  active={active}
-                  socialLayout
-                />
-              );
-            if (item.feedType === "text")
-              return <TextFeedCard key={"text-" + item.id} post={item} />;
-            if (item.feedType === "shorts" && item.video) {
-              return (
-                <ShortsInsertionBlock
-                  key={item.id}
-                  video={item.video}
-                  active={active}
-                  onOpenViewer={() => onOpenShort(item.video.id)}
-                />
-              );
-            }
-            return null;
-          })}
-        </div>
-      ) : (
-        <div className="media-empty feed-empty-state" role="status">
-          <h3>Your feed is quiet.</h3>
-          <p>Real posts from the KINBA community will appear here.</p>
-        </div>
-      )}
-    </section>
-  );
-}
-
 function HomeFeedPanel({
   tab,
   active = true,
@@ -3365,7 +3075,6 @@ export function CommunityAnnouncements() {
 export type FeedSection =
   | HomeTab
   | "wheels"
-  | "all"
   | "shorts"
   | "announcements"
   | "publish"
@@ -3443,7 +3152,7 @@ export function SearchFeed() {
 }
 
 export default function MediaHub({
-  section = "all",
+  section = "wheels",
   onSectionChange,
   showTabs = true,
   wheels,
@@ -3484,7 +3193,7 @@ export default function MediaHub({
     onSectionChange?.(next);
   };
   const focusHighlight = (highlight: SpotlightHighlight) => {
-    select("all");
+    select("wheels");
     window.setTimeout(() => {
       document
         .getElementById(
@@ -3506,7 +3215,6 @@ export default function MediaHub({
           {(
             [
               ["wheels", "Spotlight"],
-              ["all", "All Feed"],
               ["videos", "Videos"],
               ["shorts", "Shorts"],
             ] as const
@@ -3547,13 +3255,6 @@ export default function MediaHub({
               )}
             </div>
           </div>
-        </div>
-      )}
-      {activeSection === "all" && (
-        <div className="media-tab-panel">
-          <ErrorBoundary fallback={<FeedRecovery />}>
-            <UnifiedFeedPanel active onOpenShort={setShortsViewerId} />
-          </ErrorBoundary>
         </div>
       )}
       {activeSection === "videos" && (
