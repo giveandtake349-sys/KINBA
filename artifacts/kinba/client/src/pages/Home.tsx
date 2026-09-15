@@ -2621,7 +2621,7 @@ export default function Home() {
         <main
           className={`app-main-content max-w-vw overflow-x-hidden box-border ${
             screen === "dashboard" ? "has-feed-tabs" : ""
-          }`}
+          } ${screen === "dashboard" && isScrollingDown ? "chrome-collapsed" : ""}`}
         >
           {screen === "dashboard" ? (
             <section className="section-shell home-page">

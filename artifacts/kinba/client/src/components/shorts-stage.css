@@ -1,0 +1,509 @@
+/* ============================================================================
+   KINBA SHORTS STAGE — single source of truth for the Shorts UX.
+   Imported LAST in MediaHub.tsx so it always wins the cascade. It owns the tab
+   stage geometry (snap pager), the edge-to-edge 9:16 viewer, the engagement
+   rail, and the app chrome that must surrender to the immersive stage.
+   ============================================================================
+
+   1. App chrome hand-off while the Shorts tab is active.
+   2. Tab stage: fixed screen, flex column (header + flex:1 viewport).
+   3. Snap pager contract (viewport owns scrolling; cards are full-stage frames).
+   4. Media geometry: absolute, inset 0, cover, no intrinsic cropping.
+   5. Content details + engagement rail.
+   6. Detail viewer layer (sealed full-screen stage).
+   ========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   1. App chrome hand-off.
+   While the Shorts tab is mounted, the bottom nav / mobile drawer must not
+   cover the stage, and the app columns must not add clearance under the
+   full-bleed stage.
+   --------------------------------------------------------------------------- */
+
+body:has(.shorts-tab-panel) .bottom-navigation,
+body:has(.shorts-tab-panel) .mobile-drawer {
+  display: none !important;
+}
+
+body:has(.shorts-tab-panel) .app-main-content,
+body:has(.shorts-tab-panel) .app-main-content.has-feed-tabs .home-page,
+body:has(.shorts-tab-panel) .media-hub,
+body:has(.shorts-tab-panel) .media-hub .shorts-section,
+body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
+  padding-bottom: 0 !important;
+}
+
+/* ---------------------------------------------------------------------------
+   2. Tab stage. The panel is the exact area between the fixed header/tabs
+   (104px mobile, 116px desktop) and the bottom of the viewport.
+   --------------------------------------------------------------------------- */
+
+.shorts-tab-panel,
+.media-hub .shorts-tab-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: calc(100dvh - 104px) !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: #000 !important;
+}
+
+@media (min-width: 768px) {
+  .shorts-tab-panel,
+  .media-hub .shorts-tab-panel {
+    height: calc(100dvh - 116px) !important;
+  }
+}
+
+/* When the app chrome collapses on scroll-down (Home adds chrome-collapsed),
+   the Shorts stage grows to a full-bleed 100dvh so it replaces the freed
+   header clearance and the snap pager fills the viewport. */
+.app-main-content.chrome-collapsed .shorts-tab-panel,
+.app-main-content.chrome-collapsed .media-hub .shorts-tab-panel {
+  height: 100dvh !important;
+}
+
+/* The section is the flex column inside the stage: header + viewport. */
+.shorts-tab-panel .shorts-section,
+.media-hub .shorts-tab-panel .shorts-section {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+  background: #000 !important;
+}
+
+/* ---------------------------------------------------------------------------
+   3. Snap pager contract. The viewport is the ONLY scroll surface; it owns
+   vertical scrolling and native swipes. Cards are full-stage frames.
+   --------------------------------------------------------------------------- */
+
+.media-hub .shorts-tab-panel .shorts-viewport {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scroll-snap-type: y mandatory !important;
+  scroll-behavior: auto !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  touch-action: pan-y !important;
+  overscroll-behavior-y: contain !important;
+  background: #000 !important;
+  border-radius: 0 !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card {
+  flex: 0 0 100% !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: #000 !important;
+  overflow: hidden !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+  isolation: isolate;
+  content-visibility: visible !important;
+  scroll-snap-align: start !important;
+  scroll-snap-stop: always !important;
+}
+
+/* ---------------------------------------------------------------------------
+   4. Media geometry. Edge-to-edge, fully covering the card, no cropping by
+   any intrinsic ratio or layout box.
+   --------------------------------------------------------------------------- */
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card > img {
+  position: absolute !important;
+  inset: 0 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  object-fit: cover !important;
+  z-index: 1 !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .media-video-frame,
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card > .media-video-frame {
+  position: absolute !important;
+  inset: 0 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  object-fit: cover !important;
+  overflow: hidden !important;
+  z-index: 1 !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .media-video-frame video,
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card > .media-video-frame > video {
+  position: absolute !important;
+  inset: 0 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  object-fit: cover !important;
+  z-index: 1 !important;
+}
+
+/* ---------------------------------------------------------------------------
+   5. Content details + engagement rail.
+   --------------------------------------------------------------------------- */
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .short-overlay {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 20 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-end !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0) 55%,
+    rgba(0, 0, 0, 0.62) 100%
+  ) !important;
+  pointer-events: none !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .short-overlay > * {
+  pointer-events: auto !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .short-overlay-details {
+  position: absolute !important;
+  left: 14px !important;
+  right: 76px !important;
+  bottom: 18px !important;
+  top: auto !important;
+  z-index: 25 !important;
+  max-width: calc(100% - 92px) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
+  pointer-events: auto;
+}
+
+/* Legacy, intentional: the rail follow avatar carries identity, so the inline
+   owner block stays hidden in Shorts details. */
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .media-owner {
+  display: none !important;
+}
+
+/* Engagement rail: a right-edge column pinned above the content, with the
+   circular action buttons kept in normal flow inside it. */
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .shorts-overlay-actions {
+  position: absolute !important;
+  top: auto !important;
+  right: 12px !important;
+  bottom: 64px !important;
+  left: auto !important;
+  z-index: 30 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 16px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+  pointer-events: auto !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .shorts-overlay-actions .media-engagement-actions--overlay {
+  position: static !important;
+  inset: auto !important;
+  z-index: 30 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 16px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+  pointer-events: auto !important;
+}
+
+/* ---------------------------------------------------------------------------
+   6. Detail viewer layer: a sealed full-screen stage over everything, with
+   its own close control and no app chrome behind it.
+   --------------------------------------------------------------------------- */
+
+.shorts-viewer-layer,
+.media-hub .shorts-viewer-layer {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483000 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: #000 !important;
+  isolation: isolate !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-section.shorts-detail-feed {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+  background: #000 !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .media-section-heading {
+  display: none !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  scroll-snap-type: y mandatory !important;
+  scroll-behavior: auto !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  touch-action: pan-y !important;
+  overscroll-behavior-y: contain !important;
+  background: #000 !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Reuse the exact frame, media, and rail contract for viewer cards. */
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card {
+  flex: 0 0 100% !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: #000 !important;
+  overflow: hidden !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+  isolation: isolate;
+  content-visibility: visible !important;
+  scroll-snap-align: start !important;
+  scroll-snap-stop: always !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card > img {
+  position: absolute !important;
+  inset: 0 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  object-fit: cover !important;
+  z-index: 1 !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card > .media-video-frame {
+  position: absolute !important;
+  inset: 0 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  object-fit: cover !important;
+  overflow: hidden !important;
+  z-index: 1 !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card > .media-video-frame > video {
+  position: absolute !important;
+  inset: 0 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  object-fit: cover !important;
+  z-index: 1 !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .short-overlay {
+  z-index: 20 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-end !important;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0) 55%,
+    rgba(0, 0, 0, 0.62) 100%
+  ) !important;
+  pointer-events: none !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .short-overlay > * {
+  pointer-events: auto !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .short-overlay-details {
+  left: 14px !important;
+  right: 76px !important;
+  bottom: 18px !important;
+  top: auto !important;
+  z-index: 25 !important;
+  max-width: calc(100% - 92px) !important;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .media-owner {
+  display: none !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .shorts-overlay-actions {
+  top: auto !important;
+  right: 12px !important;
+  bottom: 64px !important;
+  left: auto !important;
+  z-index: 30 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 16px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  transform: none !important;
+  pointer-events: auto !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .shorts-overlay-actions .media-engagement-actions--overlay {
+  position: static !important;
+  inset: auto !important;
+  z-index: 30 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 16px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  transform: none !important;
+  pointer-events: auto !important;
+}
+
+/* Viewer close control. */
+.shorts-viewer-close {
+  position: fixed !important;
+  top: 12px !important;
+  right: 12px !important;
+  z-index: 2147483001 !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  padding: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: 999px !important;
+  color: #fff !important;
+  background: rgba(8, 12, 20, 0.72) !important;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28) !important;
+  cursor: pointer !important;
+}
+
+/* Hide all known app chrome and modal surfaces behind the sealed viewer. */
+body:has(.shorts-viewer-layer) .topbar,
+body:has(.shorts-viewer-layer) .top-navigation-wrapper,
+body:has(.shorts-viewer-layer) .home-feed-tabs,
+body:has(.shorts-viewer-layer) .bottom-navigation,
+body:has(.shorts-viewer-layer) .mobile-drawer,
+body:has(.shorts-viewer-layer) .action-modal-layer {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Desktop stage: center a 9:16 column for both the tab and the viewer.
+   --------------------------------------------------------------------------- */
+
+@media (min-width: 768px) {
+  .media-hub .shorts-tab-panel .shorts-section {
+    width: min(420px, 100%) !important;
+    margin-inline: auto !important;
+  }
+
+  .media-hub .shorts-viewer-layer .shorts-viewer-close {
+    right: max(12px, calc((100% - 420px) / 2 - 52px)) !important;
+  }
+}

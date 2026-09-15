@@ -6,6 +6,8 @@ type UseScrollDirectionOptions = {
 };
 
 const FEED_SCROLL_SELECTOR = "[data-feed-scroll], .media-feed-scroll, .shorts-viewport";
+const SHORTS_SURFACE_SELECTOR =
+  ".shorts-list-feed, .shorts-detail-feed, .shorts-viewer-layer";
 
 /**
  * Observes the document and KINBA's nested feed surfaces in capture phase.
@@ -30,6 +32,13 @@ export function useScrollDirection({
   const handleScroll = useCallback(
     (event: Event) => {
       const target = event.target;
+      // Shorts surfaces own their scroll chrome (they are full-bleed stages);
+      // never hide the app header/nav while swiping through them.
+      const isShortsSurface =
+        target instanceof HTMLElement &&
+        (target.matches(SHORTS_SURFACE_SELECTOR) ||
+          target.closest(SHORTS_SURFACE_SELECTOR));
+      if (isShortsSurface) return;
       const isFeedSurface =
         target instanceof HTMLElement && target.matches(FEED_SCROLL_SELECTOR);
       const isDocumentSurface =

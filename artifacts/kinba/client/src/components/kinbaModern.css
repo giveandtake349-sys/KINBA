@@ -281,94 +281,6 @@ body {
   font-family: "Space Grotesk", sans-serif !important;
 }
 
-/* Full-screen vertical stage used by Wheels and Shorts. */
-.media-tab-panel--wheels,
-.media-hub .media-tab-panel--wheels {
-  min-height: 0 !important;
-  overflow: visible !important;
-}
-
-.media-tab-panel--wheels .home-feed-section .media-section-heading,
-.media-tab-panel--wheels .home-feed-section .media-publish-panel {
-  display: none !important;
-}
-
-.media-tab-panel--wheels .home-feed-section .long-video-grid,
-.shorts-section .shorts-viewport {
-  display: block !important;
-  width: 100% !important;
-  height: calc(100dvh - 118px) !important;
-  min-height: calc(100dvh - 118px) !important;
-  max-height: none !important;
-  padding: 0 !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  scroll-snap-type: y mandatory !important;
-  scroll-snap-stop: always;
-  overscroll-behavior-y: contain;
-  scrollbar-width: none;
-  background: #05070d;
-}
-
-.media-tab-panel--wheels .home-feed-section .long-video-grid::-webkit-scrollbar,
-.shorts-section .shorts-viewport::-webkit-scrollbar {
-  display: none;
-}
-
-.media-tab-panel--wheels .home-feed-section .long-video-card,
-.shorts-section .short-card {
-  position: relative !important;
-  display: block !important;
-  width: 100% !important;
-  max-width: none !important;
-  height: calc(100dvh - 118px) !important;
-  min-height: calc(100dvh - 118px) !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: #05070d !important;
-  scroll-snap-align: start !important;
-  scroll-snap-stop: always !important;
-}
-
-.media-tab-panel--wheels .media-fullscreen-frame,
-.shorts-section .short-card .media-video-frame {
-  position: absolute !important;
-  inset: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  min-height: 0 !important;
-  aspect-ratio: auto !important;
-  background: #05070d;
-}
-
-.media-tab-panel--wheels .media-fullscreen-frame .media-video-frame,
-.shorts-section .short-card .media-video-frame {
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.media-tab-panel--wheels .media-video-frame video,
-.shorts-section .short-card .media-video-frame video {
-  width: 100% !important;
-  height: 100% !important;
-  max-height: none !important;
-  object-fit: cover !important;
-  background: #05070d;
-}
-
-.media-tab-panel--wheels .media-fullscreen-frame::after,
-.shorts-section .short-card::after {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  content: "";
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(5, 7, 13, 0.22) 0%, transparent 27%, transparent 50%, rgba(5, 7, 13, 0.9) 100%);
-}
-
 /* Non-fullscreen video panels retain a polished responsive grid. */
 .media-hub .media-tab-panel:not(.media-tab-panel--wheels) .long-video-grid {
   display: grid !important;
@@ -405,8 +317,7 @@ body {
 }
 
 /* Caption overlays, metadata and engagement controls. */
-.media-overlay-copy,
-.short-overlay {
+.media-overlay-copy {
   position: absolute !important;
   z-index: 4 !important;
   inset: auto 0 0 0 !important;
@@ -418,16 +329,14 @@ body {
   pointer-events: none !important;
 }
 
-.media-overlay-details,
-.short-overlay-details {
+.media-overlay-details {
   position: relative;
   z-index: 1;
   width: min(100%, 580px);
   pointer-events: none !important;
 }
 
-.media-overlay-details h3,
-.short-title {
+.media-overlay-details h3 {
   display: block;
   margin: 8px 0 5px !important;
   color: #fff !important;
@@ -438,8 +347,7 @@ body {
   letter-spacing: -0.03em;
 }
 
-.media-overlay-details > p,
-.short-overlay-details > p {
+.media-overlay-details > p {
   max-width: 94%;
   margin: 0 !important;
   color: rgba(245, 248, 255, 0.86) !important;
@@ -714,8 +622,15 @@ body {
     min-height: calc(100dvh - 103px) !important;
   }
 
-  .media-overlay-copy,
-  .short-overlay {
+  .media-tab-panel--wheels .home-feed-section .long-video-grid,
+  .shorts-section .shorts-viewport,
+  .media-tab-panel--wheels .home-feed-section .long-video-card,
+  .shorts-section .short-card {
+    height: calc(100dvh - 103px) !important;
+    min-height: calc(100dvh - 103px) !important;
+  }
+
+  .media-overlay-copy {
     min-height: 46% !important;
     padding: 80px 78px calc(18px + env(safe-area-inset-bottom)) 15px !important;
   }
@@ -991,11 +906,6 @@ body {
   .bottom-navigation {
     display: none !important;
   }
-}
-
-/* Shorts uses the same uninterrupted stage as Wheels; the tab bar supplies its context. */
-.shorts-section > .media-section-heading {
-  display: none !important;
 }
 
 /* Dedicated in-place views for header, navigation, and drawer actions. */
@@ -1797,152 +1707,6 @@ body {
   bottom: calc(104px + env(safe-area-inset-bottom)) !important;
   z-index: 40 !important;
 }
-/* WHEELS and Shorts are independent viewport layers; the translating header
-   cannot move them or create a scroll-dependent top gap. */
-.media-tab-panel--fullscreen,
-.media-tab-panel--wheels {
-  position: fixed !important;
-  inset: 0 !important;
-  width: 100vw !important;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  z-index: 1 !important;
-}
-.media-tab-panel--fullscreen {
-  isolation: isolate;
-}
-.media-tab-panel--fullscreen > .shorts-section,
-.media-tab-panel--fullscreen > .wheels-feed-layout,
-.media-tab-panel--fullscreen .home-feed-section {
-  width: 100% !important;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-}
-.media-tab-panel--fullscreen .media-section-heading,
-.media-tab-panel--fullscreen .media-publish-panel,
-.media-tab-panel--fullscreen .wheels-sponsor-panel {
-  display: none !important;
-}
-.media-tab-panel--fullscreen .shorts-viewport,
-.media-tab-panel--fullscreen .home-feed-section .long-video-grid {
-  width: 100% !important;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  scroll-snap-type: y mandatory !important;
-}
-.media-tab-panel--fullscreen .short-card,
-.media-tab-panel--fullscreen .home-feed-section .long-video-card {
-  width: 100% !important;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  scroll-snap-align: start !important;
-}
-.media-tab-panel--wheels .wheels-feed-layout,
-.media-tab-panel--wheels .home-feed-section,
-.media-tab-panel--wheels .home-feed-section .long-video-grid {
-  width: 100% !important;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-}
-.media-tab-panel--wheels .home-feed-section .long-video-grid {
-  overflow-y: auto !important;
-  scroll-snap-type: y mandatory !important;
-}
-.media-tab-panel--wheels .home-feed-section .long-video-grid > .long-video-card {
-  flex: 0 0 100dvh !important;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  scroll-snap-align: start !important;
-}
-
-/* Dedicated Shorts viewer opened from any compact Shorts card. */
-.shorts-viewer-layer {
-  position: fixed;
-  z-index: 500;
-  inset: 0;
-  width: 100vw;
-  height: 100dvh;
-  overflow: hidden;
-  background: #05070d;
-  isolation: isolate;
-}
-
-.shorts-viewer-layer .shorts-section {
-  width: 100%;
-  height: 100dvh;
-  min-height: 100dvh;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-}
-
-.shorts-viewer-layer .media-section-heading,
-.shorts-viewer-layer .media-publish-panel {
-  display: none !important;
-}
-
-.shorts-viewer-layer .shorts-viewport {
-  width: 100% !important;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  scroll-behavior: smooth;
-  scroll-snap-type: y mandatory !important;
-  overscroll-behavior-y: contain;
-}
-
-.shorts-viewer-layer .short-card {
-  width: 100% !important;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  scroll-snap-align: start !important;
-  scroll-snap-stop: always !important;
-}
-
-.shorts-viewer-close {
-  position: fixed;
-  top: max(12px, env(safe-area-inset-top));
-  left: max(12px, env(safe-area-inset-left));
-  z-index: 560;
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 50%;
-  background: rgba(5, 7, 13, 0.58);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
 /* Mobile feed performance: isolate off-screen cards from layout and paint work. */
 .media-hub .long-video-card,
 .media-hub .short-card,
@@ -2052,8 +1816,7 @@ body {
 .media-hub .long-video-grid { display: block !important; padding: 0 !important; }
 .media-hub .long-video-grid > .long-video-card { padding: 0 !important; border-left: 0 !important; border-right: 0 !important; border-radius: 0 !important; }
 .media-hub .long-video-card .media-fullscreen-frame { width: 100% !important; margin: 0 !important; border-radius: 0 !important; }
-.media-hub .media-overlay-copy,
-.media-hub .short-overlay {
+.media-hub .media-overlay-copy {
   position: static !important;
   inset: auto !important;
   z-index: 1 !important;
@@ -2063,22 +1826,9 @@ body {
   background: #0b0f17 !important;
   pointer-events: auto !important;
 }
-.media-hub .media-overlay-details,
-.media-hub .short-overlay-details { width: 100% !important; color: var(--kinba-text-modern) !important; }
+.media-hub .media-overlay-details { width: 100% !important; color: var(--kinba-text-modern) !important; }
 .media-hub .media-overlay-details h3,
-.media-hub .media-overlay-details > p,
-.media-hub .short-title,
-.media-hub .short-overlay-details > p { color: var(--kinba-text-modern) !important; }
-.media-hub .media-tab-panel--wheels,
-.media-hub .media-tab-panel--wheels .home-feed-section,
-.media-hub .media-tab-panel--wheels .home-feed-section .long-video-grid { height: auto !important; min-height: 0 !important; overflow: visible !important; }
-.media-hub .media-tab-panel--wheels .home-feed-section .long-video-card { height: auto !important; min-height: 0 !important; overflow: visible !important; }
-.media-hub .media-tab-panel--wheels .media-fullscreen-frame,
-.media-hub .media-tab-panel--wheels .short-card .media-video-frame { position: relative !important; inset: auto !important; height: min(100dvh, 125vw) !important; min-height: 0 !important; aspect-ratio: 4 / 5 !important; }
-.media-hub .media-tab-panel--wheels .media-fullscreen-frame .media-video-frame,
-.media-hub .media-tab-panel--wheels .media-fullscreen-frame video { height: 100% !important; }
-.media-hub .media-tab-panel--wheels .media-engagement-actions--overlay { position: static !important; flex-direction: row !important; width: auto !important; padding: 8px 0 0 !important; }
-.media-hub .media-tab-panel--wheels .media-engagement-actions--overlay > button { width: auto !important; min-width: 0 !important; }
+.media-hub .media-overlay-details > p { color: var(--kinba-text-modern) !important; }
 
 .voice-comment-form { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
 .voice-comment-form > input { flex: 1 1 150px; min-width: 0; }
@@ -2230,20 +1980,11 @@ body {
   position: relative !important;
   z-index: 1 !important;
 }
-.shorts-overlay-actions {
-  position: relative !important;
-  z-index: 30 !important;
-  padding-bottom: max(80px, calc(80px + env(safe-area-inset-bottom))) !important;
-}
-.shorts-overlay-actions .media-engagement-actions--overlay {
-  z-index: 30 !important;
-}
 
 
 /* Final requested feed treatment: separated Facebook-style cards across all tabs. */
 .media-hub .feed-card-list,
-.media-hub .unified-feed-list,
-.media-hub .shorts-viewport {
+.media-hub .unified-feed-list {
   gap: 24px !important;
 }
 
@@ -2253,8 +1994,7 @@ body {
 .media-hub .unified-feed-list > .feed-media-post,
 .media-hub .unified-feed-list > .long-video-card,
 .media-hub .unified-feed-list > .feed-text-card,
-.media-hub .unified-feed-list > .shorts-insertion-block,
-.media-hub .shorts-viewport > .short-card {
+.media-hub .unified-feed-list > .shorts-insertion-block {
   box-sizing: border-box !important;
   margin: 0 !important;
   padding: 12px !important;
@@ -2263,19 +2003,6 @@ body {
   border-radius: 1rem !important;
   background: rgba(23, 23, 23, 0.9) !important;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24) !important;
-}
-
-/* Keep the intentional full-screen Wheels mode edge-to-edge. */
-.media-tab-panel--wheels .feed-video-list,
-.media-tab-panel--wheels .feed-video-list > .feed-media-post,
-.media-tab-panel--wheels .feed-video-list > .long-video-card {
-  gap: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
 }
 
 /* Shorts actions are anchored to the current short card, below its content and above the bottom safe area. */
@@ -2460,46 +2187,6 @@ body {
   height: auto !important;
   aspect-ratio: auto !important;
   object-fit: contain !important;
-}
-
-/* Shorts alone remains an immersive TikTok-style stage with vertical floating actions. */
-.media-hub .media-tab-panel--fullscreen,
-.media-hub .media-tab-panel--fullscreen .shorts-section,
-.media-hub .media-tab-panel--fullscreen .shorts-viewport,
-.media-hub .media-tab-panel--fullscreen .short-card {
-  background: #000 !important;
-}
-
-.media-hub .shorts-viewport {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 0 !important;
-  width: 100% !important;
-  background: #000 !important;
-}
-
-.media-hub .shorts-viewport > .short-card {
-  width: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: #000 !important;
-}
-
-.media-hub .shorts-viewport > .short-card .media-engagement-actions--overlay {
-  position: absolute !important;
-  right: 12px !important;
-  bottom: calc(84px + env(safe-area-inset-bottom)) !important;
-  z-index: 40 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 16px !important;
-  width: 52px !important;
-  margin: 0 !important;
-  padding: 0 !important;
 }
 
 @media (max-width: 760px) {
@@ -3239,80 +2926,6 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
   font-size: 11px !important;
 }
 
-/* Video/Shorts detail: close is top-right; owner identity is bottom-left. */
-.media-hub .shorts-viewer-layer .shorts-viewer-close {
-  top: max(16px, env(safe-area-inset-top)) !important;
-  right: max(16px, env(safe-area-inset-right)) !important;
-  left: auto !important;
-  z-index: 2147483001 !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .short-overlay {
-  position: absolute !important;
-  inset: auto 0 0 0 !important;
-  display: block !important;
-  max-height: none !important;
-  padding: 18px 84px 20px 18px !important;
-  color: #fff !important;
-  background: linear-gradient(transparent, rgba(0,0,0,.9)) !important;
-  pointer-events: none !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .short-overlay-details {
-  position: static !important;
-  width: min(100%, 520px) !important;
-  padding: 0 !important;
-  color: #fff !important;
-  pointer-events: auto !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .shorts-overlay-actions {
-  position: absolute !important;
-  right: 14px !important;
-  bottom: max(20px, env(safe-area-inset-bottom)) !important;
-  width: 52px !important;
-  padding: 0 !important;
-  pointer-events: auto !important;
-}
-
-/* Keep the Shorts tab compact: one title, no phantom top gap, full media area. */
-.media-hub .shorts-list-feed > .shorts-header {
-  min-height: 56px !important;
-  padding: 8px 12px !important;
-  gap: 12px !important;
-}
-
-.media-hub .shorts-list-feed > .shorts-list-viewport {
-  height: calc(100dvh - 56px) !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  padding-top: 0 !important;
-}
-
-.media-hub .shorts-list-feed > .shorts-list-viewport > .short-card {
-  margin-top: 0 !important;
-}
-
-@media (max-width: 760px) {
-  .media-hub .shorts-list-feed > .shorts-header {
-    min-height: 52px !important;
-    padding: 6px 10px !important;
-  }
-
-  .media-hub .shorts-list-feed > .shorts-list-viewport {
-    height: calc(100dvh - 52px) !important;
-  }
-
-  .media-hub .feed-photo-lightbox {
-    padding: 60px 10px !important;
-  }
-
-  .media-hub .feed-photo-lightbox > img {
-    max-height: calc(100dvh - 120px) !important;
-  }
-}
-
-
 /* Profile links must preserve the existing identity-row layout everywhere. */
 .media-hub .feed-post-author-identity,
 .media-hub .announcement-author-identity {
@@ -3338,9 +2951,7 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
 /* Final user-requested UI contract: anchored Shorts actions, separated cards, and no-crop images. */
 .media-hub .feed-card-list,
 .media-hub .unified-feed-list,
-.media-hub .feed-video-list,
-.media-hub .shorts-viewport,
-.media-hub .shorts-list-viewport {
+.media-hub .feed-video-list {
   gap: 24px !important;
 }
 .media-hub .feed-card-list > .feed-media-post,
@@ -3352,9 +2963,7 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
 .media-hub .unified-feed-list > .long-video-card,
 .media-hub .unified-feed-list > .shorts-insertion-block,
 .media-hub .feed-video-list > .feed-media-post,
-.media-hub .feed-video-list > .long-video-card,
-.media-hub .shorts-list-viewport > .short-card,
-.media-hub .shorts-viewport > .short-card {
+.media-hub .feed-video-list > .long-video-card {
   box-sizing: border-box !important;
   margin-bottom: 24px !important;
   padding: 12px !important;
@@ -3401,9 +3010,7 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
   padding: 0 !important;
 }
 .media-hub .feed-media-content > img,
-.media-hub .feed-text-card .feed-photo-button img,
-.media-hub .short-card > img,
-.media-hub .shorts-list-viewport .short-card img:not(.video-owner-avatar img) {
+.media-hub .feed-text-card .feed-photo-button img {
   width: 100% !important;
   height: auto !important;
   max-width: 100% !important;
@@ -3488,4 +3095,131 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
   margin: 0 !important;
   scroll-snap-align: start !important;
   scroll-snap-stop: always !important;
+}
+
+/* ============================================================================
+   Create composer — professional modal presentation.
+   Only the existing composer UI is restyled; the wheel options, handlers,
+   fields, media picker and posting logic are unchanged. The composer must
+   render fully above the bottom navigation (see profile.css bottom-navigation
+   z-index) and clear mobile safe-area insets.
+   ============================================================================ */
+
+.create-uploader-modal {
+  padding: 22px;
+}
+
+.create-uploader-modal .action-modal-head {
+  margin-bottom: 16px;
+  padding-right: 50px;
+}
+
+/* Single close affordance: keep the floating close, hide the duplicated
+   ActionModal head close inside the create composer. */
+.create-uploader-modal .action-modal-head button {
+  display: none;
+}
+
+.create-uploader-intro {
+  margin: 4px auto 0;
+}
+
+.create-uploader-intro p:last-child {
+  max-width: 440px;
+  margin-inline: auto;
+}
+
+/* Convert the decorative wheel into a responsive, easy-to-tap card grid. */
+.create-uploader-modal .create-uploader-wheel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: stretch;
+  width: min(100%, 640px);
+  min-height: 0;
+  margin: 18px auto 22px;
+}
+
+.create-uploader-modal .create-uploader-wheel::before,
+.create-uploader-modal .create-uploader-wheel::after,
+.create-uploader-modal .create-uploader-wheel-core {
+  display: none !important;
+}
+
+.create-uploader-modal .create-uploader-option {
+  position: static !important;
+  display: grid;
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: start;
+  gap: 12px;
+  width: auto;
+  min-height: 88px;
+  padding: 14px 16px;
+  text-align: left;
+  border-radius: 14px;
+}
+
+@media (min-width: 620px) {
+  .create-uploader-modal .create-uploader-wheel {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Form polish: breathing room, aligned labels, larger touch targets. */
+.create-uploader-modal .modal-form,
+.create-uploader-modal .create-uploader-composer {
+  gap: 16px;
+  width: min(100%, 640px);
+  margin-inline: auto;
+}
+
+.create-uploader-modal .modal-form label {
+  gap: 8px;
+  letter-spacing: 0.02em;
+}
+
+.create-uploader-modal .modal-kind-switch button {
+  min-height: 46px;
+}
+
+.create-uploader-modal .modal-intro {
+  margin: 0 0 2px;
+}
+
+/* Sticky action footer: primary action stays visible/tappable above the
+   bottom navigation and OS safe areas while the form fields scroll. */
+.create-uploader-modal .create-uploader-form-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 14px;
+  padding-bottom: max(2px, env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, transparent, var(--kinba-panel-strong) 28%);
+}
+
+.create-uploader-modal .create-uploader-form-actions .primary-btn {
+  min-height: 46px;
+  padding: 12px 22px;
+  border-radius: 12px;
+}
+
+.create-uploader-modal .create-uploader-form-actions .muted-btn {
+  min-height: 46px;
+  padding: 0 14px;
+}
+
+/* Bottom sheet must clear mobile safe areas so no control sits under the
+   home indicator / gesture bar. */
+.create-uploader-modal {
+  padding-bottom: calc(22px + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 620px) {
+  .create-uploader-modal {
+    padding: 18px 14px calc(18px + env(safe-area-inset-bottom));
+  }
 }

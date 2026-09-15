@@ -66,6 +66,7 @@ import { isAbsoluteHttpUrl, resolveMediaUrl } from "@/lib/runtimeConfig";
 import "./mediaHub.css";
 import "./kinbaModern.css";
 import "./feedUi.css";
+import "./shorts-stage.css";
 
 type HomeTab = "videos" | "trendy" | "following" | "icons" | "wheels";
 type VideoKind = "LONG" | "SHORT" | "WHEEL";
@@ -2415,11 +2416,6 @@ function ShortVideoCard({
         onOpenViewer();
       }}
     >
-      <PostManagementMenu
-        video={video}
-        onUpdated={setDescription}
-        onDeleted={() => setDeleted(true)}
-      />
       {video.mediaType === "IMAGE" ? (
         <img
           src={resolveMediaUrl(video.videoUrl)}
@@ -2429,6 +2425,13 @@ function ShortVideoCard({
       ) : (
         <QualityVideoPlayer video={video} vertical active={active} />
       )}
+      <div className="absolute right-3 top-4 z-20">
+        <PostManagementMenu
+          video={video}
+          onUpdated={setDescription}
+          onDeleted={() => setDeleted(true)}
+        />
+      </div>
       <div className="short-overlay">
         <div className="short-overlay-details">
           <div className="media-owner">
@@ -2480,23 +2483,23 @@ function ShortVideoCard({
             {ownerHandle(video.owner.name, video.owner.username)}
           </p>
         </div>
-      </div>
-      <div className="shorts-overlay-actions absolute right-3 bottom-16 z-20 flex flex-col items-center gap-4">
-        <EngagementActions
-          engagement={current}
-          onReact={react}
-          onShare={share}
-          onComments={() => {
-            if (!auth.isAuthenticated) return auth.openAuth();
-            setCommentsOpen(value => !value);
-          }}
-          pending={pending}
-          overlay={!compact}
-          feedStyle={compact}
-          bookmarked={bookmarked}
-          onBookmark={toggleBookmark}
-          owner={video.owner}
-        />
+        <div className="shorts-overlay-actions">
+          <EngagementActions
+            engagement={current}
+            onReact={react}
+            onShare={share}
+            onComments={() => {
+              if (!auth.isAuthenticated) return auth.openAuth();
+              setCommentsOpen(value => !value);
+            }}
+            pending={pending}
+            overlay={!compact}
+            feedStyle={compact}
+            bookmarked={bookmarked}
+            onBookmark={toggleBookmark}
+            owner={video.owner}
+          />
+        </div>
       </div>
       <CommentDrawer
         postId={video.id}
@@ -2637,6 +2640,17 @@ function ShortsFeed({
     const cards = Array.from(
       viewport.querySelectorAll<HTMLElement>("[data-short-index]")
     );
+    const count = Math.max(videos.length, 1);
+    const step = viewport.scrollHeight / count;
+    setActiveIndex(
+      Math.max(
+        0,
+        Math.min(
+          Math.round(viewport.scrollTop / Math.max(step, 1)),
+          Math.max(videos.length - 1, 0)
+        )
+      )
+    );
     if (!cards.length) return;
     const nextIndex = cards.reduce(
       (closest, card, index) =>
@@ -2690,7 +2704,7 @@ function ShortsFeed({
         <FeedSkeleton short />
       ) : videos.length ? (
         <div
-          className={`shorts-viewport ${viewerMode ? "shorts-detail-viewport" : "shorts-list-viewport"} space-y-6 media-feed-scroll h-[100dvh] overflow-y-scroll scrollbar-hide snap-y snap-mandatory bg-black w-full max-w-full box-border relative`}
+          className={`shorts-viewport ${viewerMode ? "shorts-detail-viewport" : "shorts-list-viewport"} media-feed-scroll overflow-y-scroll snap-y snap-mandatory bg-black w-full max-w-full box-border relative`}
           ref={viewportRef}
           onScroll={onScroll}
           onPointerDown={onPointerDown}

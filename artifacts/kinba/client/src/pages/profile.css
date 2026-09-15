@@ -674,6 +674,19 @@ body { color: var(--kinba-text); }
   }
 }
 
+/* Collapsed chrome: when the fixed header/nav slide away on scroll-down, the
+   feed must fill the viewport instead of keeping its reserved header clearance.
+   Mirrors the header's 300ms transition so content stays anchored while the
+   header slides. Ordering matters: must come after the 116px/104px rules. */
+.app-main-content.has-feed-tabs .home-page {
+  transition: padding-top 300ms ease-in-out;
+}
+
+.app-main-content.chrome-collapsed.has-feed-tabs .home-page,
+.app-main-content.chrome-collapsed > .home-page {
+  padding-top: 0 !important;
+}
+
 /* Ownership actions: clear owner affordances and guest-safe profile actions. */
 .profile-edit-trigger {
   display: block !important;
@@ -704,9 +717,12 @@ body { color: var(--kinba-text); }
   width: min(100%, 320px) !important;
 }
 
-/* Bottom navigation must remain tappable after any feed-to-profile transition. */
+/* Bottom navigation must remain tappable after any feed-to-profile transition.
+   It lives above feed content but below every modal layer (action-modal-layer:
+   z-index 470) and full-screen viewer/lightbox (z-index 2147483000), so modals
+   like the create composer always render above it. */
 .bottom-navigation {
-  z-index: 2147483000 !important;
+  z-index: 400 !important;
   pointer-events: auto !important;
 }
 .bottom-navigation > button {
