@@ -2481,6 +2481,7 @@ export default function Home() {
   const auth = useAuth();
   const { isScrollingDown } = useScrollDirection();
   const utils = trpc.useUtils();
+  const topNavRef = useRef<HTMLDivElement>(null);
   const [location, navigate] = useLocation();
   const publicProfileMatch = location.match(/^\/profile\/(\d+)$/);
   const publicProfileId = publicProfileMatch ? Number(publicProfileMatch[1]) : undefined;
@@ -2521,6 +2522,31 @@ export default function Home() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
+
+  // The app chrome is a real fixed element; its actual height is the source of
+  // truth for every viewport offset (feed clearance, Shorts stage) instead of
+  // hardcoded 104/112/114px compensation. Publish the measured height once and
+  // keep it in sync while the chrome's content (header + tab strip) changes.
+  useEffect(() => {
+    const el = topNavRef.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const measure = () => {
+      const height = Math.round(el.getBoundingClientRect().height);
+      if (height > 0) root.style.setProperty("--kinba-chrome-h", `${height}px`);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    const onResize = () => measure();
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, [screen]);
 
   const showFeed = (next: FeedSection = "wheels") => {
     setProfileOpen(false);
@@ -2598,6 +2624,7 @@ export default function Home() {
         onClick={guardNonSubmitNavigation}
       >
         <div
+          ref={topNavRef}
           className={`top-navigation-wrapper fixed top-0 left-0 right-0 z-50 bg-[#0B0F17]/95 backdrop-blur-md transition-transform duration-300 ease-in-out ${
             screen === "dashboard" && isScrollingDown
               ? "-translate-y-full"

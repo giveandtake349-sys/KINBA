@@ -34,8 +34,9 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
 }
 
 /* ---------------------------------------------------------------------------
-   2. Tab stage. The panel is the exact area between the fixed header/tabs
-   (104px mobile, 116px desktop) and the bottom of the viewport.
+   2. Tab stage. The panel is the exact area between the real fixed chrome
+   (header + tabs, measured by Home and published as --kinba-chrome-h) and the
+   bottom of the viewport.
    --------------------------------------------------------------------------- */
 
 .shorts-tab-panel,
@@ -43,7 +44,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   display: flex !important;
   flex-direction: column !important;
   width: 100% !important;
-  height: calc(100dvh - 104px) !important;
+  height: calc(100dvh - var(--kinba-chrome-h, 104px)) !important;
   min-height: 0 !important;
   max-height: none !important;
   margin: 0 !important;
@@ -52,10 +53,10 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   background: #000 !important;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 761px) {
   .shorts-tab-panel,
   .media-hub .shorts-tab-panel {
-    height: calc(100dvh - 116px) !important;
+    height: calc(100dvh - var(--kinba-chrome-h, 116px)) !important;
   }
 }
 

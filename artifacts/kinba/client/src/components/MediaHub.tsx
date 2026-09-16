@@ -35,7 +35,6 @@ import {
   Share2,
   Search,
   RotateCcw,
-  Upload,
   UserRound,
   Volume2,
   VolumeX,
@@ -47,18 +46,12 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { apiUrl } from "@/lib/api";
 import {
-  getImageDimensions,
   getVideoMetadata,
   MAX_ANNOUNCEMENT_VIDEO_DURATION_SECONDS,
-  MAX_LONG_VIDEO_DURATION_SECONDS,
-  MAX_SHORT_VIDEO_DURATION_SECONDS,
-  publishPhoto,
-  publishVideo,
   uploadCommentAudio,
   uploadImage,
   uploadVideo,
   validateImageFile,
-  validatePhotoFile,
   type VideoMetadata,
 } from "@/lib/mediaUpload";
 import ErrorBoundary from "./ErrorBoundary";
@@ -1596,62 +1589,70 @@ function VideoCard({
   if (deleted) return null;
   if (socialLayout) {
     return (
-      <article
-        id={`feed-video-${video.id}`}
-        className="feed-media-post"
+<article
+      id={`feed-video-${video.id}`}
+      className="feed-media-post"
+    >
+      <header className="feed-post-author">
+        <a
+          className="profile-link feed-post-author-identity"
+          href={`/profile/${video.owner.id}`}
+          onClick={event => navigateToProfile(event, video.owner.id)}
+          aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}
+        >
+          <div className="video-owner-avatar">
+            {video.owner.photoUrl ? (
+              <img
+                src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
+                alt=""
+              />
+            ) : (
+              <UserRound size={16} />
+            )}
+          </div>
+          <div className="feed-post-author-info">
+            <strong>
+              {displayName(video.owner.name, video.owner.username)}
+              {video.owner.isVerified && (
+                <BadgeCheck
+                  className="verified-badge"
+                  size={13}
+                  aria-label="Verified profile"
+                />
+              )}
+            </strong>
+            <span>
+              {relativeTime(video.createdAt)} ·{" "}
+              {video.mediaType === "IMAGE" ? "Photo" : "Video"}
+            </span>
+          </div>
+        </a>
+        <PostManagementMenu
+          video={video}
+          onUpdated={setDescription}
+          onDeleted={() => setDeleted(true)}
+        />
+      </header>
+      <div
+        className={`feed-media-content${video.mediaType === "VIDEO" ? " feed-media-content--video" : " feed-media-content--image"}`}
         role={onOpenViewer ? "button" : undefined}
         tabIndex={onOpenViewer ? 0 : undefined}
+        aria-label={onOpenViewer ? "Open post" : undefined}
         onClick={openViewer}
+        onKeyDown={event => {
+          if (!onOpenViewer || (event.key !== "Enter" && event.key !== " "))
+            return;
+          event.preventDefault();
+          onOpenViewer();
+        }}
       >
-        <header className="feed-post-author">
-          <a
-            className="profile-link feed-post-author-identity"
-            href={`/profile/${video.owner.id}`}
-            onClick={event => navigateToProfile(event, video.owner.id)}
-            aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}
-          >
-            <div className="video-owner-avatar">
-              {video.owner.photoUrl ? (
-                <img
-                  src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
-                  alt=""
-                />
-              ) : (
-                <UserRound size={16} />
-              )}
-            </div>
-            <div className="feed-post-author-info">
-              <strong>
-                {displayName(video.owner.name, video.owner.username)}
-                {video.owner.isVerified && (
-                  <BadgeCheck
-                    className="verified-badge"
-                    size={13}
-                    aria-label="Verified profile"
-                  />
-                )}
-              </strong>
-              <span>
-                {relativeTime(video.createdAt)} ·{" "}
-                {video.mediaType === "IMAGE" ? "Photo" : "Video"}
-              </span>
-            </div>
-          </a>
-          <PostManagementMenu
-            video={video}
-            onUpdated={setDescription}
-            onDeleted={() => setDeleted(true)}
-          />
-        </header>
-        <div
-          className={`feed-media-content${video.mediaType === "VIDEO" ? " feed-media-content--video" : " feed-media-content--image"}`}
-        >
           {video.mediaType === "IMAGE" ? (
             <img
               src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
               alt={video.title || "Post"}
               loading="lazy"
               className="object-contain w-full h-auto max-h-[60vh] bg-black"
+              draggable={false}
             />
           ) : (
             <QualityVideoPlayer
@@ -1694,9 +1695,6 @@ function VideoCard({
     <article
       id={`feed-video-${video.id}`}
       className="long-video-card snap-start h-full w-full overflow-hidden box-border"
-      role={onOpenViewer ? "button" : undefined}
-      tabIndex={onOpenViewer ? 0 : undefined}
-      onClick={openViewer}
     >
       <header className="feed-post-author">
         <a
@@ -1744,12 +1742,23 @@ function VideoCard({
       </header>
       <div
         className={`feed-media-content${video.mediaType === "VIDEO" ? " feed-media-content--video" : " feed-media-content--image"}`}
+        role={onOpenViewer ? "button" : undefined}
+        tabIndex={onOpenViewer ? 0 : undefined}
+        aria-label={onOpenViewer ? "Open post" : undefined}
+        onClick={openViewer}
+        onKeyDown={event => {
+          if (!onOpenViewer || (event.key !== "Enter" && event.key !== " "))
+            return;
+          event.preventDefault();
+          onOpenViewer();
+        }}
       >
         {video.mediaType === "IMAGE" ? (
           <img
             className="object-contain w-full h-auto max-h-[60vh] bg-black"
             src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
             alt={video.title || "Post"}
+            draggable={false}
           />
         ) : (
           <QualityVideoPlayer
@@ -1809,284 +1818,6 @@ function VideoCard({
 }
 const MemoVideoCard = memo(VideoCard);
 
-function UploadVideoPanel({
-  onPublished,
-  detailsRef,
-  initialKind = "LONG",
-  fixedKind,
-}: {
-  onPublished: () => void;
-  detailsRef: { current: HTMLDetailsElement | null };
-  initialKind?: VideoKind;
-  fixedKind?: "LONG" | "SHORT";
-}) {
-  const [mode, setMode] = useState<"video" | "photo">("video");
-  const [kind, setKind] = useState<VideoKind>(initialKind);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
-  const [imageDimensions, setImageDimensions] = useState<{
-    width: number;
-    height: number;
-  } | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const selectFile = async (event: ChangeEvent<HTMLInputElement>) => {
-    const nextFile = event.target.files?.[0];
-    event.target.value = "";
-    if (!nextFile) return;
-    try {
-      if (mode === "photo") {
-        validatePhotoFile(nextFile);
-        setFile(nextFile);
-        setMetadata(null);
-        setImagePreviewUrl(URL.createObjectURL(nextFile));
-        setImageDimensions(await getImageDimensions(nextFile));
-        return;
-      }
-      const nextMetadata = await getVideoMetadata(nextFile, {
-        maxDurationSeconds:
-          (fixedKind ?? kind) === "LONG"
-            ? MAX_LONG_VIDEO_DURATION_SECONDS
-            : MAX_SHORT_VIDEO_DURATION_SECONDS,
-      });
-      setFile(nextFile);
-      setMetadata(nextMetadata);
-      setImageDimensions(null);
-    } catch (error) {
-      notifyError(error);
-    }
-  };
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (
-      !file ||
-      !title.trim() ||
-      (mode === "video" && !metadata) ||
-      (mode === "photo" && !imageDimensions)
-    ) {
-      toast.error(
-        mode === "photo"
-          ? "Add an image and title first."
-          : "Add an original video and title first."
-      );
-      return;
-    }
-    setBusy(true);
-    try {
-      if (mode === "photo" && imageDimensions) {
-        await publishPhoto(
-          file,
-          title.trim(),
-          description.trim(),
-          imageDimensions
-        );
-      } else {
-        await publishVideo(
-          file,
-          fixedKind ?? (kind === "SHORT" ? "SHORT" : "LONG"),
-          title.trim(),
-          description.trim()
-        );
-      }
-      try {
-        await onPublished();
-      } catch (refreshError) {
-        console.error(
-          "[MediaPublish] Published successfully but feed refresh failed:",
-          refreshError
-        );
-        toast.info(
-          "Published successfully. Refresh the feed if it is not visible yet."
-        );
-      }
-      setTitle("");
-      setDescription("");
-      setFile(null);
-      setMetadata(null);
-      setImageDimensions(null);
-      setImagePreviewUrl(null);
-      toast.success(
-        mode === "photo"
-          ? "Photo published to your feed."
-          : "Video published to your feed."
-      );
-    } catch (error) {
-      const err =
-        error instanceof Error ? error : new Error(JSON.stringify(error));
-      alert("Upload Error: " + (err.message || JSON.stringify(err)));
-      notifyError(error);
-    } finally {
-      setBusy(false);
-    }
-  };
-  useEffect(() => {
-    setFile(null);
-    setMetadata(null);
-    setImageDimensions(null);
-    setImagePreviewUrl(null);
-  }, [fixedKind, kind, mode]);
-
-  useEffect(() => {
-    return () => {
-      if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
-    };
-  }, [imagePreviewUrl]);
-  return (
-    <details ref={detailsRef} className="media-publish-panel">
-      <summary>
-        {mode === "photo" ? <Image size={17} /> : <Upload size={17} />} Publish
-        media
-      </summary>
-      <form onSubmit={submit} className="media-publish-form">
-        <div
-          className="media-kind-switch"
-          role="tablist"
-          aria-label="Upload type"
-        >
-          <button
-            type="button"
-            className={mode === "video" ? "active" : ""}
-            onClick={() => setMode("video")}
-            role="tab"
-            aria-selected={mode === "video"}
-          >
-            Video upload
-          </button>
-          <button
-            type="button"
-            className={mode === "photo" ? "active" : ""}
-            onClick={() => setMode("photo")}
-            role="tab"
-            aria-selected={mode === "photo"}
-          >
-            Photo upload
-          </button>
-        </div>
-        {mode === "video" &&
-          (fixedKind ? (
-            <div className="media-kind-switch" aria-label="Video format">
-              <span className="active">Short · 1 min</span>
-            </div>
-          ) : (
-            <div
-              className="media-kind-switch"
-              role="tablist"
-              aria-label="Video format"
-            >
-              <button
-                type="button"
-                className={kind === "LONG" ? "active" : ""}
-                onClick={() => setKind("LONG")}
-                role="tab"
-                aria-selected={kind === "LONG"}
-              >
-                Main video · 30 min
-              </button>
-              <button
-                type="button"
-                className={kind === "SHORT" ? "active" : ""}
-                onClick={() => setKind("SHORT")}
-                role="tab"
-                aria-selected={kind === "SHORT"}
-              >
-                Short · 1 min
-              </button>
-            </div>
-          ))}
-        <p className="media-form-hint">
-          {mode === "photo"
-            ? "Share a JPEG, PNG, or WEBP image with your KINBA feed."
-            : "Upload one original video. KINBA publishes it immediately after the upload finishes."}
-        </p>
-        <label>
-          Title
-          <input
-            value={title}
-            onChange={event => setTitle(event.target.value)}
-            minLength={3}
-            maxLength={180}
-            required
-            placeholder="Give your video a clear title"
-          />
-        </label>
-        <label>
-          Description
-          <textarea
-            value={description}
-            onChange={event => setDescription(event.target.value)}
-            maxLength={2400}
-            rows={3}
-            placeholder="Tell viewers what this video is about"
-          />
-        </label>
-        <div className="quality-upload-grid">
-          <input
-            ref={inputRef}
-            type="file"
-            accept={
-              mode === "photo" ? "image/jpeg,image/png,image/webp" : "video/*"
-            }
-            className="sr-only"
-            onChange={selectFile}
-          />
-          <button
-            type="button"
-            className="secondary-media-btn"
-            onClick={() => inputRef.current?.click()}
-          >
-            {mode === "photo"
-              ? "Choose photo · JPG, PNG, or WEBP"
-              : "Choose original video · required"}
-          </button>
-          {file && (
-            <span className="selected-file">
-              {imagePreviewUrl && (
-                <img
-                  className="selected-image-preview"
-                  src={imagePreviewUrl}
-                  alt="Selected photo preview"
-                />
-              )}
-              {file.name}
-              <button
-                type="button"
-                className="muted-btn"
-                onClick={() => {
-                  setFile(null);
-                  setMetadata(null);
-                  setImageDimensions(null);
-                  setImagePreviewUrl(null);
-                }}
-              >
-                Remove
-              </button>
-            </span>
-          )}
-        </div>
-        <button
-          className="primary-btn"
-          type="submit"
-          disabled={
-            !file ||
-            !title.trim() ||
-            (mode === "video" ? !metadata : !imageDimensions) ||
-            busy
-          }
-        >
-          {busy ? <Loader2 className="spin" size={16} /> : <Upload size={16} />}{" "}
-          {busy
-            ? "Uploading"
-            : mode === "photo"
-              ? "Publish photo"
-              : "Publish video"}
-        </button>
-      </form>
-    </details>
-  );
-}
 function FeedSkeleton({ short = false }: { short?: boolean }) {
   return (
     <div
@@ -2243,20 +1974,146 @@ function FeedPhotoLightbox({
   );
 }
 
+function FocusedVideoViewer({
+  video,
+  onClose,
+}: {
+  video: VideoRecord;
+  onClose: () => void;
+}) {
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const auth = useAuth();
+  const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
+  const bookmarkMutation = trpc.videos.bookmark.useMutation();
+  const toggleBookmark = async () => {
+    if (!auth.isAuthenticated) return auth.openAuth();
+    if (bookmarkMutation.isPending) return;
+    try {
+      const engagement = await bookmarkMutation.mutateAsync({
+        videoId: video.id,
+      });
+      setBookmarked(engagement.viewerBookmarked);
+    } catch (error) {
+      notifyError(error);
+    }
+  };
+  const { current, react, share, pending } = useOptimisticEngagement(video);
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose]);
+  return (
+    <div
+      className="focused-video-viewer"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Video viewer"
+    >
+      <button
+        type="button"
+        className="focused-video-viewer__close"
+        onClick={onClose}
+        aria-label="Close video viewer"
+      >
+        <X size={22} />
+      </button>
+      <div className="focused-video-viewer__stage">
+        <header className="feed-post-author focused-video-viewer__author">
+          <a
+            className="profile-link feed-post-author-identity"
+            href={`/profile/${video.owner.id}`}
+            onClick={event => navigateToProfile(event, video.owner.id)}
+            aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}
+          >
+            <div className="video-owner-avatar">
+              {video.owner.photoUrl ? (
+                <img
+                  src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
+                  alt=""
+                />
+              ) : (
+                <UserRound size={16} />
+              )}
+            </div>
+            <div className="feed-post-author-info">
+              <strong>
+                {displayName(video.owner.name, video.owner.username)}
+                {video.owner.isVerified && (
+                  <BadgeCheck
+                    className="verified-badge"
+                    size={13}
+                    aria-label="Verified profile"
+                  />
+                )}
+              </strong>
+              <span>
+                {relativeTime(video.createdAt)} ·{" "}
+                {video.mediaType === "IMAGE"
+                  ? "Photo"
+                  : video.kind === "SHORT"
+                    ? "Short"
+                    : "Video"}
+              </span>
+            </div>
+          </a>
+        </header>
+        <div className="focused-video-viewer__media">
+          <QualityVideoPlayer video={video} active showPoster />
+        </div>
+        {(video.title || video.description) && (
+          <div className="feed-media-copy focused-video-viewer__copy">
+            {video.title && <h3>{video.title}</h3>}
+            {video.description && <p>{video.description}</p>}
+          </div>
+        )}
+        <EngagementActions
+          engagement={current}
+          onReact={react}
+          onShare={share}
+          onComments={() => {
+            if (!auth.isAuthenticated) return auth.openAuth();
+            setCommentsOpen(value => !value);
+          }}
+          pending={pending}
+          feedStyle
+          bookmarked={bookmarked}
+          onBookmark={toggleBookmark}
+        />
+        <CommentDrawer
+          postId={video.id}
+          postOwnerId={video.owner.id}
+          open={commentsOpen}
+          onClose={() => setCommentsOpen(false)}
+        />
+      </div>
+    </div>
+  );
+}
+
 function HomeFeedPanel({
   tab,
   active = true,
-  autoOpenUpload = false,
   showDetailsOverlay = true,
   showHeader = true,
   onOpenShort,
+  onOpenPhoto,
+  onOpenVideo,
 }: {
   tab: HomeTab;
   active?: boolean;
-  autoOpenUpload?: boolean;
   showDetailsOverlay?: boolean;
   showHeader?: boolean;
   onOpenShort?: (videoId: number) => void;
+  onOpenPhoto?: (video: VideoRecord) => void;
+  onOpenVideo?: (video: VideoRecord) => void;
 }) {
   const auth = useAuth();
   const utils = trpc.useUtils();
@@ -2271,17 +2128,6 @@ function HomeFeedPanel({
     }
   );
   const videos = (query.data ?? []) as VideoRecord[];
-  const uploadDetailsRef = useRef<HTMLDetailsElement>(null);
-  const openUploader = () => {
-    uploadDetailsRef.current?.setAttribute("open", "");
-    uploadDetailsRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
-  };
-  useEffect(() => {
-    if (autoOpenUpload) openUploader();
-  }, [autoOpenUpload]);
   return (
     <section
       className="media-section home-feed-section w-full max-w-full overflow-hidden box-border"
@@ -2320,11 +2166,15 @@ function HomeFeedPanel({
               video={video}
               active={active}
               showDetailsOverlay={showDetailsOverlay}
-              socialLayout={tab === "videos"}
+              socialLayout
               onOpenViewer={
-                tab === "wheels" && video.kind === "SHORT" && onOpenShort
+                video.kind === "SHORT" && onOpenShort
                   ? () => onOpenShort(video.id)
-                  : undefined
+                  : video.mediaType === "IMAGE" && onOpenPhoto
+                    ? () => onOpenPhoto(video)
+                    : video.mediaType === "VIDEO" && onOpenVideo
+                      ? () => onOpenVideo(video)
+                      : undefined
               }
             />
           ))}
@@ -2337,26 +2187,8 @@ function HomeFeedPanel({
               ? "Sign in to see Following."
               : "No videos to show yet."}
           </h3>
-          {tab !== "wheels" && (
-            <button
-              type="button"
-              className="primary-btn"
-              onClick={openUploader}
-            >
-              <Upload size={15} /> Upload Video
-            </button>
-          )}
         </div>
       )}
-      <UploadVideoPanel
-        detailsRef={uploadDetailsRef}
-        onPublished={async () => {
-          await Promise.all([
-            utils.home.feed.invalidate(),
-            utils.videos.list.invalidate(),
-          ]);
-        }}
-      />
     </section>
   );
 }
@@ -2532,7 +2364,6 @@ function ShortsFeed({
     }
   );
   const viewportRef = useRef<HTMLDivElement>(null);
-  const uploadDetailsRef = useRef<HTMLDetailsElement>(null);
   const gestureRef = useRef<{
     pointerId: number;
     startX: number;
@@ -2541,15 +2372,7 @@ function ShortsFeed({
   } | null>(null);
   const gestureLockRef = useRef(false);
   const gestureUnlockTimerRef = useRef<number | null>(null);
-  const utils = trpc.useUtils();
   const [activeIndex, setActiveIndex] = useState(0);
-  const openUploader = () => {
-    uploadDetailsRef.current?.setAttribute("open", "");
-    uploadDetailsRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
-  };
   const videos = (query.data ?? []) as VideoRecord[];
   useEffect(() => {
     if (initialVideoId === undefined || !videos.length) return;
@@ -2674,13 +2497,6 @@ function ShortsFeed({
         <div className="shorts-controls">
           <button
             type="button"
-            className="primary-btn shorts-upload-button"
-            onClick={openUploader}
-          >
-            <Upload size={15} /> Upload Short
-          </button>
-          <button
-            type="button"
             onClick={() => goTo(activeIndex - 1)}
             disabled={!videos.length || activeIndex === 0}
             aria-label="Previous Short"
@@ -2727,17 +2543,6 @@ function ShortsFeed({
           <h3>No Shorts to show yet.</h3>
         </div>
       )}
-      <UploadVideoPanel
-        detailsRef={uploadDetailsRef}
-        initialKind="SHORT"
-        fixedKind="SHORT"
-        onPublished={async () => {
-          await Promise.all([
-            utils.home.feed.invalidate(),
-            utils.videos.list.invalidate(),
-          ]);
-        }}
-      />
     </section>
   );
 }
@@ -3255,6 +3060,8 @@ export default function MediaHub({
 }) {
   const [selectedSection, setSelectedSection] = useState<FeedSection>(section);
   const [shortsViewerId, setShortsViewerId] = useState<number | null>(null);
+  const [photoViewer, setPhotoViewer] = useState<VideoRecord | null>(null);
+  const [videoViewer, setVideoViewer] = useState<VideoRecord | null>(null);
 
   useEffect(() => {
     setSelectedSection(section);
@@ -3337,6 +3144,8 @@ export default function MediaHub({
               showDetailsOverlay={false}
               showHeader={false}
               onOpenShort={setShortsViewerId}
+              onOpenPhoto={setPhotoViewer}
+              onOpenVideo={setVideoViewer}
             />
             <div className="wheels-sponsor-panel">
               {wheels ?? (
@@ -3354,9 +3163,11 @@ export default function MediaHub({
             <HomeFeedPanel
               tab="videos"
               active
-              autoOpenUpload={section === "publish"}
               showDetailsOverlay={false}
               showHeader={false}
+              onOpenShort={setShortsViewerId}
+              onOpenPhoto={setPhotoViewer}
+              onOpenVideo={setVideoViewer}
             />
           </ErrorBoundary>
         </div>
@@ -3387,6 +3198,20 @@ export default function MediaHub({
           </button>
           <ShortsFeed active initialVideoId={shortsViewerId} viewerMode />
         </div>
+      )}
+      {photoViewer && (
+        <FeedPhotoLightbox
+          imageUrl={photoViewer.videoUrl}
+          alt={photoViewer.title || "Post"}
+          owner={photoViewer.owner}
+          onClose={() => setPhotoViewer(null)}
+        />
+      )}
+      {videoViewer && (
+        <FocusedVideoViewer
+          video={videoViewer}
+          onClose={() => setVideoViewer(null)}
+        />
       )}
     </div>
   );

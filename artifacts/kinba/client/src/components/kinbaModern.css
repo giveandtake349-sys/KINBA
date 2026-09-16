@@ -1396,37 +1396,7 @@ body {
   background: #05070d;
 }
 
-/* Final feed-only presentation: plain text tabs and one-post vertical streams. */
-.top-navigation-wrapper .home-feed-tabs,
-.media-hub .home-feed-tabs {
-  gap: 24px !important;
-  padding: 8px max(16px, calc((100% - 940px) / 2)) !important;
-  border: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-.top-navigation-wrapper .home-feed-tabs button,
-.media-hub .home-feed-tabs button {
-  flex: 0 0 auto !important;
-  min-height: 38px !important;
-  padding: 9px 0 7px !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-.top-navigation-wrapper .home-feed-tabs button:hover,
-.media-hub .home-feed-tabs button:hover,
-.top-navigation-wrapper .home-feed-tabs button.active,
-.media-hub .home-feed-tabs button.active {
-  background: transparent !important;
-  box-shadow: none !important;
-}
-.top-navigation-wrapper .home-feed-tabs button.active,
-.media-hub .home-feed-tabs button.active {
-  border-bottom-color: var(--kinba-coral) !important;
-}
+/* One-post vertical streams for the feed-only videos view. */
 .feed-video-list {
   display: flex !important;
   flex-direction: column !important;
@@ -2063,59 +2033,6 @@ body {
     right: 12px !important;
     bottom: 64px !important;
   }
-}
-
-
-/* Strict Facebook-style feed contract: black gutters, full-width dark cards, and no mobile card rounding. */
-.kinba-app,
-.app-main-content.has-feed-tabs,
-.app-main-content.has-feed-tabs .home-page,
-.media-hub,
-.media-hub .media-tab-panel,
-.media-hub .unified-feed,
-.media-hub .home-feed-section,
-.media-hub .wheels-feed-layout {
-  background: #000 !important;
-}
-
-.media-hub .feed-card-list,
-.media-hub .unified-feed-list,
-.media-hub .feed-video-list {
-  display: flex !important;
-  flex-direction: column !important;
-  width: 100% !important;
-  max-width: none !important;
-  gap: 24px !important;
-  margin: 0 !important;
-  padding: 0 0 24px !important;
-  background: #000 !important;
-}
-
-.media-hub .feed-card-list > .feed-media-post,
-.media-hub .feed-card-list > .feed-text-card,
-.media-hub .feed-card-list > .long-video-card,
-.media-hub .feed-card-list > .shorts-insertion-block,
-.media-hub .unified-feed-list > .feed-media-post,
-.media-hub .unified-feed-list > .feed-text-card,
-.media-hub .unified-feed-list > .long-video-card,
-.media-hub .unified-feed-list > .shorts-insertion-block,
-.media-hub .feed-video-list > .long-video-card {
-  width: 100% !important;
-  max-width: none !important;
-  min-height: 0 !important;
-  margin: 0 0 24px !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: #242526 !important;
-  box-shadow: none !important;
-}
-
-.media-hub .feed-card-list > :last-child,
-.media-hub .unified-feed-list > :last-child,
-.media-hub .feed-video-list > :last-child {
-  margin-bottom: 0 !important;
 }
 
 /* The normal feed order ends with a horizontal, touch-friendly action bar. */

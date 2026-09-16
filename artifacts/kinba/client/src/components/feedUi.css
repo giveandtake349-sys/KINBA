@@ -539,3 +539,302 @@
     margin-inline: auto;
   }
 }
+
+/* ============================================================================
+   KINBA FEED STAGE — final source of truth for the Feed/Post presentation.
+   Imported after mediaHub.css and kinbaModern.css so it closes the cascade for
+   the normal Feed (the Shorts tab keeps shorts-stage.css as its own owner, and
+   the transparent Spotlight | Videos | Shorts tab strip lives in profile.css
+   alongside the app chrome that owns it).
+   UI ONLY: separated Facebook-style post cards and maximum practical media.
+   ============================================================================ */
+
+/* ---------- Separated Facebook-style post cards ---------- */
+
+.media-hub .feed-card-list,
+.media-hub .unified-feed-list,
+.media-hub .feed-video-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 24px !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+  padding: 0 0 24px !important;
+  background: #000 !important;
+  scroll-snap-type: none !important;
+  scroll-snap-stop: normal !important;
+}
+
+.media-hub .feed-card-list > .feed-media-post,
+.media-hub .feed-card-list > .feed-text-card,
+.media-hub .feed-card-list > .long-video-card,
+.media-hub .unified-feed-list > .feed-media-post,
+.media-hub .unified-feed-list > .feed-text-card,
+.media-hub .unified-feed-list > .long-video-card,
+.media-hub .feed-video-list > .long-video-card {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #242526 !important;
+  box-shadow: none !important;
+  scroll-snap-align: none !important;
+}
+
+.media-hub .feed-card-list > .feed-media-post > .feed-post-author,
+.media-hub .feed-card-list > .long-video-card > .feed-post-author,
+.media-hub .unified-feed-list > .feed-media-post > .feed-post-author,
+.media-hub .unified-feed-list > .long-video-card > .feed-post-author,
+.media-hub .feed-video-list > .long-video-card > .feed-post-author {
+  min-height: 58px !important;
+  margin: 0 !important;
+  padding: 10px 14px !important;
+  background: #242526 !important;
+}
+
+.media-hub .feed-video-list > .long-video-card > .video-card-details,
+.media-hub .unified-feed-list > .long-video-card > .video-card-details,
+.media-hub .feed-card-list > .long-video-card > .video-card-details {
+  margin: 0 !important;
+  padding: 12px 14px 4px !important;
+}
+
+/* Maximum practical media: bleed edge-to-edge in the card, fill the width, and
+   grow as tall as fits below the app chrome without forcing the cover. */
+.media-hub .feed-media-content {
+  position: relative !important;
+  z-index: 1 !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  min-height: 0 !important;
+  aspect-ratio: auto !important;
+  background: #050505 !important;
+}
+
+.media-hub .feed-media-content--image {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.media-hub .feed-media-content--image > img {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: min(calc(100svh - var(--kinba-chrome-h, 116px) - 74px), 920px) !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  margin: 0 !important;
+  background: #050505 !important;
+}
+
+.media-hub .feed-media-content--video,
+.media-hub .feed-media-content--video > .media-video-frame {
+  min-height: 0 !important;
+  aspect-ratio: auto !important;
+}
+
+.media-hub .feed-media-content--video > .media-video-frame {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  background: #050505 !important;
+}
+
+.media-hub .feed-media-content--video .media-video-frame video {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: min(calc(100svh - var(--kinba-chrome-h, 116px) - 74px), 920px) !important;
+  aspect-ratio: auto !important;
+  object-fit: contain !important;
+  margin: 0 !important;
+  background: #050505 !important;
+}
+
+.media-hub .unified-feed-list > .long-video-card .media-video-frame,
+.media-hub .feed-video-list > .long-video-card .media-video-frame,
+.media-hub .feed-card-list > .long-video-card .media-video-frame {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  background: #050505 !important;
+}
+
+.media-hub .unified-feed-list > .long-video-card .media-video-frame video,
+.media-hub .feed-video-list > .long-video-card .media-video-frame video,
+.media-hub .feed-card-list > .long-video-card .media-video-frame video {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: min(calc(100svh - var(--kinba-chrome-h, 116px) - 74px), 920px) !important;
+  aspect-ratio: auto !important;
+  object-fit: contain !important;
+  margin: 0 !important;
+  background: #050505 !important;
+}
+
+/* Nearly full-height frame for the feed action bar and comment entry. */
+.media-hub .feed-card-list > .feed-media-post > .feed-action-bar,
+.media-hub .unified-feed-list > .long-video-card > .feed-action-bar {
+  margin: 12px 0 0 !important;
+  padding: 0 12px 12px !important;
+  background: transparent !important;
+}
+
+@media (max-width: 760px) {
+  .media-hub .feed-card-list,
+  .media-hub .unified-feed-list,
+  .media-hub .feed-video-list {
+    gap: 18px !important;
+    padding: 0 0 calc(96px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* Desktop: center a Facebook-style column and round the separated cards. */
+@media (min-width: 761px) {
+  .media-hub .feed-card-list,
+  .media-hub .unified-feed-list,
+  .media-hub .feed-video-list {
+    max-width: 720px !important;
+  }
+
+  .media-hub .feed-card-list > .feed-media-post,
+  .media-hub .feed-card-list > .feed-text-card,
+  .media-hub .feed-card-list > .long-video-card,
+  .media-hub .unified-feed-list > .feed-media-post,
+  .media-hub .unified-feed-list > .feed-text-card,
+  .media-hub .unified-feed-list > .long-video-card,
+  .media-hub .feed-video-list > .long-video-card,
+  .media-hub .media-tab-panel:not(.media-tab-panel--wheels) .feed-video-list > .long-video-card {
+    border-radius: 14px !important;
+  }
+}
+
+/* ============================================================================
+   Focused video viewer: the dedicated long-form/NORMAL video experience opened
+   from the post media. Full-viewport stage on the same canvas as the feed.
+   ============================================================================ */
+
+.focused-video-viewer {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147482000 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior-y: contain !important;
+  background: #000 !important;
+  isolation: isolate !important;
+}
+
+body:has(.focused-video-viewer) .topbar,
+body:has(.focused-video-viewer) .top-navigation-wrapper,
+body:has(.focused-video-viewer) .home-feed-tabs,
+body:has(.focused-video-viewer) .bottom-navigation,
+body:has(.focused-video-viewer) .mobile-drawer {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.focused-video-viewer__close {
+  position: fixed !important;
+  top: 12px !important;
+  right: 12px !important;
+  z-index: 20 !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  padding: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: 999px !important;
+  color: #fff !important;
+  background: rgba(8, 12, 20, 0.72) !important;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28) !important;
+  cursor: pointer !important;
+}
+
+.focused-video-viewer__stage {
+  width: 100% !important;
+  max-width: 720px !important;
+  margin: 0 auto !important;
+  padding: 64px 0 calc(48px + env(safe-area-inset-bottom)) !important;
+  background: #000 !important;
+}
+
+.focused-video-viewer__stage > .feed-post-author {
+  padding: 0 14px 12px !important;
+  background: transparent !important;
+}
+
+.focused-video-viewer__media {
+  width: 100% !important;
+  background: #050505 !important;
+}
+
+.focused-video-viewer__media .media-video-frame {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  background: #050505 !important;
+}
+
+.focused-video-viewer__media .media-video-frame video {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: calc(100dvh - 260px) !important;
+  aspect-ratio: auto !important;
+  object-fit: contain !important;
+  margin: 0 !important;
+  background: #050505 !important;
+}
+
+.focused-video-viewer__copy {
+  padding: 12px 14px 0 !important;
+  background: transparent !important;
+}
+
+.focused-video-viewer__stage > .feed-action-bar {
+  padding: 10px 14px 0 !important;
+  background: transparent !important;
+}
+
+@media (min-width: 768px) {
+  .focused-video-viewer__stage {
+    max-width: 860px !important;
+  }
+}

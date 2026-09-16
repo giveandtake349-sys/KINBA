@@ -619,6 +619,19 @@ body { color: var(--kinba-text); }
   pointer-events: auto;
 }
 
+/* The home page reserves exactly the measured height of the real fixed chrome.
+   Home.tsx measures .top-navigation-wrapper and publishes --kinba-chrome-h.
+   These fallbacks only cover the brief window before that measurement lands. */
+:root {
+  --kinba-chrome-h: 116px; /* desktop: 68px header + 48px tabs */
+}
+
+@media (max-width: 760px) {
+  :root {
+    --kinba-chrome-h: 104px; /* mobile: 58px header + 46px tabs */
+  }
+}
+
 .top-navigation-wrapper .topbar.mobile-first-header {
   position: relative !important;
   top: auto !important;
@@ -628,27 +641,61 @@ body { color: var(--kinba-text); }
   background: transparent !important;
 }
 
+/* Transparent tab strip: only the labels plus an active underline. No bar,
+   panel, border, or backdrop — the feed canvas runs edge-to-edge behind them. */
 .top-navigation-wrapper .home-feed-tabs {
   position: relative !important;
   top: auto !important;
   z-index: auto !important;
+  display: flex !important;
+  align-items: stretch !important;
+  gap: 28px !important;
   width: 100% !important;
   min-height: 48px;
   margin: 0 !important;
-  padding: 0 max(12px, calc((100% - 940px) / 2)) !important;
+  padding: 0 max(16px, calc((100% - 940px) / 2)) !important;
+  border: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  overflow-x: auto !important;
+  scrollbar-width: none !important;
+}
+
+.top-navigation-wrapper .home-feed-tabs::-webkit-scrollbar {
+  display: none !important;
 }
 
 .top-navigation-wrapper .home-feed-tabs button {
+  flex: 0 0 auto !important;
+  min-width: max-content !important;
   min-height: 48px;
-  padding-top: 8px !important;
-  padding-bottom: 7px !important;
+  margin: 0 !important;
+  padding: 0 2px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--kinba-muted) !important;
+  font-weight: 600 !important;
+}
+
+.top-navigation-wrapper .home-feed-tabs button:hover,
+.top-navigation-wrapper .home-feed-tabs button:focus-visible {
+  color: var(--kinba-text) !important;
+  background: transparent !important;
+}
+
+.top-navigation-wrapper .home-feed-tabs button.active {
+  color: var(--kinba-text) !important;
+  background: transparent !important;
+  box-shadow: inset 0 -2px 0 var(--kinba-blue) !important;
 }
 
 .app-main-content.has-feed-tabs .home-page {
-  padding-top: 116px !important;
+  padding-top: var(--kinba-chrome-h, 116px) !important;
 }
 
 .app-main-content:not(.has-feed-tabs) > .profile-page {
@@ -668,23 +715,19 @@ body { color: var(--kinba-text); }
   .top-navigation-wrapper .home-feed-tabs button {
     min-height: 46px;
   }
-
-  .app-main-content.has-feed-tabs .home-page {
-    padding-top: 104px !important;
-  }
 }
 
-/* Collapsed chrome: when the fixed header/nav slide away on scroll-down, the
-   feed must fill the viewport instead of keeping its reserved header clearance.
-   Mirrors the header's 300ms transition so content stays anchored while the
-   header slides. Ordering matters: must come after the 116px/104px rules. */
-.app-main-content.has-feed-tabs .home-page {
-  transition: padding-top 300ms ease-in-out;
-}
-
+/* Collapsed chrome (scroll-down): the feed expands to the top of the viewport
+   immediately — no transition is applied, so the freed space is taken at once. */
 .app-main-content.chrome-collapsed.has-feed-tabs .home-page,
 .app-main-content.chrome-collapsed > .home-page {
   padding-top: 0 !important;
+}
+
+/* When the chrome collapses, the post media canvas grows with the freed space. */
+.app-main-content.chrome-collapsed.has-feed-tabs .media-hub .feed-media-content > img,
+.app-main-content.chrome-collapsed.has-feed-tabs .media-hub .feed-media-content--video > .media-video-frame > video {
+  max-height: calc(100svh - 70px) !important;
 }
 
 /* Ownership actions: clear owner affordances and guest-safe profile actions. */
