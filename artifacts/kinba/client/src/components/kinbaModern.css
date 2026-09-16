@@ -2635,13 +2635,6 @@ body:has(.shorts-viewer-layer) .action-modal-layer {
   object-fit: contain !important;
 }
 
-.media-hub .shorts-list-feed > .shorts-list-viewport > .short-card .short-overlay {
-  flex: 0 0 auto !important;
-  min-height: 0 !important;
-  max-height: 36% !important;
-  overflow: auto !important;
-}
-
 /* Detail mode: one full-height card at a time, with no collapsed children or feed bleed. */
 .media-hub .shorts-viewer-layer {
   position: fixed !important;
@@ -2714,13 +2707,6 @@ body:has(.shorts-viewer-layer) .action-modal-layer {
   height: 100% !important;
   min-height: 0 !important;
   object-fit: cover !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .short-overlay {
-  flex: 0 0 auto !important;
-  min-height: 0 !important;
-  max-height: 32% !important;
-  overflow: auto !important;
 }
 
 /* Hide all known app chrome and modal surfaces while the detail screen is mounted. */
@@ -2977,37 +2963,6 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
 .media-hub .shorts-list-viewport > .short-card {
   position: relative !important;
   background: #000 !important;
-}
-.media-hub .shorts-overlay-actions,
-.media-hub .shorts-tab-panel .shorts-list-viewport > .short-card .shorts-overlay-actions,
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .shorts-overlay-actions {
-  position: absolute !important;
-  right: 12px !important;
-  bottom: 64px !important;
-  z-index: 20 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  gap: 16px !important;
-  width: auto !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  pointer-events: auto !important;
-}
-.media-hub .shorts-overlay-actions .media-engagement-actions--overlay,
-.media-hub .shorts-tab-panel .shorts-list-viewport > .short-card .shorts-overlay-actions .media-engagement-actions--overlay,
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .shorts-overlay-actions .media-engagement-actions--overlay {
-  position: static !important;
-  right: auto !important;
-  bottom: auto !important;
-  z-index: 20 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  gap: 16px !important;
-  width: auto !important;
-  margin: 0 !important;
-  padding: 0 !important;
 }
 .media-hub .feed-media-content > img,
 .media-hub .feed-text-card .feed-photo-button img {
