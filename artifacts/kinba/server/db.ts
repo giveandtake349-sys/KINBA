@@ -501,7 +501,15 @@ async function selectVideos(
     .from(videos)
     .innerJoin(users, eq(videos.userId, users.id))
     .leftJoin(profiles, eq(videos.userId, profiles.userId))
-    .where(and(...conditions))
+    .where(
+      and(
+        // Only deliver playable media. PENDING/PROCESSING rows may still point
+        // at unfinished HLS artifacts; filtering here keeps every public
+        // listing (home feed, search, profiles, bookmarks) READY-only.
+        eq(videos.processingStatus, "READY"),
+        ...conditions
+      )
+    )
     .orderBy(
       ...(orderBy === "trendy"
         ? [desc(reactionCount), desc(shareCount), desc(videos.createdAt)]
