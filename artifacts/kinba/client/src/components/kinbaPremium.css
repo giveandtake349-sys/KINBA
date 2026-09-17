@@ -1,0 +1,943 @@
+/* ============================================================================
+   KINBA PREMIUM — unified product design system
+   ============================================================================
+   Loaded after every other stylesheet (last in Home.tsx AND last in
+   MediaHub.tsx) so it is the single source of truth for the visual system.
+
+   Scope: presentation only. No data, API, routing, or business logic.
+   - Replaces the accumulated warm-editorial / Facebook-gray / dark-glass
+     palettes with one premium, theme-aware palette.
+   - Adaptive media rules (aspect-ratio preserved) are re-asserted and kept.
+   - Dedicated Shorts styling is deliberately untouched: rules below never
+     target .short-card / .shorts-* / .short-overlay selectors, so the
+     shorts stage keeps its own 9:16 experience.
+   ============================================================================ */
+
+/* ----------------------------- 1. TOKENS ----------------------------- */
+
+:root,
+:root[data-theme="dark"] {
+  --page-bg: #0b0b0e;
+  --text: #f3f3f6;
+  --muted: #9b9ba8;
+  --surface: #131317;
+  --surface-raised: #1c1c22;
+  --border: rgba(246, 246, 250, 0.1);
+  --input: rgba(255, 255, 255, 0.07);
+  --accent: #ff5e57;
+  --accent-soft: rgba(255, 94, 87, 0.11);
+  --accent-border: rgba(255, 94, 87, 0.42);
+  --accent-ink: #ffffff;
+  --teal: #2ad4cf;
+  --teal-soft: rgba(42, 212, 207, 0.12);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --shadow-pop: 0 14px 40px rgba(0, 0, 0, 0.42);
+  --chrome-bg: rgba(11, 11, 14, 0.8);
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  --page-bg: #f4f4f6;
+  --text: #16161b;
+  --muted: #6e6e7a;
+  --surface: #ffffff;
+  --surface-raised: #ececf0;
+  --border: rgba(20, 20, 28, 0.1);
+  --input: rgba(20, 20, 28, 0.06);
+  --accent: #e23b31;
+  --accent-soft: rgba(226, 59, 49, 0.1);
+  --accent-border: rgba(196, 42, 38, 0.34);
+  --accent-ink: #ffffff;
+  --teal: #0e9b96;
+  --teal-soft: rgba(14, 155, 150, 0.12);
+  --shadow-soft: 0 1px 3px rgba(16, 16, 24, 0.08);
+  --shadow-pop: 0 14px 40px rgba(16, 16, 24, 0.16);
+  --chrome-bg: rgba(244, 244, 246, 0.82);
+  color-scheme: light;
+}
+
+/* Remap legacy palettes so every pre-existing rule resolves to the system. */
+:root,
+:root[data-theme="light"],
+:root[data-theme="dark"] {
+  --kinba-bg: var(--page-bg);
+  --kinba-surface: var(--surface);
+  --kinba-raised: var(--surface-raised);
+  --kinba-line: var(--border);
+  --kinba-text: var(--text);
+  --kinba-muted: var(--muted);
+  --kinba-blue: var(--accent);
+  --kinba-blue-soft: var(--accent-soft);
+  --kinba-coral: var(--accent);
+  --kinba-coral-soft: var(--accent-soft);
+  --kinba-cyan: var(--teal);
+  --kinba-cyan-soft: var(--teal-soft);
+  --kinba-ink: var(--page-bg);
+  --kinba-text-modern: var(--text);
+  --kinba-muted-modern: var(--muted);
+  --kinba-line-modern: var(--border);
+  --kinba-panel: color-mix(in srgb, var(--surface) 70%, transparent);
+  --kinba-panel-strong: var(--surface);
+  --kinba-shadow: var(--shadow-pop);
+  --kinba-accent: var(--accent);
+}
+
+.kinba-app {
+  background: var(--page-bg) !important;
+}
+
+body {
+  background: var(--page-bg) !important;
+  color: var(--text) !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body {
+  overscroll-behavior-y: none;
+}
+
+/* ------------------- 2. APP CHROME (header / tabs / nav) ------------------- */
+
+.top-navigation-wrapper {
+  background: transparent !important;
+}
+
+.top-navigation-wrapper .topbar.mobile-first-header {
+  min-height: 62px;
+  height: 62px;
+  padding: 0 clamp(16px, 4vw, 56px) !important;
+  background: var(--chrome-bg) !important;
+  border-bottom: 1px solid var(--border) !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+}
+
+.topbar.mobile-first-header .brand {
+  gap: 10px !important;
+}
+
+.topbar.mobile-first-header .official-logo {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 10px !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 65%, transparent) !important;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 78%, #fff), var(--accent) 60%, #c22c28) !important;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 32%, transparent) !important;
+}
+
+.topbar.mobile-first-header .brand-name {
+  color: var(--text) !important;
+  font-family: "DM Sans", sans-serif !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.02em !important;
+  text-shadow: none !important;
+}
+
+.topbar.mobile-first-header .desktop-nav {
+  gap: 4px !important;
+  margin-left: clamp(16px, 4vw, 60px) !important;
+}
+
+.topbar.mobile-first-header .desktop-nav button {
+  padding: 8px 12px !important;
+  border-radius: 999px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: var(--muted) !important;
+  background: transparent !important;
+}
+
+.topbar.mobile-first-header .desktop-nav button:hover {
+  color: var(--text) !important;
+  background: var(--surface-raised) !important;
+}
+
+.top-navigation-wrapper .topbar.mobile-first-header .topbar-actions {
+  gap: 8px !important;
+}
+
+.top-navigation-wrapper .topbar-icon-button {
+  width: 36px !important;
+  height: 36px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 999px !important;
+  color: var(--muted) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.top-navigation-wrapper .topbar-icon-button:hover {
+  color: var(--text) !important;
+  background: var(--surface-raised) !important;
+}
+
+.top-navigation-wrapper .topbar-actions .topbar-icon-button:first-child {
+  color: var(--accent-ink) !important;
+  background: var(--accent) !important;
+  border-color: transparent !important;
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--accent) 34%, transparent) !important;
+}
+
+.notification-badge {
+  background: var(--accent) !important;
+  border-color: var(--page-bg) !important;
+  box-shadow: none !important;
+  font-weight: 700 !important;
+}
+
+.top-navigation-wrapper .header-profile-trigger {
+  border: 1px solid var(--border) !important;
+  border-radius: 999px !important;
+  padding: 3px 8px 3px 3px !important;
+}
+
+.top-navigation-wrapper .header-profile-trigger .profile-avatar {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+  background: var(--accent-soft) !important;
+}
+
+.top-navigation-wrapper .theme-toggle,
+.top-navigation-wrapper .logout-btn {
+  border: 1px solid var(--border) !important;
+  border-radius: 999px !important;
+  color: var(--muted) !important;
+  background: transparent !important;
+}
+
+.top-navigation-wrapper .theme-toggle:hover,
+.top-navigation-wrapper .logout-btn:hover {
+  color: var(--text) !important;
+  background: var(--surface-raised) !important;
+  border-color: var(--accent-border) !important;
+}
+
+/* Feed tab strip: labels + active underline only, transparent. */
+.top-navigation-wrapper .home-feed-tabs {
+  gap: 26px !important;
+  min-height: 46px !important;
+  background: transparent !important;
+}
+
+.top-navigation-wrapper .home-feed-tabs button {
+  min-height: 46px !important;
+  padding: 0 2px !important;
+  color: var(--muted) !important;
+  font-family: "DM Sans", sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  border-radius: 0 !important;
+}
+
+.top-navigation-wrapper .home-feed-tabs button:hover {
+  color: var(--text) !important;
+}
+
+.top-navigation-wrapper .home-feed-tabs button.active {
+  color: var(--text) !important;
+  box-shadow: inset 0 -2px 0 var(--accent) !important;
+}
+
+/* Bottom navigation */
+.bottom-navigation {
+  min-height: 60px !important;
+  height: 60px;
+  padding: 6px max(10px, env(safe-area-inset-left)) calc(6px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-right)) !important;
+  background: var(--chrome-bg) !important;
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border-top: 1px solid var(--border) !important;
+}
+
+.bottom-navigation button {
+  color: var(--muted) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  gap: 3px !important;
+}
+
+.bottom-navigation button:hover {
+  color: var(--text) !important;
+}
+
+.bottom-navigation button.active {
+  color: var(--accent) !important;
+}
+
+.bottom-navigation .publish-nav {
+  background: var(--accent) !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 36%, transparent) !important;
+}
+
+/* Mobile drawer */
+.mobile-drawer {
+  background: var(--surface) !important;
+  border-left: 1px solid var(--border) !important;
+  box-shadow: -20px 0 55px rgba(0, 0, 0, 0.36) !important;
+}
+
+.drawer-profile-card {
+  background: var(--surface-raised) !important;
+  border-color: var(--border) !important;
+}
+
+.drawer-group h2 {
+  color: var(--muted) !important;
+}
+
+.drawer-item-icon {
+  background: var(--accent-soft) !important;
+  border-color: var(--accent-border) !important;
+  color: var(--accent) !important;
+}
+
+/* ------------------------------- 3. FEED ------------------------------- */
+
+.kinba-app .media-hub {
+  background: var(--page-bg) !important;
+}
+
+/* Feed column: single premium column; posts separated by whitespace. */
+@media (min-width: 768px) {
+  .media-hub .media-tab-panel:not(:has(.wheels-feed-layout)) .unified-feed-list,
+  .media-hub .media-tab-panel:not(:has(.wheels-feed-layout)) .feed-video-list {
+    max-width: 580px !important;
+  }
+}
+
+.kinba-app .media-hub .feed-card-list,
+.kinba-app .media-hub .unified-feed-list,
+.kinba-app .media-hub .feed-video-list {
+  gap: 0 !important;
+  padding: 0 0 28px !important;
+  background: transparent !important;
+}
+
+.kinba-app .media-hub .feed-card-list > .feed-media-post,
+.kinba-app .media-hub .unified-feed-list > .feed-media-post {
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  margin: 0 0 22px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+/* Post chrome sits on the page surface — no dark card boxes. */
+.kinba-app .media-hub .feed-media-post > .feed-post-author,
+.kinba-app .media-hub .feed-media-post > .feed-media-copy,
+.kinba-app .media-hub .feed-media-post > .feed-action-bar {
+  background: transparent !important;
+}
+
+.kinba-app .media-hub .feed-media-post > .feed-post-author {
+  min-height: 56px !important;
+  padding: 12px 14px 10px !important;
+}
+
+.kinba-app .media-hub .feed-media-post .video-owner-avatar {
+  width: 40px !important;
+  height: 40px !important;
+  flex: 0 0 40px !important;
+  border-radius: 50% !important;
+  outline: 1px solid var(--border);
+}
+
+.kinba-app .media-hub .feed-media-post .feed-post-author-info strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.kinba-app .media-hub .feed-media-post .feed-post-author-info > span {
+  color: var(--muted);
+  font-size: 12px;
+  opacity: 1;
+}
+
+/* Media block: full-bleed within the column, rounded, adaptive ratio kept. */
+.kinba-app .media-hub .feed-media-post > .feed-media-content {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  background: #070709 !important;
+}
+
+.kinba-app .media-hub .feed-media-post > .feed-media-content--image {
+  min-height: 0 !important;
+}
+
+.kinba-app .media-hub .feed-media-post > .feed-media-content--image > img {
+  background: #070709 !important;
+}
+
+.kinba-app .media-hub .feed-media-post > .feed-media-content--video > .media-video-frame,
+.kinba-app .media-hub .feed-media-post > .feed-media-content--video > .media-video-frame video {
+  background: #070709 !important;
+}
+
+/* Caption + action bar. */
+.kinba-app .media-hub .feed-media-post .feed-media-copy {
+  padding: 12px 14px 4px !important;
+}
+
+.kinba-app .media-hub .feed-media-post .feed-media-copy h3 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.kinba-app .media-hub .feed-media-post .feed-media-copy p {
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--muted);
+  opacity: 1;
+}
+
+.kinba-app .media-hub .feed-media-post > .feed-action-bar {
+  justify-content: flex-start !important;
+  gap: 2px !important;
+  padding: 2px 8px 10px !important;
+  min-height: 44px !important;
+}
+
+.kinba-app .media-hub .feed-media-post > .feed-action-bar button {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 8px 10px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  color: var(--muted) !important;
+  background: transparent !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+}
+
+.kinba-app .media-hub .feed-media-post > .feed-action-bar button:hover {
+  color: var(--text) !important;
+  background: var(--surface-raised) !important;
+}
+
+.kinba-app .media-hub .feed-media-post > .feed-action-bar button.is-active {
+  color: var(--accent) !important;
+}
+
+.kinba-app .media-hub .feed-media-post > .feed-action-bar button strong {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.kinba-app .media-hub .feed-media-post > .feed-action-bar button svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Desktop: wider radius + generous column coming from the strip above. */
+@media (min-width: 768px) {
+  .kinba-app .media-hub .feed-media-post > .feed-media-content {
+    border-radius: 14px !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .kinba-app .media-hub .feed-card-list > .feed-media-post,
+  .kinba-app .media-hub .unified-feed-list > .feed-media-post {
+    margin-bottom: 20px !important;
+  }
+
+  .kinba-app .media-hub .feed-media-post > .feed-media-content {
+    border-radius: 0 !important;
+  }
+}
+
+/* Engagement / empty / loading states */
+.media-hub .media-empty,
+.media-hub .feed-empty-state {
+  color: var(--muted) !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* ------------------------------ 4. PROFILE ------------------------------ */
+
+.profile-page {
+  max-width: 980px !important;
+  gap: 28px !important;
+  padding-top: calc(var(--kinba-chrome-h, 116px) + 20px) !important;
+}
+
+.app-main-content:not(.has-feed-tabs) > .profile-page {
+  padding-top: calc(var(--kinba-chrome-h, 116px) + 20px) !important;
+}
+
+.profile-hero {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) !important;
+  grid-template-rows: auto auto auto !important;
+  align-items: start !important;
+  gap: 4px 28px !important;
+  margin: 0 !important;
+  padding: 24px 4px !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  text-align: left !important;
+}
+
+.profile-hero-avatar-wrap {
+  grid-row: 1 / span 3 !important;
+  grid-column: 1 !important;
+  margin: 0 !important;
+}
+
+.profile-avatar--hero {
+  width: 96px !important;
+  height: 96px !important;
+  border: 2px solid var(--accent) !important;
+  box-shadow: none !important;
+}
+
+.profile-avatar--hero svg {
+  width: 38px !important;
+  height: 38px !important;
+}
+
+.profile-hero h1 {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  align-self: end !important;
+  margin: 0 0 2px !important;
+  font-family: "DM Sans", sans-serif !important;
+  font-size: clamp(1.4rem, 3.4vw, 1.9rem) !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+  color: var(--text) !important;
+}
+
+.profile-handle {
+  grid-column: 2 !important;
+  grid-row: 2 !important;
+  margin: 0 0 12px !important;
+  color: var(--muted) !important;
+  font-family: "DM Sans", sans-serif !important;
+  font-size: 13px !important;
+  letter-spacing: 0 !important;
+}
+
+.profile-stat-line {
+  grid-column: 2 !important;
+  grid-row: 3 !important;
+  justify-content: flex-start !important;
+  margin: 0 0 10px !important;
+  gap: 26px !important;
+}
+
+.profile-stat-line span {
+  display: grid !important;
+  gap: 1px !important;
+  padding-left: 0 !important;
+  border-left: 0 !important;
+  color: var(--muted) !important;
+  font-size: 12px !important;
+}
+
+.profile-stat-line strong {
+  color: var(--text) !important;
+  font-family: "DM Sans", sans-serif !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+}
+
+.profile-edit-details {
+  grid-column: 2 !important;
+  grid-row: auto !important;
+  justify-self: start !important;
+  width: auto !important;
+  margin-top: 4px !important;
+}
+
+.profile-edit-details .profile-editor {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: auto;
+  width: min(92vw, 440px);
+  z-index: 40;
+}
+
+.profile-follow-trigger {
+  grid-column: 2 !important;
+  justify-self: start !important;
+  width: auto !important;
+  margin-top: 4px !important;
+}
+
+.profile-edit-trigger {
+  width: auto !important;
+  padding-right: 18px !important;
+  padding-left: 18px !important;
+}
+
+/* Profile action buttons unified with the system pill. */
+.primary-btn {
+  border-radius: 999px !important;
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: var(--accent-ink) !important;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 30%, transparent) !important;
+  font-weight: 700 !important;
+}
+
+.primary-btn:hover:not(:disabled) {
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 38%, transparent) !important;
+}
+
+/* Content heading + tabs */
+.profile-content-heading h2 {
+  color: var(--text) !important;
+}
+
+.profile-grid-tabs {
+  border-bottom: 1px solid var(--border) !important;
+  max-width: none !important;
+  margin-top: 20px !important;
+}
+
+.profile-grid-tabs button {
+  color: var(--muted) !important;
+  font-family: "DM Sans", sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  border-bottom: 2px solid transparent !important;
+}
+
+.profile-grid-tabs button.active {
+  border-bottom-color: var(--accent) !important;
+  color: var(--text) !important;
+}
+
+/* Media grid: premium square grid, cover-crop thumbnails (Instagram model). */
+.profile-video-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 6px !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 14px 0 0 !important;
+}
+
+@media (min-width: 768px) {
+  .profile-video-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+.profile-video-tile {
+  aspect-ratio: 1 / 1 !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  background: var(--surface-raised) !important;
+  overflow: hidden !important;
+}
+
+.profile-video-tile > img,
+.profile-video-tile .profile-video-tile-thumb {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 0 !important;
+}
+
+.profile-video-tile::after {
+  background: linear-gradient(transparent 55%, rgba(0, 0, 0, 0.55)) !important;
+  border-radius: 0 !important;
+}
+
+.profile-video-tile-play {
+  background: var(--accent) !important;
+  color: var(--accent-ink) !important;
+}
+
+.profile-grid-empty {
+  color: var(--muted) !important;
+  background: var(--surface) !important;
+  border: 1px dashed var(--border) !important;
+  border-radius: 12px !important;
+}
+
+@media (max-width: 700px) {
+  .profile-hero {
+    grid-template-columns: 1fr !important;
+    justify-items: center !important;
+    text-align: center !important;
+  }
+
+  .profile-hero-avatar-wrap {
+    grid-column: 1 !important;
+    grid-row: auto !important;
+    margin-bottom: 6px !important;
+  }
+
+  .profile-hero h1,
+  .profile-handle,
+  .profile-stat-line,
+  .profile-edit-details,
+  .profile-follow-trigger {
+    grid-column: 1 !important;
+  }
+
+  .profile-hero h1 {
+    grid-row: auto !important;
+    justify-self: center !important;
+    margin-top: 6px !important;
+  }
+
+  .profile-handle {
+    grid-row: auto !important;
+    justify-self: center !important;
+  }
+
+  .profile-stat-line {
+    grid-row: auto !important;
+    justify-content: center !important;
+    margin: 10px 0 6px !important;
+  }
+
+  .profile-edit-details,
+  .profile-follow-trigger {
+    grid-row: auto !important;
+    justify-self: center !important;
+    margin-top: 6px !important;
+  }
+
+  .profile-page {
+    padding-top: calc(var(--kinba-chrome-h, 116px) + 10px) !important;
+  }
+
+  .profile-video-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+/* ------------------------- 5. FOCUSED VIEWER ------------------------- */
+
+.focused-video-viewer__close {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent) !important;
+  background: rgba(8, 10, 14, 0.78) !important;
+  color: #fff !important;
+}
+
+.focused-video-viewer__stage > .feed-post-author .video-owner-avatar {
+  outline: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.focused-video-viewer__stage > .feed-action-bar button {
+  color: #e8eaef !important;
+}
+
+/* The viewer stage is always black, so its text stays light in every theme. */
+.focused-video-viewer .feed-post-author-info strong,
+.focused-video-viewer .feed-post-author-info > span,
+.focused-video-viewer .feed-media-copy h3,
+.focused-video-viewer .feed-media-copy p {
+  color: #f3f3f6 !important;
+}
+
+/* ---------------------------- 6. GLOBAL POLISH ---------------------------- */
+
+/* Buttons */
+.action-modal .primary-btn,
+.request-modal .primary-btn,
+.admin-page .primary-btn,
+.profile-editor .primary-btn,
+.verification-content .primary-btn,
+.admin-verification-panel .primary-btn {
+  border-radius: 999px !important;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--accent) 26%, transparent) !important;
+}
+
+/* Modal surface */
+.action-modal,
+.request-modal {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 18px !important;
+  box-shadow: var(--shadow-pop) !important;
+}
+
+.action-modal-backdrop {
+  background: rgba(4, 4, 6, 0.62) !important;
+}
+
+.action-modal-head h2 {
+  color: var(--text) !important;
+  font-family: "DM Sans", sans-serif !important;
+  font-size: 1.05rem !important;
+  letter-spacing: -0.02em !important;
+}
+
+.action-modal-head button {
+  color: var(--muted) !important;
+  border-color: var(--border) !important;
+  background: var(--surface-raised) !important;
+}
+
+.modal-form label {
+  color: var(--muted) !important;
+}
+
+.modal-form input:not([type="file"]),
+.modal-form textarea {
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+  border-radius: 12px !important;
+  background: var(--page-bg) !important;
+}
+
+.modal-form input:not([type="file"]):focus,
+.modal-form textarea:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-soft) !important;
+}
+
+.modal-backdrop {
+  background: rgba(4, 4, 6, 0.6) !important;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* Form fields */
+.input-label input,
+.sponsor-widget__form input,
+.admin-session-form input,
+.profile-editor input {
+  background: var(--page-bg) !important;
+  border-color: var(--border) !important;
+  border-radius: 12px !important;
+}
+
+.input-label input:focus,
+.profile-editor input:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-soft) !important;
+}
+
+/* Lists / cards used across utility surfaces */
+.notification-item,
+.settings-list,
+.sponsor-bids-panel,
+.sponsor-widget,
+.winner-card,
+.admin-card,
+.admin-stat {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  box-shadow: var(--shadow-soft) !important;
+}
+
+.admin-stat {
+  background: var(--surface-raised) !important;
+}
+
+/* Landing */
+.landing-shell {
+  background: transparent !important;
+}
+
+/* Offline / search / notification surfaces inside modals */
+.offline-video-item,
+.search-result-item {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+  border-radius: 12px !important;
+}
+
+.feed-search-form {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+
+/* Search results use the non-social long-video-card path — restyle it to
+   match the premium feed so results never fall back to the old card look. */
+.search-section .long-video-card {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  padding: 0 0 22px !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.search-section .long-video-card > .feed-post-author {
+  min-height: 56px !important;
+  padding: 12px 14px 6px !important;
+  background: transparent !important;
+}
+
+.search-section .long-video-card .video-owner-avatar {
+  width: 40px !important;
+  height: 40px !important;
+  flex: 0 0 40px !important;
+  border-radius: 50% !important;
+  outline: 1px solid var(--border);
+}
+
+.search-section .long-video-card .feed-post-author-info strong {
+  color: var(--text) !important;
+  font-weight: 600 !important;
+}
+
+.search-section .long-video-card .feed-post-author-info > span {
+  color: var(--muted) !important;
+  opacity: 1 !important;
+}
+
+.search-section .long-video-card > .feed-media-content {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  background: #070709 !important;
+}
+
+.search-section .video-card-details {
+  padding: 12px 14px 4px !important;
+  background: transparent !important;
+}
+
+.search-section .video-card-details h3 {
+  color: var(--text) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.search-section .video-card-details p,
+.search-section .media-caption-tags,
+.search-section .media-meta-line {
+  color: var(--muted) !important;
+  opacity: 1 !important;
+}
+
+.search-section .media-section-heading h2 {
+  color: var(--text) !important;
+}
+
+.search-section .media-section-heading > span {
+  color: var(--muted) !important;
+}

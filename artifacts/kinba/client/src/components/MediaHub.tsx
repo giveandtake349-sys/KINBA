@@ -60,6 +60,7 @@ import "./mediaHub.css";
 import "./kinbaModern.css";
 import "./feedUi.css";
 import "./shorts-stage.css";
+import "./kinbaPremium.css";
 
 type HomeTab = "videos" | "trendy" | "following" | "icons" | "wheels";
 type VideoKind = "LONG" | "SHORT" | "WHEEL";
@@ -759,8 +760,7 @@ function QualityVideoPlayer({
     directSourceUrl && !isHlsMediaUrl(directSourceUrl)
       ? directSourceUrl
       : originalSourceUrl || directSourceUrl;
-  const posterUrl =
-    resolveMediaUrl(video.thumbnailUrl) ?? `/api/videos/${video.id}/thumbnail`;
+  const posterUrl = resolveMediaUrl(video.thumbnailUrl);
 
   const shouldPlay = active && isInView;
 
@@ -853,7 +853,7 @@ function QualityVideoPlayer({
         controlsList="nofullscreen noplaybackrate"
         disablePictureInPicture
         playsInline
-        preload={isNearViewport ? "metadata" : "none"}
+        preload={isNearViewport ? "auto" : "metadata"}
         autoPlay={active && isInView}
         muted={muted}
         onLoadedMetadata={restorePlayback}
@@ -1659,6 +1659,7 @@ function VideoCard({
               video={video}
               active={active}
               onFirstPlay={recordView}
+              showPoster
             />
           )}
         </div>
@@ -1765,6 +1766,7 @@ function VideoCard({
             video={video}
             active={active}
             onFirstPlay={recordView}
+            showPoster
           />
         )}
       </div>

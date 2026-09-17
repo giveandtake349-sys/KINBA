@@ -62,6 +62,7 @@ import MediaHub, {
   type FeedSection,
 } from "@/components/MediaHub";
 import "./profile.css";
+import "../components/kinbaPremium.css";
 
 type Screen = "landing" | "dashboard" | "profile";
 type AppModal =
