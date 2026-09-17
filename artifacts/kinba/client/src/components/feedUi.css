@@ -842,3 +842,282 @@ body:has(.focused-video-viewer) .mobile-drawer {
     max-width: 860px !important;
   }
 }
+
+/* ============================================================================
+   PHASE 1 — NORMAL FEED VISUAL REDESIGN (UI ONLY)
+   Isolated presentation pass for the normal social Feed: post headers,
+   captions and the engagement row. Scroll architecture, viewport locking,
+   touch-action, scroll-snap, media sizing (no-crop/natural) and engagement
+   handlers are intentionally untouched. Scoped to the feed list containers
+   (`.feed-card-list` / `.unified-feed-list` / `.feed-video-list`) so Spotlight
+   rails, Shorts, the focused video viewer and search results are unaffected.
+   ============================================================================ */
+
+/* ---------- Feed column ---------- */
+.media-hub .feed-card-list,
+.media-hub .unified-feed-list,
+.media-hub .feed-video-list {
+  gap: 16px !important;
+}
+
+/* ---------- Card surface: subtle separation, no heavy dashboard shell ---------- */
+.media-hub .feed-card-list > .feed-media-post,
+.media-hub .feed-card-list > .feed-text-card,
+.media-hub .feed-card-list > .long-video-card,
+.media-hub .unified-feed-list > .feed-media-post,
+.media-hub .unified-feed-list > .feed-text-card,
+.media-hub .unified-feed-list > .long-video-card,
+.media-hub .feed-video-list > .feed-media-post,
+.media-hub .feed-video-list > .feed-text-card,
+.media-hub .feed-video-list > .long-video-card {
+  background: rgba(15, 16, 19, 0.9) !important;
+  border-color: rgba(255, 255, 255, 0.055) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.32) !important;
+}
+
+/* ---------- Post header: avatar / name / meta / more ---------- */
+.media-hub .feed-card-list > .feed-media-post > .feed-post-author,
+.media-hub .feed-card-list > .feed-text-card > .feed-post-author,
+.media-hub .feed-card-list > .long-video-card > .feed-post-author,
+.media-hub .unified-feed-list > .feed-media-post > .feed-post-author,
+.media-hub .unified-feed-list > .feed-text-card > .feed-post-author,
+.media-hub .unified-feed-list > .long-video-card > .feed-post-author,
+.media-hub .feed-video-list > .feed-media-post > .feed-post-author,
+.media-hub .feed-video-list > .feed-text-card > .feed-post-author,
+.media-hub .feed-video-list > .long-video-card > .feed-post-author {
+  min-height: 0 !important;
+  padding: 14px 16px 12px !important;
+  gap: 12px;
+  align-items: center;
+}
+
+.media-hub .feed-card-list .feed-post-author .video-owner-avatar,
+.media-hub .unified-feed-list .feed-post-author .video-owner-avatar,
+.media-hub .feed-video-list .feed-post-author .video-owner-avatar {
+  flex: 0 0 40px !important;
+  width: 40px !important;
+  height: 40px !important;
+}
+
+.media-hub .feed-card-list .feed-post-author-info,
+.media-hub .unified-feed-list .feed-post-author-info,
+.media-hub .feed-video-list .feed-post-author-info {
+  gap: 3px;
+}
+
+.media-hub .feed-card-list .feed-post-author-info strong,
+.media-hub .unified-feed-list .feed-post-author-info strong,
+.media-hub .feed-video-list .feed-post-author-info strong {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.media-hub .feed-card-list .feed-post-author-info span,
+.media-hub .unified-feed-list .feed-post-author-info span,
+.media-hub .feed-video-list .feed-post-author-info span {
+  font-size: 0.72rem;
+  opacity: 0.68;
+}
+
+/* ---------- Caption: clear title / body hierarchy ---------- */
+.media-hub .feed-card-list > .feed-media-post > .feed-media-copy,
+.media-hub .feed-card-list > .long-video-card > .video-card-details,
+.media-hub .unified-feed-list > .feed-media-post > .feed-media-copy,
+.media-hub .unified-feed-list > .long-video-card > .video-card-details,
+.media-hub .feed-video-list > .feed-media-post > .feed-media-copy,
+.media-hub .feed-video-list > .long-video-card > .video-card-details {
+  padding: 12px 16px 6px !important;
+}
+
+.media-hub .feed-card-list .feed-media-copy h3,
+.media-hub .feed-card-list .video-card-details h3,
+.media-hub .unified-feed-list .feed-media-copy h3,
+.media-hub .unified-feed-list .video-card-details h3,
+.media-hub .feed-video-list .feed-media-copy h3,
+.media-hub .feed-video-list .video-card-details h3 {
+  margin: 0 0 5px !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  line-height: 1.32 !important;
+  letter-spacing: -0.012em !important;
+}
+
+.media-hub .feed-card-list .feed-media-copy p,
+.media-hub .feed-card-list .video-card-details > p:not(.media-caption-tags),
+.media-hub .unified-feed-list .feed-media-copy p,
+.media-hub .unified-feed-list .video-card-details > p:not(.media-caption-tags),
+.media-hub .feed-video-list .feed-media-copy p,
+.media-hub .feed-video-list .video-card-details > p:not(.media-caption-tags) {
+  font-size: 0.875rem !important;
+  line-height: 1.55 !important;
+  color: rgba(229, 235, 247, 0.78) !important;
+}
+
+/* ---------- Engagement bar: consistent, mobile-friendly row ---------- */
+.media-hub .feed-card-list > .feed-media-post > .feed-action-bar,
+.media-hub .feed-card-list > .feed-text-card > .feed-action-bar,
+.media-hub .feed-card-list > .long-video-card > .feed-action-bar,
+.media-hub .unified-feed-list > .feed-media-post > .feed-action-bar,
+.media-hub .unified-feed-list > .feed-text-card > .feed-action-bar,
+.media-hub .unified-feed-list > .long-video-card > .feed-action-bar,
+.media-hub .feed-video-list > .feed-media-post > .feed-action-bar,
+.media-hub .feed-video-list > .feed-text-card > .feed-action-bar,
+.media-hub .feed-video-list > .long-video-card > .feed-action-bar {
+  min-height: 52px !important;
+  padding: 8px 12px 8px !important;
+  gap: 2px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.media-hub .feed-card-list .feed-action-bar > button,
+.media-hub .unified-feed-list .feed-action-bar > button,
+.media-hub .feed-video-list .feed-action-bar > button {
+  min-height: 40px;
+  padding: 6px 12px;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.media-hub .feed-card-list .feed-action-bar > button:hover:not(:disabled),
+.media-hub .unified-feed-list .feed-action-bar > button:hover:not(:disabled),
+.media-hub .feed-video-list .feed-action-bar > button:hover:not(:disabled) {
+  color: var(--kinba-text-modern);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.media-hub .feed-card-list .feed-action-bar > button.is-active,
+.media-hub .feed-card-list .feed-action-bar > button.is-active:hover:not(:disabled),
+.media-hub .unified-feed-list .feed-action-bar > button.is-active,
+.media-hub .unified-feed-list .feed-action-bar > button.is-active:hover:not(:disabled),
+.media-hub .feed-video-list .feed-action-bar > button.is-active,
+.media-hub .feed-video-list .feed-action-bar > button.is-active:hover:not(:disabled) {
+  color: var(--kinba-coral) !important;
+  background: var(--kinba-coral-soft) !important;
+}
+
+.media-hub .feed-card-list .feed-action-bar > button > strong,
+.media-hub .unified-feed-list .feed-action-bar > button > strong,
+.media-hub .feed-video-list .feed-action-bar > button > strong {
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+/* ---------- Feed text/announcement card actions: match the bar ---------- */
+.media-hub .feed-card-list .feed-text-card .feed-post-actions,
+.media-hub .unified-feed-list .feed-text-card .feed-post-actions,
+.media-hub .feed-video-list .feed-text-card .feed-post-actions {
+  gap: 2px !important;
+  margin-top: 0 !important;
+  padding: 8px 12px 8px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.media-hub .feed-card-list .feed-text-card .feed-post-actions > button,
+.media-hub .feed-card-list .feed-text-card .announcement-comment-toggle,
+.media-hub .unified-feed-list .feed-text-card .feed-post-actions > button,
+.media-hub .unified-feed-list .feed-text-card .announcement-comment-toggle,
+.media-hub .feed-video-list .feed-text-card .feed-post-actions > button,
+.media-hub .feed-video-list .feed-text-card .announcement-comment-toggle {
+  min-height: 40px;
+  padding: 6px 12px;
+  font-size: 0.75rem;
+}
+
+.media-hub .feed-card-list .feed-text-card .feed-post-actions > button:hover,
+.media-hub .feed-card-list .feed-text-card .announcement-comment-toggle:hover,
+.media-hub .unified-feed-list .feed-text-card .feed-post-actions > button:hover,
+.media-hub .unified-feed-list .feed-text-card .announcement-comment-toggle:hover,
+.media-hub .feed-video-list .feed-text-card .feed-post-actions > button:hover,
+.media-hub .feed-video-list .feed-text-card .announcement-comment-toggle:hover {
+  color: var(--kinba-text-modern);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.media-hub .feed-card-list .feed-text-card .feed-post-actions > button.is-active,
+.media-hub .feed-card-list .feed-text-card .feed-post-actions > button.is-active:hover,
+.media-hub .feed-card-list .feed-text-card .announcement-comment-toggle.is-active,
+.media-hub .feed-card-list .feed-text-card .announcement-comment-toggle.is-active:hover,
+.media-hub .unified-feed-list .feed-text-card .feed-post-actions > button.is-active,
+.media-hub .unified-feed-list .feed-text-card .feed-post-actions > button.is-active:hover,
+.media-hub .unified-feed-list .feed-text-card .announcement-comment-toggle.is-active,
+.media-hub .unified-feed-list .feed-text-card .announcement-comment-toggle.is-active:hover,
+.media-hub .feed-video-list .feed-text-card .feed-post-actions > button.is-active,
+.media-hub .feed-video-list .feed-text-card .feed-post-actions > button.is-active:hover,
+.media-hub .feed-video-list .feed-text-card .announcement-comment-toggle.is-active,
+.media-hub .feed-video-list .feed-text-card .announcement-comment-toggle.is-active:hover {
+  color: var(--kinba-coral) !important;
+  background: var(--kinba-coral-soft) !important;
+}
+
+/* ---------- Mobile: tight full-bleed rhythm, comfortable hit targets ---------- */
+@media (max-width: 760px) {
+  .media-hub .feed-card-list,
+  .media-hub .unified-feed-list,
+  .media-hub .feed-video-list {
+    gap: 12px !important;
+  }
+}
+
+@media (max-width: 400px) {
+  .media-hub .feed-card-list .feed-action-bar > button > span,
+  .media-hub .unified-feed-list .feed-action-bar > button > span,
+  .media-hub .feed-video-list .feed-action-bar > button > span,
+  .media-hub .feed-card-list .feed-text-card .feed-post-actions > button > span,
+  .media-hub .unified-feed-list .feed-text-card .feed-post-actions > button > span,
+  .media-hub .feed-video-list .feed-text-card .feed-post-actions > button > span {
+    display: none;
+  }
+}
+
+/* Tight mobile band (approx. 400-520px): keep the four real Pookie / Comment /
+   Share / Save controls fully visible without crowding the neighbours. Icons
+   and counts stay; only horizontal button padding, intra-button gap and label
+   size shrink. The label ellipsis is a last-resort fallback for very large
+   counts: the button remains fully clickable (aria-label preserved). */
+@media (max-width: 520px) {
+  .media-hub .feed-card-list .feed-action-bar > button,
+  .media-hub .unified-feed-list .feed-action-bar > button,
+  .media-hub .feed-video-list .feed-action-bar > button,
+  .media-hub .feed-card-list .feed-text-card .feed-post-actions > button,
+  .media-hub .feed-card-list .feed-text-card .announcement-comment-toggle,
+  .media-hub .unified-feed-list .feed-text-card .feed-post-actions > button,
+  .media-hub .unified-feed-list .feed-text-card .announcement-comment-toggle,
+  .media-hub .feed-video-list .feed-text-card .feed-post-actions > button,
+  .media-hub .feed-video-list .feed-text-card .announcement-comment-toggle {
+    padding: 6px 6px;
+    gap: 3px;
+    font-size: 0.7rem;
+  }
+
+  .media-hub .feed-card-list .feed-action-bar > button > strong,
+  .media-hub .unified-feed-list .feed-action-bar > button > strong,
+  .media-hub .feed-video-list .feed-action-bar > button > strong {
+    font-size: 0.7rem;
+  }
+
+  .media-hub .feed-card-list .feed-action-bar > button > span,
+  .media-hub .unified-feed-list .feed-action-bar > button > span,
+  .media-hub .feed-video-list .feed-action-bar > button > span,
+  .media-hub .feed-card-list .feed-text-card .feed-post-actions > button > span,
+  .media-hub .unified-feed-list .feed-text-card .feed-post-actions > button > span,
+  .media-hub .feed-video-list .feed-text-card .feed-post-actions > button > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+}
+
+/* ---------- Desktop: readable centered column ---------- */
+@media (min-width: 761px) {
+  .media-hub .feed-card-list,
+  .media-hub .unified-feed-list,
+  .media-hub .feed-video-list {
+    max-width: 640px !important;
+  }
+}
