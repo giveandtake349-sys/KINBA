@@ -7,7 +7,7 @@
   width: 100%;
   overflow: hidden;
   border-radius: 0;
-  background: #0b0e0f;
+  background: transparent;
   box-sizing: border-box;
 }
 
@@ -64,8 +64,8 @@
 .feed-media-post > .feed-media-copy {
   position: relative;
   z-index: 12;
-  padding: 12px 14px 4px;
-  background: #0b0e0f;
+  padding: 10px 14px 4px;
+  background: transparent;
 }
 
 .feed-media-post > .feed-action-bar {
@@ -77,9 +77,10 @@
   gap: 8px;
   width: 100% !important;
   margin: 0 !important;
-  padding: 10px 12px 12px !important;
-  background: #0b0e0f;
+  padding: 8px 12px 10px !important;
+  background: transparent;
   box-sizing: border-box;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 /* SHORTS */
@@ -163,18 +164,8 @@
     border-radius: 0;
   }
 
-  .feed-media-post > .feed-media-content.feed-media-content--image {
-    min-height: calc(100svh - 128px);
-  }
-
   .feed-media-post > .feed-media-content.feed-media-content--image img {
-    max-height: calc(100svh - 128px) !important;
-  }
-
-  .feed-media-post > .feed-media-content.feed-media-content--video,
-  .feed-media-post > .feed-media-content.feed-media-content--video video {
-    height: calc(100svh - 128px) !important;
-    min-height: calc(100svh - 128px);
+    max-height: calc(100svh - 150px) !important;
   }
 
   .short-card,
@@ -216,7 +207,7 @@
 /* ---------- ALL FEED ---------- */
 
 .feed-media-post {
-  background: #0b0e0f !important;
+  background: transparent !important;
   border: 0 !important;
   box-shadow: none !important;
 }
@@ -228,9 +219,9 @@
   gap: 10px;
   width: 100%;
   min-height: 58px;
-  padding: 10px 14px;
+  padding: 12px 14px 10px;
   box-sizing: border-box;
-  background: #0b0e0f;
+  background: transparent;
 }
 
 .feed-media-post .feed-post-author-identity {
@@ -325,8 +316,8 @@
 }
 
 .feed-media-post .feed-media-copy {
-  padding: 12px 14px 2px;
-  background: #0b0e0f;
+  padding: 10px 14px 2px;
+  background: transparent;
 }
 
 .feed-media-post .feed-media-copy h3 {
@@ -348,13 +339,13 @@
   width: 100% !important;
   min-height: 48px;
   margin: 0 !important;
-  padding: 8px 12px 12px !important;
+  padding: 6px 12px 10px !important;
   display: flex !important;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   box-sizing: border-box;
-  background: #0b0e0f !important;
+  background: transparent !important;
 }
 
 /* ---------- SHORTS ---------- */
@@ -556,12 +547,12 @@
 .media-hub .feed-video-list {
   display: flex !important;
   flex-direction: column !important;
-  gap: 24px !important;
+  gap: 18px !important;
   width: 100% !important;
   max-width: none !important;
   margin: 0 auto !important;
   padding: 0 0 24px !important;
-  background: #000 !important;
+  background: transparent !important;
   scroll-snap-type: none !important;
   scroll-snap-stop: normal !important;
 }
@@ -581,10 +572,10 @@
   margin: 0 !important;
   padding: 0 !important;
   overflow: hidden !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: #242526 !important;
-  box-shadow: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.065) !important;
+  border-radius: 14px !important;
+  background: rgba(21, 21, 24, 0.92) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset !important;
   scroll-snap-align: none !important;
 }
 
@@ -595,8 +586,8 @@
 .media-hub .feed-video-list > .long-video-card > .feed-post-author {
   min-height: 58px !important;
   margin: 0 !important;
-  padding: 10px 14px !important;
-  background: #242526 !important;
+  padding: 12px 14px 10px !important;
+  background: transparent !important;
 }
 
 .media-hub .feed-video-list > .long-video-card > .video-card-details,
@@ -698,17 +689,30 @@
 /* Nearly full-height frame for the feed action bar and comment entry. */
 .media-hub .feed-card-list > .feed-media-post > .feed-action-bar,
 .media-hub .unified-feed-list > .long-video-card > .feed-action-bar {
-  margin: 12px 0 0 !important;
-  padding: 0 12px 12px !important;
+  margin: 0 !important;
+  padding: 6px 12px 10px !important;
   background: transparent !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
 }
 
 @media (max-width: 760px) {
   .media-hub .feed-card-list,
   .media-hub .unified-feed-list,
   .media-hub .feed-video-list {
-    gap: 18px !important;
+    gap: 12px !important;
     padding: 0 0 calc(96px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .media-hub .feed-card-list > .feed-media-post,
+  .media-hub .feed-card-list > .feed-text-card,
+  .media-hub .feed-card-list > .long-video-card,
+  .media-hub .unified-feed-list > .feed-media-post,
+  .media-hub .unified-feed-list > .feed-text-card,
+  .media-hub .unified-feed-list > .long-video-card,
+  .media-hub .feed-video-list > .long-video-card {
+    border-radius: 0 !important;
+    border-left: 0 !important;
+    border-right: 0 !important;
   }
 }
 
@@ -717,7 +721,7 @@
   .media-hub .feed-card-list,
   .media-hub .unified-feed-list,
   .media-hub .feed-video-list {
-    max-width: 720px !important;
+    max-width: 680px !important;
   }
 
   .media-hub .feed-card-list > .feed-media-post,

@@ -1486,15 +1486,16 @@ body {
   gap: 5px;
   overflow: hidden;
   color: var(--kinba-text-modern);
-  font-size: 0.88rem;
-  font-weight: 700;
+  font-size: 0.84rem;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .media-hub .feed-post-author-info span {
   color: var(--kinba-muted-modern);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
+  opacity: 0.75;
 }
 
 .media-hub .feed-post-more {
@@ -1523,26 +1524,27 @@ body {
   margin: 0 0 4px;
   color: var(--kinba-text-modern);
   font-family: "Space Grotesk", sans-serif;
-  font-size: 0.98rem;
-  font-weight: 700;
-  line-height: 1.25;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
 }
 
 .media-hub .feed-media-copy p,
 .media-hub .feed-post-body {
   margin: 0;
-  color: rgba(244, 247, 255, 0.84);
-  font-size: 0.88rem;
-  line-height: 1.48;
+  color: rgba(244, 247, 255, 0.72);
+  font-size: 0.84rem;
+  line-height: 1.5;
   white-space: pre-wrap;
 }
 
 .media-hub .feed-media-content {
-  width: calc(100% + 32px);
-  aspect-ratio: 1 / 1;
-  margin: 0 -16px 12px;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
   overflow: hidden;
-  background: #05070d;
+  background: #080808;
 }
 
 .media-hub .feed-media-content > img,
@@ -1550,24 +1552,24 @@ body {
 .media-hub .feed-media-content > .media-video-frame video {
   display: block;
   width: 100%;
-  height: 100%;
-  max-height: none;
+  max-width: 100%;
+  height: auto;
+  max-height: 80vh;
 }
 
-.media-hub .feed-media-content > img,
-.media-hub .feed-media-content > .media-video-frame video {
-  object-fit: cover;
+.media-hub .feed-media-content > img {
+  object-fit: contain !important;
 }
 
 .media-hub .feed-media-content > .media-video-frame video {
   object-fit: contain;
-  background: #05070d;
+  background: #080808;
 }
 
 .media-hub .feed-media-content > .media-video-frame {
   min-height: 0;
   aspect-ratio: auto !important;
-  background: #05070d;
+  background: #080808;
 }
 
 .media-hub .feed-action-bar {
@@ -1585,15 +1587,16 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
-  min-height: 34px;
-  padding: 5px 6px;
+  min-height: 36px;
+  padding: 6px 8px;
   color: var(--kinba-muted-modern);
   border: 0;
-  border-radius: 8px;
+  border-radius: 999px;
   background: transparent;
-  font-size: 0.74rem;
+  font-size: 0.73rem;
+  white-space: nowrap;
 }
 
 .media-hub .feed-action-bar > button:hover:not(:disabled),
@@ -1605,6 +1608,7 @@ body {
 .media-hub .feed-action-bar > button > strong {
   color: inherit;
   font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .media-hub .feed-text-card .feed-post-actions {
@@ -1619,13 +1623,14 @@ body {
 
 .media-hub .feed-text-card .feed-post-actions > button,
 .media-hub .feed-text-card .announcement-comment-toggle {
-  min-height: 34px;
-  padding: 5px 6px;
+  min-height: 36px;
+  padding: 6px 8px;
   color: var(--kinba-muted-modern);
   border: 0;
-  border-radius: 8px;
+  border-radius: 999px;
   background: transparent;
-  font-size: 0.74rem;
+  font-size: 0.73rem;
+  white-space: nowrap;
 }
 
 .media-hub .feed-text-card .feed-post-actions > button:hover,
@@ -1771,8 +1776,8 @@ body {
   padding-right: 0 !important;
 }
 .media-hub .feed-media-post { display: flex !important; flex-direction: column !important; }
-.media-hub .feed-media-post > .feed-post-author { order: 1; padding: 12px 16px 8px; }
-.media-hub .feed-media-post > .feed-media-copy { order: 3; padding: 12px 16px 8px; margin: 0 !important; }
+.media-hub .feed-media-post > .feed-post-author { order: 1; padding: 14px 16px 10px; }
+.media-hub .feed-media-post > .feed-media-copy { order: 3; padding: 10px 16px 6px; margin: 0 !important; }
 .media-hub .feed-media-post > .feed-media-content { order: 2; width: 100% !important; margin: 0 !important; }
 .media-hub .feed-media-post > .feed-post-actions { order: 4; padding: 8px 16px 12px; }
 .media-hub .feed-media-content > img,
@@ -2043,12 +2048,13 @@ body {
   flex-direction: row !important;
   align-items: center !important;
   justify-content: space-around !important;
-  gap: 4px !important;
+  gap: 2px !important;
   width: 100% !important;
-  margin: 12px 0 0 !important;
-  padding: 0 12px 12px !important;
+  margin: 0 !important;
+  padding: 6px 8px 10px !important;
   overflow: visible !important;
   background: transparent !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
 }
 
 .media-hub .feed-media-post > .feed-media-copy,
@@ -2123,9 +2129,9 @@ body {
   .media-hub .unified-feed-list > .long-video-card,
   .media-hub .unified-feed-list > .shorts-insertion-block,
   .media-hub .feed-video-list > .long-video-card {
-    margin-bottom: 24px !important;
+    margin-bottom: 0 !important;
     border-radius: 0 !important;
-    background: #242526 !important;
+    background: rgba(18, 18, 20, 0.92) !important;
   }
 }
 
@@ -2855,7 +2861,7 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
 .media-hub .feed-card-list,
 .media-hub .unified-feed-list,
 .media-hub .feed-video-list {
-  gap: 24px !important;
+  gap: 18px !important;
 }
 .media-hub .feed-card-list > .feed-media-post,
 .media-hub .feed-card-list > .feed-text-card,
@@ -2868,13 +2874,13 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
 .media-hub .feed-video-list > .feed-media-post,
 .media-hub .feed-video-list > .long-video-card {
   box-sizing: border-box !important;
-  margin-bottom: 24px !important;
-  padding: 12px !important;
-  border: 1px solid rgb(38 38 38) !important;
-  border-radius: 16px !important;
-  background: rgb(23 23 23 / 90%) !important;
+  margin-bottom: 0 !important;
+  padding: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  background: rgba(18, 18, 20, 0.92) !important;
   overflow: hidden !important;
-  box-shadow: 0 10px 28px rgb(0 0 0 / 24%) !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18) !important;
 }
 .media-hub .shorts-viewport > .short-card,
 .media-hub .shorts-list-viewport > .short-card {
@@ -2906,13 +2912,6 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
   margin-inline: 0 !important;
   padding: 0 !important;
   overflow: hidden !important;
-}
-.media-hub .feed-media-post > .feed-media-content,
-.media-hub .long-video-card > .feed-media-content {
-  width: calc(100% + 24px) !important;
-  max-width: none !important;
-  margin-left: -12px !important;
-  margin-right: -12px !important;
 }
 .media-hub .feed-media-content > img,
 .media-hub .feed-media-content > video,
