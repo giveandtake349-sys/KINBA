@@ -546,7 +546,7 @@ export type SpotlightHighlight = {
 export async function listSpotlightHighlights(): Promise<SpotlightHighlight[]> {
   const db = await getDb();
   if (!db) return [];
-  const since = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const [videoRows, postRows] = await Promise.all([
     db
       .select({
@@ -690,7 +690,9 @@ export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
   const db = await getDb();
   if (!db) return [];
   const conditions: any[] = [];
-  if (tab === "videos" || tab === "trendy" || tab === "following")
+  if (tab === "videos")
+    conditions.push(or(eq(videos.kind, "LONG"), eq(videos.kind, "SHORT")));
+  if (tab === "trendy" || tab === "following")
     conditions.push(eq(videos.kind, "LONG"), eq(videos.mediaType, "VIDEO"));
   if (tab === "following")
     conditions.push(
