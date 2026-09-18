@@ -9,13 +9,13 @@
 /* ---- DESIGN TOKENS ---- */
 :root {
   --feed-bg: transparent;
-  --feed-card-bg: rgba(14, 15, 18, 0.92);
-  --feed-card-border: 1px solid rgba(255, 255, 255, 0.06);
-  --feed-card-radius: 16px;
+  --feed-card-bg: transparent;
+  --feed-card-border: none;
+  --feed-card-radius: 0;
   --feed-card-radius-mobile: 0;
-  --feed-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --feed-card-shadow: none;
   --feed-media-bg: #08090b;
-  --feed-separator: 1px solid rgba(255, 255, 255, 0.045);
+  --feed-separator: 1px solid rgba(255, 255, 255, 0.08);
   --feed-text-primary: rgba(244, 247, 255, 0.94);
   --feed-text-secondary: rgba(244, 247, 255, 0.55);
   --feed-coral: var(--kinba-coral);
@@ -34,7 +34,7 @@
 .media-hub .feed-video-list {
   display: flex !important;
   flex-direction: column !important;
-  gap: 20px !important;
+  gap: 0 !important;
   width: 100% !important;
   max-width: 100% !important;
   margin: 0 !important;
@@ -49,7 +49,7 @@
 
 
 /* ========================================================================
-   2. POST SURFACE — The outermost post container
+   2. POST SURFACE — The outermost post container (no card, edge-to-edge)
    ======================================================================== */
 
 .media-hub .feed-card-list > .feed-media-post,
@@ -69,12 +69,13 @@
   max-width: 100% !important;
   margin: 0 !important;
   padding: 0 !important;
-  background: var(--feed-card-bg) !important;
-  border: var(--feed-card-border) !important;
-  border-radius: var(--feed-card-radius) !important;
-  box-shadow: var(--feed-card-shadow) !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
   overflow: hidden !important;
   box-sizing: border-box;
+  border-bottom: var(--feed-separator) !important;
 }
 
 .feed-media-post,
@@ -88,15 +89,15 @@
 }
 
 .media-hub .feed-media-post {
-  background: var(--feed-card-bg) !important;
-  border: var(--feed-card-border) !important;
-  border-radius: var(--feed-card-radius) !important;
-  box-shadow: var(--feed-card-shadow) !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
 }
 
 
 /* ========================================================================
-   3. POST TOP BAR — New compact author row (avatar + identity + menu)
+   3. POST TOP BAR — Compact author row (avatar + identity + menu)
    ======================================================================== */
 
 .media-hub .feed-card-list > .feed-media-post > .feed-post-top,
@@ -108,7 +109,7 @@
   align-items: center !important;
   gap: 10px !important;
   min-height: 0 !important;
-  padding: 14px 16px 10px !important;
+  padding: 12px 14px 8px !important;
   margin: 0 !important;
   order: 1 !important;
 }
@@ -125,9 +126,9 @@
 .media-hub .feed-card-list .feed-post-avatar,
 .media-hub .unified-feed-list .feed-post-avatar,
 .media-hub .feed-video-list .feed-post-avatar {
-  flex: 0 0 38px !important;
-  width: 38px !important;
-  height: 38px !important;
+  flex: 0 0 34px !important;
+  width: 34px !important;
+  height: 34px !important;
   border-radius: 50% !important;
   overflow: hidden !important;
   background: rgba(255, 255, 255, 0.06) !important;
@@ -168,7 +169,7 @@
 .media-hub .feed-card-list .feed-post-author-name strong,
 .media-hub .unified-feed-list .feed-post-author-name strong,
 .media-hub .feed-video-list .feed-post-author-name strong {
-  font-size: 0.85rem !important;
+  font-size: 0.82rem !important;
   font-weight: 600 !important;
   line-height: 1.25 !important;
   color: var(--feed-text-primary) !important;
@@ -181,7 +182,7 @@
   display: flex !important;
   align-items: center !important;
   gap: 5px !important;
-  font-size: 0.72rem !important;
+  font-size: 0.7rem !important;
   line-height: 1.3 !important;
   color: var(--feed-text-secondary) !important;
   white-space: nowrap !important;
@@ -225,7 +226,7 @@
   align-items: center !important;
   gap: 10px !important;
   min-height: 0 !important;
-  padding: 12px 16px 10px !important;
+  padding: 12px 14px 8px !important;
   margin: 0 !important;
   order: 1 !important;
 }
@@ -236,9 +237,9 @@
 .media-hub .feed-card-list .feed-post-author .profile-link img,
 .media-hub .unified-feed-list .feed-post-author .profile-link img,
 .media-hub .feed-video-list .feed-post-author .profile-link img {
-  flex: 0 0 36px !important;
-  width: 36px !important;
-  height: 36px !important;
+  flex: 0 0 34px !important;
+  width: 34px !important;
+  height: 34px !important;
   border-radius: 50% !important;
   object-fit: cover !important;
 }
@@ -258,7 +259,7 @@
   display: flex !important;
   align-items: center !important;
   gap: 4px !important;
-  font-size: 0.85rem !important;
+  font-size: 0.82rem !important;
   font-weight: 600 !important;
   line-height: 1.25 !important;
   color: var(--feed-text-primary) !important;
@@ -268,7 +269,7 @@
 .media-hub .feed-card-list .feed-post-author-info span,
 .media-hub .unified-feed-list .feed-post-author-info span,
 .media-hub .feed-video-list .feed-post-author-info span {
-  font-size: 0.72rem !important;
+  font-size: 0.7rem !important;
   line-height: 1.3 !important;
   color: var(--feed-text-secondary) !important;
   opacity: 1 !important;
@@ -484,7 +485,7 @@
 .media-hub .unified-feed-list > .feed-media-post > .feed-post-content,
 .media-hub .feed-video-list > .feed-media-post > .feed-post-content {
   order: 3 !important;
-  padding: 10px 16px 4px !important;
+  padding: 8px 14px 2px !important;
   margin: 0 !important;
   background: transparent !important;
 }
@@ -497,7 +498,7 @@
 .media-hub .feed-video-list > .long-video-card > .video-card-details {
   position: relative;
   order: 3 !important;
-  padding: 10px 16px 4px !important;
+  padding: 8px 14px 2px !important;
   margin: 0 !important;
   background: transparent !important;
 }
@@ -515,14 +516,14 @@
 .media-hub .feed-video-list .feed-media-post > .video-card-details,
 .media-hub .feed-video-list .feed-text-card > .video-card-details {
   position: relative;
-  padding: 10px 16px 4px !important;
+  padding: 8px 14px 2px !important;
   margin: 0 !important;
   background: transparent !important;
 }
 
 .feed-post-title {
-  margin: 0 0 4px !important;
-  font-size: 0.92rem !important;
+  margin: 0 0 3px !important;
+  font-size: 0.88rem !important;
   font-weight: 600 !important;
   line-height: 1.35 !important;
   color: var(--feed-text-primary) !important;
@@ -531,15 +532,15 @@
 
 .feed-post-desc {
   margin: 0 !important;
-  font-size: 0.84rem !important;
-  line-height: 1.5 !important;
+  font-size: 0.82rem !important;
+  line-height: 1.45 !important;
   color: rgba(244, 247, 255, 0.72) !important;
 }
 
 .feed-post-views {
   display: block !important;
-  margin-top: 4px !important;
-  font-size: 0.72rem !important;
+  margin-top: 3px !important;
+  font-size: 0.7rem !important;
   line-height: 1.3 !important;
   color: var(--feed-text-secondary) !important;
 }
@@ -550,8 +551,8 @@
 .media-hub .unified-feed-list .video-card-details h3,
 .media-hub .feed-video-list .feed-media-copy h3,
 .media-hub .feed-video-list .video-card-details h3 {
-  margin: 0 0 4px !important;
-  font-size: 0.92rem !important;
+  margin: 0 0 3px !important;
+  font-size: 0.88rem !important;
   font-weight: 600 !important;
   line-height: 1.35 !important;
   color: var(--feed-text-primary) !important;
@@ -565,16 +566,16 @@
 .media-hub .feed-video-list .feed-media-copy p,
 .media-hub .feed-video-list .video-card-details > p:not(.media-caption-tags) {
   margin: 0 !important;
-  font-size: 0.84rem !important;
-  line-height: 1.5 !important;
+  font-size: 0.82rem !important;
+  line-height: 1.45 !important;
   color: rgba(244, 247, 255, 0.72) !important;
 }
 
 .media-hub .feed-card-list .media-caption-tags,
 .media-hub .unified-feed-list .media-caption-tags,
 .media-hub .feed-video-list .media-caption-tags {
-  margin: 4px 0 0 !important;
-  font-size: 0.78rem !important;
+  margin: 3px 0 0 !important;
+  font-size: 0.76rem !important;
   color: var(--feed-text-secondary) !important;
 }
 
@@ -584,7 +585,7 @@
 
 
 /* ========================================================================
-   8. ENGAGEMENT BAR — The action row
+   8. ENGAGEMENT BAR — Clean action row
    ======================================================================== */
 
 .media-hub .feed-card-list > .feed-media-post > .feed-action-bar,
@@ -603,11 +604,11 @@
   align-items: center !important;
   justify-content: space-between !important;
   width: 100% !important;
-  min-height: 48px !important;
-  padding: 6px 10px 6px !important;
+  min-height: 44px !important;
+  padding: 4px 8px 4px !important;
   margin: 0 !important;
-  gap: 2px !important;
-  border-top: var(--feed-separator) !important;
+  gap: 0 !important;
+  border-top: none !important;
   background: transparent !important;
   order: 6 !important;
   box-sizing: border-box;
@@ -641,14 +642,14 @@
   flex: 1 1 0 !important;
   justify-content: center !important;
   min-width: 0 !important;
-  min-height: 40px !important;
-  padding: 6px 8px !important;
+  min-height: 36px !important;
+  padding: 6px 6px !important;
   margin: 0 !important;
   border: 0 !important;
   border-radius: 8px !important;
   background: transparent !important;
   color: var(--feed-icon) !important;
-  font-size: 0.75rem !important;
+  font-size: 0.72rem !important;
   font-weight: 500 !important;
   font-family: inherit !important;
   cursor: pointer !important;
@@ -708,7 +709,7 @@
 .media-hub .feed-card-list .feed-action-bar > button > strong,
 .media-hub .unified-feed-list .feed-action-bar > button > strong,
 .media-hub .feed-video-list .feed-action-bar > button > strong {
-  font-size: 0.72rem !important;
+  font-size: 0.7rem !important;
   font-weight: 600 !important;
   font-variant-numeric: tabular-nums !important;
 }
@@ -723,10 +724,10 @@
 .media-hub .feed-video-list .feed-text-card .feed-post-actions {
   display: flex !important;
   flex-direction: row !important;
-  gap: 2px !important;
+  gap: 0 !important;
   margin-top: 0 !important;
-  padding: 6px 10px 6px !important;
-  border-top: var(--feed-separator) !important;
+  padding: 4px 8px 4px !important;
+  border-top: none !important;
   order: 6 !important;
 }
 
@@ -736,9 +737,9 @@
 .media-hub .unified-feed-list .feed-text-card .announcement-comment-toggle,
 .media-hub .feed-video-list .feed-text-card .feed-post-actions > button,
 .media-hub .feed-video-list .feed-text-card .announcement-comment-toggle {
-  min-height: 38px !important;
-  padding: 6px 8px !important;
-  font-size: 0.75rem !important;
+  min-height: 34px !important;
+  padding: 5px 6px !important;
+  font-size: 0.72rem !important;
 }
 
 
@@ -761,7 +762,7 @@
   .media-hub .feed-card-list,
   .media-hub .unified-feed-list,
   .media-hub .feed-video-list {
-    gap: 14px !important;
+    gap: 0 !important;
   }
 
   .media-hub .feed-card-list > .feed-media-post,
@@ -774,8 +775,6 @@
   .media-hub .feed-video-list > .feed-text-card,
   .media-hub .feed-video-list > .long-video-card {
     border-radius: 0 !important;
-    border-left: 0 !important;
-    border-right: 0 !important;
     box-shadow: none !important;
   }
 }
@@ -801,15 +800,15 @@
   .media-hub .unified-feed-list .feed-text-card .announcement-comment-toggle,
   .media-hub .feed-video-list .feed-text-card .feed-post-actions > button,
   .media-hub .feed-video-list .feed-text-card .announcement-comment-toggle {
-    padding: 5px 5px !important;
-    gap: 3px !important;
-    font-size: 0.72rem !important;
+    padding: 4px 4px !important;
+    gap: 2px !important;
+    font-size: 0.7rem !important;
   }
 
   .media-hub .feed-card-list .feed-action-bar > button > strong,
   .media-hub .unified-feed-list .feed-action-bar > button > strong,
   .media-hub .feed-video-list .feed-action-bar > button > strong {
-    font-size: 0.7rem !important;
+    font-size: 0.68rem !important;
   }
 }
 
@@ -836,14 +835,14 @@
 .media-hub .feed-skeleton-grid {
   display: flex !important;
   flex-direction: column !important;
-  gap: 20px !important;
+  gap: 0 !important;
   width: 100% !important;
 }
 
 .media-hub .feed-skeleton-grid > span {
   display: block !important;
   min-height: 320px !important;
-  border-radius: var(--feed-card-radius) !important;
+  border-radius: 0 !important;
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0.03) 25%,
@@ -852,6 +851,7 @@
   ) !important;
   background-size: 200% 100% !important;
   animation: feed-skeleton-pulse 1.8s ease-in-out infinite !important;
+  border-bottom: var(--feed-separator) !important;
 }
 
 @keyframes feed-skeleton-pulse {
@@ -899,7 +899,7 @@
 .media-hub .feed-card-list > .feed-text-card .feed-post-body,
 .media-hub .unified-feed-list > .feed-text-card .feed-post-body,
 .media-hub .feed-video-list > .feed-text-card .feed-post-body {
-  padding: 10px 16px 4px !important;
+  padding: 8px 14px 2px !important;
 }
 
 .media-hub .feed-card-list > .feed-text-card .feed-post-attachments,
@@ -1010,10 +1010,10 @@
 .media-hub .feed-card-list,
 .media-hub .unified-feed-list,
 .media-hub .feed-video-list {
-  gap: 20px !important;
+  gap: 0 !important;
 }
 
-/* Neutralize mediaHub.css border-radius:0 on feed media (line ~2791-2804) */
+/* Neutralize mediaHub.css margin-bottom on feed posts (line ~2697) — edge-to-edge uses border-bottom */
 .media-hub .feed-card-list > .feed-media-post,
 .media-hub .feed-card-list > .long-video-card,
 .media-hub .feed-card-list > .feed-text-card,
@@ -1021,7 +1021,38 @@
 .media-hub .unified-feed-list > .long-video-card,
 .media-hub .unified-feed-list > .feed-text-card,
 .media-hub .feed-video-list > .feed-media-post,
-.media-hub .feed-video-list > .long-video-card {
-  border-radius: var(--feed-card-radius) !important;
+.media-hub .feed-video-list > .long-video-card,
+.media-hub .feed-video-list > .feed-text-card {
+  margin: 0 !important;
+}
+
+/* Neutralize mediaHub.css border, background, border-radius on feed posts */
+.media-hub .feed-card-list > .feed-media-post,
+.media-hub .feed-card-list > .long-video-card,
+.media-hub .feed-card-list > .feed-text-card,
+.media-hub .unified-feed-list > .feed-media-post,
+.media-hub .unified-feed-list > .long-video-card,
+.media-hub .unified-feed-list > .feed-text-card,
+.media-hub .feed-video-list > .feed-media-post,
+.media-hub .feed-video-list > .long-video-card,
+.media-hub .feed-video-list > .feed-text-card {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+
+/* Neutralize mediaHub.css border-left/border-right removal on feed posts (line ~2812) */
+.media-hub .feed-card-list > .feed-media-post,
+.media-hub .feed-card-list > .long-video-card,
+.media-hub .feed-card-list > .feed-text-card,
+.media-hub .unified-feed-list > .feed-media-post,
+.media-hub .unified-feed-list > .long-video-card,
+.media-hub .unified-feed-list > .feed-text-card,
+.media-hub .feed-video-list > .feed-media-post,
+.media-hub .feed-video-list > .long-video-card,
+.media-hub .feed-video-list > .feed-text-card {
+  border-radius: 0 !important;
   overflow: hidden !important;
 }

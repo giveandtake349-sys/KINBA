@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type UseScrollDirectionOptions = {
   threshold?: number;
-  stopDelay?: number;
 };
 
 const FEED_SCROLL_SELECTOR = "[data-feed-scroll], .media-feed-scroll, .shorts-viewport";
@@ -10,30 +9,18 @@ const SHORTS_VIEWER_SELECTOR = ".shorts-viewer-layer";
 
 /**
  * Observes the document and KINBA's nested feed surfaces in capture phase.
- * Chrome is hidden only after a meaningful downward movement and is restored
- * when the feed moves upward, returns to its origin, or becomes idle.
+ * Chrome is hidden after a meaningful downward movement and is restored
+ * only when the feed scrolls upward or returns to the top.
  */
 export function useScrollDirection({
   threshold = 5,
-  stopDelay = 180,
 }: UseScrollDirectionOptions = {}) {
   const [isScrollingDown, setIsScrollingDown] = useState(false);
   const lastScrollTop = useRef(0);
-  const stopTimer = useRef<number | null>(null);
-
-  const clearStopTimer = useCallback(() => {
-    if (stopTimer.current !== null) {
-      window.clearTimeout(stopTimer.current);
-      stopTimer.current = null;
-    }
-  }, []);
 
   const handleScroll = useCallback(
     (event: Event) => {
       const target = event.target;
-      // The tab Shorts feed joins the chrome-collapse so the stage grows
-      // full-bleed while swiping. Only the sealed full-screen detail viewer
-      // is exempt: it hides the app chrome via Shorts-stage CSS.
       const isShortsViewer =
         target instanceof HTMLElement &&
         (target.matches(SHORTS_VIEWER_SELECTOR) ||
@@ -63,12 +50,8 @@ export function useScrollDirection({
       }
 
       lastScrollTop.current = currentScrollTop;
-      clearStopTimer();
-      stopTimer.current = window.setTimeout(() => {
-        setIsScrollingDown(false);
-      }, stopDelay);
     },
-    [clearStopTimer, stopDelay, threshold]
+    [threshold]
   );
 
   useEffect(() => {
@@ -79,9 +62,8 @@ export function useScrollDirection({
 
     return () => {
       document.removeEventListener("scroll", handleScroll, true);
-      clearStopTimer();
     };
-  }, [clearStopTimer, handleScroll]);
+  }, [handleScroll]);
 
   return { isScrollingDown };
 }

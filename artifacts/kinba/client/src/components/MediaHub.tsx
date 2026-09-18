@@ -839,13 +839,13 @@ function QualityVideoPlayer({
       className={
         vertical
           ? "media-video-frame media-video-frame--short w-full h-full object-cover aspect-[9/16]"
-          : "media-video-frame media-video-frame--square w-full h-full"
+          : "media-video-frame media-video-frame--square w-full"
       }
     >
       <video
         src={sourceUrl}
         poster={showPoster ? posterUrl : undefined}
-        className={`w-full h-full ${vertical ? "object-cover aspect-[9/16]" : ""}`}
+        className={`w-full h-full ${vertical ? "object-cover aspect-[9/16]" : "object-contain"}`}
         ref={ref}
         {...({ "webkit-playsinline": "true" } as Record<string, string>)}
         controls={false}
@@ -914,6 +914,282 @@ function QualityVideoPlayer({
           {playbackError}
         </p>
       )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------
+   ForYouVideoPlayer — Dedicated player for the For You feed.
+
+   Uses class "for-you-video-frame" (NOT "media-video-frame") so it
+   is never targeted by the feedUi.css specificity cascade that forces
+   height:0 / aspect-ratio:auto on .media-video-frame in feed context.
+
+   Inline style={{ aspectRatio }} from video.width/video.height gives
+   the frame deterministic non-zero height on mount, breaking the
+   chicken-and-egg: frame visible → IntersectionObserver fires →
+   preload="metadata" → metadata loads → video uses real intrinsic dims.
+   ------------------------------------------------------------------ */
+
+function ForYouVideoPlayer({
+  video,
+  active = true,
+  onFirstPlay,
+}: {
+  video: VideoRecord;
+  active?: boolean;
+  onFirstPlay?: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hlsRef = useRef<Hls | null>(null);
+  const [playing, setPlaying] = useState(false);
+  const [isInView, setIsInView] = useState(false);
+  const [isNearViewport, setIsNearViewport] = useState(false);
+  const [muted, setMuted] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const viewedRef = useRef(false);
+  const [showOverlay, setShowOverlay] = useState(false);
+  const overlayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const sourceMap = useMemo(
+    () =>
+      new Map(
+        (Array.isArray(video.sources) ? video.sources : []).map(s => [
+          s.quality,
+          s.videoUrl,
+        ])
+      ),
+    [video.sources]
+  );
+
+  const directUrl = resolvePlaybackUrl(video.videoUrl);
+  const originalUrl = resolvePlaybackUrl(sourceMap.get("ORIGINAL"));
+  const sourceUrl =
+    directUrl && !isHlsMediaUrl(directUrl)
+      ? directUrl
+      : originalUrl || directUrl;
+
+  const posterUrl =
+    resolveMediaUrl(video.thumbnailUrl) ?? `/api/videos/${video.id}/thumbnail`;
+
+  const w = video.width || 16;
+  const h = video.height || 9;
+
+  /* IntersectionObserver — viewport tracking */
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      entries => {
+        const entry = entries[0];
+        const visible = Boolean(entry?.isIntersecting);
+        setIsNearViewport(visible);
+        setIsInView(Boolean(visible && entry.intersectionRatio >= 0.7));
+      },
+      { rootMargin: "240px 0px", threshold: [0, 0.7] }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  /* Source loader — attach video source when URL or viewport changes */
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    if (!sourceUrl) {
+      setError("No playable source available.");
+      return;
+    }
+    setError(null);
+    hlsRef.current?.destroy();
+    hlsRef.current = null;
+    if (isHlsMediaUrl(sourceUrl) && Hls.isSupported()) {
+      const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+      hlsRef.current = hls;
+      hls.on(Hls.Events.ERROR, (_e, data) => {
+        if (data.fatal) setError("Stream could not be loaded.");
+      });
+      hls.loadSource(sourceUrl);
+      hls.attachMedia(el);
+    } else {
+      el.src = sourceUrl;
+      el.load();
+    }
+    return () => {
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
+    };
+  }, [sourceUrl]);
+
+  /* Auto-play/pause based on viewport */
+  const shouldAutoPlay = active && isInView;
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    if (!shouldAutoPlay) {
+      el.pause();
+    } else {
+      el.play().catch(() => undefined);
+    }
+  }, [shouldAutoPlay]);
+
+  const togglePlay = () => {
+    const el = videoRef.current;
+    if (!el) return;
+    if (el.paused) el.play().catch(() => undefined);
+    else el.pause();
+  };
+
+  const flashOverlay = () => {
+    setShowOverlay(true);
+    if (overlayTimer.current) clearTimeout(overlayTimer.current);
+    overlayTimer.current = setTimeout(() => setShowOverlay(false), 2500);
+  };
+
+  useEffect(
+    () => () => {
+      if (overlayTimer.current) clearTimeout(overlayTimer.current);
+    },
+    []
+  );
+
+  return (
+    <div
+      ref={containerRef}
+      className="for-you-video-frame"
+      style={{
+        position: "relative",
+        width: "100%",
+        aspectRatio: `${w} / ${h}`,
+        background: "#08090b",
+        overflow: "hidden",
+      }}
+      onClick={togglePlay}
+      onPointerDown={flashOverlay}
+    >
+      <video
+        ref={videoRef}
+        src={sourceUrl}
+        poster={posterUrl}
+        muted={muted}
+        loop
+        playsInline
+        preload={isNearViewport ? "metadata" : "none"}
+        onPlay={() => {
+          setPlaying(true);
+          if (!viewedRef.current) {
+            viewedRef.current = true;
+            onFirstPlay?.();
+          }
+        }}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+        onError={() => setError("Video could not be loaded.")}
+        style={{
+          display: "block",
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+          background: "#08090b",
+        }}
+      />
+      {!playing && !error && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: "50%",
+              background: "rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Play size={24} color="#fff" />
+          </div>
+        </div>
+      )}
+      {error && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#08090b",
+            color: "#aaa",
+            fontSize: "0.82rem",
+            textAlign: "center",
+            padding: 16,
+          }}
+        >
+          {error}
+        </div>
+      )}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 8,
+          right: 8,
+          display: "flex",
+          gap: 6,
+          opacity: showOverlay ? 1 : 0,
+          transition: "opacity 0.2s",
+          pointerEvents: showOverlay ? "auto" : "none",
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={togglePlay}
+          aria-label={playing ? "Pause" : "Play"}
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: "50%",
+            border: "none",
+            background: "rgba(0,0,0,0.6)",
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+          }}
+        >
+          {playing ? <Pause size={14} /> : <Play size={14} />}
+        </button>
+        <button
+          type="button"
+          onClick={() => setMuted(v => !v)}
+          aria-label={muted ? "Unmute" : "Mute"}
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: "50%",
+            border: "none",
+            background: "rgba(0,0,0,0.6)",
+            color: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+          }}
+        >
+          {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+        </button>
+      </div>
     </div>
   );
 }
@@ -1540,6 +1816,7 @@ function VideoCard({
   showDetailsOverlay = false,
   socialLayout = false,
   onOpenViewer,
+  renderVideo,
 }: {
   video: VideoRecord;
   active?: boolean;
@@ -1547,6 +1824,7 @@ function VideoCard({
   socialLayout?: boolean;
   onOpenViewer?: () => void;
   showHeader?: boolean;
+  renderVideo?: (video: VideoRecord, active: boolean, onFirstPlay: () => void) => ReactNode;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [description, setDescription] = useState(video.description);
@@ -1661,11 +1939,13 @@ function VideoCard({
               draggable={false}
             />
           ) : (
-            <QualityVideoPlayer
-              video={video}
-              active={active}
-              onFirstPlay={recordView}
-            />
+            renderVideo
+              ? renderVideo(video, active, recordView)
+              : <QualityVideoPlayer
+                  video={video}
+                  active={active}
+                  onFirstPlay={recordView}
+                />
           )}
         </div>
         <div className="feed-post-content">
@@ -2135,6 +2415,12 @@ function HomeFeedPanel({
     }
   );
   const videos = (query.data ?? []) as VideoRecord[];
+  const useForYouPlayer = tab === "videos";
+  const forYouVideoRenderer = useForYouPlayer
+    ? (v: VideoRecord, a: boolean, onFirstPlay: () => void) => (
+        <ForYouVideoPlayer video={v} active={a} onFirstPlay={onFirstPlay} />
+      )
+    : undefined;
   return (
     <section
       className="media-section home-feed-section w-full max-w-full overflow-hidden box-border"
@@ -2174,6 +2460,11 @@ function HomeFeedPanel({
               active={active}
               showDetailsOverlay={showDetailsOverlay}
               socialLayout
+              renderVideo={
+                useForYouPlayer && video.mediaType === "VIDEO"
+                  ? forYouVideoRenderer
+                  : undefined
+              }
               onOpenViewer={
                 video.kind === "SHORT" && onOpenShort
                   ? () => onOpenShort(video.id)
