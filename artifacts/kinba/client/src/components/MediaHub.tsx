@@ -3279,68 +3279,267 @@ export type FeedSection =
   | "offline";
 
 export function SearchFeed() {
-  const [term, setTerm] = useState("");
-  const query = trpc.home.search.useQuery(
-    { term },
+  const [rawTerm, setRawTerm] = useState("");
+  const [debouncedTerm, setDebouncedTerm] = useState("");
+  const [videoViewer, setVideoViewer] = useState<VideoRecord | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedTerm(rawTerm), 300);
+    return () => clearTimeout(id);
+  }, [rawTerm]);
+
+  const query = trpc.home.searchAll.useQuery(
+    { term: debouncedTerm },
     {
-      enabled: term.trim().length >= 2,
+      enabled: debouncedTerm.trim().length >= 2,
       retry: 1,
       throwOnError: false,
       refetchOnWindowFocus: false,
     }
   );
-  const results = ((query.data ?? []) as VideoRecord[]).filter(
-    video => !isReportedLegacyMedia(video)
+
+  const term = debouncedTerm;
+  const hasQuery = term.trim().length >= 2;
+  const isLoading = query.isPending && hasQuery;
+  const isError = query.isError && hasQuery;
+  const data = query.data as
+    | { users: SearchUserResult[]; videos: VideoRecord[] }
+    | undefined;
+  const users = data?.users ?? [];
+  const videos = (data?.videos ?? []).filter(
+    (v: VideoRecord) => !isReportedLegacyMedia(v)
   );
+  const hasResults = users.length > 0 || videos.length > 0;
+
   return (
     <section
-      className="media-section search-section"
+      className="search-section"
       aria-labelledby="search-heading"
     >
-      <div className="media-section-heading">
-        <div>
-          <p className="eyebrow">Search</p>
-          <h2 id="search-heading">Find your next signal.</h2>
+      <div className="search-bar-wrapper">
+        <div className="search-bar">
+          <Search size={17} className="search-bar-icon" />
+          <input
+            ref={inputRef}
+            value={rawTerm}
+            onChange={e => setRawTerm(e.target.value)}
+            placeholder="Search people, videos, creators..."
+            aria-label="Search"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          {rawTerm && (
+            <button
+              type="button"
+              className="search-bar-clear"
+              onClick={() => {
+                setRawTerm("");
+                inputRef.current?.focus();
+              }}
+              aria-label="Clear search"
+            >
+              <X size={15} />
+            </button>
+          )}
         </div>
-        <span>Searches published videos</span>
       </div>
-      <form
-        className="feed-search-form"
-        onSubmit={event => event.preventDefault()}
-      >
-        <Search size={17} />
-        <input
-          value={term}
-          onChange={event => setTerm(event.target.value)}
-          placeholder="Search videos, creators, or topics"
-          aria-label="Search videos, creators, or topics"
+
+      <div className="search-results">
+        {!hasQuery && (
+          <div className="search-empty-state">
+            <Search size={28} strokeWidth={1.5} />
+            <h3>Search KINBA</h3>
+            <p>Find creators, videos, and content.</p>
+          </div>
+        )}
+
+        {hasQuery && rawTerm !== term && (
+          <div className="search-loading-hint">
+            <Loader2 size={14} className="spin" />
+            <span>Searching...</span>
+          </div>
+        )}
+
+        {isError && (
+          <div className="search-empty-state">
+            <p>Something went wrong. Try again.</p>
+          </div>
+        )}
+
+        {hasQuery && !isLoading && !isError && !hasResults && (
+          <div className="search-empty-state">
+            <p>No results for &ldquo;{term}&rdquo;</p>
+            <p className="search-empty-hint">Try different keywords or check spelling.</p>
+          </div>
+        )}
+
+        {isLoading && (
+          <div className="search-skeleton">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="search-skeleton-row">
+                <div className="search-skeleton-avatar" />
+                <div className="search-skeleton-text">
+                  <div className="search-skeleton-line w-[40%]" />
+                  <div className="search-skeleton-line w-[25%]" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!isLoading && !isError && users.length > 0 && (
+          <div className="search-group">
+            <h4 className="search-group-title">People</h4>
+            <div className="search-people-list">
+              {users.map(user => (
+                <SearchUserRow key={user.id} user={user} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!isLoading && !isError && videos.length > 0 && (
+          <div className="search-group">
+            <h4 className="search-group-title">Content</h4>
+            <div className="search-content-grid">
+              {videos.map(video => (
+                <SearchVideoCard key={video.id} video={video} onOpenVideo={setVideoViewer} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      {videoViewer && (
+        <FocusedVideoViewer
+          video={videoViewer}
+          onClose={() => setVideoViewer(null)}
         />
-      </form>
-      {!term.trim() ? (
-        <div className="media-empty">
-          <Search size={18} />
-          <h3>Search the KINBA feed.</h3>
-          <p>Try a creator name, title, or topic.</p>
-        </div>
-      ) : term.trim().length < 2 ? (
-        <div className="media-empty">
-          <p>Enter at least two characters to search.</p>
-        </div>
-      ) : query.isPending ? (
-        <FeedSkeleton />
-      ) : results.length ? (
-        <div className="long-video-grid media-feed-scroll h-[100dvh] overflow-y-scroll scrollbar-hide snap-y snap-mandatory w-full max-w-full box-border">
-          {results.map(video => (
-            <MemoVideoCard key={video.id} video={video} />
-          ))}
-        </div>
-      ) : (
-        <div className="media-empty">
-          <h3>No videos found.</h3>
-          <p>Try another creator, title, or topic.</p>
-        </div>
       )}
     </section>
+  );
+}
+
+type SearchUserResult = {
+  id: number;
+  name: string | null;
+  username: string | null;
+  photoUrl: string | null;
+  isVerified: boolean;
+  followersCount: number;
+};
+
+function SearchUserRow({ user }: { user: SearchUserResult }) {
+  return (
+    <a
+      className="search-user-row"
+      href={`/profile/${user.id}`}
+      onClick={e => navigateToProfile(e, user.id)}
+    >
+      <div className="search-user-avatar">
+        {user.photoUrl ? (
+          <img
+            src={resolveMediaUrl(user.photoUrl, "avatars")}
+            alt=""
+            loading="lazy"
+          />
+        ) : (
+          <UserRound size={18} />
+        )}
+      </div>
+      <div className="search-user-info">
+        <span className="search-user-name">
+          {displayName(user.name, null)}
+          {user.isVerified && (
+            <BadgeCheck size={13} className="verified-badge" />
+          )}
+        </span>
+        {user.username && (
+          <span className="search-user-handle">@{user.username}</span>
+        )}
+      </div>
+      <span className="search-user-followers">
+        {formatCount(user.followersCount)} followers
+      </span>
+    </a>
+  );
+}
+
+function SearchVideoCard({ video, onOpenVideo }: { video: VideoRecord; onOpenVideo?: (v: VideoRecord) => void }) {
+  const openViewer = (event: React.MouseEvent<HTMLElement>) => {
+    if (!onOpenVideo) return;
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      target.closest("a")
+    )
+      return;
+    onOpenVideo(video);
+  };
+
+  return (
+    <article className="search-video-card">
+      <div
+        className="search-video-thumb"
+        role={onOpenVideo ? "button" : undefined}
+        tabIndex={onOpenVideo ? 0 : undefined}
+        onClick={openViewer}
+        onKeyDown={event => {
+          if (!onOpenVideo || (event.key !== "Enter" && event.key !== " "))
+            return;
+          event.preventDefault();
+          onOpenVideo(video);
+        }}
+      >
+        {video.mediaType === "IMAGE" ? (
+          <img
+            src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
+            alt={video.title || "Post"}
+            loading="lazy"
+            draggable={false}
+          />
+        ) : (
+          <QualityVideoPlayer
+            video={video}
+            active={false}
+            showPoster
+          />
+        )}
+      </div>
+      <div className="search-video-info">
+        <div className="search-video-author">
+          <a
+            className="search-video-author-link"
+            href={`/profile/${video.owner.id}`}
+            onClick={e => navigateToProfile(e, video.owner.id)}
+          >
+            <div className="search-video-author-avatar">
+              {video.owner.photoUrl ? (
+                <img
+                  src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
+                  alt=""
+                  loading="lazy"
+                />
+              ) : (
+                <UserRound size={12} />
+              )}
+            </div>
+            <span className="search-video-author-name">
+              {displayName(video.owner.name, video.owner.username)}
+              {video.owner.isVerified && (
+                <BadgeCheck size={11} className="verified-badge" />
+              )}
+            </span>
+          </a>
+        </div>
+        {video.title && (
+          <h4 className="search-video-title">{video.title}</h4>
+        )}
+        <span className="search-video-meta">
+          {formatCount(video.viewCount)} views · {relativeTime(video.createdAt)}
+        </span>
+      </div>
+    </article>
   );
 }
 

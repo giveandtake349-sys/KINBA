@@ -665,6 +665,56 @@ export async function searchVideos(term: string, viewerId?: number) {
   );
 }
 
+export type SearchUserResult = {
+  id: number;
+  name: string | null;
+  username: string | null;
+  photoUrl: string | null;
+  isVerified: boolean;
+  followersCount: number;
+};
+
+export type SearchAllResult = {
+  users: SearchUserResult[];
+  videos: Awaited<ReturnType<typeof searchVideos>>;
+};
+
+export async function searchAll(
+  term: string,
+  viewerId?: number
+): Promise<SearchAllResult> {
+  const db = await getDb();
+  const query = term.trim();
+  if (!db || !query) return { users: [], videos: [] };
+  const pattern = `%${query}%`;
+
+  const [userRows, videos] = await Promise.all([
+    db
+      .select({
+        id: users.id,
+        name: users.name,
+        username: profiles.username,
+        photoUrl: profiles.photoUrl,
+        isVerified: profiles.isVerified,
+        followersCount: sql<number>`(select count(*) from follows where follows."followedId" = ${users.id})`,
+      })
+      .from(users)
+      .innerJoin(profiles, eq(users.id, profiles.userId))
+      .where(or(ilike(users.name, pattern), ilike(profiles.username, pattern)))
+      .orderBy(desc(sql<number>`(select count(*) from follows where follows."followedId" = ${users.id})`))
+      .limit(20),
+    searchVideos(term, viewerId),
+  ]);
+
+  return {
+    users: userRows.map(row => ({
+      ...row,
+      followersCount: Number(row.followersCount),
+    })),
+    videos,
+  };
+}
+
 export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
   if (tab === "all") return listUnifiedHomeFeed(viewerId);
   if (tab === "shorts")

@@ -33,6 +33,7 @@ import {
   submitVerificationTransaction,
   updateOwnProfile,
   searchVideos,
+  searchAll,
   listVideos,
   listSponsorBidsSessions,
   getSponsorBidsSession,
@@ -145,6 +146,9 @@ export const appRouter = router({
     search: publicProcedure
       .input(z.object({ term: z.string().trim().max(120) }))
       .query(({ ctx, input }) => searchVideos(input.term, ctx.user?.id)),
+    searchAll: publicProcedure
+      .input(z.object({ term: z.string().trim().max(120) }))
+      .query(({ ctx, input }) => searchAll(input.term, ctx.user?.id)),
     notifications: protectedProcedure.query(({ ctx }) =>
       listNotifications(ctx.user.id)
     ),
