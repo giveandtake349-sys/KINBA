@@ -219,7 +219,13 @@ export const appRouter = router({
     ),
     view: publicProcedure
       .input(videoIdInput)
-      .mutation(({ input }) => recordVideoView(input.videoId)),
+      .mutation(({ ctx, input }) => {
+        const forwarded = ctx.req.headers["x-forwarded-for"];
+        const ip = typeof forwarded === "string"
+          ? forwarded.split(",")[0].trim()
+          : ctx.req.socket.remoteAddress ?? "unknown";
+        return recordVideoView(input.videoId, ip);
+      }),
     comments: router({
       list: publicProcedure
         .input(videoIdInput)

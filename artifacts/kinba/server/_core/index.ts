@@ -10,6 +10,9 @@ import { serveStatic, setupVite } from "./vite";
 import { registerVideoUploadRoute } from "../videoUploadRoute";
 import { registerCommentRoutes } from "../commentRoutes";
 import { listSpotlightHighlights } from "../db";
+import { rateLimit } from "../rateLimiter";
+import { getDb } from "../db";
+import { sql } from "drizzle-orm";
 
 async function startServer() {
   const app = express();
@@ -17,12 +20,23 @@ async function startServer() {
   // Render and other reverse proxies forward the original HTTPS scheme. Trusting
   // the first proxy keeps secure session cookies stable for protected mutations.
   app.set("trust proxy", 1);
-  // Keep the platform health check independent of Supabase, R2, auth, and HLS.
-  // Render must be able to verify the process is alive while integrations are
-  // unavailable or background jobs are recovering.
-  app.get("/api/health", (_req, res) => {
-    res.status(200).json({ ok: true });
+
+  // --- Health check: liveness + optional DB readiness ---
+  app.get("/api/health", async (_req, res) => {
+    try {
+      const db = await getDb();
+      if (!db) {
+        res.status(200).json({ ok: true, db: "not_configured" });
+        return;
+      }
+      await db.execute(sql`SELECT 1`);
+      res.status(200).json({ ok: true, db: "connected" });
+    } catch (error) {
+      console.error("[Health] Database readiness check failed:", error);
+      res.status(503).json({ ok: false, db: "unreachable" });
+    }
   });
+
   app.get("/api/spotlight/highlights", async (_req, res) => {
     try {
       const highlights = await listSpotlightHighlights();
@@ -67,6 +81,45 @@ async function startServer() {
   registerStorageProxy(app);
   registerVideoUploadRoute(app);
   registerCommentRoutes(app);
+
+  // --- Rate limiting ---
+  // Search: 60 req/min — normal browsing involves typing + auto-search
+  app.use("/api/trpc/home.search", rateLimit({ windowMs: 60_000, max: 60, keyPrefix: "srch" }));
+  app.use("/api/trpc/home.searchAll", rateLimit({ windowMs: 60_000, max: 60, keyPrefix: "srch" }));
+
+  // Spotlight: 10 req/min — loaded on page views, not continuous
+  app.use("/api/spotlight/highlights", rateLimit({ windowMs: 60_000, max: 10, keyPrefix: "spot" }));
+
+  // View: 30 req/min — allows normal multi-video browsing
+  app.use("/api/trpc/videos.view", rateLimit({ windowMs: 60_000, max: 30, keyPrefix: "view" }));
+
+  // Comments: 10 req/min — prevents spam
+  app.use("/api/trpc/videos.comments.create", rateLimit({ windowMs: 60_000, max: 10, keyPrefix: "cmt" }));
+  app.use("/api/trpc/community.comments.create", rateLimit({ windowMs: 60_000, max: 10, keyPrefix: "cmt" }));
+
+  // Reactions/likes: 30 req/min — fast toggling is normal
+  app.use("/api/trpc/videos.react", rateLimit({ windowMs: 60_000, max: 30, keyPrefix: "react" }));
+  app.use("/api/trpc/videos.comments.like", rateLimit({ windowMs: 60_000, max: 30, keyPrefix: "react" }));
+  app.use("/api/trpc/community.react", rateLimit({ windowMs: 60_000, max: 30, keyPrefix: "react" }));
+
+  // Shares/bookmarks/follows: 20 req/min
+  app.use("/api/trpc/videos.share", rateLimit({ windowMs: 60_000, max: 20, keyPrefix: "share" }));
+  app.use("/api/trpc/videos.bookmark", rateLimit({ windowMs: 60_000, max: 20, keyPrefix: "bkmk" }));
+  app.use("/api/trpc/profile.toggleFollow", rateLimit({ windowMs: 60_000, max: 20, keyPrefix: "fol" }));
+  app.use("/api/trpc/community.bookmark", rateLimit({ windowMs: 60_000, max: 20, keyPrefix: "bkmk" }));
+
+  // Video creation: 5 req/min — expensive, infrequent
+  app.use("/api/trpc/videos.create", rateLimit({ windowMs: 60_000, max: 5, keyPrefix: "create" }));
+
+  // Community post creation: 5 req/min
+  app.use("/api/trpc/community.create", rateLimit({ windowMs: 60_000, max: 5, keyPrefix: "create" }));
+
+  // Profile updates: 5 req/min
+  app.use("/api/trpc/profile.update", rateLimit({ windowMs: 60_000, max: 5, keyPrefix: "prof" }));
+
+  // Global catch-all for any tRPC route not explicitly limited: 120 req/min
+  app.use("/api/trpc", rateLimit({ windowMs: 60_000, max: 120, keyPrefix: "tRPC" }));
+
   // tRPC API
   app.use(
     "/api/trpc",
@@ -82,6 +135,15 @@ async function startServer() {
     serveStatic(app);
   }
 
+  // --- Global Express error handler (must be last) ---
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    console.error("[Express] Unhandled error:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   const port = Number(process.env.PORT || 10000);
 
   server.listen(port, "0.0.0.0", () => {
@@ -90,6 +152,15 @@ async function startServer() {
     );
   });
 }
+
+// --- Process-level error handlers ---
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("[Process] Unhandled Promise rejection:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("[Process] Uncaught exception:", error);
+});
 
 startServer().catch(error => {
   console.error("[Startup] Server failed to start:", error);

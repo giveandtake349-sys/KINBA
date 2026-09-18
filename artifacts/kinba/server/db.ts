@@ -547,34 +547,50 @@ export async function listSpotlightHighlights(): Promise<SpotlightHighlight[]> {
   const db = await getDb();
   if (!db) return [];
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+  const likesCount = sql<number>`(select count(*) from video_reactions where video_reactions."videoId" = ${videos.id})`;
+  const commentsCount = sql<number>`(select count(*) from video_comments where video_comments."videoId" = ${videos.id})`;
+  const sharesCount = sql<number>`(select count(*) from video_shares where video_shares."videoId" = ${videos.id})`;
+  const videoScore = sql<number>`${likesCount} + ${commentsCount} * 2 + ${sharesCount} * 3`;
+
+  const postLikes = sql<number>`(select count(*) from community_reactions where community_reactions."announcementId" = ${communityAnnouncements.id})`;
+  const postComments = sql<number>`(select count(*) from community_comments where community_comments."announcementId" = ${communityAnnouncements.id})`;
+  const postScore = sql<number>`${postLikes} + ${postComments} * 2`;
+
   const [videoRows, postRows] = await Promise.all([
     db
       .select({
         video: videos,
         user: users,
         profile: profiles,
-        likes: sql<number>`(select count(*) from video_reactions where video_reactions."videoId" = ${videos.id})`,
-        comments: sql<number>`(select count(*) from video_comments where video_comments."videoId" = ${videos.id})`,
-        shares: sql<number>`(select count(*) from video_shares where video_shares."videoId" = ${videos.id})`,
+        likes: likesCount,
+        comments: commentsCount,
+        shares: sharesCount,
+        score: videoScore,
       })
       .from(videos)
       .innerJoin(users, eq(videos.userId, users.id))
       .leftJoin(profiles, eq(videos.userId, profiles.userId))
-      .where(gt(videos.createdAt, since)),
+      .where(and(eq(videos.processingStatus, "READY"), gt(videos.createdAt, since)))
+      .orderBy(desc(videoScore), desc(videos.createdAt))
+      .limit(50),
     db
       .select({
         post: communityAnnouncements,
         user: users,
         profile: profiles,
-        likes: sql<number>`(select count(*) from community_reactions where community_reactions."announcementId" = ${communityAnnouncements.id})`,
-        comments: sql<number>`(select count(*) from community_comments where community_comments."announcementId" = ${communityAnnouncements.id})`,
+        likes: postLikes,
+        comments: postComments,
+        score: postScore,
         attachmentType: sql<"IMAGE" | "VIDEO" | null>`(select "mediaType" from community_announcement_attachments where "announcementId" = ${communityAnnouncements.id} order by "sortOrder" asc limit 1)`,
         attachmentUrl: sql<string | null>`(select "mediaUrl" from community_announcement_attachments where "announcementId" = ${communityAnnouncements.id} order by "sortOrder" asc limit 1)`,
       })
       .from(communityAnnouncements)
       .innerJoin(users, eq(communityAnnouncements.userId, users.id))
       .leftJoin(profiles, eq(communityAnnouncements.userId, profiles.userId))
-      .where(gt(communityAnnouncements.createdAt, since)),
+      .where(gt(communityAnnouncements.createdAt, since))
+      .orderBy(desc(postScore), desc(communityAnnouncements.createdAt))
+      .limit(50),
   ]);
   const videoHighlights: SpotlightHighlight[] = videoRows.map(row => {
     const likes = Number(row.likes ?? 0);
@@ -1097,7 +1113,20 @@ async function getVideoEngagement(videoId: number, viewerId: number) {
   };
 }
 
-export async function recordVideoView(videoId: number) {
+export async function recordVideoView(videoId: number, viewerIp?: string) {
+  if (viewerIp) {
+    const { wasRecentlyViewed } = await import("./viewDedup");
+    if (wasRecentlyViewed(viewerIp, videoId)) {
+      const db = await getDb();
+      if (!db) throw new Error("Database unavailable");
+      const [row] = await db
+        .select({ viewCount: videos.viewCount })
+        .from(videos)
+        .where(eq(videos.id, videoId))
+        .limit(1);
+      return { viewCount: Number(row?.viewCount ?? 0), deduped: true };
+    }
+  }
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const [updated] = await db
@@ -1105,7 +1134,7 @@ export async function recordVideoView(videoId: number) {
     .set({ viewCount: sql`${videos.viewCount} + 1` })
     .where(eq(videos.id, videoId))
     .returning({ viewCount: videos.viewCount });
-  return { viewCount: Number(updated?.viewCount ?? 0) };
+  return { viewCount: Number(updated?.viewCount ?? 0), deduped: false };
 }
 
 export type RawPulseOption = {
