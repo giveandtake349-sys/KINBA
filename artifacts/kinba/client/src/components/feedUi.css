@@ -29,7 +29,6 @@
    1. FEED COLUMN — Layout container
    ======================================================================== */
 
-/* List containers: single centered column */
 .media-hub .feed-card-list,
 .media-hub .unified-feed-list,
 .media-hub .feed-video-list {
@@ -43,7 +42,6 @@
   box-sizing: border-box;
 }
 
-/* Feed section wrapper */
 .media-section.home-feed-section {
   overflow: visible !important;
   box-sizing: border-box;
@@ -79,7 +77,6 @@
   box-sizing: border-box;
 }
 
-/* Legacy bare posts: unify treatment */
 .feed-media-post,
 .feed-text-post {
   position: relative !important;
@@ -90,8 +87,6 @@
   box-sizing: border-box;
 }
 
-/* Bare feed posts outside the feed list (rare, but keep consistent) —
-   NOT long-video-card (Videos tab grid must remain untouched). */
 .media-hub .feed-media-post {
   background: var(--feed-card-bg) !important;
   border: var(--feed-card-border) !important;
@@ -101,9 +96,120 @@
 
 
 /* ========================================================================
-   3. POST HEADER — Author avatar / name / meta / menu
+   3. POST TOP BAR — New compact author row (avatar + identity + menu)
    ======================================================================== */
 
+.media-hub .feed-card-list > .feed-media-post > .feed-post-top,
+.media-hub .unified-feed-list > .feed-media-post > .feed-post-top,
+.media-hub .feed-video-list > .feed-media-post > .feed-post-top {
+  position: relative !important;
+  z-index: 10;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-height: 0 !important;
+  padding: 14px 16px 10px !important;
+  margin: 0 !important;
+  order: 1 !important;
+}
+
+.media-hub .feed-card-list .feed-post-avatar-link,
+.media-hub .unified-feed-list .feed-post-avatar-link,
+.media-hub .feed-video-list .feed-post-avatar-link {
+  display: flex !important;
+  flex-shrink: 0 !important;
+  text-decoration: none !important;
+  color: inherit !important;
+}
+
+.media-hub .feed-card-list .feed-post-avatar,
+.media-hub .unified-feed-list .feed-post-avatar,
+.media-hub .feed-video-list .feed-post-avatar {
+  flex: 0 0 38px !important;
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.media-hub .feed-card-list .feed-post-avatar img,
+.media-hub .unified-feed-list .feed-post-avatar img,
+.media-hub .feed-video-list .feed-post-avatar img,
+.media-hub .feed-card-list .feed-post-avatar-link img,
+.media-hub .unified-feed-list .feed-post-avatar-link img,
+.media-hub .feed-video-list .feed-post-avatar-link img {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+}
+
+.media-hub .feed-card-list .feed-post-identity,
+.media-hub .unified-feed-list .feed-post-identity,
+.media-hub .feed-video-list .feed-post-identity {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1px !important;
+  min-width: 0 !important;
+  flex: 1 1 0 !important;
+}
+
+.media-hub .feed-card-list .feed-post-author-name,
+.media-hub .unified-feed-list .feed-post-author-name,
+.media-hub .feed-video-list .feed-post-author-name {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  text-decoration: none !important;
+  color: inherit !important;
+}
+
+.media-hub .feed-card-list .feed-post-author-name strong,
+.media-hub .unified-feed-list .feed-post-author-name strong,
+.media-hub .feed-video-list .feed-post-author-name strong {
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  line-height: 1.25 !important;
+  color: var(--feed-text-primary) !important;
+  letter-spacing: -0.01em !important;
+}
+
+.media-hub .feed-card-list .feed-post-meta,
+.media-hub .unified-feed-list .feed-post-meta,
+.media-hub .feed-video-list .feed-post-meta {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  font-size: 0.72rem !important;
+  line-height: 1.3 !important;
+  color: var(--feed-text-secondary) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.media-hub .feed-card-list .feed-post-meta-dot::before,
+.media-hub .unified-feed-list .feed-post-meta-dot::before,
+.media-hub .feed-video-list .feed-post-meta-dot::before {
+  content: "\00b7";
+  font-weight: 700;
+}
+
+.media-hub .feed-card-list .feed-post-top > button,
+.media-hub .unified-feed-list .feed-post-top > button,
+.media-hub .feed-video-list .feed-post-top > button {
+  flex: 0 0 auto !important;
+  margin-left: auto !important;
+}
+
+.media-hub .feed-card-list .verified-badge,
+.media-hub .unified-feed-list .verified-badge,
+.media-hub .feed-video-list .verified-badge {
+  flex: 0 0 auto !important;
+}
+
+/* Legacy header structure fallback */
 .media-hub .feed-card-list > .feed-media-post > .feed-post-author,
 .media-hub .feed-card-list > .feed-text-card > .feed-post-author,
 .media-hub .feed-card-list > .long-video-card > .feed-post-author,
@@ -124,7 +230,6 @@
   order: 1 !important;
 }
 
-/* Avatar */
 .media-hub .feed-card-list .feed-post-author .video-owner-avatar,
 .media-hub .unified-feed-list .feed-post-author .video-owner-avatar,
 .media-hub .feed-video-list .feed-post-author .video-owner-avatar,
@@ -138,7 +243,6 @@
   object-fit: cover !important;
 }
 
-/* Author info column */
 .media-hub .feed-card-list .feed-post-author-info,
 .media-hub .unified-feed-list .feed-post-author-info,
 .media-hub .feed-video-list .feed-post-author-info {
@@ -148,7 +252,6 @@
   min-width: 0 !important;
 }
 
-/* Author name */
 .media-hub .feed-card-list .feed-post-author-info strong,
 .media-hub .unified-feed-list .feed-post-author-info strong,
 .media-hub .feed-video-list .feed-post-author-info strong {
@@ -162,7 +265,6 @@
   letter-spacing: -0.01em !important;
 }
 
-/* Username / timestamp line */
 .media-hub .feed-card-list .feed-post-author-info span,
 .media-hub .unified-feed-list .feed-post-author-info span,
 .media-hub .feed-video-list .feed-post-author-info span {
@@ -175,7 +277,6 @@
   text-overflow: ellipsis !important;
 }
 
-/* Profile link inside header — no underline, full row clickable */
 .media-hub .feed-card-list .feed-post-author .profile-link,
 .media-hub .unified-feed-list .feed-post-author .profile-link,
 .media-hub .feed-video-list .feed-post-author .profile-link {
@@ -188,28 +289,32 @@
   color: inherit !important;
 }
 
-/* 3-dot menu position */
 .media-hub .feed-card-list .feed-post-author > button,
 .media-hub .unified-feed-list .feed-post-author > button,
-.media-hub .feed-video-list .feed-post-author > button,
-.media-hub .feed-card-list .feed-post-author > [class*="post-more"],
-.media-hub .unified-feed-list .feed-post-author > [class*="post-more"],
-.media-hub .feed-video-list .feed-post-author > [class*="post-more"] {
+.media-hub .feed-video-list .feed-post-author > button {
   flex: 0 0 auto !important;
   margin-left: auto !important;
 }
 
-/* Verified badge */
-.media-hub .feed-card-list .verified-badge,
-.media-hub .unified-feed-list .verified-badge,
-.media-hub .feed-video-list .verified-badge {
-  flex: 0 0 auto !important;
-}
-
 
 /* ========================================================================
-   4. MEDIA CONTAINER — Image and video parent
+   4. MEDIA BODY — Image and video parent (natural ratio, no crop)
    ======================================================================== */
+
+.media-hub .feed-card-list > .feed-media-post > .feed-media-body,
+.media-hub .unified-feed-list > .feed-media-post > .feed-media-body,
+.media-hub .feed-video-list > .feed-media-post > .feed-media-body {
+  position: relative !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  background: var(--feed-media-bg) !important;
+  box-sizing: border-box;
+  order: 2 !important;
+}
 
 .media-hub .feed-card-list > .feed-media-post > .feed-media-content,
 .media-hub .feed-card-list > .long-video-card > .feed-media-content,
@@ -228,7 +333,6 @@
   box-sizing: border-box;
 }
 
-/* Generic media content sizing inside the feed lists (incl. text cards) */
 .media-hub .feed-card-list .feed-media-content,
 .media-hub .unified-feed-list .feed-media-content,
 .media-hub .feed-video-list .feed-media-content {
@@ -241,23 +345,27 @@
   box-sizing: border-box;
 }
 
-/* Remove any min-height on the content wrapper — media controls own sizing */
-.media-hub .feed-card-list > .feed-media-post > .feed-media-content,
+.media-hub .feed-card-list > .feed-media-post > .feed-media-body,
 .media-hub .feed-card-list > .long-video-card > .feed-media-content,
-.media-hub .unified-feed-list > .feed-media-post > .feed-media-content,
+.media-hub .unified-feed-list > .feed-media-post > .feed-media-body,
 .media-hub .unified-feed-list > .long-video-card > .feed-media-content,
-.media-hub .feed-video-list > .feed-media-post > .feed-media-content,
+.media-hub .feed-video-list > .feed-media-post > .feed-media-body,
 .media-hub .feed-video-list > .long-video-card > .feed-media-content {
   min-height: 0 !important;
 }
 
-/* Content type modifiers — feed lists only */
 .media-hub .feed-card-list .feed-media-content--video,
 .media-hub .feed-card-list .feed-media-content--image,
 .media-hub .unified-feed-list .feed-media-content--video,
 .media-hub .unified-feed-list .feed-media-content--image,
 .media-hub .feed-video-list .feed-media-content--video,
-.media-hub .feed-video-list .feed-media-content--image {
+.media-hub .feed-video-list .feed-media-content--image,
+.media-hub .feed-card-list .feed-media-body--video,
+.media-hub .feed-card-list .feed-media-body--image,
+.media-hub .unified-feed-list .feed-media-body--video,
+.media-hub .unified-feed-list .feed-media-body--image,
+.media-hub .feed-video-list .feed-media-body--video,
+.media-hub .feed-video-list .feed-media-body--image {
   display: block !important;
 }
 
@@ -266,7 +374,9 @@
    5. IMAGE MEDIA — Natural aspect ratio, no crop
    ======================================================================== */
 
-/* Image container: flex center for horizontal centering */
+.media-hub .feed-card-list > .feed-media-post > .feed-media-body.feed-media-body--image,
+.media-hub .unified-feed-list > .feed-media-post > .feed-media-body.feed-media-body--image,
+.media-hub .feed-video-list > .feed-media-post > .feed-media-body.feed-media-body--image,
 .media-hub .feed-card-list > .feed-media-post > .feed-media-content.feed-media-content--image,
 .media-hub .feed-card-list > .long-video-card > .feed-media-content.feed-media-content--image,
 .media-hub .unified-feed-list > .feed-media-post > .feed-media-content.feed-media-content--image,
@@ -279,7 +389,9 @@
   background: var(--feed-media-bg) !important;
 }
 
-/* The <img> itself */
+.media-hub .feed-card-list > .feed-media-post > .feed-media-body--image > img,
+.media-hub .unified-feed-list > .feed-media-post > .feed-media-body--image > img,
+.media-hub .feed-video-list > .feed-media-post > .feed-media-body--image > img,
 .media-hub .feed-card-list .feed-media-content.feed-media-content--image > img,
 .media-hub .unified-feed-list .feed-media-content.feed-media-content--image > img,
 .media-hub .feed-video-list .feed-media-content.feed-media-content--image > img,
@@ -302,10 +414,12 @@
 
 
 /* ========================================================================
-   6. VIDEO MEDIA — aspect-ratio, contain, responsive
+   6. VIDEO MEDIA — Natural aspect ratio, no forced 16:9 or 9:16
    ======================================================================== */
 
-/* Video frame: clean container with aspect-ratio from data */
+.media-hub .feed-card-list > .feed-media-post > .feed-media-body--video > .media-video-frame,
+.media-hub .unified-feed-list > .feed-media-post > .feed-media-body--video > .media-video-frame,
+.media-hub .feed-video-list > .feed-media-post > .feed-media-body--video > .media-video-frame,
 .media-hub .feed-card-list > .feed-media-post > .feed-media-content--video > .media-video-frame,
 .media-hub .feed-card-list > .long-video-card > .feed-media-content--video > .media-video-frame,
 .media-hub .unified-feed-list > .feed-media-post > .feed-media-content--video > .media-video-frame,
@@ -323,24 +437,28 @@
   overflow: hidden;
 }
 
-/* Also neutralize kinbaModern height:100% on .feed-media-content > .media-video-frame */
-.media-hub .feed-card-list > .feed-media-post > .feed-media-content > .media-video-frame,
+.media-hub .feed-card-list > .feed-media-post > .feed-media-body > .media-video-frame,
 .media-hub .feed-card-list > .long-video-card > .feed-media-content > .media-video-frame,
-.media-hub .unified-feed-list > .feed-media-post > .feed-media-content > .media-video-frame,
+.media-hub .unified-feed-list > .feed-media-post > .feed-media-body > .media-video-frame,
 .media-hub .unified-feed-list > .long-video-card > .feed-media-content > .media-video-frame,
-.media-hub .feed-video-list > .feed-media-post > .feed-media-content > .media-video-frame,
+.media-hub .feed-video-list > .feed-media-post > .feed-media-body > .media-video-frame,
 .media-hub .feed-video-list > .long-video-card > .feed-media-content > .media-video-frame {
   width: 100% !important;
   height: auto !important;
   min-height: 0 !important;
 }
 
-/* The <video> element — contain, preserve ratio, sensible cap */
+.media-hub .feed-card-list .feed-media-body--video video,
 .media-hub .feed-card-list .feed-media-content--video video,
+.media-hub .unified-feed-list .feed-media-body--video video,
 .media-hub .unified-feed-list .feed-media-content--video video,
+.media-hub .feed-video-list .feed-media-body--video video,
 .media-hub .feed-video-list .feed-media-content--video video,
+.media-hub .feed-card-list > .feed-media-post > .feed-media-body--video video,
 .media-hub .feed-card-list > .feed-media-post > .feed-media-content--video video,
+.media-hub .unified-feed-list > .feed-media-post > .feed-media-body--video video,
 .media-hub .unified-feed-list > .feed-media-post > .feed-media-content--video video,
+.media-hub .feed-video-list > .feed-media-post > .feed-media-body--video video,
 .media-hub .feed-video-list > .feed-media-post > .feed-media-content--video video,
 .media-hub .feed-card-list > .long-video-card > .feed-media-content--video video,
 .media-hub .unified-feed-list > .long-video-card > .feed-media-content--video video,
@@ -359,8 +477,17 @@
 
 
 /* ========================================================================
-   7. CAPTION / COPY — Title and body text
+   7. POST CONTENT — Title, description, view count
    ======================================================================== */
+
+.media-hub .feed-card-list > .feed-media-post > .feed-post-content,
+.media-hub .unified-feed-list > .feed-media-post > .feed-post-content,
+.media-hub .feed-video-list > .feed-media-post > .feed-post-content {
+  order: 3 !important;
+  padding: 10px 16px 4px !important;
+  margin: 0 !important;
+  background: transparent !important;
+}
 
 .media-hub .feed-card-list > .feed-media-post > .feed-media-copy,
 .media-hub .feed-card-list > .long-video-card > .video-card-details,
@@ -375,7 +502,6 @@
   background: transparent !important;
 }
 
-/* Caption scoped to feed lists (text-card + social layout variants) */
 .media-hub .feed-card-list .feed-media-post > .feed-media-copy,
 .media-hub .feed-card-list .feed-text-card > .feed-media-copy,
 .media-hub .unified-feed-list .feed-media-post > .feed-media-copy,
@@ -394,7 +520,30 @@
   background: transparent !important;
 }
 
-/* Title */
+.feed-post-title {
+  margin: 0 0 4px !important;
+  font-size: 0.92rem !important;
+  font-weight: 600 !important;
+  line-height: 1.35 !important;
+  color: var(--feed-text-primary) !important;
+  letter-spacing: -0.01em !important;
+}
+
+.feed-post-desc {
+  margin: 0 !important;
+  font-size: 0.84rem !important;
+  line-height: 1.5 !important;
+  color: rgba(244, 247, 255, 0.72) !important;
+}
+
+.feed-post-views {
+  display: block !important;
+  margin-top: 4px !important;
+  font-size: 0.72rem !important;
+  line-height: 1.3 !important;
+  color: var(--feed-text-secondary) !important;
+}
+
 .media-hub .feed-card-list .feed-media-copy h3,
 .media-hub .feed-card-list .video-card-details h3,
 .media-hub .unified-feed-list .feed-media-copy h3,
@@ -409,7 +558,6 @@
   letter-spacing: -0.01em !important;
 }
 
-/* Body / description */
 .media-hub .feed-card-list .feed-media-copy p,
 .media-hub .feed-card-list .video-card-details > p:not(.media-caption-tags),
 .media-hub .unified-feed-list .feed-media-copy p,
@@ -422,7 +570,6 @@
   color: rgba(244, 247, 255, 0.72) !important;
 }
 
-/* Hashtags / metadata line */
 .media-hub .feed-card-list .media-caption-tags,
 .media-hub .unified-feed-list .media-caption-tags,
 .media-hub .feed-video-list .media-caption-tags {
@@ -466,7 +613,6 @@
   box-sizing: border-box;
 }
 
-/* Ensure bar is visible and interactive */
 .media-hub .feed-card-list > .feed-media-post > .feed-action-bar,
 .media-hub .unified-feed-list > .feed-media-post > .feed-action-bar,
 .media-hub .feed-video-list > .feed-media-post > .feed-action-bar {
@@ -512,7 +658,6 @@
   box-sizing: border-box;
 }
 
-/* Button hover */
 .media-hub .feed-card-list .feed-action-bar > button:hover:not(:disabled),
 .media-hub .unified-feed-list .feed-action-bar > button:hover:not(:disabled),
 .media-hub .feed-video-list .feed-action-bar > button:hover:not(:disabled),
@@ -526,7 +671,6 @@
   color: var(--feed-text-primary) !important;
 }
 
-/* Active / reacted state */
 .media-hub .feed-card-list .feed-action-bar > button.is-active,
 .media-hub .feed-card-list .feed-action-bar > button.is-active:hover:not(:disabled),
 .media-hub .unified-feed-list .feed-action-bar > button.is-active,
@@ -549,7 +693,6 @@
   background: var(--feed-coral-soft) !important;
 }
 
-/* Button label text — hidden at very narrow widths */
 .media-hub .feed-card-list .feed-action-bar > button > span,
 .media-hub .unified-feed-list .feed-action-bar > button > span,
 .media-hub .feed-video-list .feed-action-bar > button > span,
@@ -562,7 +705,6 @@
   white-space: nowrap !important;
 }
 
-/* Count text */
 .media-hub .feed-card-list .feed-action-bar > button > strong,
 .media-hub .unified-feed-list .feed-action-bar > button > strong,
 .media-hub .feed-video-list .feed-action-bar > button > strong {
@@ -573,7 +715,7 @@
 
 
 /* ========================================================================
-   10. TEXT CARD ACTIONS — .feed-post-actions / .announcement-comment-toggle
+   10. TEXT CARD ACTIONS
    ======================================================================== */
 
 .media-hub .feed-card-list .feed-text-card .feed-post-actions,
@@ -601,7 +743,7 @@
 
 
 /* ========================================================================
-   11. PULSE CARD (RawPulseCard)
+   11. PULSE CARD
    ======================================================================== */
 
 .media-hub .feed-card-list .raw-pulse,
@@ -615,7 +757,6 @@
    12. RESPONSIVE — Mobile adjustments
    ======================================================================== */
 
-/* Mobile: tighter gap, edge-to-edge media */
 @media (max-width: 760px) {
   .media-hub .feed-card-list,
   .media-hub .unified-feed-list,
@@ -639,7 +780,6 @@
   }
 }
 
-/* Very narrow: hide text labels, keep icons */
 @media (max-width: 400px) {
   .media-hub .feed-card-list .feed-action-bar > button > span,
   .media-hub .unified-feed-list .feed-action-bar > button > span,
@@ -651,7 +791,6 @@
   }
 }
 
-/* Narrow mobile band: compact spacing */
 @media (max-width: 520px) {
   .media-hub .feed-card-list .feed-action-bar > button,
   .media-hub .unified-feed-list .feed-action-bar > button,
@@ -691,14 +830,7 @@
 
 
 /* ========================================================================
-   14. FOCUSED VIDEO VIEWER — Preserve existing (not redesigned)
-   ======================================================================== */
-/* (FocusedVideoViewer styles remain in kinbaModern.css / mediaHub.css —
-   not part of the normal Feed redesign scope.) */
-
-
-/* ========================================================================
-   15. SKELETON LOADING STATE
+   14. SKELETON LOADING STATE
    ======================================================================== */
 
 .media-hub .feed-skeleton-grid {
@@ -733,7 +865,7 @@
 
 
 /* ========================================================================
-   16. EMPTY STATE
+   15. EMPTY STATE
    ======================================================================== */
 
 .media-hub .feed-empty-state {
@@ -755,14 +887,7 @@
 
 
 /* ========================================================================
-   17. COMMENT DRAWER — Preserve existing structure
-   ======================================================================== */
-/* (CommentDrawer is rendered via portal to document.body. Styles are in
-   mediaHub.css / shorts-stage.css. Not redesigned in this pass. */
-
-
-/* ========================================================================
-   18. ANNOUNCEMENT / TEXT CARD (when present in feed list)
+   16. ANNOUNCEMENT / TEXT CARD (when present in feed list)
    ======================================================================== */
 
 .media-hub .feed-card-list > .feed-text-card,
@@ -793,4 +918,110 @@
   max-height: min(calc(100svh - 240px), 600px) !important;
   object-fit: contain !important;
   background: var(--feed-media-bg) !important;
+}
+
+
+/* ========================================================================
+   17. CONFLICT NEUTRALIZATION — Override kinbaModern.css / mediaHub.css
+   These rules must come after all feedUi.css rules and neutralize any
+   conflicting aspect-ratio or object-fit from earlier stylesheets.
+   Scoped to .feed-card-list / .unified-feed-list / .feed-video-list only.
+   Does NOT affect Shorts, Spotlight, Videos tab grid, or Profile.
+   ======================================================================== */
+
+/* Neutralize kinbaModern.css forced 16:9 on feed video (line ~1417-1424) */
+.media-hub .feed-video-list > .long-video-card .media-video-frame video,
+.media-hub .feed-card-list > .long-video-card .media-video-frame video,
+.media-hub .unified-feed-list > .long-video-card .media-video-frame video {
+  aspect-ratio: auto !important;
+  object-fit: contain !important;
+}
+
+/* Neutralize kinbaModern.css forced object-fit:cover on feed media (line ~1865) */
+.media-hub .feed-card-list .feed-media-content > img,
+.media-hub .feed-card-list .feed-media-content > video,
+.media-hub .feed-card-list .feed-media-content > .media-video-frame,
+.media-hub .feed-card-list .feed-media-content > .media-video-frame video,
+.media-hub .feed-card-list .feed-media-body > img,
+.media-hub .feed-card-list .feed-media-body > video,
+.media-hub .feed-card-list .feed-media-body > .media-video-frame,
+.media-hub .feed-card-list .feed-media-body > .media-video-frame video,
+.media-hub .unified-feed-list .feed-media-content > img,
+.media-hub .unified-feed-list .feed-media-content > video,
+.media-hub .unified-feed-list .feed-media-content > .media-video-frame,
+.media-hub .unified-feed-list .feed-media-content > .media-video-frame video,
+.media-hub .unified-feed-list .feed-media-body > img,
+.media-hub .unified-feed-list .feed-media-body > video,
+.media-hub .unified-feed-list .feed-media-body > .media-video-frame,
+.media-hub .unified-feed-list .feed-media-body > .media-video-frame video,
+.media-hub .feed-video-list .feed-media-content > img,
+.media-hub .feed-video-list .feed-media-content > video,
+.media-hub .feed-video-list .feed-media-content > .media-video-frame,
+.media-hub .feed-video-list .feed-media-content > .media-video-frame video,
+.media-hub .feed-video-list .feed-media-body > img,
+.media-hub .feed-video-list .feed-media-body > video,
+.media-hub .feed-video-list .feed-media-body > .media-video-frame,
+.media-hub .feed-video-list .feed-media-body > .media-video-frame video {
+  object-fit: contain !important;
+  object-position: center !important;
+}
+
+/* Neutralize mediaHub.css forced 16:9 on feed frames (lines ~1667-1679, 2066-2078, 2845-2861) */
+.media-hub .feed-card-list .media-fullscreen-frame,
+.media-hub .feed-card-list .media-video-frame,
+.media-hub .unified-feed-list .media-fullscreen-frame,
+.media-hub .unified-feed-list .media-video-frame,
+.media-hub .feed-video-list .media-fullscreen-frame,
+.media-hub .feed-video-list .media-video-frame {
+  aspect-ratio: auto !important;
+}
+
+.media-hub .feed-card-list .media-fullscreen-frame video,
+.media-hub .feed-card-list .media-video-frame video,
+.media-hub .unified-feed-list .media-fullscreen-frame video,
+.media-hub .unified-feed-list .media-video-frame video,
+.media-hub .feed-video-list .media-fullscreen-frame video,
+.media-hub .feed-video-list .media-video-frame video {
+  aspect-ratio: auto !important;
+  object-fit: contain !important;
+  object-position: center !important;
+}
+
+/* Neutralize the .unified-feed-specific rules from mediaHub.css */
+.media-hub .unified-feed .media-fullscreen-frame,
+.media-hub .unified-feed .media-video-frame {
+  aspect-ratio: auto !important;
+}
+
+.media-hub .unified-feed .media-video-frame video {
+  aspect-ratio: auto !important;
+  object-fit: contain !important;
+}
+
+/* Neutralize mediaHub.css forced width:100vw on feed containers (line ~2737-2763) */
+.media-hub .feed-card-list,
+.media-hub .unified-feed-list,
+.media-hub .feed-video-list {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Neutralize mediaHub.css gap:0 on feed lists (line ~2765) */
+.media-hub .feed-card-list,
+.media-hub .unified-feed-list,
+.media-hub .feed-video-list {
+  gap: 20px !important;
+}
+
+/* Neutralize mediaHub.css border-radius:0 on feed media (line ~2791-2804) */
+.media-hub .feed-card-list > .feed-media-post,
+.media-hub .feed-card-list > .long-video-card,
+.media-hub .feed-card-list > .feed-text-card,
+.media-hub .unified-feed-list > .feed-media-post,
+.media-hub .unified-feed-list > .long-video-card,
+.media-hub .unified-feed-list > .feed-text-card,
+.media-hub .feed-video-list > .feed-media-post,
+.media-hub .feed-video-list > .long-video-card {
+  border-radius: var(--feed-card-radius) !important;
+  overflow: hidden !important;
 }

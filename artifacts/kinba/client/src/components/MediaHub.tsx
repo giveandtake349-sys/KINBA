@@ -61,7 +61,7 @@ import "./kinbaModern.css";
 import "./feedUi.css";
 import "./shorts-stage.css";
 
-type HomeTab = "videos" | "trendy" | "following" | "icons" | "wheels";
+type HomeTab = "videos" | "trendy" | "following" | "icons" | "spotlight";
 type VideoKind = "LONG" | "SHORT" | "WHEEL";
 type Quality = "ORIGINAL" | "1080P" | "720P" | "480P" | "240P";
 type VideoSource = { quality: Quality; videoUrl: string };
@@ -147,7 +147,7 @@ type AnnouncementVideoSelection = {
 const tabOptions: { id: HomeTab; label: string; caption: string }[] = [
   { id: "videos", label: "Videos", caption: "Latest main-feed videos" },
   {
-    id: "wheels",
+    id: "spotlight",
     label: "Spotlight",
     caption: "Global photo and video spotlight",
   },
@@ -839,13 +839,13 @@ function QualityVideoPlayer({
       className={
         vertical
           ? "media-video-frame media-video-frame--short w-full h-full object-cover aspect-[9/16]"
-          : "media-video-frame media-video-frame--square w-full h-full object-cover"
+          : "media-video-frame media-video-frame--square w-full h-full"
       }
     >
       <video
         src={sourceUrl}
         poster={showPoster ? posterUrl : undefined}
-        className={`w-full h-full object-cover ${vertical ? "aspect-[9/16]" : ""}`}
+        className={`w-full h-full ${vertical ? "object-cover aspect-[9/16]" : ""}`}
         ref={ref}
         {...({ "webkit-playsinline": "true" } as Record<string, string>)}
         controls={false}
@@ -1589,30 +1589,37 @@ function VideoCard({
   if (deleted) return null;
   if (socialLayout) {
     return (
-<article
-      id={`feed-video-${video.id}`}
-      className="feed-media-post"
-    >
-      <header className="feed-post-author">
-        <a
-          className="profile-link feed-post-author-identity"
-          href={`/profile/${video.owner.id}`}
-          onClick={event => navigateToProfile(event, video.owner.id)}
-          aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}
-        >
-          <div className="video-owner-avatar">
-            {video.owner.photoUrl ? (
-              <img
-                src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
-                alt=""
-              />
-            ) : (
-              <UserRound size={16} />
-            )}
-          </div>
-          <div className="feed-post-author-info">
-            <strong>
-              {displayName(video.owner.name, video.owner.username)}
+      <article
+        id={`feed-video-${video.id}`}
+        className="feed-media-post"
+      >
+        <div className="feed-post-top">
+          <a
+            className="feed-post-avatar-link"
+            href={`/profile/${video.owner.id}`}
+            onClick={event => navigateToProfile(event, video.owner.id)}
+            aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}
+          >
+            <div className="feed-post-avatar">
+              {video.owner.photoUrl ? (
+                <img
+                  src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
+                  alt=""
+                />
+              ) : (
+                <UserRound size={18} />
+              )}
+            </div>
+          </a>
+          <div className="feed-post-identity">
+            <a
+              className="feed-post-author-name"
+              href={`/profile/${video.owner.id}`}
+              onClick={event => navigateToProfile(event, video.owner.id)}
+            >
+              <strong>
+                {displayName(video.owner.name, video.owner.username)}
+              </strong>
               {video.owner.isVerified && (
                 <BadgeCheck
                   className="verified-badge"
@@ -1620,38 +1627,37 @@ function VideoCard({
                   aria-label="Verified profile"
                 />
               )}
-            </strong>
-            <span>
-              {relativeTime(video.createdAt)} ·{" "}
+            </a>
+            <span className="feed-post-meta">
+              {relativeTime(video.createdAt)}
+              <span className="feed-post-meta-dot" />
               {video.mediaType === "IMAGE" ? "Photo" : "Video"}
             </span>
           </div>
-        </a>
-        <PostManagementMenu
-          video={video}
-          onUpdated={setDescription}
-          onDeleted={() => setDeleted(true)}
-        />
-      </header>
-      <div
-        className={`feed-media-content${video.mediaType === "VIDEO" ? " feed-media-content--video" : " feed-media-content--image"}`}
-        role={onOpenViewer ? "button" : undefined}
-        tabIndex={onOpenViewer ? 0 : undefined}
-        aria-label={onOpenViewer ? "Open post" : undefined}
-        onClick={openViewer}
-        onKeyDown={event => {
-          if (!onOpenViewer || (event.key !== "Enter" && event.key !== " "))
-            return;
-          event.preventDefault();
-          onOpenViewer();
-        }}
-      >
+          <PostManagementMenu
+            video={video}
+            onUpdated={setDescription}
+            onDeleted={() => setDeleted(true)}
+          />
+        </div>
+        <div
+          className={`feed-media-body${video.mediaType === "VIDEO" ? " feed-media-body--video" : " feed-media-body--image"}`}
+          role={onOpenViewer ? "button" : undefined}
+          tabIndex={onOpenViewer ? 0 : undefined}
+          aria-label={onOpenViewer ? "Open post" : undefined}
+          onClick={openViewer}
+          onKeyDown={event => {
+            if (!onOpenViewer || (event.key !== "Enter" && event.key !== " "))
+              return;
+            event.preventDefault();
+            onOpenViewer();
+          }}
+        >
           {video.mediaType === "IMAGE" ? (
             <img
               src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
               alt={video.title || "Post"}
               loading="lazy"
-              className="object-contain w-full h-auto max-h-[60vh] bg-black"
               draggable={false}
             />
           ) : (
@@ -1662,12 +1668,13 @@ function VideoCard({
             />
           )}
         </div>
-        {(video.title || video.description) && (
-          <div className="feed-media-copy">
-            {video.title && <h3>{video.title}</h3>}
-            {description && <p>{description}</p>}
-          </div>
-        )}
+        <div className="feed-post-content">
+          {video.title && <h3 className="feed-post-title">{video.title}</h3>}
+          {description && (
+            <p className="feed-post-desc">{description}</p>
+          )}
+          <span className="feed-post-views">{formatCount(views)} views</span>
+        </div>
         <RawPulseCard videoId={video.id} />
         <EngagementActions
           engagement={current}
@@ -2970,7 +2977,6 @@ export function CommunityAnnouncements() {
 }
 export type FeedSection =
   | HomeTab
-  | "wheels"
   | "shorts"
   | "announcements"
   | "publish"
@@ -3048,15 +3054,13 @@ export function SearchFeed() {
 }
 
 export default function MediaHub({
-  section = "wheels",
+  section = "videos",
   onSectionChange,
   showTabs = true,
-  wheels,
 }: {
   section?: FeedSection;
   onSectionChange?: (section: FeedSection) => void;
   showTabs?: boolean;
-  wheels?: ReactNode;
 }) {
   const [selectedSection, setSelectedSection] = useState<FeedSection>(section);
   const [shortsViewerId, setShortsViewerId] = useState<number | null>(null);
@@ -3091,7 +3095,7 @@ export default function MediaHub({
     onSectionChange?.(next);
   };
   const focusHighlight = (highlight: SpotlightHighlight) => {
-    select("wheels");
+    select("videos");
     window.setTimeout(() => {
       document
         .getElementById(
@@ -3112,8 +3116,8 @@ export default function MediaHub({
         >
           {(
             [
-              ["wheels", "Spotlight"],
-              ["videos", "Videos"],
+              ["videos", "For You"],
+              ["spotlight", "Spotlight"],
               ["shorts", "Shorts"],
             ] as const
           ).map(([id, label]) => (
@@ -3134,27 +3138,9 @@ export default function MediaHub({
           ))}
         </nav>
       )}
-      {activeSection === "wheels" && (
+      {activeSection === "spotlight" && (
         <div className="media-tab-panel">
-          <div className="wheels-feed-layout w-full">
-            <SpotlightHighlights onSelect={focusHighlight} />
-            <HomeFeedPanel
-              tab="wheels"
-              active
-              showDetailsOverlay={false}
-              showHeader={false}
-              onOpenShort={setShortsViewerId}
-              onOpenPhoto={setPhotoViewer}
-              onOpenVideo={setVideoViewer}
-            />
-            <div className="wheels-sponsor-panel">
-              {wheels ?? (
-                <div className="media-empty">
-                  <h3>Wheels are unavailable.</h3>
-                </div>
-              )}
-            </div>
-          </div>
+          <SpotlightHighlights onSelect={focusHighlight} />
         </div>
       )}
       {activeSection === "videos" && (

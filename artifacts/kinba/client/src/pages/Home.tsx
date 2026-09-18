@@ -17,7 +17,6 @@ import {
   Clock3,
   Copy,
   Coins,
-  ExternalLink,
   Film,
   Home as HomeIcon,
   ImagePlus,
@@ -801,7 +800,6 @@ function AppHeader({
       <nav className="desktop-nav" aria-label="Primary navigation">
         <button type="button" onClick={safeClick(onHome)}>Feed</button>
         <button type="button" onClick={safeClick(() => onSelectFeed("shorts"))}>Shorts</button>
-        <button type="button" onClick={safeClick(() => onSelectFeed("wheels"))}>Wheels</button>
         <button type="button" onClick={safeClick(onProfile)}>Profile</button>
       </nav>
       <div className="topbar-actions">
@@ -864,8 +862,8 @@ function FeedTabs({
   onSectionChange: (section: FeedSection) => void;
 }) {
   const tabs = [
-    ["wheels", "Spotlight"],
-    ["videos", "Videos"],
+    ["videos", "For You"],
+    ["spotlight", "Spotlight"],
     ["shorts", "Shorts"],
   ] as const;
 
@@ -906,7 +904,7 @@ function BottomNavigation({
   onNotifications: () => void;
   onMenu: () => void;
 }) {
-  const isHome = ["videos", "shorts", "wheels"].includes(activePanel);
+  const isHome = ["videos", "shorts", "spotlight"].includes(activePanel);
   return (
     <nav
       className={`bottom-navigation fixed left-0 right-0 z-50 transition-transform duration-300 ease-in-out ${className ?? ""}`}
@@ -1317,7 +1315,7 @@ function WalletPanel() {
         <div className="wallet-balance-card">
           <span>Available balance</span>
           <strong>৳{Number(wallet.data ?? 0).toFixed(2)}</strong>
-          <small>Used for Wheels entries and sponsorships.</small>
+          <small>Used for sponsorships.</small>
         </div>
       )}
       <div className="wallet-status-row">
@@ -1941,542 +1939,6 @@ function OfflineVideosPanel({ onBrowse }: { onBrowse: () => void }) {
   );
 }
 
-function formatCountdown(milliseconds: number) {
-  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  return [hours, minutes, seconds]
-    .map((value, index) =>
-      index === 0 ? String(value) : String(value).padStart(2, "0")
-    )
-    .join(":");
-}
-
-function SponsorWidget({ sessionId }: { sessionId: number }) {
-  const sponsors = trpc.sponsorBids.liveSponsors.useQuery(
-    { sessionId },
-    {
-      refetchOnWindowFocus: false,
-      staleTime: 30_000,
-    }
-  );
-  const sponsor = trpc.sponsorBids.sponsor.useMutation();
-  const wallet = trpc.sponsorBids.walletBalance.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-    staleTime: 30_000,
-  });
-  const utils = trpc.useUtils();
-  const [open, setOpen] = useState(false);
-  const [logoUrl, setLogoUrl] = useState("");
-  const [externalLink, setExternalLink] = useState("");
-  const [amount, setAmount] = useState("100");
-  const [message, setMessage] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const activeSponsors = (sponsors.data ?? []).filter(
-    item => new Date(item.expiresAt).getTime() > now
-  );
-  const chooseLogo = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    setUploading(true);
-    setMessage("");
-    try {
-      setLogoUrl(await uploadImage("post", file));
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "The logo could not be uploaded."
-      );
-    } finally {
-      setUploading(false);
-    }
-  };
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setMessage("");
-    try {
-      await sponsor.mutateAsync({
-        sessionId,
-        logoUrl,
-        externalLink,
-        sponsoredAmount: amount,
-      });
-      await Promise.all([
-        sponsors.refetch(),
-        wallet.refetch(),
-        utils.sponsorBids.liveSponsors.invalidate({ sessionId }),
-      ]);
-      setLogoUrl("");
-      setExternalLink("");
-      setAmount("100");
-      setOpen(false);
-      setMessage("Sponsorship live for 10 minutes.");
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "The sponsorship could not be completed."
-      );
-    }
-  };
-
-  return (
-    <aside className="sponsor-widget" aria-labelledby="sponsor-widget-heading">
-      <div className="sponsor-widget__heading">
-        <div>
-          <p className="eyebrow">Live sponsors</p>
-          <h2 id="sponsor-widget-heading">Back this wheel</h2>
-        </div>
-        <button
-          type="button"
-          className="muted-btn sponsor-widget__toggle"
-          onClick={() => setOpen(value => !value)}
-        >
-          <ImagePlus size={16} /> {open ? "Close" : "Sponsor This Wheel"}
-        </button>
-      </div>
-      {activeSponsors.length ? (
-        <div className="sponsor-widget__list">
-          {activeSponsors.map(item => (
-            <a
-              className="sponsor-card"
-              href={item.externalLink}
-              target="_blank"
-              rel="noreferrer"
-              key={item.id}
-            >
-              <img src={item.logoUrl} alt="Sponsor logo" />
-              <span>
-                <strong>৳{Number(item.sponsoredAmount).toFixed(2)}</strong>
-                <small>
-                  Visit sponsor <ExternalLink size={12} />
-                </small>
-              </span>
-            </a>
-          ))}
-        </div>
-      ) : (
-        <p className="sponsor-widget__empty">
-          No live sponsors yet. Be the first to appear beside the wheel.
-        </p>
-      )}
-      {open && (
-        <form className="sponsor-widget__form" onSubmit={submit}>
-          <label>
-            Logo or image
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              onChange={chooseLogo}
-              disabled={uploading || sponsor.isPending}
-              required={!logoUrl}
-            />
-            {logoUrl && <small>Logo uploaded and ready.</small>}
-          </label>
-          <label>
-            External link
-            <input
-              type="url"
-              value={externalLink}
-              onChange={event => setExternalLink(event.target.value)}
-              placeholder="https://facebook.com/your-brand"
-              required
-              disabled={sponsor.isPending}
-            />
-          </label>
-          <label>
-            Sponsorship amount (Taka)
-            <input
-              type="number"
-              min="1"
-              step="0.01"
-              value={amount}
-              onChange={event => setAmount(event.target.value)}
-              required
-              disabled={sponsor.isPending}
-            />
-          </label>
-          <p className="sponsor-widget__wallet">
-            Wallet available: ৳{Number(wallet.data ?? 0).toFixed(2)} · Your logo
-            displays for 10 minutes.
-          </p>
-          <button
-            type="submit"
-            className="primary-btn"
-            disabled={uploading || sponsor.isPending || !logoUrl}
-          >
-            {sponsor.isPending
-              ? "Processing payment…"
-              : uploading
-                ? "Uploading…"
-                : `Pay ৳${amount || "0"} & Go Live`}
-          </button>
-        </form>
-      )}
-      {message && (
-        <p className="form-message" role="status">
-          {message}
-        </p>
-      )}
-    </aside>
-  );
-}
-
-type SponsorBidsWinner = {
-  winner: { rank: number; prizeAmount: string };
-  user: { name: string | null };
-  profile?: { photoUrl?: string | null } | null;
-};
-type SponsorBidsSponsor = {
-  id: number;
-  logoUrl: string;
-  externalLink: string;
-  sponsoredAmount: string;
-  expiresAt: Date | string;
-};
-type SponsorBidsDraw = {
-  rank: number;
-  nomineeParticipantIds: number[];
-  selectedParticipantId: number | null;
-};
-
-function WinnersShowcase({
-  winners,
-  sponsors,
-}: {
-  winners: SponsorBidsWinner[];
-  sponsors: SponsorBidsSponsor[];
-}) {
-  const ordered = [...winners].sort((a, b) => a.winner.rank - b.winner.rank);
-  return (
-    <div
-      className="sponsor-showcase w-full max-w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 mb-4 overflow-hidden box-border px-4"
-      aria-labelledby="sponsor-showcase-heading"
-    >
-      <div className="sponsor-showcase__heading">
-        <div>
-          <p className="eyebrow eyebrow--bright">24-hour showcase</p>
-          <h2 id="sponsor-showcase-heading">Winners Showcase Board</h2>
-        </div>
-        <span className="sponsor-bids-panel__badge">Wheel complete</span>
-      </div>
-      {ordered.length ? (
-        <div className="winner-board w-full max-w-full overflow-hidden box-border">
-          {ordered.map(({ winner, user, profile }) => (
-            <article
-              className={`winner-card winner-card--${winner.rank}`}
-              key={winner.rank}
-            >
-              <div className="winner-card__rank">
-                {winner.rank}
-                <sup>
-                  {winner.rank === 1 ? "st" : winner.rank === 2 ? "nd" : "rd"}
-                </sup>
-              </div>
-              <div className="winner-card__avatar">
-                {profile?.photoUrl ? (
-                  <img src={profile.photoUrl} alt="" />
-                ) : (
-                  <UserRound size={22} />
-                )}
-              </div>
-              <div>
-                <strong>{user.name || "KINBA winner"}</strong>
-                <span>৳{Number(winner.prizeAmount).toFixed(2)} prize</span>
-              </div>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <p className="sponsor-widget__empty">
-          Winner records are being finalized.
-        </p>
-      )}
-      {sponsors.length > 0 && (
-        <div className="showcase-sponsors">
-          <p className="eyebrow">Live sponsors</p>
-          <div className="showcase-sponsors__list">
-            {sponsors.map(sponsor => (
-              <a
-                href={sponsor.externalLink}
-                target="_blank"
-                rel="noreferrer"
-                key={sponsor.id}
-              >
-                <img src={sponsor.logoUrl} alt="Sponsor logo" />
-                <span>৳{Number(sponsor.sponsoredAmount).toFixed(2)}</span>
-                <ExternalLink size={13} />
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function SponsorWheel({
-  phase = "entry",
-  label = "WheelsBids wheel",
-}: {
-  phase?: string;
-  label?: string;
-}) {
-  return (
-    <div
-      className={`sponsor-wheel sponsor-wheel--${phase}`}
-      aria-label={label}
-      role="img"
-    >
-      <span />
-      <span />
-      <span />
-    </div>
-  );
-}
-
-function SponsorBidsPanel() {
-  const sessions = trpc.sponsorBids.sessions.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-    staleTime: 30_000,
-  });
-  const wallet = trpc.sponsorBids.walletBalance.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-    staleTime: 30_000,
-  });
-  const join = trpc.sponsorBids.join.useMutation();
-  const utils = trpc.useUtils();
-  const [now, setNow] = useState(() => Date.now());
-  const [message, setMessage] = useState("");
-  const session = sessions.data
-    ?.filter(
-      item =>
-        item.status === "scheduled" ||
-        item.status === "live" ||
-        (item.status === "completed" &&
-          item.endsAt &&
-          new Date(item.endsAt).getTime() > Date.now())
-    )
-    .sort((left, right) => {
-      const leftTime = left.startsAt
-        ? new Date(left.startsAt).getTime()
-        : Number.MAX_SAFE_INTEGER;
-      const rightTime = right.startsAt
-        ? new Date(right.startsAt).getTime()
-        : Number.MAX_SAFE_INTEGER;
-      return leftTime - rightTime;
-    })[0];
-  const stateQuery = trpc.sponsorBids.state.useQuery(
-    { sessionId: session?.id ?? 0 },
-    {
-      enabled: Boolean(session),
-      refetchOnWindowFocus: false,
-      staleTime: 30_000,
-    }
-  );
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  const synchronizedNow =
-    now + (stateQuery.data?.serverNow ?? Date.now()) - Date.now();
-  const spinAt = session?.startsAt
-    ? new Date(session.startsAt).getTime()
-    : null;
-  const entryOpensAt = spinAt === null ? null : spinAt - 60 * 60 * 1000;
-  const isOpen =
-    session?.status === "scheduled" &&
-    entryOpensAt !== null &&
-    spinAt !== null &&
-    synchronizedNow >= entryOpensAt &&
-    synchronizedNow < spinAt;
-  const hasEnoughBalance = Number(wallet.data ?? 0) >= 100;
-  const countdown =
-    spinAt === null ? "—" : formatCountdown(spinAt - synchronizedNow);
-  const phase =
-    stateQuery.data?.phase ??
-    (spinAt !== null && synchronizedNow >= spinAt ? "spin-3rd" : "entry");
-  const isShowcase = phase === "showcase";
-  const phaseLabel =
-    phase === "spin-3rd"
-      ? "3 nominee 3rd-place spin"
-      : phase === "pause-after-3rd"
-        ? "Pause after 3rd-place draw"
-        : phase === "spin-2nd"
-          ? "3 nominee 2nd-place spin"
-          : phase === "pause-after-2nd"
-            ? "Pause after 2nd-place draw"
-            : phase === "spin-1st"
-              ? "3 nominee 1st-place spin"
-              : phase === "showcase"
-                ? "Winners showcase"
-                : "Entry window";
-  const activeRank =
-    phase === "spin-3rd"
-      ? 3
-      : phase === "spin-2nd"
-        ? 2
-        : phase === "spin-1st"
-          ? 1
-          : null;
-  const announcedWinner = activeRank
-    ? (stateQuery.data?.winners ?? []).find(
-        item => item.winner.rank === activeRank
-      )
-    : undefined;
-  const activeDraw = activeRank
-    ? (stateQuery.data?.draws ?? []).find(
-        (draw: SponsorBidsDraw) => draw.rank === activeRank
-      )
-    : undefined;
-  const handleJoin = async () => {
-    if (!session || !isOpen) return;
-    setMessage("");
-    try {
-      await join.mutateAsync({ sessionId: session.id });
-      await Promise.all([wallet.refetch(), sessions.refetch()]);
-      await utils.sponsorBids.session.invalidate({ sessionId: session.id });
-      setMessage("You’re in. 100 Taka has been deducted from your wallet.");
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "The wheel entry could not be completed."
-      );
-    }
-  };
-
-  return (
-    <section
-      className="sponsor-bids-panel w-full max-w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 mb-4 overflow-hidden box-border px-4"
-      aria-labelledby="sponsor-bids-heading"
-    >
-      <div className="sponsor-bids-panel__header">
-        <div>
-          <p className="eyebrow">Live on KINBA</p>
-          <h1 id="sponsor-bids-heading">WheelsBids</h1>
-          <p className="sponsor-bids-panel__subcopy">
-            Join the next one-hour entry window for your chance to win.
-          </p>
-        </div>
-        <span className="sponsor-bids-panel__badge">100 Taka</span>
-      </div>
-      {sessions.isPending ? (
-        <p className="profile-loading-note">Loading the next wheel…</p>
-      ) : sessions.error ? (
-        <p className="form-message form-message--error">
-          The wheel service is temporarily unavailable. Please try again
-          shortly.
-        </p>
-      ) : !session ? (
-        <div className="sponsor-bids-panel__body sponsor-bids-empty-state">
-          <div className="sponsor-bids-countdown">
-            <SponsorWheel label="WheelsBids wheel awaiting the next session" />
-            <Clock3 size={20} aria-hidden="true" />
-            <div>
-              <span>Next wheel</span>
-              <strong>Awaiting schedule</strong>
-            </div>
-          </div>
-          <p className="form-message">
-            The next WheelsBids session has not been scheduled yet. The wheel is
-            ready for the next entry window.
-          </p>
-        </div>
-      ) : (
-        <div className="sponsor-bids-panel__body">
-          {isShowcase ? (
-            <WinnersShowcase
-              winners={(stateQuery.data?.winners ?? []) as SponsorBidsWinner[]}
-              sponsors={
-                (stateQuery.data?.sponsors ?? []) as SponsorBidsSponsor[]
-              }
-            />
-          ) : (
-            <div className="sponsor-bids-panel__top-row w-full max-w-full overflow-hidden box-border">
-              <div className="sponsor-bids-countdown">
-                <SponsorWheel
-                  phase={phase}
-                  label={`${phaseLabel} in progress`}
-                />
-                <Clock3 size={20} aria-hidden="true" />
-                <div>
-                  <span>Wheel starts in</span>
-                  <strong aria-live="polite">{countdown}</strong>
-                </div>
-              </div>
-              <SponsorWidget sessionId={session.id} />
-            </div>
-          )}
-          {!isShowcase && activeDraw && activeRank && (
-            <p className="sponsor-bids-announcement" role="status">
-              {activeDraw.nomineeParticipantIds.length} nominees entered the{" "}
-              {activeRank === 1 ? "1st" : activeRank === 2 ? "2nd" : "3rd"}
-              -place secondary spin.
-            </p>
-          )}
-          {!isShowcase && announcedWinner && (
-            <p className="sponsor-bids-announcement" role="status">
-              Winner announced:{" "}
-              <strong>{announcedWinner.user.name || "KINBA winner"}</strong>{" "}
-              takes the{" "}
-              {activeRank === 1 ? "1st" : activeRank === 2 ? "2nd" : "3rd"}{" "}
-              prize of ৳{Number(announcedWinner.winner.prizeAmount).toFixed(2)}.
-            </p>
-          )}
-          {!isShowcase && (
-            <div className="sponsor-bids-panel__meta">
-              <span>
-                <WalletCards size={16} /> Wallet: ৳
-                {Number(wallet.data ?? 0).toFixed(2)}
-              </span>
-              <span>
-                {isOpen
-                  ? "Entry window open"
-                  : synchronizedNow < (entryOpensAt ?? synchronizedNow)
-                    ? "Entry opens soon"
-                    : "Entry window closed"}
-              </span>
-              <span className="sponsor-bids-phase">Phase: {phaseLabel}</span>
-            </div>
-          )}
-          {!isShowcase && (
-            <button
-              type="button"
-              className="primary-btn sponsor-bids-join"
-              onClick={handleJoin}
-              disabled={!isOpen || !hasEnoughBalance || join.isPending}
-            >
-              {join.isPending ? "Joining…" : "Join TimeWheels — ৳100"}
-            </button>
-          )}
-          {!isShowcase && !hasEnoughBalance && (
-            <p className="form-message form-message--error">
-              You need at least 100 Taka in your wallet to join.
-            </p>
-          )}
-          {message && (
-            <p className="form-message" role="status">
-              {message}
-            </p>
-          )}
-        </div>
-      )}
-    </section>
-  );
-}
-
 export default function Home() {
   const auth = useAuth();
   const { isScrollingDown } = useScrollDirection();
@@ -2486,7 +1948,7 @@ export default function Home() {
   const publicProfileMatch = location.match(/^\/profile\/(\d+)$/);
   const publicProfileId = publicProfileMatch ? Number(publicProfileMatch[1]) : undefined;
   const { theme } = useTheme();
-  const [activeView, setActiveView] = useState<FeedSection>("wheels");
+  const [activeView, setActiveView] = useState<FeedSection>("videos");
   const [activeModal, setActiveModal] = useState<AppModal>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(() => location === "/profile");
@@ -2548,13 +2010,13 @@ export default function Home() {
     };
   }, [screen]);
 
-  const showFeed = (next: FeedSection = "wheels") => {
+  const showFeed = (next: FeedSection = "videos") => {
     setProfileOpen(false);
     setActiveView(next);
     setActiveModal(null);
   };
   const goHome = () => {
-    showFeed("wheels");
+    showFeed("videos");
     setMenuOpen(false);
     if (location !== "/") navigate("/");
   };
@@ -2593,7 +2055,7 @@ export default function Home() {
       setMenuOpen(false);
       setActiveModal(null);
       setProfileOpen(false);
-      setActiveView("wheels");
+      setActiveView("videos");
       navigate("/login");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to log out.");
@@ -2634,7 +2096,7 @@ export default function Home() {
           <AppHeader
             profile={profile}
             notificationCount={notificationCount}
-            onHome={() => showFeed("wheels")}
+            onHome={() => showFeed("videos")}
             onSelectFeed={showFeed}
             onOpenModal={openModal}
             onMenu={() => setMenuOpen(value => !value)}
@@ -2661,7 +2123,6 @@ export default function Home() {
                   section={activeView}
                   onSectionChange={showFeed}
                   showTabs={false}
-                  wheels={<SponsorBidsPanel />}
                 />
               )}
             </section>
