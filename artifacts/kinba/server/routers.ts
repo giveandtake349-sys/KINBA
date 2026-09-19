@@ -74,6 +74,7 @@ const profileUpdateInput = z.object({
     .nullable()
     .optional(),
   photoUrl: z.string().url().max(1024).nullable().optional(),
+  about: z.string().trim().max(500).nullable().optional(),
 });
 const sponsorInput = z.object({
   sessionId: z.number().int().positive(),

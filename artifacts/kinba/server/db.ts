@@ -173,12 +173,13 @@ export async function getPublicProfile(userId: number) {
 
 export async function updateOwnProfile(
   userId: number,
-  input: { username?: string | null; photoUrl?: string | null }
+  input: { username?: string | null; photoUrl?: string | null; about?: string | null }
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const hasUsername = Object.prototype.hasOwnProperty.call(input, "username");
   const hasPhotoUrl = Object.prototype.hasOwnProperty.call(input, "photoUrl");
+  const hasAbout = Object.prototype.hasOwnProperty.call(input, "about");
   const username = hasUsername
     ? input.username?.trim().toLowerCase() || null
     : undefined;
@@ -200,10 +201,12 @@ export async function updateOwnProfile(
   };
   if (hasUsername) updateSet.username = username ?? null;
   if (hasPhotoUrl) updateSet.photoUrl = input.photoUrl ?? null;
+  if (hasAbout) updateSet.about = input.about?.trim() || null;
   const insertValues: typeof profiles.$inferInsert = {
     userId,
     username: username ?? null,
     photoUrl: hasPhotoUrl ? (input.photoUrl ?? null) : null,
+    about: hasAbout ? (input.about?.trim() || null) : undefined,
   };
   await db
     .insert(profiles)

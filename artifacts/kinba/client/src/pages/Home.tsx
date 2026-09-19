@@ -59,7 +59,12 @@ import MediaHub, {
   CommunityAnnouncements,
   SearchFeed,
   type FeedSection,
+  type VideoRecord,
+  FeedPhotoLightbox,
+  FocusedVideoViewer,
+  ShortsFeed,
 } from "@/components/MediaHub";
+import ProfileView, { ProfileSkeleton } from "@/components/ProfileView";
 import "./profile.css";
 
 type Screen = "landing" | "dashboard" | "profile";
@@ -98,6 +103,7 @@ type ProfileSnapshot = {
     photoUrl?: string | null;
     isVerified?: boolean;
     accountType?: "member" | "creator" | "company";
+    about?: string | null;
   } | null;
   stats?: {
     reactionsReceived: number;
@@ -202,108 +208,6 @@ function ProfileStatsGrid({ profile }: { profile?: ProfileSnapshot }) {
         </div>
       ))}
     </div>
-  );
-}
-
-function ProfileEditor({ profile }: { profile?: ProfileSnapshot }) {
-  const [username, setUsername] = useState(profile?.profile?.username ?? "");
-  const [photoUrl, setPhotoUrl] = useState(profile?.profile?.photoUrl ?? "");
-  const [message, setMessage] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const update = trpc.profile.update.useMutation();
-  const utils = trpc.useUtils();
-  const chooseAvatar = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) return;
-    setUploading(true);
-    setMessage("");
-    try {
-      setPhotoUrl(await uploadImage("avatar", file));
-      setMessage("Profile picture uploaded. Save your profile to keep it.");
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "The profile picture could not be uploaded."
-      );
-    } finally {
-      setUploading(false);
-    }
-  };
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const nextUsername = username.trim() || null;
-    const currentUsername = profile?.profile?.username?.trim() || null;
-    const nextPhotoUrl = photoUrl.trim() || null;
-    const currentPhotoUrl = profile?.profile?.photoUrl || null;
-    const changes: { username?: string | null; photoUrl?: string | null } = {};
-    if (nextUsername !== currentUsername) changes.username = nextUsername;
-    if (nextPhotoUrl !== currentPhotoUrl) changes.photoUrl = nextPhotoUrl;
-    if (!Object.keys(changes).length) {
-      setMessage("No profile changes to save.");
-      return;
-    }
-    try {
-      await update.mutateAsync(changes);
-      await utils.profile.me.invalidate();
-      setMessage("Profile updated.");
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "The profile could not be updated."
-      );
-    }
-  };
-  return (
-    <form className="profile-editor" onSubmit={submit}>
-      <div className="profile-editor-heading">
-        <div className="profile-avatar profile-avatar--large">
-          {photoUrl ? (
-            <img src={photoUrl} alt="Profile preview" />
-          ) : (
-            <UserRound size={28} />
-          )}
-        </div>
-        <div>
-          <strong>Edit Profile</strong>
-          <span>Update the identity shown across KINBA.</span>
-        </div>
-      </div>
-      <label>
-        Username
-        <input
-          value={username}
-          onChange={event => setUsername(event.target.value)}
-          minLength={3}
-          maxLength={64}
-          pattern="[A-Za-z0-9_]+"
-          placeholder="kinba_creator"
-        />
-      </label>
-      <label>
-        Profile picture
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
-          onChange={chooseAvatar}
-          disabled={uploading}
-        />
-      </label>
-      <button
-        className="primary-btn"
-        type="submit"
-        disabled={update.isPending || uploading}
-      >
-        {update.isPending ? "Saving…" : "Save Profile"}
-      </button>
-      {message && (
-        <p className="form-message" role="status">
-          {message}
-        </p>
-      )}
-    </form>
   );
 }
 
@@ -983,202 +887,6 @@ function Landing({ onLogin }: { onLogin: () => void }) {
         <span>ICONS</span>
         <span>Community</span>
       </div>
-    </main>
-  );
-}
-
-function ProfileStats({
-  profile,
-  isOwner,
-  isAuthenticated,
-  isAdmin,
-  userId,
-}: {
-  profile?: ProfileSnapshot;
-  isOwner: boolean;
-  isAuthenticated: boolean;
-  isAdmin: boolean;
-  userId?: number;
-}) {
-  const [gridTab, setGridTab] = useState<"videos" | "shorts" | "liked">(
-    "videos"
-  );
-  const followState = trpc.profile.followState.useQuery(
-    { userId: userId as number },
-    {
-      enabled: isAuthenticated && !isOwner && Boolean(userId),
-      refetchOnWindowFocus: false,
-    }
-  );
-  const toggleFollow = trpc.profile.toggleFollow.useMutation({
-    onSuccess: () => void followState.refetch(),
-  });
-  const videosQuery = trpc.profile.videos.useQuery(undefined, {
-    enabled: isOwner,
-    refetchOnWindowFocus: false,
-  });
-  const publicVideosQuery = trpc.profile.videosById.useQuery(
-    { userId: userId as number },
-    { enabled: Boolean(userId), refetchOnWindowFocus: false }
-  );
-  const stats = profile?.stats;
-  const displayName = profileDisplayName(profile);
-  const handle = profile?.profile?.username
-    ? `@${profile.profile.username}`
-    : "@kinba_member";
-  const videos = ((userId ? publicVideosQuery.data : videosQuery.data) ?? []).filter(video =>
-    gridTab === "shorts"
-      ? video.kind === "SHORT"
-      : gridTab === "videos"
-        ? video.kind === "LONG"
-        : false
-  );
-  return (
-    <main className="profile-page section-shell">
-      <section className="profile-hero" aria-labelledby="profile-heading">
-        <div className="profile-hero-avatar-wrap">
-          <div className="profile-avatar profile-avatar--hero">
-            {profile?.profile?.photoUrl ? (
-              <img
-                src={profile.profile.photoUrl}
-                alt={`${displayName} avatar`}
-              />
-            ) : (
-              <UserRound size={42} />
-            )}
-          </div>
-          {isOwner && (
-            <span
-              className="profile-avatar-edit"
-              aria-label="Edit profile picture"
-            >
-              <PenLine size={14} />
-            </span>
-          )}
-        </div>
-        <h1 id="profile-heading">{displayName}</h1>
-        <p className="profile-handle">
-          {handle}
-          {isOwner && (
-            <span className="profile-handle-edit" aria-label="Edit profile">
-              <PenLine size={13} />
-            </span>
-          )}
-        </p>
-        <div className="profile-stat-line" aria-label="Profile statistics">
-          <span>
-            <strong>{stats?.followingCount ?? 0}</strong> Following
-          </span>
-          <span>
-            <strong>{stats?.followersCount ?? 0}</strong> Followers
-          </span>
-          <span>
-            <strong>{stats?.reactionsReceived ?? 0}</strong> Pookies
-          </span>
-        </div>
-        {isOwner ? (
-          <details className="profile-edit-details">
-            <summary className="primary-btn profile-edit-trigger">Edit Profile</summary>
-            <ProfileEditor profile={profile} />
-          </details>
-        ) : isAuthenticated && userId ? (
-          <button
-            type="button"
-            className="primary-btn profile-follow-trigger"
-            onClick={() =>
-              void toggleFollow.mutateAsync({ userId })
-            }
-            disabled={toggleFollow.isPending || followState.isPending}
-          >
-            {followState.data?.following ? "Following" : "Follow"}
-          </button>
-        ) : null}
-      </section>
-      <section
-        className="profile-content"
-        aria-labelledby="profile-content-heading"
-      >
-        <div className="profile-content-heading">
-          <div>
-            <p className="eyebrow">Creator library</p>
-            <h2 id="profile-content-heading">Your videos</h2>
-          </div>
-          {videosQuery.isFetching && !videosQuery.isPending && (
-            <span className="profile-loading-note">Refreshing…</span>
-          )}
-        </div>
-        <div
-          className="profile-grid-tabs"
-          role="tablist"
-          aria-label="Profile media tabs"
-        >
-          {(
-            [
-              ["videos", "Videos"],
-              ["shorts", "Shorts"],
-              ["liked", "Pookies"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={gridTab === id}
-              className={gridTab === id ? "active" : ""}
-              onClick={() => setGridTab(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {gridTab === "liked" ? (
-          <div className="profile-grid-empty">
-            Pookied videos will appear here.
-          </div>
-        ) : videos.length ? (
-          <div className="profile-video-grid">
-            {videos.map(video => (
-              <article className="profile-video-tile" key={video.id}>
-                {video.mediaType === "IMAGE" ? (
-                  <img
-                    src={resolveMediaUrl(video.videoUrl) ?? video.videoUrl}
-                    className="w-full h-auto object-cover rounded-lg"
-                    alt={video.title || "Post"}
-                  />
-                ) : resolveMediaUrl(video.thumbnailUrl) ? (
-                  <img
-                    src={resolveMediaUrl(video.thumbnailUrl)}
-                    alt={video.title}
-                  />
-                ) : (
-                  <div className="profile-video-tile-fallback">
-                    <Video size={24} />
-                  </div>
-                )}
-                {video.mediaType === "VIDEO" && (
-                  <span className="profile-video-tile-play">
-                    <Video size={15} />
-                  </span>
-                )}
-                <div>
-                  <strong>{video.title}</strong>
-                  <span>{video.viewCount} views</span>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="profile-grid-empty">
-            No {gridTab === "shorts" ? "Shorts" : "videos"} uploaded yet.
-          </div>
-        )}
-      </section>
-      {isOwner && (
-        <section className="profile-secondary-tools">
-          <GetVerifiedPanel />
-          {isAdmin && <AdminVerificationPanel />}
-        </section>
-      )}
     </main>
   );
 }
@@ -1952,6 +1660,9 @@ export default function Home() {
   const [activeModal, setActiveModal] = useState<AppModal>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(() => location === "/profile");
+  const [shortsViewerId, setShortsViewerId] = useState<number | null>(null);
+  const [photoViewer, setPhotoViewer] = useState<VideoRecord | null>(null);
+  const [videoViewer, setVideoViewer] = useState<VideoRecord | null>(null);
   const profileQuery = trpc.profile.me.useQuery(undefined, {
     enabled: auth.isAuthenticated && !publicProfileId,
     refetchOnWindowFocus: false,
@@ -2127,12 +1838,22 @@ export default function Home() {
               )}
             </section>
           ) : (
-            <ProfileStats
+            <ProfileView
               profile={profile}
               isOwner={isOwner}
               isAuthenticated={auth.isAuthenticated}
               isAdmin={auth.user?.role === "admin"}
               userId={publicProfileId}
+              onBack={closeProfile}
+              onOpenShort={setShortsViewerId}
+              onOpenPhoto={setPhotoViewer}
+              onOpenVideo={setVideoViewer}
+              ownerTools={
+                <>
+                  <GetVerifiedPanel />
+                  {auth.user?.role === "admin" && <AdminVerificationPanel />}
+                </>
+              }
             />
           )}
         </main>
@@ -2181,6 +1902,38 @@ export default function Home() {
         )}
         {activeModal === "announcements" && (
           <AnnouncementsModal open onClose={() => setActiveModal(null)} />
+        )}
+        {shortsViewerId !== null && (
+          <div
+            className="shorts-viewer-layer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Shorts viewer"
+          >
+            <button
+              type="button"
+              className="shorts-viewer-close"
+              onClick={() => setShortsViewerId(null)}
+              aria-label="Close Shorts viewer"
+            >
+              <X size={22} />
+            </button>
+            <ShortsFeed active initialVideoId={shortsViewerId} viewerMode />
+          </div>
+        )}
+        {photoViewer && (
+          <FeedPhotoLightbox
+            imageUrl={photoViewer.videoUrl}
+            alt={photoViewer.title || "Post"}
+            owner={photoViewer.owner}
+            onClose={() => setPhotoViewer(null)}
+          />
+        )}
+        {videoViewer && (
+          <FocusedVideoViewer
+            video={videoViewer}
+            onClose={() => setVideoViewer(null)}
+          />
         )}
         <BottomNavigation
           className={

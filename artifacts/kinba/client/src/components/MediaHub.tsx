@@ -89,7 +89,7 @@ function navigateToProfile(
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
-type VideoRecord = {
+export type VideoRecord = {
   id: number;
   title: string;
   description: string;
@@ -2137,7 +2137,7 @@ function FeedRecovery() {
   );
 }
 
-function FeedPhotoLightbox({
+export function FeedPhotoLightbox({
   attachments = [],
   index,
   onClose,
@@ -2261,7 +2261,7 @@ function FeedPhotoLightbox({
   );
 }
 
-function FocusedVideoViewer({
+export function FocusedVideoViewer({
   video,
   onClose,
 }: {
@@ -2394,7 +2394,7 @@ function HomeFeedPanel({
   onOpenPhoto,
   onOpenVideo,
 }: {
-  tab: HomeTab;
+  tab: Exclude<HomeTab, "spotlight">;
   active?: boolean;
   showDetailsOverlay?: boolean;
   showHeader?: boolean;
@@ -2643,7 +2643,7 @@ function ShortVideoCard({
 
 const MemoShortVideoCard = memo(ShortVideoCard);
 
-function ShortsFeed({
+export function ShortsFeed({
   active = true,
   initialVideoId,
   viewerMode = false,
