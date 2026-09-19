@@ -1678,9 +1678,12 @@ export default function Home() {
     staleTime: 30_000,
   });
   const notificationCount = Math.min(notificationQuery.data?.length ?? 0, 99);
-  const profile = (publicProfileId ? publicProfileQuery.data : profileQuery.data) as ProfileSnapshot | undefined;
+  const publicProfileData = publicProfileQuery.data;
+  const ownProfileData = profileQuery.data;
+  const profile = (publicProfileId ? publicProfileData : ownProfileData) as ProfileSnapshot | undefined;
+  const profileForHeader = publicProfileId ? (publicProfileData ?? ownProfileData) : ownProfileData;
   const isOwner = Boolean(
-    auth.user?.id && profile?.user?.id && auth.user.id === profile.user.id
+    auth.user?.id && profileForHeader?.user?.id && auth.user.id === profileForHeader.user.id
   );
   const screen: Screen =
     location === "/login"
@@ -1805,7 +1808,7 @@ export default function Home() {
           }`}
         >
           <AppHeader
-            profile={profile}
+            profile={profileForHeader}
             notificationCount={notificationCount}
             onHome={() => showFeed("videos")}
             onSelectFeed={showFeed}
@@ -1839,7 +1842,7 @@ export default function Home() {
             </section>
           ) : (
             <ProfileView
-              profile={profile}
+              profile={profileForHeader}
               isOwner={isOwner}
               isAuthenticated={auth.isAuthenticated}
               isAdmin={auth.user?.role === "admin"}

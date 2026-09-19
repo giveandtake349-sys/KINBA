@@ -237,6 +237,14 @@
   gap: 4px;
   border-bottom: 1px solid var(--border, rgba(255,255,255,0.08));
   margin-bottom: 16px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+.pr-tabs::-webkit-scrollbar {
+  display: none;
 }
 .pr-tab {
   display: flex;
@@ -253,6 +261,9 @@
   transition: color 0.15s, border-color 0.15s;
   margin-bottom: -1px;
   font-family: inherit;
+  scroll-snap-align: center;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .pr-tab:hover {
   color: var(--text);
@@ -272,6 +283,27 @@
 .pr-tab--active .pr-tab-count {
   background: var(--border, rgba(255,255,255,0.12));
   color: var(--text);
+}
+
+/* --- Content Pages (Swipeable) --- */
+.pr-content-pages {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin: 0 -16px;
+  padding: 0 16px 16px;
+}
+.pr-content-pages::-webkit-scrollbar {
+  display: none;
+}
+.pr-content-page {
+  flex: 0 0 100%;
+  width: 100%;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  box-sizing: border-box;
 }
 
 /* --- Content Grid --- */

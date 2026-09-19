@@ -21,6 +21,8 @@ import {
   X,
   Link as LinkIcon,
   Heart,
+  ChevronRight,
+  ChevronLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -287,6 +289,11 @@ export default function ProfileView({
   const [editOpen, setEditOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const tabButtonsRef = useRef<(HTMLButtonElement | null)[]>([]);
+  const isScrollingTabs = useRef(false);
+  const isScrollingContent = useRef(false);
 
   const followState = trpc.profile.followState.useQuery(
     { userId: userId as number },
@@ -375,6 +382,53 @@ export default function ProfileView({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
+
+  const tabOrder: ProfileTab[] = ["posts", "videos", "shorts", "pookies"];
+
+  const scrollToTab = useCallback((tab: ProfileTab, behavior: ScrollBehavior = "smooth") => {
+    const index = tabOrder.indexOf(tab);
+    if (index === -1 || !contentRef.current) return;
+    isScrollingContent.current = true;
+    contentRef.current.scrollTo({
+      left: index * contentRef.current.clientWidth,
+      behavior,
+    });
+    setActiveTab(tab);
+    if (tabsRef.current && tabButtonsRef.current[index]) {
+      isScrollingTabs.current = true;
+      tabButtonsRef.current[index].scrollIntoView({ behavior, inline: "center" });
+    }
+    setTimeout(() => {
+      isScrollingContent.current = false;
+      isScrollingTabs.current = false;
+    }, 350);
+  }, []);
+
+  useEffect(() => {
+    if (!contentRef.current) return;
+    const container = contentRef.current;
+    const handleScroll = () => {
+      if (isScrollingContent.current) return;
+      const index = Math.round(container.scrollLeft / container.clientWidth);
+      const clampedIndex = Math.max(0, Math.min(index, tabOrder.length - 1));
+      const newTab = tabOrder[clampedIndex];
+      if (newTab !== activeTab) {
+        isScrollingTabs.current = true;
+        setActiveTab(newTab);
+        if (tabsRef.current && tabButtonsRef.current[clampedIndex]) {
+          tabButtonsRef.current[clampedIndex].scrollIntoView({ behavior: "smooth", inline: "center" });
+        }
+        setTimeout(() => { isScrollingTabs.current = false; }, 150);
+      }
+    };
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (isScrollingTabs.current) return;
+    scrollToTab(activeTab, "smooth");
+  }, [activeTab, scrollToTab]);
 
   return (
     <main className="pr-page">
@@ -524,7 +578,7 @@ export default function ProfileView({
       </div>
 
       <div className="pr-content">
-        <div className="pr-tabs" role="tablist" aria-label="Content tabs">
+        <div className="pr-tabs" role="tablist" aria-label="Content tabs" ref={tabsRef}>
           {(
             [
               ["posts", "Posts", posts.length],
@@ -532,14 +586,15 @@ export default function ProfileView({
               ["shorts", "Shorts", shorts.length],
               ["pookies", "Pookies", pookies.length],
             ] as const
-          ).map(([id, label, count]) => (
+          ).map(([id, label, count], index) => (
             <button
               key={id}
               type="button"
               role="tab"
               aria-selected={activeTab === id}
               className={`pr-tab ${activeTab === id ? "pr-tab--active" : ""}`}
-              onClick={() => setActiveTab(id)}
+              onClick={() => scrollToTab(id as ProfileTab, "smooth")}
+              ref={(el) => { tabButtonsRef.current[index] = el; }}
             >
               {id === "posts" ? <ImageIcon size={15} /> : id === "videos" ? <Video size={15} /> : id === "shorts" ? <Film size={15} /> : <Heart size={15} />}
               <span>{label}</span>
@@ -548,94 +603,115 @@ export default function ProfileView({
           ))}
         </div>
 
-        {isLoading ? (
-          <div className="pr-grid">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <SkeletonBlock className="pr-skeleton-tile" key={i} />
-            ))}
-          </div>
-        ) : activeContent.length > 0 ? (
-          <div className="pr-grid">
-            {activeContent.map(video => (
-              <article
-                className="pr-tile"
-                key={video.id}
-                onClick={() => {
-                  if (video.mediaType === "IMAGE" && onOpenPhoto) {
-                    onOpenPhoto(video);
-                  } else if (video.mediaType === "VIDEO" && video.kind === "SHORT" && onOpenShort) {
-                    onOpenShort(video.id);
-                  } else if (video.mediaType === "VIDEO" && onOpenVideo) {
-                    onOpenVideo(video);
-                  }
-                }}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if ((e.key === "Enter" || e.key === " ") && video.mediaType === "IMAGE" && onOpenPhoto) {
-                    e.preventDefault();
-                    onOpenPhoto(video);
-                  } else if ((e.key === "Enter" || e.key === " ") && video.mediaType === "VIDEO" && video.kind === "SHORT" && onOpenShort) {
-                    e.preventDefault();
-                    onOpenShort(video.id);
-                  } else if ((e.key === "Enter" || e.key === " ") && video.mediaType === "VIDEO" && onOpenVideo) {
-                    e.preventDefault();
-                    onOpenVideo(video);
-                  }
-                }}
-              >
-                {video.mediaType === "IMAGE" ? (
-                  <img
-                    src={resolveMediaUrl(video.videoUrl) ?? video.videoUrl}
-                    className="pr-tile-img"
-                    alt={video.title || "Post"}
-                    loading="lazy"
-                  />
-                ) : resolveMediaUrl(video.thumbnailUrl) ? (
-                  <img
-                    src={resolveMediaUrl(video.thumbnailUrl)}
-                    className="pr-tile-img"
-                    alt={video.title}
-                    loading="lazy"
-                  />
+        <div className="pr-content-pages" ref={contentRef} role="tabpanel" aria-label="Profile content">
+          {tabOrder.map((tabId, pageIndex) => {
+            const content = tabId === "posts"
+              ? posts
+              : tabId === "videos"
+                ? videos
+                : tabId === "shorts"
+                  ? shorts
+                  : pookies;
+            const isLoadingTab = tabId === "pookies"
+              ? bookmarkedVideosQuery.isPending
+              : isOwner
+                ? videosQuery.isPending
+                : publicVideosQuery.isPending;
+
+            return (
+              <div key={tabId} className="pr-content-page" role="tabpanel" aria-labelledby={`tab-${tabId}`}>
+                {isLoadingTab ? (
+                  <div className="pr-grid">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <SkeletonBlock className="pr-skeleton-tile" key={i} />
+                    ))}
+                  </div>
+                ) : content.length > 0 ? (
+                  <div className="pr-grid">
+                    {content.map(video => (
+                      <article
+                        className="pr-tile"
+                        key={video.id}
+                        onClick={() => {
+                          if (video.mediaType === "IMAGE" && onOpenPhoto) {
+                            onOpenPhoto(video);
+                          } else if (video.mediaType === "VIDEO" && video.kind === "SHORT" && onOpenShort) {
+                            onOpenShort(video.id);
+                          } else if (video.mediaType === "VIDEO" && onOpenVideo) {
+                            onOpenVideo(video);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if ((e.key === "Enter" || e.key === " ") && video.mediaType === "IMAGE" && onOpenPhoto) {
+                            e.preventDefault();
+                            onOpenPhoto(video);
+                          } else if ((e.key === "Enter" || e.key === " ") && video.mediaType === "VIDEO" && video.kind === "SHORT" && onOpenShort) {
+                            e.preventDefault();
+                            onOpenShort(video.id);
+                          } else if ((e.key === "Enter" || e.key === " ") && video.mediaType === "VIDEO" && onOpenVideo) {
+                            e.preventDefault();
+                            onOpenVideo(video);
+                          }
+                        }}
+                      >
+                        {video.mediaType === "IMAGE" ? (
+                          <img
+                            src={resolveMediaUrl(video.videoUrl) ?? video.videoUrl}
+                            className="pr-tile-img"
+                            alt={video.title || "Post"}
+                            loading="lazy"
+                          />
+                        ) : resolveMediaUrl(video.thumbnailUrl) ? (
+                          <img
+                            src={resolveMediaUrl(video.thumbnailUrl)}
+                            className="pr-tile-img"
+                            alt={video.title}
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="pr-tile-fallback">
+                            <Video size={22} />
+                          </div>
+                        )}
+                        {video.mediaType === "VIDEO" && (
+                          <span className="pr-tile-play">
+                            <Video size={13} />
+                          </span>
+                        )}
+                        <div className="pr-tile-meta">
+                          <span className="pr-tile-title">{video.title}</span>
+                          <span className="pr-tile-views">{formatCount(video.viewCount)} views</span>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
                 ) : (
-                  <div className="pr-tile-fallback">
-                    <Video size={22} />
+                  <div className="pr-empty">
+                    <div className="pr-empty-icon">
+                      {tabId === "posts" ? (
+                        <ImageIcon size={32} />
+                      ) : tabId === "videos" ? (
+                        <Video size={32} />
+                      ) : tabId === "shorts" ? (
+                        <Film size={32} />
+                      ) : (
+                        <Heart size={32} />
+                      )}
+                    </div>
+                    <p className="pr-empty-title">No {tabId} yet</p>
+                    <p className="pr-empty-desc">
+                      {isOwner
+                        ? `Share your first ${tabId === "posts" ? "photo" : tabId === "videos" ? "video" : tabId === "shorts" ? "short" : "pookied content"} with the community.`
+                        : `This user hasn't posted any ${tabId} yet.`}
+                    </p>
                   </div>
                 )}
-                {video.mediaType === "VIDEO" && (
-                  <span className="pr-tile-play">
-                    <Video size={13} />
-                  </span>
-                )}
-                <div className="pr-tile-meta">
-                  <span className="pr-tile-title">{video.title}</span>
-                  <span className="pr-tile-views">{formatCount(video.viewCount)} views</span>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="pr-empty">
-            <div className="pr-empty-icon">
-              {activeTab === "posts" ? (
-                <ImageIcon size={32} />
-              ) : activeTab === "videos" ? (
-                <Video size={32} />
-              ) : activeTab === "shorts" ? (
-                <Film size={32} />
-              ) : (
-                <Heart size={32} />
-              )}
-            </div>
-            <p className="pr-empty-title">No {activeTab} yet</p>
-            <p className="pr-empty-desc">
-              {isOwner
-                ? `Share your first ${activeTab === "posts" ? "photo" : activeTab === "videos" ? "video" : activeTab === "shorts" ? "short" : "pookied content"} with the community.`
-                : `This user hasn't posted any ${activeTab} yet.`}
-            </p>
-          </div>
-        )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {isOwner && ownerTools && (
