@@ -26,6 +26,8 @@ import {
   Megaphone,
   Mic,
   Send,
+  SkipBack,
+  SkipForward,
   Square,
   Trash2,
   MoreHorizontal,
@@ -45,6 +47,7 @@ import Hls from "hls.js";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { apiUrl } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import {
   getVideoMetadata,
   MAX_ANNOUNCEMENT_VIDEO_DURATION_SECONDS,
@@ -738,6 +741,9 @@ function QualityVideoPlayer({
   const [isNearViewport, setIsNearViewport] = useState(false);
   const [muted, setMuted] = useState(true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [showTapIcon, setShowTapIcon] = useState(false);
+  const tapIconTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const positionRef = useRef(0);
   const resumeRef = useRef(false);
   const viewedRef = useRef(false);
@@ -763,6 +769,21 @@ function QualityVideoPlayer({
     resolveMediaUrl(video.thumbnailUrl) ?? `/api/videos/${video.id}/thumbnail`;
 
   const shouldPlay = active && isInView;
+
+  const togglePlay = () => {
+    const element = ref.current;
+    if (!element) return;
+    if (element.paused) void element.play();
+    else element.pause();
+  };
+
+  const handleVideoTap = (event: React.MouseEvent<HTMLVideoElement>) => {
+    if (event.defaultPrevented) return;
+    togglePlay();
+    setShowTapIcon(true);
+    if (tapIconTimer.current) clearTimeout(tapIconTimer.current);
+    tapIconTimer.current = setTimeout(() => setShowTapIcon(false), 800);
+  };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -833,6 +854,13 @@ function QualityVideoPlayer({
       void element.play().catch(() => undefined);
     }
   }, [shouldPlay]);
+
+  useEffect(() => {
+    return () => {
+      if (tapIconTimer.current) clearTimeout(tapIconTimer.current);
+    };
+  }, []);
+
   return (
     <div
       ref={containerRef}
@@ -857,6 +885,7 @@ function QualityVideoPlayer({
         autoPlay={active && isInView}
         muted={muted}
         onLoadedMetadata={restorePlayback}
+        onClick={handleVideoTap}
         onError={() => {
           const element = ref.current;
           if (element && directSourceUrl && sourceUrl !== directSourceUrl) {
@@ -878,33 +907,81 @@ function QualityVideoPlayer({
         }}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
+        onTimeUpdate={() => {
+          const el = ref.current;
+          if (el) setCurrentTime(el.currentTime);
+        }}
       />
-      <div className="media-video-controls">
-        <button
-          type="button"
-          onClick={() => {
-            const element = ref.current;
-            if (!element) return;
-            if (element.paused) void element.play();
-            else element.pause();
-          }}
-          aria-label={playing ? "Pause video" : "Play video"}
-        >
-          {playing ? <Pause size={16} /> : <Play size={16} />}
-        </button>
-        <button
-          type="button"
-          onClick={() => setMuted(value => !value)}
-          aria-label={muted ? "Unmute video" : "Mute video"}
-        >
-          {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-        </button>
-        <label className="media-quality-control">
-          <ChevronDown size={13} />
-          <span className="sr-only">Video quality</span>
-          <span className="media-quality-label">Original</span>
-        </label>
-        <span>{formatDuration(video.durationSeconds)}</span>
+      {showTapIcon && (
+        <div className="media-video-tap-indicator" aria-hidden="true">
+          {playing ? <Pause size={32} /> : <Play size={32} />}
+        </div>
+      )}
+      <div className="media-video-controls" data-short-no-swipe>
+        <div className="media-video-timeline">
+          <span className="media-video-time">{formatDuration(Math.floor(currentTime))}</span>
+          <input
+            type="range"
+            min={0}
+            max={video.durationSeconds || 0}
+            step={0.1}
+            value={currentTime}
+            onChange={event => {
+              const el = ref.current;
+              if (!el) return;
+              const time = Number(event.target.value);
+              el.currentTime = time;
+              setCurrentTime(time);
+            }}
+            aria-label="Video timeline"
+          />
+          <span className="media-video-time">{formatDuration(video.durationSeconds)}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button
+            type="button"
+            className="media-video-skip-btn"
+            onClick={() => {
+              const el = ref.current;
+              if (!el) return;
+              el.currentTime = Math.max(0, el.currentTime - 5);
+            }}
+            aria-label="Rewind 5 seconds"
+          >
+            <SkipBack size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const element = ref.current;
+              if (!element) return;
+              if (element.paused) void element.play();
+              else element.pause();
+            }}
+            aria-label={playing ? "Pause video" : "Play video"}
+          >
+            {playing ? <Pause size={16} /> : <Play size={16} />}
+          </button>
+          <button
+            type="button"
+            className="media-video-skip-btn"
+            onClick={() => {
+              const el = ref.current;
+              if (!el) return;
+              el.currentTime = Math.min(el.duration || 0, el.currentTime + 5);
+            }}
+            aria-label="Forward 5 seconds"
+          >
+            <SkipForward size={14} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setMuted(value => !value)}
+            aria-label={muted ? "Unmute video" : "Mute video"}
+          >
+            {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+          </button>
+        </div>
       </div>
       {playbackError && (
         <p
@@ -2184,6 +2261,8 @@ export function FeedPhotoLightbox({
     photoUrl: string | null;
   };
 }) {
+  const auth = useAuth();
+  const [sharing, setSharing] = useState(false);
   const imageAttachments = attachments.filter(
     item => item.mediaType === "IMAGE"
   );
@@ -2282,17 +2361,71 @@ export function FeedPhotoLightbox({
           <ChevronRight size={28} />
         </button>
       )}
+      {photoUrl && (
+        <button
+          type="button"
+          className="feed-photo-lightbox-share"
+          onClick={event => {
+            event.stopPropagation();
+            if (!auth.isAuthenticated) return auth.openAuth();
+            if (sharing) return;
+            setSharing(true);
+            const img = event.currentTarget.closest(".feed-photo-lightbox")?.querySelector("img");
+            const w = img?.naturalWidth || 800;
+            const h = img?.naturalHeight || 600;
+            void (async () => {
+              try {
+                const session = await supabase.auth.getSession();
+                const token = session.data.session?.access_token;
+                if (!token) throw new Error("Please sign in to share.");
+                const response = await fetch(apiUrl("/api/photos/create"), {
+                  method: "POST",
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                  },
+                  credentials: "include",
+                  body: JSON.stringify({
+                    title: alt || "Shared photo",
+                    description: "",
+                    imageUrl: photoUrl,
+                    width: w,
+                    height: h,
+                  }),
+                });
+                if (!response.ok) {
+                  const payload = await response.json().catch(() => ({}));
+                  throw new Error(
+                    (payload as { error?: string }).error || "Share failed."
+                  );
+                }
+                toast.success("Photo shared as a new post.");
+                onClose();
+              } catch (error) {
+                notifyError(error);
+              } finally {
+                setSharing(false);
+              }
+            })();
+          }}
+          aria-label="Share photo as post"
+        >
+          <Share2 size={15} />
+          {sharing ? "Sharing…" : "Share as post"}
+        </button>
+      )}
     </div>
   );
 }
 
 export function FocusedVideoViewer({
-  video,
+  video: initialVideo,
   onClose,
 }: {
   video: VideoRecord;
   onClose: () => void;
 }) {
+  const [video, setVideo] = useState(initialVideo);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const auth = useAuth();
   const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
@@ -2329,14 +2462,22 @@ export function FocusedVideoViewer({
       aria-modal="true"
       aria-label="Video viewer"
     >
-      <button
-        type="button"
-        className="focused-video-viewer__close"
-        onClick={onClose}
-        aria-label="Close video viewer"
-      >
-        <X size={22} />
-      </button>
+      <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 600, padding: "12px 16px 0", boxSizing: "border-box" }}>
+        <PostManagementMenu
+          video={video}
+          onUpdated={description => setVideo(v => ({ ...v, description }))}
+          onDeleted={onClose}
+        />
+        <button
+          type="button"
+          className="focused-video-viewer__close"
+          onClick={onClose}
+          aria-label="Close video viewer"
+          style={{ margin: 0 }}
+        >
+          <X size={22} />
+        </button>
+      </div>
       <div className="focused-video-viewer__stage">
         <header className="feed-post-author focused-video-viewer__author">
           <a

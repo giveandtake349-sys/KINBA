@@ -312,7 +312,8 @@ export async function listVerificationTransactions() {
 export async function approveVerificationTransaction(
   transactionId: number,
   adminId: number,
-  status: "approved" | "rejected"
+  status: "approved" | "rejected",
+  accountType: "creator" | "company" = "creator"
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -347,7 +348,7 @@ export async function approveVerificationTransaction(
     if (status === "approved")
       await tx
         .update(profiles)
-        .set({ isVerified: true, phoneVerified: true, updatedAt: new Date() })
+        .set({ isVerified: true, phoneVerified: true, accountType, updatedAt: new Date() })
         .where(eq(profiles.userId, transaction.userId));
     return updated;
   });

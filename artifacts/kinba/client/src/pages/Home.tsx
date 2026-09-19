@@ -385,6 +385,7 @@ function AdminVerificationPanel() {
   const review = trpc.payments.approve.useMutation();
   const [activeId, setActiveId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
+  const [accountTypes, setAccountTypes] = useState<Record<number, "creator" | "company">>({});
   const decide = async (
     transactionId: number,
     status: "approved" | "rejected"
@@ -392,7 +393,11 @@ function AdminVerificationPanel() {
     setActiveId(transactionId);
     setMessage("");
     try {
-      await review.mutateAsync({ transactionId, status });
+      await review.mutateAsync({
+        transactionId,
+        status,
+        accountType: accountTypes[transactionId] ?? "creator",
+      });
       await transactions.refetch();
       setMessage(
         status === "approved"
@@ -487,6 +492,20 @@ function AdminVerificationPanel() {
                     <td>
                       {isPending ? (
                         <div className="verification-review-actions">
+                          <select
+                            className="verification-type-select"
+                            value={accountTypes[transaction.id] ?? "creator"}
+                            onChange={event =>
+                              setAccountTypes(prev => ({
+                                ...prev,
+                                [transaction.id]: event.target.value as "creator" | "company",
+                              }))
+                            }
+                            disabled={isBusy}
+                          >
+                            <option value="creator">Creator</option>
+                            <option value="company">Company</option>
+                          </select>
                           <button
                             type="button"
                             className="primary-btn"

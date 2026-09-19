@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { uploadImage } from "@/lib/mediaUpload";
 import { resolveMediaUrl } from "@/lib/runtimeConfig";
+import AvatarCropModal from "./AvatarCropModal";
 import "./profileRedesign.css";
 
 type ProfileSnapshot = {
@@ -116,6 +117,8 @@ function ProfileEditModal({
   const [photoUrl, setPhotoUrl] = useState(profile?.profile?.photoUrl ?? "");
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
   const update = trpc.profile.update.useMutation();
   const utils = trpc.useUtils();
 
@@ -128,22 +131,20 @@ function ProfileEditModal({
     }
   }, [open, profile?.profile?.username, profile?.profile?.about, profile?.profile?.photoUrl]);
 
-  const chooseAvatar = async (event: ChangeEvent<HTMLInputElement>) => {
+  const chooseAvatar = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    setUploading(true);
-    setMessage("");
-    try {
-      setPhotoUrl(await uploadImage("avatar", file));
-      setMessage("Profile picture uploaded.");
-    } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Upload failed."
-      );
-    } finally {
-      setUploading(false);
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setMessage("Choose a JPG, PNG, or WEBP image.");
+      return;
     }
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage("Image must be under 5 MB.");
+      return;
+    }
+    setCropFile(file);
+    setCropOpen(true);
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -258,6 +259,12 @@ function ProfileEditModal({
           </div>
         </form>
       </div>
+      <AvatarCropModal
+        file={cropFile}
+        open={cropOpen}
+        onClose={() => { setCropOpen(false); setCropFile(null); }}
+        onSaved={url => { setPhotoUrl(url); setMessage("Profile photo updated."); setCropOpen(false); setCropFile(null); }}
+      />
     </div>
   );
 }

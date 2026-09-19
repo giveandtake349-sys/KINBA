@@ -283,13 +283,15 @@ export const appRouter = router({
         z.object({
           transactionId: z.number().int().positive(),
           status: z.enum(["approved", "rejected"]),
+          accountType: z.enum(["creator", "company"]).default("creator"),
         })
       )
       .mutation(({ ctx, input }) =>
         approveVerificationTransaction(
           input.transactionId,
           ctx.user.id,
-          input.status
+          input.status,
+          input.accountType
         )
       ),
   }),
