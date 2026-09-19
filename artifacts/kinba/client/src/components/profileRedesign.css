@@ -515,6 +515,8 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  -webkit-overflow-scrolling: touch;
 }
 
 .pr-edit-avatar-section {
@@ -678,6 +680,7 @@
 @media (max-width: 640px) {
   .pr-page {
     padding: 0 12px 100px;
+    padding-top: calc(68px + env(safe-area-inset-top, 0px));
   }
   .pr-back-btn {
     display: flex;
@@ -705,6 +708,10 @@
   .pr-modal {
     max-width: 100%;
     border-radius: 16px 16px 0 0;
+    max-height: calc(100vh - 68px - env(safe-area-inset-bottom, 0px));
+  }
+  .pr-modal-overlay {
+    padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
   }
 }
 
