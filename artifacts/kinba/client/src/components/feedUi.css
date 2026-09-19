@@ -502,6 +502,25 @@
   margin: 0 !important;
   background: transparent !important;
 }
+.feed-media-post > .feed-post-content--text {
+  padding: 14px;
+  background: transparent;
+}
+.feed-media-post > .feed-post-content--text .feed-post-desc {
+  font-size: 15px !important;
+  line-height: 1.55 !important;
+  color: var(--text, #fff) !important;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.text-post-body p {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text, #fff);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+}
 
 .media-hub .feed-card-list .feed-media-post > .feed-media-copy,
 .media-hub .feed-card-list .feed-text-card > .feed-media-copy,

@@ -65,6 +65,10 @@ const attachmentInput = z.object({
     .optional(),
 });
 
+export const textPostInput = z.object({
+  text: z.string().trim().min(1, "Text post cannot be empty.").max(5000),
+});
+
 export const communityAnnouncementInput = z
   .object({
     body: z.string().trim().max(5000).default(""),

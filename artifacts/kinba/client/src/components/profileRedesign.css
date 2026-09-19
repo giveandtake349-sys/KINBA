@@ -416,6 +416,27 @@
   font-size: 10px;
   color: rgba(255,255,255,0.75);
 }
+.pr-tile-text {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: var(--surface, rgba(255,255,255,0.04));
+  box-sizing: border-box;
+}
+.pr-tile-text-content {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text);
+  text-align: center;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  word-break: break-word;
+}
 
 /* --- Empty State --- */
 .pr-empty {

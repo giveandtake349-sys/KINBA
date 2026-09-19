@@ -323,7 +323,7 @@ export default function ProfileView({
     (userId ? publicVideosQuery.data : videosQuery.data) ?? []
   );
 
-  const posts = allVideos.filter(v => v.mediaType === "IMAGE");
+  const posts = allVideos.filter(v => v.mediaType === "IMAGE" || v.mediaType === "TEXT");
   const videos = allVideos.filter(
     v => v.mediaType === "VIDEO" && v.kind !== "SHORT"
   );
@@ -656,7 +656,11 @@ export default function ProfileView({
                           }
                         }}
                       >
-                        {video.mediaType === "IMAGE" ? (
+                        {video.mediaType === "TEXT" ? (
+                          <div className="pr-tile-text">
+                            <span className="pr-tile-text-content">{video.description || video.title}</span>
+                          </div>
+                        ) : video.mediaType === "IMAGE" ? (
                           <img
                             src={resolveMediaUrl(video.videoUrl) ?? video.videoUrl}
                             className="pr-tile-img"
@@ -680,10 +684,12 @@ export default function ProfileView({
                             <Video size={13} />
                           </span>
                         )}
-                        <div className="pr-tile-meta">
-                          <span className="pr-tile-title">{video.title}</span>
-                          <span className="pr-tile-views">{formatCount(video.viewCount)} views</span>
-                        </div>
+                        {video.mediaType !== "TEXT" && (
+                          <div className="pr-tile-meta">
+                            <span className="pr-tile-title">{video.title}</span>
+                            <span className="pr-tile-views">{formatCount(video.viewCount)} views</span>
+                          </div>
+                        )}
                       </article>
                     ))}
                   </div>

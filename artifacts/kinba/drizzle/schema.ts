@@ -16,7 +16,7 @@ import {
 
 export const appRole = pgEnum("app_role", ["user", "admin"]);
 export const videoKind = pgEnum("video_kind", ["LONG", "SHORT", "WHEEL"]);
-export const mediaType = pgEnum("media_type", ["VIDEO", "IMAGE"]);
+export const mediaType = pgEnum("media_type", ["VIDEO", "IMAGE", "TEXT"]);
 export const videoProcessingStatus = pgEnum("video_processing_status", [
   "PENDING",
   "PROCESSING",

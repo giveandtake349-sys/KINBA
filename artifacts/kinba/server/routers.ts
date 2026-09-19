@@ -57,8 +57,9 @@ import {
   getRawPulse,
   voteRawPulse,
   createRawPulse,
+  createTextPost,
 } from "./db";
-import { communityAnnouncementInput, videoInput } from "./mediaValidation";
+import { communityAnnouncementInput, textPostInput, videoInput } from "./mediaValidation";
 
 const videoIdInput = z.object({ videoId: z.number().int().positive() });
 const announcementIdInput = z.object({
@@ -194,6 +195,9 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         return createVideo(ctx.user.id, input);
       }),
+    createText: protectedProcedure
+      .input(textPostInput)
+      .mutation(({ ctx, input }) => createTextPost(ctx.user.id, input)),
     updateDescription: protectedProcedure
       .input(videoIdInput.extend({ description: z.string().max(2000) }))
       .mutation(({ ctx, input }) => updateVideoDescription(input.videoId, ctx.user.id, input.description)),

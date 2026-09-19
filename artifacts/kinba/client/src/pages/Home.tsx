@@ -1259,8 +1259,11 @@ function UploadVideoModal({
   const [file, setFile] = useState<File | null>(null);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [textBody, setTextBody] = useState("");
+  const [textBusy, setTextBusy] = useState(false);
   const auth = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
+  const createTextMutation = trpc.videos.createText.useMutation();
   const mediaHistory = trpc.profile.videos.useQuery(undefined, {
     enabled: open && auth.isAuthenticated,
     refetchOnWindowFocus: false,
@@ -1282,6 +1285,7 @@ function UploadVideoModal({
     setImageDimensions(null);
     setTitle("");
     setDescription("");
+    setTextBody("");
     onClose();
   };
   const chooseMode = (next: CreateUploaderMode) => {
@@ -1318,6 +1322,25 @@ function UploadVideoModal({
       setFile(nextFile);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "This media cannot be uploaded.");
+    }
+  };
+  const submitText = async () => {
+    const text = textBody.trim();
+    if (!text) {
+      toast.error("Write something to post.");
+      return;
+    }
+    setTextBusy(true);
+    try {
+      await createTextMutation.mutateAsync({ text });
+      await onPublished();
+      setTextBody("");
+      toast.success("Text post published to your feed.");
+      close();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not publish text post.");
+    } finally {
+      setTextBusy(false);
     }
   };
   const submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -1369,9 +1392,33 @@ function UploadVideoModal({
           </div>
           <UploaderHistory media={mediaHistory.data ?? []} textPosts={textHistory.data ?? []} />
         </>
-      ) : mode === "text" || mode === "thread" ? (
+      ) : mode === "text" ? (
         <div className="create-uploader-composer">
-          <p className="modal-intro">{mode === "thread" ? "Start a conversation with your community." : "Publish a text update to your KINBA history."}</p>
+          <p className="modal-intro">Share a text post with your followers.</p>
+          <textarea
+            value={textBody}
+            onChange={event => setTextBody(event.target.value)}
+            placeholder="What's on your mind?"
+            maxLength={5000}
+            rows={5}
+            autoFocus
+          />
+          <span className="field-hint">{textBody.length}/5000</span>
+          <div className="create-uploader-form-actions">
+            <button type="button" className="muted-btn" onClick={safeClick(() => setMode("menu"))}>Back</button>
+            <button
+              type="button"
+              className="primary-btn"
+              disabled={textBusy || !textBody.trim()}
+              onClick={safeClick(submitText)}
+            >
+              {textBusy ? "Publishing…" : "Publish text post"}
+            </button>
+          </div>
+        </div>
+      ) : mode === "thread" ? (
+        <div className="create-uploader-composer">
+          <p className="modal-intro">Start a conversation with your community.</p>
           <CommunityAnnouncements />
         </div>
       ) : (

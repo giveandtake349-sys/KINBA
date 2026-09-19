@@ -354,7 +354,7 @@ export async function approveVerificationTransaction(
 }
 
 export type VideoKind = "LONG" | "SHORT" | "WHEEL";
-export type MediaType = "VIDEO" | "IMAGE";
+export type MediaType = "VIDEO" | "IMAGE" | "TEXT";
 export type VideoQuality = "ORIGINAL" | "1080P" | "720P" | "480P" | "240P";
 export type VideoSourceInput = { quality: VideoQuality; videoUrl: string };
 export type VideoAttachmentInput = {
@@ -447,7 +447,7 @@ function shapeVideoRow(row: any) {
     videoUrl: publicMediaUrl(row.video.videoUrl) ?? "",
     thumbnailUrl: publicMediaUrl(row.video.thumbnailUrl),
     hlsMasterUrl: publicMediaUrl(row.video.hlsMasterUrl),
-    mediaType: row.video.mediaType === "IMAGE" ? "IMAGE" : "VIDEO",
+    mediaType: row.video.mediaType === "IMAGE" ? "IMAGE" : row.video.mediaType === "TEXT" ? "TEXT" : "VIDEO",
     processingStatus: row.video.processingStatus ?? "READY",
     reactionCount: Number(row.reactionCount),
     shareCount: Number(row.shareCount),
@@ -998,6 +998,35 @@ export async function createPhotoPost(
       durationSeconds: 1,
       width: input.width,
       height: input.height,
+      processingStatus: "READY",
+    })
+    .returning();
+  return created;
+}
+
+export async function createTextPost(
+  userId: number,
+  input: { text: string }
+) {
+  if (!Number.isInteger(userId) || userId < 1)
+    throw new Error("Authenticated application user ID is invalid.");
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const text = input.text.trim();
+  if (!text) throw new Error("Text post cannot be empty.");
+  const [created] = await db
+    .insert(videos)
+    .values({
+      userId,
+      title: text.length > 80 ? text.slice(0, 80) + "…" : text,
+      description: text,
+      videoUrl: "",
+      thumbnailUrl: null,
+      mediaType: "TEXT",
+      kind: "LONG",
+      durationSeconds: 0,
+      width: 0,
+      height: 0,
       processingStatus: "READY",
     })
     .returning();

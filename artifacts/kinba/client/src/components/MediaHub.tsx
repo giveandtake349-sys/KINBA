@@ -95,7 +95,7 @@ export type VideoRecord = {
   description: string;
   videoUrl: string;
   thumbnailUrl: string | null;
-  mediaType: "VIDEO" | "IMAGE";
+  mediaType: "VIDEO" | "IMAGE" | "TEXT";
   kind: VideoKind;
   durationSeconds: number;
   width: number;
@@ -1908,8 +1908,12 @@ function VideoCard({
             </a>
             <span className="feed-post-meta">
               {relativeTime(video.createdAt)}
-              <span className="feed-post-meta-dot" />
-              {video.mediaType === "IMAGE" ? "Photo" : "Video"}
+              {video.mediaType !== "TEXT" && (
+                <>
+                  <span className="feed-post-meta-dot" />
+                  {video.mediaType === "IMAGE" ? "Photo" : "Video"}
+                </>
+              )}
             </span>
           </div>
           <PostManagementMenu
@@ -1918,43 +1922,53 @@ function VideoCard({
             onDeleted={() => setDeleted(true)}
           />
         </div>
-        <div
-          className={`feed-media-body${video.mediaType === "VIDEO" ? " feed-media-body--video" : " feed-media-body--image"}`}
-          role={onOpenViewer ? "button" : undefined}
-          tabIndex={onOpenViewer ? 0 : undefined}
-          aria-label={onOpenViewer ? "Open post" : undefined}
-          onClick={openViewer}
-          onKeyDown={event => {
-            if (!onOpenViewer || (event.key !== "Enter" && event.key !== " "))
-              return;
-            event.preventDefault();
-            onOpenViewer();
-          }}
-        >
-          {video.mediaType === "IMAGE" ? (
-            <img
-              src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
-              alt={video.title || "Post"}
-              loading="lazy"
-              draggable={false}
-            />
-          ) : (
-            renderVideo
-              ? renderVideo(video, active, recordView)
-              : <QualityVideoPlayer
-                  video={video}
-                  active={active}
-                  onFirstPlay={recordView}
+        {video.mediaType === "TEXT" ? (
+          <div className="feed-post-content feed-post-content--text">
+            {description && (
+              <p className="feed-post-desc">{description}</p>
+            )}
+          </div>
+        ) : (
+          <>
+            <div
+              className={`feed-media-body${video.mediaType === "VIDEO" ? " feed-media-body--video" : " feed-media-body--image"}`}
+              role={onOpenViewer ? "button" : undefined}
+              tabIndex={onOpenViewer ? 0 : undefined}
+              aria-label={onOpenViewer ? "Open post" : undefined}
+              onClick={openViewer}
+              onKeyDown={event => {
+                if (!onOpenViewer || (event.key !== "Enter" && event.key !== " "))
+                  return;
+                event.preventDefault();
+                onOpenViewer();
+              }}
+            >
+              {video.mediaType === "IMAGE" ? (
+                <img
+                  src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
+                  alt={video.title || "Post"}
+                  loading="lazy"
+                  draggable={false}
                 />
-          )}
-        </div>
-        <div className="feed-post-content">
-          {video.title && <h3 className="feed-post-title">{video.title}</h3>}
-          {description && (
-            <p className="feed-post-desc">{description}</p>
-          )}
-          <span className="feed-post-views">{formatCount(views)} views</span>
-        </div>
+              ) : (
+                renderVideo
+                  ? renderVideo(video, active, recordView)
+                  : <QualityVideoPlayer
+                      video={video}
+                      active={active}
+                      onFirstPlay={recordView}
+                    />
+              )}
+            </div>
+            <div className="feed-post-content">
+              {video.title && <h3 className="feed-post-title">{video.title}</h3>}
+              {description && (
+                <p className="feed-post-desc">{description}</p>
+              )}
+              <span className="feed-post-views">{formatCount(views)} views</span>
+            </div>
+          </>
+        )}
         <RawPulseCard videoId={video.id} />
         <EngagementActions
           engagement={current}
@@ -2012,12 +2026,15 @@ function VideoCard({
               )}
             </strong>
             <span>
-              {relativeTime(video.createdAt)} ·{" "}
-              {video.mediaType === "IMAGE"
-                ? "Photo"
-                : video.kind === "SHORT"
-                  ? "Short"
-                  : "Video"}
+              {relativeTime(video.createdAt)}
+              {video.mediaType !== "TEXT" && (
+                <> · {video.mediaType === "IMAGE"
+                  ? "Photo"
+                  : video.kind === "SHORT"
+                    ? "Short"
+                    : "Video"}
+                </>
+              )}
             </span>
           </div>
         </a>
@@ -2027,59 +2044,67 @@ function VideoCard({
           onDeleted={() => setDeleted(true)}
         />
       </header>
-      <div
-        className={`feed-media-content${video.mediaType === "VIDEO" ? " feed-media-content--video" : " feed-media-content--image"}`}
-        role={onOpenViewer ? "button" : undefined}
-        tabIndex={onOpenViewer ? 0 : undefined}
-        aria-label={onOpenViewer ? "Open post" : undefined}
-        onClick={openViewer}
-        onKeyDown={event => {
-          if (!onOpenViewer || (event.key !== "Enter" && event.key !== " "))
-            return;
-          event.preventDefault();
-          onOpenViewer();
-        }}
-      >
-        {video.mediaType === "IMAGE" ? (
-          <img
-            className="object-contain w-full h-auto max-h-[60vh] bg-black"
-            src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
-            alt={video.title || "Post"}
-            draggable={false}
-          />
-        ) : (
-          <QualityVideoPlayer
-            video={video}
-            active={active}
-            onFirstPlay={recordView}
-          />
-        )}
-      </div>
-      <div
-        className={
-          video.mediaType === "IMAGE"
-            ? "video-card-details photo-card-details"
-            : "video-card-details"
-        }
-      >
-        {video.title && <h3>{video.title}</h3>}
-        <p>{description}</p>
-        <p className="media-caption-tags">
-          {ownerHandle(video.owner.name, video.owner.username)} ·{" "}
-          {hashtagsFromDescription(video.description)}
-        </p>
-        <div className="media-meta-line" aria-label="Media metadata">
-          <span>{formatCount(views)} views</span>
-          <span>{relativeTime(video.createdAt)}</span>
-          <span>
-            {video.mediaType === "IMAGE"
-              ? "Photo"
-              : video.kind === "SHORT"
-                ? "Short"
-                : "Video"}
-          </span>
+      {video.mediaType === "TEXT" ? (
+        <div className="video-card-details text-post-body">
+          {description && <p>{description}</p>}
         </div>
-      </div>
+      ) : (
+        <>
+          <div
+            className={`feed-media-content${video.mediaType === "VIDEO" ? " feed-media-content--video" : " feed-media-content--image"}`}
+            role={onOpenViewer ? "button" : undefined}
+            tabIndex={onOpenViewer ? 0 : undefined}
+            aria-label={onOpenViewer ? "Open post" : undefined}
+            onClick={openViewer}
+            onKeyDown={event => {
+              if (!onOpenViewer || (event.key !== "Enter" && event.key !== " "))
+                return;
+              event.preventDefault();
+              onOpenViewer();
+            }}
+          >
+            {video.mediaType === "IMAGE" ? (
+              <img
+                className="object-contain w-full h-auto max-h-[60vh] bg-black"
+                src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
+                alt={video.title || "Post"}
+                draggable={false}
+              />
+            ) : (
+              <QualityVideoPlayer
+                video={video}
+                active={active}
+                onFirstPlay={recordView}
+              />
+            )}
+          </div>
+          <div
+            className={
+              video.mediaType === "IMAGE"
+                ? "video-card-details photo-card-details"
+                : "video-card-details"
+            }
+          >
+            {video.title && <h3>{video.title}</h3>}
+            <p>{description}</p>
+            <p className="media-caption-tags">
+              {ownerHandle(video.owner.name, video.owner.username)} ·{" "}
+              {hashtagsFromDescription(video.description)}
+            </p>
+            <div className="media-meta-line" aria-label="Media metadata">
+              <span>{formatCount(views)} views</span>
+              <span>{relativeTime(video.createdAt)}</span>
+              <span>
+                {video.mediaType === "IMAGE"
+                  ? "Photo"
+                  : video.kind === "SHORT"
+                    ? "Short"
+                    : "Video"}
+              </span>
+            </div>
+          </div>
+        </>
+      )}
       <RawPulseCard videoId={video.id} />
       <EngagementActions
         engagement={current}
