@@ -1083,6 +1083,7 @@ function InlineVideoPlayer({
   }, [sourceUrl, isNearViewport]);
 
   const togglePlay = (e: React.MouseEvent) => {
+    console.log("[KINBA DIAGNOSTIC] InlineVideoPlayer.togglePlay FIRED", { videoId: video.id, hasStopProp: true, timestamp: Date.now() });
     e.stopPropagation();
     const el = videoRef.current;
     if (!el) return;
@@ -1279,6 +1280,7 @@ function ForYouVideoPlayer({
   }, [shouldAutoPlay]);
 
   const togglePlay = () => {
+    console.log("[KINBA DIAGNOSTIC] ForYouVideoPlayer.togglePlay FIRED", { videoId: video.id, hasStopProp: false, timestamp: Date.now() });
     const el = videoRef.current;
     if (!el) return;
     if (el.paused) el.play().catch(() => undefined);
@@ -2124,6 +2126,13 @@ function VideoCard({
       target.closest("button, a, input, textarea, select")
     )
       return;
+    console.log("[KINBA DIAGNOSTIC] FEED VIDEO OPEN REQUEST", {
+      videoId: video.id,
+      mediaType: video.mediaType,
+      component: "VideoCard",
+      source: event.target instanceof HTMLElement ? event.target.tagName : "unknown",
+      timestamp: Date.now(),
+    });
     onOpenViewer();
   };
   const recordView = () => {
@@ -2630,6 +2639,11 @@ export function FocusedVideoViewer({
   video: VideoRecord;
   onClose: () => void;
 }) {
+  console.log("[KINBA DIAGNOSTIC] FocusedVideoViewer RENDER", {
+    videoId: initialVideo.id,
+    videoUrl: initialVideo.videoUrl,
+    timestamp: Date.now(),
+  });
   const [video, setVideo] = useState(initialVideo);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const auth = useAuth();
@@ -2656,6 +2670,7 @@ export function FocusedVideoViewer({
   const { current, react, share, pending } = useOptimisticEngagement(video);
 
   useEffect(() => {
+    console.log("[KINBA DIAGNOSTIC] FocusedVideoViewer EFFECT MOUNTED", { videoId: initialVideo.id, timestamp: Date.now() });
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
@@ -2663,6 +2678,7 @@ export function FocusedVideoViewer({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {
+      console.log("[KINBA DIAGNOSTIC] FocusedVideoViewer UNMOUNTED", { videoId: initialVideo.id, timestamp: Date.now() });
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
@@ -2741,6 +2757,27 @@ export function FocusedVideoViewer({
         overflow: "hidden",
       }}
     >
+      {/* ── DIAGNOSTIC BANNER ── */}
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 2147483647,
+          background: "#ff0000",
+          color: "#fff",
+          fontFamily: "monospace",
+          fontSize: 16,
+          fontWeight: 900,
+          textAlign: "center",
+          padding: "8px 12px",
+          pointerEvents: "none",
+        }}
+      >
+        KINBA DIAGNOSTIC: FOCUSED VIEWER MOUNTED — videoId={video.id}
+      </div>
+
       {/* ── Video fills entire viewer ── */}
       <div
         style={{
@@ -4230,7 +4267,11 @@ export default function MediaHub({
   const [selectedSection, setSelectedSection] = useState<FeedSection>(section);
   const [shortsViewerId, setShortsViewerId] = useState<number | null>(null);
   const [photoViewer, setPhotoViewer] = useState<VideoRecord | null>(null);
-  const [videoViewer, setVideoViewer] = useState<VideoRecord | null>(null);
+  const [videoViewer, _setVideoViewer] = useState<VideoRecord | null>(null);
+  const setVideoViewer = (v: VideoRecord | null) => {
+    console.log("[KINBA DIAGNOSTIC] setVideoViewer CALLED", { videoId: v?.id ?? null, timestamp: Date.now() });
+    _setVideoViewer(v);
+  };
 
   useEffect(() => {
     setSelectedSection(section);
