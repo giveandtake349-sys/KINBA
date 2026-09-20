@@ -144,15 +144,14 @@ export default function AvatarCropModal({
       const img = imgRef.current;
       if (!img) throw new Error("Image not loaded.");
 
-      const srcCropX = (imgDisplayW / 2 - cropSize / 2 - clampedOffset.x) * (imgNatural.w / imgDisplayW);
-      const srcCropY = (imgDisplayH / 2 - cropSize / 2 - clampedOffset.y) * (imgNatural.h / imgDisplayH);
-      const srcCropSize = cropSize * (imgNatural.w / imgDisplayW);
+      const displayCropX = imgDisplayW / 2 - cropSize / 2 - clampedOffset.x;
+      const displayCropY = imgDisplayH / 2 - cropSize / 2 - clampedOffset.y;
 
       const blob = await getCroppedBlob(
         imageSrc,
-        srcCropX,
-        srcCropY,
-        srcCropSize,
+        displayCropX,
+        displayCropY,
+        cropSize,
         imgNatural.w,
         imgNatural.h,
         imgDisplayW,

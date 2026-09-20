@@ -15,6 +15,7 @@ import { createPortal } from "react-dom";
 import {
   BadgeCheck,
   Bookmark,
+  BookmarkCheck,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -62,6 +63,7 @@ import { isAbsoluteHttpUrl, resolveMediaUrl } from "@/lib/runtimeConfig";
 import "./mediaHub.css";
 import "./kinbaModern.css";
 import "./feedUi.css";
+import "./modernFeed.css";
 import "./shorts-stage.css";
 
 type HomeTab = "videos" | "trendy" | "following" | "icons" | "spotlight";
@@ -1943,54 +1945,45 @@ function VideoCard({
   };
   if (deleted) return null;
   if (socialLayout) {
+    const isText = video.mediaType === "TEXT";
+    const isImage = video.mediaType === "IMAGE";
+    const ownerName = displayName(video.owner.name, video.owner.username);
+
     return (
       <article
         id={`feed-video-${video.id}`}
-        className="feed-media-post"
+        className={`k-post${isText ? " k-post--text" : ""}`}
       >
-        <div className="feed-post-top">
+        <div className="k-post__creator">
           <a
-            className="feed-post-avatar-link"
+            className="k-post__avatar"
             href={`/profile/${video.owner.id}`}
             onClick={event => navigateToProfile(event, video.owner.id)}
-            aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}
+            aria-label={`Open ${ownerName} profile`}
           >
-            <div className="feed-post-avatar">
-              {video.owner.photoUrl ? (
-                <img
-                  src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
-                  alt=""
-                />
-              ) : (
-                <UserRound size={18} />
-              )}
-            </div>
+            {video.owner.photoUrl ? (
+              <img
+                src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
+                alt=""
+              />
+            ) : (
+              <UserRound size={18} />
+            )}
           </a>
-          <div className="feed-post-identity">
+          <div className="k-post__identity">
             <a
-              className="feed-post-author-name"
+              className="k-post__name"
               href={`/profile/${video.owner.id}`}
               onClick={event => navigateToProfile(event, video.owner.id)}
             >
-              <strong>
-                {displayName(video.owner.name, video.owner.username)}
-              </strong>
+              {ownerName}
               {video.owner.isVerified && (
-                <BadgeCheck
-                  className="verified-badge"
-                  size={13}
-                  aria-label="Verified profile"
-                />
+                <BadgeCheck size={13} className="verified-badge" aria-label="Verified profile" />
               )}
             </a>
-            <span className="feed-post-meta">
+            <span className="k-post__meta-line">
               {relativeTime(video.createdAt)}
-              {video.mediaType !== "TEXT" && (
-                <>
-                  <span className="feed-post-meta-dot" />
-                  {video.mediaType === "IMAGE" ? "Photo" : "Video"}
-                </>
-              )}
+              {!isText && ` · ${isImage ? "Photo" : "Video"}`}
             </span>
           </div>
           <PostManagementMenu
@@ -1999,28 +1992,31 @@ function VideoCard({
             onDeleted={() => setDeleted(true)}
           />
         </div>
-        {video.mediaType === "TEXT" ? (
-          <div className="feed-post-content feed-post-content--text">
-            {description && (
-              <p className="feed-post-desc">{description}</p>
-            )}
+
+        {isText ? (
+          <div className="k-post__bottom">
+            {video.title && <h3 className="k-post__title">{video.title}</h3>}
+            {description && <p className="k-post__caption">{description}</p>}
+            <p className="k-post__stats">
+              <span>{formatCount(views)} views</span>
+              <span>{relativeTime(video.createdAt)}</span>
+            </p>
           </div>
         ) : (
           <>
             <div
-              className={`feed-media-body${video.mediaType === "VIDEO" ? " feed-media-body--video" : " feed-media-body--image"}`}
+              className={`k-post__media${isImage ? " k-post__media--image" : " k-post__media--video"}`}
               role={onOpenViewer ? "button" : undefined}
               tabIndex={onOpenViewer ? 0 : undefined}
               aria-label={onOpenViewer ? "Open post" : undefined}
               onClick={openViewer}
               onKeyDown={event => {
-                if (!onOpenViewer || (event.key !== "Enter" && event.key !== " "))
-                  return;
+                if (!onOpenViewer || (event.key !== "Enter" && event.key !== " ")) return;
                 event.preventDefault();
                 onOpenViewer();
               }}
             >
-              {video.mediaType === "IMAGE" ? (
+              {isImage ? (
                 <img
                   src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
                   alt={video.title || "Post"}
@@ -2030,36 +2026,64 @@ function VideoCard({
               ) : (
                 renderVideo
                   ? renderVideo(video, active, recordView)
-                  : <QualityVideoPlayer
-                      video={video}
-                      active={active}
-                      onFirstPlay={recordView}
-                    />
+                  : <QualityVideoPlayer video={video} active={active} onFirstPlay={recordView} />
+              )}
+
+              {!isImage && (
+                <div className="k-post__rail">
+                  <button
+                    type="button"
+                    className={`k-post__rail-btn${current.viewerReacted ? " is-active" : ""}`}
+                    onClick={e => { e.stopPropagation(); react(); }}
+                    aria-label={current.viewerReacted ? "Unlike" : "Like"}
+                  >
+                    <Heart size={26} fill={current.viewerReacted ? "currentColor" : "none"} />
+                    <strong>{formatCount(current.reactionCount)}</strong>
+                  </button>
+                  <button
+                    type="button"
+                    className="k-post__rail-btn"
+                    onClick={e => {
+                      e.stopPropagation();
+                      if (!auth.isAuthenticated) return auth.openAuth();
+                      setCommentsOpen(v => !v);
+                    }}
+                    aria-label="Comments"
+                  >
+                    <MessageCircle size={26} />
+                    <strong>{formatCount(current.commentCount)}</strong>
+                  </button>
+                  <button
+                    type="button"
+                    className="k-post__rail-btn"
+                    onClick={e => { e.stopPropagation(); share(); }}
+                    aria-label="Share"
+                  >
+                    <Share2 size={26} />
+                    <strong>{formatCount(current.shareCount)}</strong>
+                  </button>
+                  <button
+                    type="button"
+                    className={`k-post__rail-btn${bookmarked ? " is-active" : ""}`}
+                    onClick={e => { e.stopPropagation(); toggleBookmark(); }}
+                    aria-label={bookmarked ? "Unsave" : "Save"}
+                  >
+                    <Bookmark size={26} fill={bookmarked ? "currentColor" : "none"} />
+                  </button>
+                </div>
               )}
             </div>
-            <div className="feed-post-content">
-              {video.title && <h3 className="feed-post-title">{video.title}</h3>}
-              {description && (
-                <p className="feed-post-desc">{description}</p>
-              )}
-              <span className="feed-post-views">{formatCount(views)} views</span>
+            <div className="k-post__bottom">
+              {video.title && <h3 className="k-post__title">{video.title}</h3>}
+              {description && <p className="k-post__caption">{description}</p>}
+              <p className="k-post__stats">
+                <span>{formatCount(views)} views</span>
+                <span>{relativeTime(video.createdAt)}</span>
+              </p>
             </div>
           </>
         )}
-        <RawPulseCard videoId={video.id} />
-        <EngagementActions
-          engagement={current}
-          onReact={react}
-          onShare={share}
-          onComments={() => {
-            if (!auth.isAuthenticated) return auth.openAuth();
-            setCommentsOpen(value => !value);
-          }}
-          pending={pending}
-          feedStyle
-          bookmarked={bookmarked}
-          onBookmark={toggleBookmark}
-        />
+
         <CommentDrawer
           postId={video.id}
           postOwnerId={video.owner.id}
@@ -2443,6 +2467,7 @@ export function FocusedVideoViewer({
     }
   };
   const { current, react, share, pending } = useOptimisticEngagement(video);
+
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -2455,91 +2480,128 @@ export function FocusedVideoViewer({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [onClose]);
+
+  const isImage = video.mediaType === "IMAGE";
+  const ownerName = displayName(video.owner.name, video.owner.username);
+
   return (
-    <div
-      className="focused-video-viewer"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Video viewer"
-    >
-      <div style={{ display: "flex", justifyContent: "space-between", width: "100%", maxWidth: 600, padding: "12px 16px 0", boxSizing: "border-box" }}>
+    <div className="k-viewer" role="dialog" aria-modal="true" aria-label="Post viewer">
+      <div className="k-viewer__topbar">
         <PostManagementMenu
           video={video}
-          onUpdated={description => setVideo(v => ({ ...v, description }))}
+          onUpdated={desc => setVideo(v => ({ ...v, description: desc }))}
           onDeleted={onClose}
         />
         <button
           type="button"
-          className="focused-video-viewer__close"
+          className="k-viewer__back"
           onClick={onClose}
-          aria-label="Close video viewer"
-          style={{ margin: 0 }}
+          aria-label="Close viewer"
         >
-          <X size={22} />
+          <ChevronLeft size={18} />
+          <span>Back</span>
         </button>
       </div>
-      <div className="focused-video-viewer__stage">
-        <header className="feed-post-author focused-video-viewer__author">
+
+      <div className="k-viewer__stage">
+        <div className="k-viewer__media-wrap">
+          {isImage ? (
+            <img
+              src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
+              alt={video.title || "Post"}
+              draggable={false}
+            />
+          ) : (
+            <QualityVideoPlayer video={video} active showPoster />
+          )}
+        </div>
+
+        <div className="k-viewer__rail">
+          <button
+            type="button"
+            className={`k-viewer__rail-btn${current.viewerReacted ? " is-active" : ""}`}
+            onClick={react}
+            disabled={!!pending}
+            aria-label={current.viewerReacted ? "Unlike" : "Like"}
+          >
+            <Heart size={28} fill={current.viewerReacted ? "currentColor" : "none"} />
+            <strong>{formatCount(current.reactionCount)}</strong>
+          </button>
+          <button
+            type="button"
+            className="k-viewer__rail-btn"
+            onClick={() => {
+              if (!auth.isAuthenticated) return auth.openAuth();
+              setCommentsOpen(v => !v);
+            }}
+            aria-label="Comments"
+          >
+            <MessageCircle size={28} />
+            <strong>{formatCount(current.commentCount)}</strong>
+          </button>
+          <button
+            type="button"
+            className="k-viewer__rail-btn"
+            onClick={share}
+            disabled={!!pending}
+            aria-label="Share"
+          >
+            <Share2 size={28} />
+            <strong>{formatCount(current.shareCount)}</strong>
+          </button>
+          <button
+            type="button"
+            className={`k-viewer__rail-btn${bookmarked ? " is-active" : ""}`}
+            onClick={toggleBookmark}
+            disabled={bookmarkMutation.isPending}
+            aria-label={bookmarked ? "Unsave" : "Save"}
+          >
+            <Bookmark size={28} fill={bookmarked ? "currentColor" : "none"} />
+          </button>
+        </div>
+      </div>
+
+      <div className="k-viewer__bottom">
+        <div className="k-viewer__creator">
           <a
-            className="profile-link feed-post-author-identity"
+            className="k-viewer__creator-avatar"
             href={`/profile/${video.owner.id}`}
             onClick={event => navigateToProfile(event, video.owner.id)}
-            aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}
           >
-            <div className="video-owner-avatar">
-              {video.owner.photoUrl ? (
-                <img
-                  src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
-                  alt=""
-                />
-              ) : (
-                <UserRound size={16} />
-              )}
-            </div>
-            <div className="feed-post-author-info">
-              <strong>
-                {displayName(video.owner.name, video.owner.username)}
-                {video.owner.isVerified && (
-                  <BadgeCheck
-                    className="verified-badge"
-                    size={13}
-                    aria-label="Verified profile"
-                  />
-                )}
-              </strong>
-              <span>
-                {relativeTime(video.createdAt)} ·{" "}
-                {video.mediaType === "IMAGE"
-                  ? "Photo"
-                  : video.kind === "SHORT"
-                    ? "Short"
-                    : "Video"}
-              </span>
-            </div>
+            {video.owner.photoUrl ? (
+              <img
+                src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
+                alt=""
+              />
+            ) : (
+              <UserRound size={18} />
+            )}
           </a>
-        </header>
-        <div className="focused-video-viewer__media">
-          <QualityVideoPlayer video={video} active showPoster />
+          <div>
+            <a
+              className="k-viewer__creator-name"
+              href={`/profile/${video.owner.id}`}
+              onClick={event => navigateToProfile(event, video.owner.id)}
+            >
+              {ownerName}
+              {video.owner.isVerified && (
+                <BadgeCheck size={13} className="verified-badge" />
+              )}
+            </a>
+            <div className="k-viewer__creator-time">
+              {relativeTime(video.createdAt)}
+              {!isImage && ` · ${video.kind === "SHORT" ? "Short" : "Video"}`}
+            </div>
+          </div>
         </div>
+
         {(video.title || video.description) && (
-          <div className="feed-media-copy focused-video-viewer__copy">
-            {video.title && <h3>{video.title}</h3>}
+          <div className="k-viewer__caption">
+            {video.title && <p className="k-viewer__caption-title">{video.title}</p>}
             {video.description && <p>{video.description}</p>}
           </div>
         )}
-        <EngagementActions
-          engagement={current}
-          onReact={react}
-          onShare={share}
-          onComments={() => {
-            if (!auth.isAuthenticated) return auth.openAuth();
-            setCommentsOpen(value => !value);
-          }}
-          pending={pending}
-          feedStyle
-          bookmarked={bookmarked}
-          onBookmark={toggleBookmark}
-        />
+
         <CommentDrawer
           postId={video.id}
           postOwnerId={video.owner.id}
@@ -3099,7 +3161,13 @@ function AnnouncementComposer({ onCreated }: { onCreated: () => void }) {
       onCreated();
       toast.success("Community announcement published.");
     } catch (error) {
-      notifyError(error);
+      const msg =
+        error instanceof Error ? error.message : "Publish failed.";
+      if (msg.includes("verified") || msg.includes("Only")) {
+        toast.error(msg + " Check your verification status on your profile.");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setBusy(false);
     }
