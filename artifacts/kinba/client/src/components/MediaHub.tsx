@@ -2639,11 +2639,7 @@ export function FocusedVideoViewer({
   video: VideoRecord;
   onClose: () => void;
 }) {
-  console.log("[KINBA DIAGNOSTIC] FocusedVideoViewer RENDER", {
-    videoId: initialVideo.id,
-    videoUrl: initialVideo.videoUrl,
-    timestamp: Date.now(),
-  });
+
   const [video, setVideo] = useState(initialVideo);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const auth = useAuth();
@@ -2670,7 +2666,6 @@ export function FocusedVideoViewer({
   const { current, react, share, pending } = useOptimisticEngagement(video);
 
   useEffect(() => {
-    console.log("[KINBA DIAGNOSTIC] FocusedVideoViewer EFFECT MOUNTED", { videoId: initialVideo.id, timestamp: Date.now() });
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
@@ -2678,7 +2673,6 @@ export function FocusedVideoViewer({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {
-      console.log("[KINBA DIAGNOSTIC] FocusedVideoViewer UNMOUNTED", { videoId: initialVideo.id, timestamp: Date.now() });
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
     };
@@ -2757,32 +2751,13 @@ export function FocusedVideoViewer({
         overflow: "hidden",
       }}
     >
-      {/* ── DIAGNOSTIC BANNER ── */}
-      <div
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 2147483647,
-          background: "#ff0000",
-          color: "#fff",
-          fontFamily: "monospace",
-          fontSize: 16,
-          fontWeight: 900,
-          textAlign: "center",
-          padding: "8px 12px",
-          pointerEvents: "none",
-        }}
-      >
-        KINBA DIAGNOSTIC: FOCUSED VIEWER MOUNTED — videoId={video.id}
-      </div>
-
-      {/* ── Video fills entire viewer ── */}
+      {/* ── Video stage: continuous surface ── */}
       <div
         style={{
           position: "absolute",
           inset: 0,
+          lineHeight: 0,
+          fontSize: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -2799,6 +2774,7 @@ export function FocusedVideoViewer({
               maxWidth: "100%",
               maxHeight: "100%",
               objectFit: "contain",
+              lineHeight: 0,
             }}
           />
         ) : (
@@ -2808,6 +2784,7 @@ export function FocusedVideoViewer({
             muted={muted}
             loop
             playsInline
+            controls={false}
             preload="metadata"
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
@@ -2817,6 +2794,7 @@ export function FocusedVideoViewer({
               maxWidth: "100%",
               maxHeight: "100%",
               objectFit: "contain",
+              lineHeight: 0,
             }}
           />
         )}
@@ -2900,7 +2878,7 @@ export function FocusedVideoViewer({
         style={{
           position: "absolute",
           right: 12,
-          bottom: BOTTOM_PAD + AVATAR_SIZE + 56,
+          bottom: 80,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
