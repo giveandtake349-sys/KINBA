@@ -941,81 +941,10 @@
 
 
 /* ========================================================================
-   17. CONFLICT NEUTRALIZATION — Override kinbaModern.css / mediaHub.css
-   These rules must come after all feedUi.css rules and neutralize any
-   conflicting aspect-ratio or object-fit from earlier stylesheets.
+   17. CONFLICT NEUTRALIZATION — Override mediaHub.css
    Scoped to .feed-card-list / .unified-feed-list / .feed-video-list only.
    Does NOT affect Shorts, Spotlight, Videos tab grid, or Profile.
    ======================================================================== */
-
-/* Neutralize kinbaModern.css forced 16:9 on feed video (line ~1417-1424) */
-.media-hub .feed-video-list > .long-video-card .media-video-frame video,
-.media-hub .feed-card-list > .long-video-card .media-video-frame video,
-.media-hub .unified-feed-list > .long-video-card .media-video-frame video {
-  aspect-ratio: auto !important;
-  object-fit: contain !important;
-}
-
-/* Neutralize kinbaModern.css forced object-fit:cover on feed media (line ~1865) */
-.media-hub .feed-card-list .feed-media-content > img,
-.media-hub .feed-card-list .feed-media-content > video,
-.media-hub .feed-card-list .feed-media-content > .media-video-frame,
-.media-hub .feed-card-list .feed-media-content > .media-video-frame video,
-.media-hub .feed-card-list .feed-media-body > img,
-.media-hub .feed-card-list .feed-media-body > video,
-.media-hub .feed-card-list .feed-media-body > .media-video-frame,
-.media-hub .feed-card-list .feed-media-body > .media-video-frame video,
-.media-hub .unified-feed-list .feed-media-content > img,
-.media-hub .unified-feed-list .feed-media-content > video,
-.media-hub .unified-feed-list .feed-media-content > .media-video-frame,
-.media-hub .unified-feed-list .feed-media-content > .media-video-frame video,
-.media-hub .unified-feed-list .feed-media-body > img,
-.media-hub .unified-feed-list .feed-media-body > video,
-.media-hub .unified-feed-list .feed-media-body > .media-video-frame,
-.media-hub .unified-feed-list .feed-media-body > .media-video-frame video,
-.media-hub .feed-video-list .feed-media-content > img,
-.media-hub .feed-video-list .feed-media-content > video,
-.media-hub .feed-video-list .feed-media-content > .media-video-frame,
-.media-hub .feed-video-list .feed-media-content > .media-video-frame video,
-.media-hub .feed-video-list .feed-media-body > img,
-.media-hub .feed-video-list .feed-media-body > video,
-.media-hub .feed-video-list .feed-media-body > .media-video-frame,
-.media-hub .feed-video-list .feed-media-body > .media-video-frame video {
-  object-fit: contain !important;
-  object-position: center !important;
-}
-
-/* Neutralize mediaHub.css forced 16:9 on feed frames (lines ~1667-1679, 2066-2078, 2845-2861) */
-.media-hub .feed-card-list .media-fullscreen-frame,
-.media-hub .feed-card-list .media-video-frame,
-.media-hub .unified-feed-list .media-fullscreen-frame,
-.media-hub .unified-feed-list .media-video-frame,
-.media-hub .feed-video-list .media-fullscreen-frame,
-.media-hub .feed-video-list .media-video-frame {
-  aspect-ratio: auto !important;
-}
-
-.media-hub .feed-card-list .media-fullscreen-frame video,
-.media-hub .feed-card-list .media-video-frame video,
-.media-hub .unified-feed-list .media-fullscreen-frame video,
-.media-hub .unified-feed-list .media-video-frame video,
-.media-hub .feed-video-list .media-fullscreen-frame video,
-.media-hub .feed-video-list .media-video-frame video {
-  aspect-ratio: auto !important;
-  object-fit: contain !important;
-  object-position: center !important;
-}
-
-/* Neutralize the .unified-feed-specific rules from mediaHub.css */
-.media-hub .unified-feed .media-fullscreen-frame,
-.media-hub .unified-feed .media-video-frame {
-  aspect-ratio: auto !important;
-}
-
-.media-hub .unified-feed .media-video-frame video {
-  aspect-ratio: auto !important;
-  object-fit: contain !important;
-}
 
 /* Neutralize mediaHub.css forced width:100vw on feed containers (line ~2737-2763) */
 .media-hub .feed-card-list,
@@ -1030,48 +959,4 @@
 .media-hub .unified-feed-list,
 .media-hub .feed-video-list {
   gap: 0 !important;
-}
-
-/* Neutralize mediaHub.css margin-bottom on feed posts (line ~2697) — edge-to-edge uses border-bottom */
-.media-hub .feed-card-list > .feed-media-post,
-.media-hub .feed-card-list > .long-video-card,
-.media-hub .feed-card-list > .feed-text-card,
-.media-hub .unified-feed-list > .feed-media-post,
-.media-hub .unified-feed-list > .long-video-card,
-.media-hub .unified-feed-list > .feed-text-card,
-.media-hub .feed-video-list > .feed-media-post,
-.media-hub .feed-video-list > .long-video-card,
-.media-hub .feed-video-list > .feed-text-card {
-  margin: 0 !important;
-}
-
-/* Neutralize mediaHub.css border, background, border-radius on feed posts */
-.media-hub .feed-card-list > .feed-media-post,
-.media-hub .feed-card-list > .long-video-card,
-.media-hub .feed-card-list > .feed-text-card,
-.media-hub .unified-feed-list > .feed-media-post,
-.media-hub .unified-feed-list > .long-video-card,
-.media-hub .unified-feed-list > .feed-text-card,
-.media-hub .feed-video-list > .feed-media-post,
-.media-hub .feed-video-list > .long-video-card,
-.media-hub .feed-video-list > .feed-text-card {
-  background: transparent !important;
-  border: none !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  overflow: hidden !important;
-}
-
-/* Neutralize mediaHub.css border-left/border-right removal on feed posts (line ~2812) */
-.media-hub .feed-card-list > .feed-media-post,
-.media-hub .feed-card-list > .long-video-card,
-.media-hub .feed-card-list > .feed-text-card,
-.media-hub .unified-feed-list > .feed-media-post,
-.media-hub .unified-feed-list > .long-video-card,
-.media-hub .unified-feed-list > .feed-text-card,
-.media-hub .feed-video-list > .feed-media-post,
-.media-hub .feed-video-list > .long-video-card,
-.media-hub .feed-video-list > .feed-text-card {
-  border-radius: 0 !important;
-  overflow: hidden !important;
 }

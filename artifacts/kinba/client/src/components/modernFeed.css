@@ -81,21 +81,6 @@
   overflow: hidden;
 }
 
-/* Neutralize .media-video-frame--square inside feed cards */
-.k-post__media .media-video-frame {
-  aspect-ratio: auto !important;
-  contain: layout paint style !important;
-}
-
-.k-post__media .media-video-frame video {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: min(calc(100svh - 260px), 720px);
-  object-fit: contain;
-  background: #08090b;
-}
-
 .k-post__media img {
   display: block;
   width: 100%;
@@ -454,7 +439,6 @@
   background: rgba(0, 0, 0, 0.06);
 }
 
-:root[data-theme="light"] .k-post__media .media-video-frame video,
 :root[data-theme="light"] .k-post__media img {
   background: #f0f0f0;
 }

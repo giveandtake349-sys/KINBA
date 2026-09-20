@@ -1045,6 +1045,9 @@ function InlineVideoPlayer({
 
   const w = video.width || 16;
   const h = video.height || 9;
+  const [displayDims, setDisplayDims] = useState<{ w: number; h: number } | null>(null);
+  const displayW = displayDims?.w ?? w;
+  const displayH = displayDims?.h ?? h;
 
   const [isNearViewport, setIsNearViewport] = useState(false);
   useEffect(() => {
@@ -1082,6 +1085,16 @@ function InlineVideoPlayer({
     };
   }, [sourceUrl, isNearViewport]);
 
+  const handleLoadedMetadata = () => {
+    const el = videoRef.current;
+    if (el && el.videoWidth && el.videoHeight) {
+      if (el.videoWidth !== w || el.videoHeight !== h) {
+        console.warn(`[FeedVideo] Dimension mismatch video=${video.id}: DB=${w}x${h} actual=${el.videoWidth}x${el.videoHeight}`);
+        setDisplayDims({ w: el.videoWidth, h: el.videoHeight });
+      }
+    }
+  };
+
   const togglePlay = (e: React.MouseEvent) => {
     console.log("[KINBA DIAGNOSTIC] InlineVideoPlayer.togglePlay FIRED", { videoId: video.id, hasStopProp: true, timestamp: Date.now() });
     e.stopPropagation();
@@ -1097,10 +1110,11 @@ function InlineVideoPlayer({
       style={{
         position: "relative",
         width: "100%",
-        aspectRatio: `${w} / ${h}`,
+        aspectRatio: `${displayW} / ${displayH}`,
         background: "#08090b",
         overflow: "hidden",
         borderRadius: 0,
+        contain: "size layout paint style",
       }}
       onClick={togglePlay}
     >
@@ -1120,6 +1134,7 @@ function InlineVideoPlayer({
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
         onError={() => setError("Video could not be loaded.")}
+        onLoadedMetadata={handleLoadedMetadata}
         style={{
           display: "block",
           width: "100%",
@@ -1196,6 +1211,7 @@ function ForYouVideoPlayer({
   const viewedRef = useRef(false);
   const [showOverlay, setShowOverlay] = useState(false);
   const overlayTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [displayDims, setDisplayDims] = useState<{ w: number; h: number } | null>(null);
 
   const sourceMap = useMemo(
     () =>
@@ -1220,6 +1236,8 @@ function ForYouVideoPlayer({
 
   const w = video.width || 16;
   const h = video.height || 9;
+  const displayW = displayDims?.w ?? w;
+  const displayH = displayDims?.h ?? h;
 
   /* IntersectionObserver — viewport tracking */
   useEffect(() => {
@@ -1279,6 +1297,16 @@ function ForYouVideoPlayer({
     }
   }, [shouldAutoPlay]);
 
+  const handleLoadedMetadata = () => {
+    const el = videoRef.current;
+    if (el && el.videoWidth && el.videoHeight) {
+      if (el.videoWidth !== w || el.videoHeight !== h) {
+        console.warn(`[FeedVideo] Dimension mismatch video=${video.id}: DB=${w}x${h} actual=${el.videoWidth}x${el.videoHeight}`);
+        setDisplayDims({ w: el.videoWidth, h: el.videoHeight });
+      }
+    }
+  };
+
   const togglePlay = () => {
     console.log("[KINBA DIAGNOSTIC] ForYouVideoPlayer.togglePlay FIRED", { videoId: video.id, hasStopProp: false, timestamp: Date.now() });
     const el = videoRef.current;
@@ -1307,9 +1335,10 @@ function ForYouVideoPlayer({
       style={{
         position: "relative",
         width: "100%",
-        aspectRatio: `${w} / ${h}`,
+        aspectRatio: `${displayW} / ${displayH}`,
         background: "#08090b",
         overflow: "hidden",
+        contain: "size layout paint style",
       }}
       onClick={togglePlay}
       onPointerDown={flashOverlay}
@@ -1332,6 +1361,7 @@ function ForYouVideoPlayer({
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
         onError={() => setError("Video could not be loaded.")}
+        onLoadedMetadata={handleLoadedMetadata}
         style={{
           display: "block",
           width: "100%",
@@ -2282,142 +2312,7 @@ function VideoCard({
       </article>
     );
   }
-  return (
-    <article
-      id={`feed-video-${video.id}`}
-      className="long-video-card snap-start h-full w-full overflow-hidden box-border"
-    >
-      <header className="feed-post-author">
-        <a
-          className="profile-link feed-post-author-identity"
-          href={`/profile/${video.owner.id}`}
-          onClick={event => navigateToProfile(event, video.owner.id)}
-          aria-label={`Open ${displayName(video.owner.name, video.owner.username)} profile`}
-        >
-          <div className="video-owner-avatar">
-            {video.owner.photoUrl ? (
-              <img
-                src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
-                alt=""
-              />
-            ) : (
-              <UserRound size={16} />
-            )}
-          </div>
-          <div className="feed-post-author-info">
-            <strong>
-              {displayName(video.owner.name, video.owner.username)}
-              {video.owner.isVerified && (
-                <BadgeCheck
-                  className="verified-badge"
-                  size={13}
-                  aria-label="Verified profile"
-                />
-              )}
-            </strong>
-            <span>
-              {relativeTime(video.createdAt)}
-              {video.mediaType !== "TEXT" && (
-                <> · {video.mediaType === "IMAGE"
-                  ? "Photo"
-                  : video.kind === "SHORT"
-                    ? "Short"
-                    : "Video"}
-                </>
-              )}
-            </span>
-          </div>
-        </a>
-        <PostManagementMenu
-          video={video}
-          onUpdated={setDescription}
-          onDeleted={() => setDeleted(true)}
-        />
-      </header>
-      {video.mediaType === "TEXT" ? (
-        <div className="video-card-details text-post-body">
-          {description && <p>{description}</p>}
-        </div>
-      ) : (
-        <>
-          <div
-            className={`feed-media-content${video.mediaType === "VIDEO" ? " feed-media-content--video" : " feed-media-content--image"}`}
-            role={onOpenViewer ? "button" : undefined}
-            tabIndex={onOpenViewer ? 0 : undefined}
-            aria-label={onOpenViewer ? "Open post" : undefined}
-            onClick={openViewer}
-            onKeyDown={event => {
-              if (!onOpenViewer || (event.key !== "Enter" && event.key !== " "))
-                return;
-              event.preventDefault();
-              onOpenViewer();
-            }}
-          >
-            {video.mediaType === "IMAGE" ? (
-              <img
-                className="object-contain w-full h-auto max-h-[60vh] bg-black"
-                src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
-                alt={video.title || "Post"}
-                loading="lazy"
-                draggable={false}
-              />
-            ) : (
-              <InlineVideoPlayer
-                video={video}
-                active={active}
-                onFirstPlay={recordView}
-              />
-            )}
-          </div>
-          <div
-            className={
-              video.mediaType === "IMAGE"
-                ? "video-card-details photo-card-details"
-                : "video-card-details"
-            }
-          >
-            {video.title && <h3>{video.title}</h3>}
-            <p>{description}</p>
-            <p className="media-caption-tags">
-              {ownerHandle(video.owner.name, video.owner.username)} ·{" "}
-              {hashtagsFromDescription(video.description)}
-            </p>
-            <div className="media-meta-line" aria-label="Media metadata">
-              <span>{formatCount(views)} views</span>
-              <span>{relativeTime(video.createdAt)}</span>
-              <span>
-                {video.mediaType === "IMAGE"
-                  ? "Photo"
-                  : video.kind === "SHORT"
-                    ? "Short"
-                    : "Video"}
-              </span>
-            </div>
-          </div>
-        </>
-      )}
-      <RawPulseCard videoId={video.id} />
-      <EngagementActions
-        engagement={current}
-        onReact={react}
-        onShare={share}
-        onComments={() => {
-          if (!auth.isAuthenticated) return auth.openAuth();
-          setCommentsOpen(value => !value);
-        }}
-        pending={pending}
-        feedStyle
-        bookmarked={bookmarked}
-        onBookmark={toggleBookmark}
-      />
-      <CommentDrawer
-        postId={video.id}
-        postOwnerId={video.owner.id}
-        open={commentsOpen}
-        onClose={() => setCommentsOpen(false)}
-      />
-    </article>
-  );
+  return null;
 }
 const MemoVideoCard = memo(VideoCard);
 
@@ -2775,7 +2670,7 @@ export function FocusedVideoViewer({
     <div className="k-viewer" role="dialog" aria-modal="true" aria-label="Post viewer">
 
       {/* ── Video stage ── */}
-      <div className="k-viewer__stage">
+      <div className="k-viewer__stage" style={{ contain: "size layout paint style" }}>
         <div className="k-viewer__media-wrap" onClick={togglePlay}>
           {isImage ? (
             <img
