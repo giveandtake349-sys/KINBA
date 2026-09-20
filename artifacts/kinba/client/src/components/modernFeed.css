@@ -1,8 +1,6 @@
 /* ========================================================================
-   MODERN FEED — New post card + viewer design
+   MODERN FEED — Post card + viewer design
    Loaded AFTER feedUi.css, BEFORE shorts-stage.css.
-   Uses its own class namespace (.k-post, .k-viewer) to avoid conflicts.
-   Shorts stay untouched — scoped via .media-hub > .media-tab-panel context.
    ======================================================================== */
 
 /* ---- POST CARD ---- */
@@ -14,7 +12,6 @@
   background: rgba(18, 22, 30, 0.92);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 14px;
-  overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
   box-sizing: border-box;
 }
@@ -76,29 +73,12 @@
   text-overflow: ellipsis;
 }
 
-.k-post__more {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.4);
-  cursor: pointer;
-}
-
-.k-post__more:hover {
-  color: rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.06);
-}
-
-/* ---- MEDIA AREA + RAIL ---- */
+/* ---- MEDIA AREA ---- */
 .k-post__media {
   position: relative;
   width: 100%;
   background: #08090b;
+  overflow: hidden;
 }
 
 .k-post__media img,
@@ -110,57 +90,6 @@
   height: auto;
   object-fit: contain;
   background: #08090b;
-}
-
-/* Rail overlay — positioned inside media area on the right */
-.k-post__rail {
-  position: absolute;
-  right: 10px;
-  bottom: 14px;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  pointer-events: auto;
-}
-
-.k-post__rail-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  background: transparent;
-  border: 0;
-  color: rgba(255, 255, 255, 0.85);
-  cursor: pointer;
-  padding: 0;
-  min-width: 44px;
-}
-
-.k-post__rail-btn svg {
-  width: 26px;
-  height: 26px;
-  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.5));
-}
-
-.k-post__rail-btn strong {
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 0.6rem;
-  font-weight: 600;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-}
-
-.k-post__rail-btn.is-active {
-  color: var(--kinba-coral, #ff5e56);
-}
-
-.k-post__rail-btn.is-active strong {
-  color: var(--kinba-coral, #ff5e56);
-}
-
-.k-post__rail-btn:active svg {
-  transform: scale(0.9);
 }
 
 /* ---- BOTTOM SECTION ---- */
@@ -200,6 +129,51 @@
   margin: 0 6px;
 }
 
+/* ---- ACTION ROW (below media, Facebook-style) ---- */
+.k-post__actions {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 2px 4px;
+}
+
+.k-post__actions button {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+}
+
+.k-post__actions button:hover {
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.k-post__actions button.is-active {
+  color: var(--kinba-coral, #ff5e56);
+}
+
+.k-post__actions button.is-active:hover {
+  background: var(--kinba-coral-soft, rgba(255, 94, 86, 0.1));
+}
+
+.k-post__actions button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
 /* ---- TEXT POST (no media) ---- */
 .k-post--text .k-post__bottom {
   padding: 0 14px 14px;
@@ -220,7 +194,9 @@
   max-height: min(calc(100svh - 260px), 720px);
 }
 
-/* ---- VIEWER (FocusedVideoViewer replacement) ---- */
+/* ========================================================================
+   VIEWER (Dedicated video viewer page)
+   ======================================================================== */
 .k-viewer {
   position: fixed;
   inset: 0;
@@ -228,14 +204,10 @@
   background: #000;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 .k-viewer__topbar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -243,6 +215,7 @@
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  z-index: 10;
 }
 
 .k-viewer__back {
@@ -262,7 +235,7 @@
   background: rgba(255, 255, 255, 0.14);
 }
 
-/* ---- VIEWER STAGE: media + right rail side by side ---- */
+/* ---- VIEWER STAGE: media centered + right rail ---- */
 .k-viewer__stage {
   flex: 1;
   display: flex;
@@ -275,31 +248,36 @@
 }
 
 .k-viewer__media-wrap {
-  position: relative;
   flex: 1 1 0;
   min-width: 0;
   min-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  max-height: calc(100dvh - 180px);
+  background: #000;
 }
 
 .k-viewer__media-wrap .media-video-frame {
   contain: layout paint style !important;
+  aspect-ratio: inherit !important;
 }
 
 .k-viewer__media-wrap video,
-.k-viewer__media-wrap img,
-.k-viewer__media-wrap .media-video-frame,
-.k-viewer__media-wrap .media-video-frame video {
+.k-viewer__media-wrap img {
   display: block;
   max-width: 100%;
-  max-height: calc(100dvh - 180px);
+  max-height: 100%;
   width: auto;
   height: auto;
   object-fit: contain;
   background: #000;
+}
+
+.k-viewer__media-wrap .media-video-frame video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 /* Viewer right-side rail */
@@ -346,7 +324,7 @@
   color: var(--kinba-coral, #ff5e56);
 }
 
-/* ---- VIEWER BOTTOM: creator + caption + controls ---- */
+/* ---- VIEWER BOTTOM: creator + caption ---- */
 .k-viewer__bottom {
   flex: 0 0 auto;
   padding: 14px 18px 20px;
@@ -412,107 +390,6 @@
   margin: 0 0 4px;
 }
 
-/* ---- VIDEO CONTROLS (inside viewer bottom) ---- */
-.k-viewer__controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.k-viewer__controls button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.k-viewer__controls button:hover {
-  background: rgba(255, 255, 255, 0.16);
-}
-
-.k-viewer__timeline {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.k-viewer__timeline input[type="range"] {
-  flex: 1;
-  height: 4px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: rgba(255, 255, 255, 0.18);
-  border-radius: 2px;
-  outline: none;
-  cursor: pointer;
-}
-
-.k-viewer__timeline input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #fff;
-  cursor: pointer;
-}
-
-.k-viewer__timeline input[type="range"]::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #fff;
-  border: none;
-}
-
-.k-viewer__time {
-  color: rgba(255, 255, 255, 0.55);
-  font-size: 0.68rem;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  min-width: 32px;
-  text-align: center;
-}
-
-/* ---- TAP INDICATOR ---- */
-.k-post__tap-indicator {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  z-index: 5;
-  animation: k-tap-fade 0.7s ease-out forwards;
-}
-
-.k-post__tap-indicator > * {
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 50%;
-  width: 52px;
-  height: 52px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-}
-
-@keyframes k-tap-fade {
-  0% { opacity: 1; transform: scale(1); }
-  60% { opacity: 1; transform: scale(1.04); }
-  100% { opacity: 0; transform: scale(1.08); }
-}
-
 /* ---- RESPONSIVE ---- */
 @media (max-width: 600px) {
   .k-post {
@@ -520,16 +397,6 @@
     border-left: 0;
     border-right: 0;
     margin-bottom: 10px;
-  }
-
-  .k-post__rail {
-    right: 8px;
-    gap: 12px;
-  }
-
-  .k-post__rail-btn svg {
-    width: 24px;
-    height: 24px;
   }
 
   .k-viewer__rail {
@@ -543,11 +410,6 @@
 
   .k-viewer__bottom {
     padding: 12px 14px 16px;
-  }
-
-  .k-viewer__media-wrap video,
-  .k-viewer__media-wrap img {
-    max-height: calc(100dvh - 220px);
   }
 }
 
@@ -574,23 +436,6 @@
   color: rgba(0, 0, 0, 0.4);
 }
 
-:root[data-theme="light"] .k-post__more {
-  color: rgba(0, 0, 0, 0.35);
-}
-
-:root[data-theme="light"] .k-post__more:hover {
-  color: rgba(0, 0, 0, 0.6);
-  background: rgba(0, 0, 0, 0.04);
-}
-
-:root[data-theme="light"] .k-post__rail-btn {
-  color: rgba(255, 255, 255, 0.9);
-}
-
-:root[data-theme="light"] .k-post__rail-btn strong {
-  color: rgba(255, 255, 255, 0.85);
-}
-
 :root[data-theme="light"] .k-post__avatar {
   background: rgba(0, 0, 0, 0.06);
 }
@@ -598,4 +443,21 @@
 :root[data-theme="light"] .k-post__media img,
 :root[data-theme="light"] .k-post__media video {
   background: #f0f0f0;
+}
+
+:root[data-theme="light"] .k-post__actions {
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+:root[data-theme="light"] .k-post__actions button {
+  color: rgba(0, 0, 0, 0.55);
+}
+
+:root[data-theme="light"] .k-post__actions button:hover {
+  color: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+:root[data-theme="light"] .k-post__actions button.is-active {
+  color: var(--kinba-coral, #ff5e56);
 }

@@ -2028,50 +2028,6 @@ function VideoCard({
                   ? renderVideo(video, active, recordView)
                   : <QualityVideoPlayer video={video} active={active} onFirstPlay={recordView} />
               )}
-
-              {!isImage && (
-                <div className="k-post__rail">
-                  <button
-                    type="button"
-                    className={`k-post__rail-btn${current.viewerReacted ? " is-active" : ""}`}
-                    onClick={e => { e.stopPropagation(); react(); }}
-                    aria-label={current.viewerReacted ? "Unlike" : "Like"}
-                  >
-                    <Heart size={26} fill={current.viewerReacted ? "currentColor" : "none"} />
-                    <strong>{formatCount(current.reactionCount)}</strong>
-                  </button>
-                  <button
-                    type="button"
-                    className="k-post__rail-btn"
-                    onClick={e => {
-                      e.stopPropagation();
-                      if (!auth.isAuthenticated) return auth.openAuth();
-                      setCommentsOpen(v => !v);
-                    }}
-                    aria-label="Comments"
-                  >
-                    <MessageCircle size={26} />
-                    <strong>{formatCount(current.commentCount)}</strong>
-                  </button>
-                  <button
-                    type="button"
-                    className="k-post__rail-btn"
-                    onClick={e => { e.stopPropagation(); share(); }}
-                    aria-label="Share"
-                  >
-                    <Share2 size={26} />
-                    <strong>{formatCount(current.shareCount)}</strong>
-                  </button>
-                  <button
-                    type="button"
-                    className={`k-post__rail-btn${bookmarked ? " is-active" : ""}`}
-                    onClick={e => { e.stopPropagation(); toggleBookmark(); }}
-                    aria-label={bookmarked ? "Unsave" : "Save"}
-                  >
-                    <Bookmark size={26} fill={bookmarked ? "currentColor" : "none"} />
-                  </button>
-                </div>
-              )}
             </div>
             <div className="k-post__bottom">
               {video.title && <h3 className="k-post__title">{video.title}</h3>}
@@ -2083,6 +2039,40 @@ function VideoCard({
             </div>
           </>
         )}
+
+        <div className="k-post__actions">
+          <button
+            type="button"
+            className={current.viewerReacted ? "is-active" : ""}
+            onClick={react}
+            disabled={!!pending}
+          >
+            <Heart size={16} fill={current.viewerReacted ? "currentColor" : "none"} />
+            <span>{current.viewerReacted ? "Pookied" : "Pookie"}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!auth.isAuthenticated) return auth.openAuth();
+              setCommentsOpen(v => !v);
+            }}
+          >
+            <MessageCircle size={16} />
+            <span>Comment</span>
+          </button>
+          <button type="button" onClick={share} disabled={!!pending}>
+            <Share2 size={16} />
+            <span>Share</span>
+          </button>
+          <button
+            type="button"
+            className={bookmarked ? "is-active" : ""}
+            onClick={toggleBookmark}
+          >
+            <Bookmark size={16} fill={bookmarked ? "currentColor" : "none"} />
+            <span>Save</span>
+          </button>
+        </div>
 
         <CommentDrawer
           postId={video.id}
@@ -2483,6 +2473,8 @@ export function FocusedVideoViewer({
 
   const isImage = video.mediaType === "IMAGE";
   const ownerName = displayName(video.owner.name, video.owner.username);
+  const videoW = video.width || 16;
+  const videoH = video.height || 9;
 
   return (
     <div className="k-viewer" role="dialog" aria-modal="true" aria-label="Post viewer">
@@ -2504,7 +2496,10 @@ export function FocusedVideoViewer({
       </div>
 
       <div className="k-viewer__stage">
-        <div className="k-viewer__media-wrap">
+        <div
+          className="k-viewer__media-wrap"
+          style={{ aspectRatio: `${videoW} / ${videoH}` }}
+        >
           {isImage ? (
             <img
               src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
