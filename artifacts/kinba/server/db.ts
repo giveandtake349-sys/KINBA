@@ -2287,10 +2287,14 @@ export async function createCommunityAnnouncement(
   if (
     !profile?.isVerified ||
     !["creator", "company"].includes(profile.accountType)
-  )
+  ) {
+    console.warn(
+      `[Announcement denied] userId=${userId} profile.isVerified=${profile?.isVerified} profile.accountType=${profile?.accountType} profileExists=${!!profile}`
+    );
     throw new Error(
       "Only verified creators and companies can publish announcements."
     );
+  }
   if (!input.body.trim() && !input.attachments.length)
     throw new Error("An announcement needs text or an attachment.");
   return db.transaction(async tx => {

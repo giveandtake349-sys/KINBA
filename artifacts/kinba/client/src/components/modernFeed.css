@@ -81,13 +81,26 @@
   overflow: hidden;
 }
 
-.k-post__media img,
-.k-post__media video,
-.k-post__media .media-video-frame,
+/* Neutralize .media-video-frame--square inside feed cards */
+.k-post__media .media-video-frame {
+  aspect-ratio: auto !important;
+  contain: layout paint style !important;
+}
+
 .k-post__media .media-video-frame video {
   display: block;
   width: 100%;
   height: auto;
+  max-height: min(calc(100svh - 260px), 720px);
+  object-fit: contain;
+  background: #08090b;
+}
+
+.k-post__media img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: min(calc(100svh - 260px), 720px);
   object-fit: contain;
   background: #08090b;
 }
@@ -179,23 +192,10 @@
   padding: 0 14px 14px;
 }
 
-/* ---- IMAGE POST ---- */
-.k-post__media--image img {
-  max-height: min(calc(100svh - 260px), 720px);
-  object-fit: contain;
-}
-
-/* ---- VIDEO POST ---- */
-.k-post__media--video {
-  min-height: 200px;
-}
-
-.k-post__media--video video {
-  max-height: min(calc(100svh - 260px), 720px);
-}
-
 /* ========================================================================
    VIEWER (Dedicated video viewer page)
+   Rendered via portal to document.body — OUTSIDE .media-hub.
+   No .media-hub-scoped rules apply here.
    ======================================================================== */
 .k-viewer {
   position: fixed;
@@ -257,27 +257,22 @@
   background: #000;
 }
 
-.k-viewer__media-wrap .media-video-frame {
-  contain: layout paint style !important;
+/* Neutralize .media-video-frame--square inside viewer (global rule, 0-1-0) */
+.k-viewer .media-video-frame {
   aspect-ratio: inherit !important;
-}
-
-.k-viewer__media-wrap video,
-.k-viewer__media-wrap img {
-  display: block;
+  width: auto !important;
   max-width: 100%;
   max-height: 100%;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  background: #000;
+  background: transparent !important;
 }
 
-.k-viewer__media-wrap .media-video-frame video {
+.k-viewer .media-video-frame video {
   display: block;
   width: 100%;
   height: 100%;
+  max-height: none;
   object-fit: contain;
+  background: #000;
 }
 
 /* Viewer right-side rail */
@@ -440,8 +435,8 @@
   background: rgba(0, 0, 0, 0.06);
 }
 
-:root[data-theme="light"] .k-post__media img,
-:root[data-theme="light"] .k-post__media video {
+:root[data-theme="light"] .k-post__media .media-video-frame video,
+:root[data-theme="light"] .k-post__media img {
   background: #f0f0f0;
 }
 

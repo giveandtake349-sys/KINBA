@@ -1769,6 +1769,8 @@ function PostManagementMenu({
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [description, setDescription] = useState(video.description);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const updateMutation = trpc.videos.updateDescription.useMutation();
   const deleteMutation = trpc.videos.delete.useMutation();
   if (auth.user?.id !== video.owner.id) return null;
@@ -1797,18 +1799,24 @@ function PostManagementMenu({
       notifyError(error);
     }
   };
-  return (
-    <div className="post-management" onClick={event => event.stopPropagation()}>
-      <button
-        type="button"
-        className="feed-post-more"
-        aria-label="Post options"
-        onClick={() => setOpen(value => !value)}
-      >
-        <MoreHorizontal size={19} />
-      </button>
+  const toggleMenu = () => {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setMenuPos({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setOpen(value => !value);
+  };
+  const menuContent = (open || editing || confirming) ? createPortal(
+    <>
       {open && !editing && !confirming && (
-        <div className="post-management__menu" role="menu">
+        <div
+          className="post-management__menu"
+          role="menu"
+          style={{ position: "fixed", top: menuPos.top, right: menuPos.right, zIndex: 2147483000 }}
+        >
           <button
             type="button"
             onClick={() => setEditing(true)}
@@ -1831,6 +1839,7 @@ function PostManagementMenu({
           className="post-management__dialog"
           role="dialog"
           aria-label="Edit caption"
+          style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 2147483000 }}
         >
           <strong>Edit Caption</strong>
           <textarea
@@ -1863,6 +1872,7 @@ function PostManagementMenu({
           className="post-management__dialog"
           role="alertdialog"
           aria-label="Confirm post deletion"
+          style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 2147483000 }}
         >
           <strong>Delete this post?</strong>
           <p>This permanently removes the post and its stored media.</p>
@@ -1885,6 +1895,21 @@ function PostManagementMenu({
           </div>
         </div>
       )}
+    </>,
+    document.body
+  ) : null;
+  return (
+    <div className="post-management" onClick={event => event.stopPropagation()}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="feed-post-more"
+        aria-label="Post options"
+        onClick={toggleMenu}
+      >
+        <MoreHorizontal size={19} />
+      </button>
+      {menuContent}
     </div>
   );
 }
@@ -3159,6 +3184,7 @@ function AnnouncementComposer({ onCreated }: { onCreated: () => void }) {
       const msg =
         error instanceof Error ? error.message : "Publish failed.";
       if (msg.includes("verified") || msg.includes("Only")) {
+        console.warn("[Announcement] Server rejected:", msg);
         toast.error(msg + " Check your verification status on your profile.");
       } else {
         toast.error(msg);
@@ -3639,12 +3665,14 @@ export function SearchFeed() {
           </div>
         )}
       </div>
-      {videoViewer && (
-        <FocusedVideoViewer
-          video={videoViewer}
-          onClose={() => setVideoViewer(null)}
-        />
-      )}
+      {videoViewer &&
+        createPortal(
+          <FocusedVideoViewer
+            video={videoViewer}
+            onClose={() => setVideoViewer(null)}
+          />,
+          document.body
+        )}
     </section>
   );
 }
@@ -3912,12 +3940,14 @@ export default function MediaHub({
           onClose={() => setPhotoViewer(null)}
         />
       )}
-      {videoViewer && (
-        <FocusedVideoViewer
-          video={videoViewer}
-          onClose={() => setVideoViewer(null)}
-        />
-      )}
+      {videoViewer &&
+        createPortal(
+          <FocusedVideoViewer
+            video={videoViewer}
+            onClose={() => setVideoViewer(null)}
+          />,
+          document.body
+        )}
     </div>
   );
 }
