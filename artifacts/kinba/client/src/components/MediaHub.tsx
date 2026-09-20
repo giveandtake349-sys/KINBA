@@ -2650,6 +2650,8 @@ export function FocusedVideoViewer({
   const playIconTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const hlsRef = useRef<Hls | null>(null);
   const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
   const bookmarkMutation = trpc.videos.bookmark.useMutation();
   const toggleBookmark = async () => {
     if (!auth.isAuthenticated) return auth.openAuth();
@@ -2707,6 +2709,8 @@ export function FocusedVideoViewer({
   useEffect(() => {
     const el = videoRef.current;
     if (!el || !sourceUrl) return;
+    setCurrentTime(0);
+    setDuration(0);
     hlsRef.current?.destroy();
     hlsRef.current = null;
     if (isHlsMediaUrl(sourceUrl) && Hls.isSupported()) {
@@ -2733,71 +2737,69 @@ export function FocusedVideoViewer({
     playIconTimer.current = setTimeout(() => setShowPlayIcon(false), 900);
   };
 
-  const AVATAR_SIZE = 40;
-  const RAIL_W = 64;
-  const BOTTOM_PAD = 20;
+  const handleTimeUpdate = () => {
+    const el = videoRef.current;
+    if (el) setCurrentTime(el.currentTime);
+  };
+
+  const handleLoadedMetadata = () => {
+    const el = videoRef.current;
+    if (el) setDuration(el.duration);
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const el = videoRef.current;
+    if (el) {
+      el.currentTime = Number(e.target.value);
+      setCurrentTime(el.currentTime);
+    }
+  };
+
+  const skipBack = () => {
+    const el = videoRef.current;
+    if (el) {
+      el.currentTime = Math.max(0, el.currentTime - 5);
+      setCurrentTime(el.currentTime);
+    }
+  };
+
+  const skipForward = () => {
+    const el = videoRef.current;
+    if (el) {
+      el.currentTime = Math.min(el.duration || 0, el.currentTime + 5);
+      setCurrentTime(el.currentTime);
+    }
+  };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Post viewer"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 2147483000,
-        background: "#000",
-        fontFamily: "inherit",
-        overflow: "hidden",
-      }}
-    >
-      {/* ── Video stage: continuous surface ── */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          lineHeight: 0,
-          fontSize: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-        onClick={togglePlay}
-      >
-        {isImage ? (
-          <img
-            src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
-            alt={video.title || "Post"}
-            draggable={false}
-            style={{
-              display: "block",
-              maxWidth: "100%",
-              maxHeight: "100%",
-              objectFit: "contain",
-              lineHeight: 0,
-            }}
-          />
-        ) : (
-          <video
-            ref={videoRef}
-            poster={posterUrl}
-            muted={muted}
-            loop
-            playsInline
-            controls={false}
-            preload="metadata"
-            onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
-            onEnded={() => setPlaying(false)}
-            style={{
-              display: "block",
-              maxWidth: "100%",
-              maxHeight: "100%",
-              objectFit: "contain",
-              lineHeight: 0,
-            }}
-          />
-        )}
+    <div className="k-viewer" role="dialog" aria-modal="true" aria-label="Post viewer">
+
+      {/* ── Video stage ── */}
+      <div className="k-viewer__stage">
+        <div className="k-viewer__media-wrap" onClick={togglePlay}>
+          {isImage ? (
+            <img
+              src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
+              alt={video.title || "Post"}
+              draggable={false}
+            />
+          ) : (
+            <video
+              ref={videoRef}
+              poster={posterUrl}
+              muted={muted}
+              loop
+              playsInline
+              controls={false}
+              preload="metadata"
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              onEnded={() => setPlaying(false)}
+              onTimeUpdate={handleTimeUpdate}
+              onLoadedMetadata={handleLoadedMetadata}
+            />
+          )}
+        </div>
       </div>
 
       {/* ── Center play/pause indicator ── */}
@@ -2828,40 +2830,13 @@ export function FocusedVideoViewer({
         </div>
       )}
 
-      {/* ── Top bar overlay ── */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "12px 14px",
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%)",
-          zIndex: 20,
-        }}
-      >
+      {/* ── Top bar ── */}
+      <div className="k-viewer__topbar">
         <button
           type="button"
+          className="k-viewer__back"
           onClick={onClose}
           aria-label="Close viewer"
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-            border: 0,
-            borderRadius: 20,
-            background: "rgba(255,255,255,0.15)",
-            color: "#fff",
-            fontSize: "0.82rem",
-            fontWeight: 500,
-            padding: "7px 14px",
-            cursor: "pointer",
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
-          }}
         >
           <ChevronLeft size={18} />
           <span>Back</span>
@@ -2873,54 +2848,21 @@ export function FocusedVideoViewer({
         />
       </div>
 
-      {/* ── Engagement rail — lower-right overlay ── */}
-      <div
-        style={{
-          position: "absolute",
-          right: 12,
-          bottom: 80,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 20,
-          zIndex: 20,
-        }}
-      >
+      {/* ── Engagement rail ── */}
+      <div className="k-viewer__rail">
         <button
           type="button"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 3,
-            background: "transparent",
-            border: 0,
-            color: current.viewerReacted ? "var(--kinba-coral, #ff5e56)" : "#fff",
-            cursor: "pointer",
-            padding: 0,
-          }}
+          className={`k-viewer__rail-btn ${current.viewerReacted ? "is-active" : ""}`}
           onClick={react}
           disabled={!!pending}
           aria-label={current.viewerReacted ? "Unlike" : "Like"}
         >
           <Heart size={26} fill={current.viewerReacted ? "currentColor" : "none"} />
-          <strong style={{ fontSize: "0.6rem", fontWeight: 600 }}>
-            {formatCount(current.reactionCount)}
-          </strong>
+          <strong>{formatCount(current.reactionCount)}</strong>
         </button>
         <button
           type="button"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 3,
-            background: "transparent",
-            border: 0,
-            color: "#fff",
-            cursor: "pointer",
-            padding: 0,
-          }}
+          className="k-viewer__rail-btn"
           onClick={() => {
             if (!auth.isAuthenticated) return auth.openAuth();
             setCommentsOpen(v => !v);
@@ -2928,45 +2870,21 @@ export function FocusedVideoViewer({
           aria-label="Comments"
         >
           <MessageCircle size={26} />
-          <strong style={{ fontSize: "0.6rem", fontWeight: 600 }}>
-            {formatCount(current.commentCount)}
-          </strong>
+          <strong>{formatCount(current.commentCount)}</strong>
         </button>
         <button
           type="button"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 3,
-            background: "transparent",
-            border: 0,
-            color: "#fff",
-            cursor: "pointer",
-            padding: 0,
-          }}
+          className="k-viewer__rail-btn"
           onClick={share}
           disabled={!!pending}
           aria-label="Share"
         >
           <Share2 size={26} />
-          <strong style={{ fontSize: "0.6rem", fontWeight: 600 }}>
-            {formatCount(current.shareCount)}
-          </strong>
+          <strong>{formatCount(current.shareCount)}</strong>
         </button>
         <button
           type="button"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 3,
-            background: "transparent",
-            border: 0,
-            color: bookmarked ? "var(--kinba-coral, #ff5e56)" : "#fff",
-            cursor: "pointer",
-            padding: 0,
-          }}
+          className={`k-viewer__rail-btn ${bookmarked ? "is-active" : ""}`}
           onClick={toggleBookmark}
           disabled={bookmarkMutation.isPending}
           aria-label={bookmarked ? "Unsave" : "Save"}
@@ -2975,39 +2893,18 @@ export function FocusedVideoViewer({
         </button>
       </div>
 
-      {/* ── Bottom info overlay — lower-left ── */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: `${BOTTOM_PAD}px ${RAIL_W + 20}px ${BOTTOM_PAD}px 16px`,
-          background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)",
-          zIndex: 20,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+      {/* ── Bottom overlay: creator + caption + playback controls ── */}
+      <div className="k-viewer__bottom">
+        <div className="k-viewer__creator">
           <a
             href={`/profile/${video.owner.id}`}
             onClick={event => navigateToProfile(event, video.owner.id)}
-            style={{
-              flex: `0 0 ${AVATAR_SIZE}px`,
-              width: AVATAR_SIZE,
-              height: AVATAR_SIZE,
-              borderRadius: "50%",
-              overflow: "hidden",
-              background: "rgba(255,255,255,0.12)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+            className="k-viewer__creator-avatar"
           >
             {video.owner.photoUrl ? (
               <img
                 src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
                 alt=""
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             ) : (
               <UserRound size={20} />
@@ -3017,23 +2914,14 @@ export function FocusedVideoViewer({
             <a
               href={`/profile/${video.owner.id}`}
               onClick={event => navigateToProfile(event, video.owner.id)}
-              style={{
-                color: "#fff",
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                textDecoration: "none",
-                display: "block",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
+              className="k-viewer__creator-name"
             >
               {ownerName}
               {video.owner.isVerified && (
-                <BadgeCheck size={13} style={{ verticalAlign: "middle", marginLeft: 4 }} />
+                <BadgeCheck size={13} className="verified-badge" />
               )}
             </a>
-            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.68rem" }}>
+            <div className="k-viewer__creator-time">
               {relativeTime(video.createdAt)}
               {!isImage && ` · ${video.kind === "SHORT" ? "Short" : "Video"}`}
             </div>
@@ -3041,9 +2929,39 @@ export function FocusedVideoViewer({
         </div>
 
         {(video.title || video.description) && (
-          <div style={{ color: "rgba(255,255,255,0.85)", fontSize: "0.82rem", lineHeight: "1.45", whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 4.4 * 14, overflow: "auto" }}>
-            {video.title && <p style={{ color: "#fff", fontSize: "0.9rem", fontWeight: 600, margin: "0 0 3px" }}>{video.title}</p>}
+          <div className="k-viewer__caption">
+            {video.title && <p className="k-viewer__caption-title">{video.title}</p>}
             {video.description && <p style={{ margin: 0 }}>{video.description}</p>}
+          </div>
+        )}
+
+        {!isImage && (
+          <div className="media-video-controls">
+            <button type="button" onClick={skipBack} aria-label="Skip back 5 seconds">
+              <SkipBack size={18} />
+            </button>
+            <button type="button" onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
+              {playing ? <Pause size={18} /> : <Play size={18} />}
+            </button>
+            <button type="button" onClick={skipForward} aria-label="Skip forward 5 seconds">
+              <SkipForward size={18} />
+            </button>
+            <span style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.7rem", minWidth: 70, textAlign: "center" }}>
+              {formatDuration(Math.floor(currentTime))} / {formatDuration(Math.floor(duration))}
+            </span>
+            <input
+              type="range"
+              min={0}
+              max={duration || 0}
+              step={0.1}
+              value={currentTime}
+              onChange={handleSeek}
+              style={{ flex: 1, minWidth: 0 }}
+              aria-label="Seek"
+            />
+            <button type="button" onClick={() => setMuted(v => !v)} aria-label={muted ? "Unmute" : "Mute"}>
+              {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+            </button>
           </div>
         )}
 
@@ -3055,7 +2973,6 @@ export function FocusedVideoViewer({
         />
       </div>
 
-      {/* ── Keyframes for fade ── */}
       <style>{`
         @keyframes kvp-fade {
           0% { opacity: 1; }

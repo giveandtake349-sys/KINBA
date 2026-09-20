@@ -1425,75 +1425,8 @@
 }
 
 /* ========================================================================
-   FOCUSED VIDEO VIEWER — Full-screen post detail overlay
+   FOCUSED VIDEO VIEWER — DEAD: All viewer styles now in modernFeed.css (.k-viewer*)
    ======================================================================== */
-
-.focused-video-viewer {
-  position: fixed;
-  inset: 0;
-  z-index: 2147483000;
-  background: #000;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-.focused-video-viewer__close {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  align-self: flex-end;
-  margin: 12px 16px;
-  background: rgba(0, 0, 0, 0.6);
-  border: none;
-  border-radius: 50%;
-  color: #fff;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.focused-video-viewer__close:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-.focused-video-viewer__stage {
-  width: 100%;
-  max-width: 600px;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-.focused-video-viewer__author {
-  padding: 12px 16px;
-}
-.focused-video-viewer__media {
-  width: 100%;
-}
-.focused-video-viewer__media .media-video-frame {
-  border-radius: 0;
-}
-.focused-video-viewer__copy {
-  padding: 12px 16px;
-  color: #fff;
-}
-.focused-video-viewer__copy h3 {
-  font-size: 1rem;
-  margin: 0 0 4px;
-}
-.focused-video-viewer__copy p {
-  font-size: 0.875rem;
-  color: rgba(255, 255, 255, 0.75);
-  white-space: pre-wrap;
-  word-break: break-word;
-  margin: 0;
-}
-.focused-video-viewer .feed-action-bar {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 8px 16px 16px;
-}
 
 /* ========================================================================
    FEED PHOTO LIGHTBOX — Share as post button

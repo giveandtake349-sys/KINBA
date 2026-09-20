@@ -8,6 +8,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   BadgeCheck,
   Bell,
@@ -1998,11 +1999,12 @@ export default function Home() {
             onClose={() => setPhotoViewer(null)}
           />
         )}
-        {videoViewer && (
+        {videoViewer && createPortal(
           <FocusedVideoViewer
             video={videoViewer}
             onClose={() => setVideoViewer(null)}
-          />
+          />,
+          document.body
         )}
         <BottomNavigation
           className={
