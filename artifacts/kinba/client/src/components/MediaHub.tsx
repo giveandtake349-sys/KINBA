@@ -1008,7 +1008,172 @@ function QualityVideoPlayer({
    the frame deterministic non-zero height on mount, breaking the
    chicken-and-egg: frame visible → IntersectionObserver fires →
    preload="metadata" → metadata loads → video uses real intrinsic dims.
-   ------------------------------------------------------------------ */
+    ------------------------------------------------------------------ */
+
+function InlineVideoPlayer({
+  video,
+  active = true,
+  onFirstPlay,
+}: {
+  video: VideoRecord;
+  active?: boolean;
+  onFirstPlay?: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [error, setError] = useState("");
+  const hlsRef = useRef<Hls | null>(null);
+  const viewedRef = useRef(false);
+
+  const sourceMap = useMemo(
+    () =>
+      new Map(
+        (Array.isArray(video.sources) ? video.sources : []).map(s => [
+          s.quality,
+          s.videoUrl,
+        ])
+      ),
+    [video.sources]
+  );
+  const directUrl = resolvePlaybackUrl(video.videoUrl);
+  const originalUrl = resolvePlaybackUrl(sourceMap.get("ORIGINAL"));
+  const sourceUrl =
+    directUrl && !isHlsMediaUrl(directUrl)
+      ? directUrl
+      : originalUrl || directUrl;
+
+  const w = video.width || 16;
+  const h = video.height || 9;
+
+  const [isNearViewport, setIsNearViewport] = useState(false);
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || isNearViewport) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsNearViewport(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "400px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isNearViewport]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !sourceUrl || !isNearViewport) return;
+    hlsRef.current?.destroy();
+    hlsRef.current = null;
+    if (isHlsMediaUrl(sourceUrl) && Hls.isSupported()) {
+      const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+      hlsRef.current = hls;
+      hls.loadSource(sourceUrl);
+      hls.attachMedia(el);
+    } else {
+      el.src = sourceUrl;
+    }
+    return () => {
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
+    };
+  }, [sourceUrl, isNearViewport]);
+
+  const togglePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const el = videoRef.current;
+    if (!el) return;
+    if (el.paused) el.play().catch(() => undefined);
+    else el.pause();
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        position: "relative",
+        width: "100%",
+        aspectRatio: `${w} / ${h}`,
+        background: "#08090b",
+        overflow: "hidden",
+        borderRadius: 0,
+      }}
+      onClick={togglePlay}
+    >
+      <video
+        ref={videoRef}
+        muted
+        loop
+        playsInline
+        preload={isNearViewport ? "metadata" : "none"}
+        onPlay={() => {
+          setPlaying(true);
+          if (!viewedRef.current) {
+            viewedRef.current = true;
+            onFirstPlay?.();
+          }
+        }}
+        onPause={() => setPlaying(false)}
+        onEnded={() => setPlaying(false)}
+        onError={() => setError("Video could not be loaded.")}
+        style={{
+          display: "block",
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+          background: "#08090b",
+        }}
+      />
+      {!playing && !error && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: "none",
+          }}
+        >
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: "50%",
+              background: "rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Play size={22} color="#fff" />
+          </div>
+        </div>
+      )}
+      {error && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#08090b",
+            color: "#aaa",
+            fontSize: "0.82rem",
+            textAlign: "center",
+            padding: 16,
+          }}
+        >
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ForYouVideoPlayer({
   video,
@@ -2048,10 +2213,10 @@ function VideoCard({
                   loading="lazy"
                   draggable={false}
                 />
+              ) : renderVideo ? (
+                renderVideo(video, active, recordView)
               ) : (
-                renderVideo
-                  ? renderVideo(video, active, recordView)
-                  : <QualityVideoPlayer video={video} active={active} onFirstPlay={recordView} />
+                <InlineVideoPlayer video={video} active={active} onFirstPlay={recordView} />
               )}
             </div>
             <div className="k-post__bottom">
@@ -2184,10 +2349,11 @@ function VideoCard({
                 className="object-contain w-full h-auto max-h-[60vh] bg-black"
                 src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
                 alt={video.title || "Post"}
+                loading="lazy"
                 draggable={false}
               />
             ) : (
-              <QualityVideoPlayer
+              <InlineVideoPlayer
                 video={video}
                 active={active}
                 onFirstPlay={recordView}
@@ -2467,6 +2633,11 @@ export function FocusedVideoViewer({
   const [video, setVideo] = useState(initialVideo);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const auth = useAuth();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [muted, setMuted] = useState(true);
+  const hlsRef = useRef<Hls | null>(null);
   const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
   const bookmarkMutation = trpc.videos.bookmark.useMutation();
   const toggleBookmark = async () => {
@@ -2498,12 +2669,80 @@ export function FocusedVideoViewer({
 
   const isImage = video.mediaType === "IMAGE";
   const ownerName = displayName(video.owner.name, video.owner.username);
-  const videoW = video.width || 16;
-  const videoH = video.height || 9;
+
+  const sourceMap = useMemo(
+    () =>
+      new Map(
+        (Array.isArray(video.sources) ? video.sources : []).map(s => [
+          s.quality,
+          s.videoUrl,
+        ])
+      ),
+    [video.sources]
+  );
+  const directUrl = resolvePlaybackUrl(video.videoUrl);
+  const originalUrl = resolvePlaybackUrl(sourceMap.get("ORIGINAL"));
+  const sourceUrl =
+    directUrl && !isHlsMediaUrl(directUrl)
+      ? directUrl
+      : originalUrl || directUrl;
+  const posterUrl =
+    resolveMediaUrl(video.thumbnailUrl) ?? `/api/videos/${video.id}/thumbnail`;
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !sourceUrl) return;
+    hlsRef.current?.destroy();
+    hlsRef.current = null;
+    if (isHlsMediaUrl(sourceUrl) && Hls.isSupported()) {
+      const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+      hlsRef.current = hls;
+      hls.loadSource(sourceUrl);
+      hls.attachMedia(el);
+    } else {
+      el.src = sourceUrl;
+    }
+    return () => {
+      hlsRef.current?.destroy();
+      hlsRef.current = null;
+    };
+  }, [sourceUrl]);
+
+  const togglePlay = () => {
+    const el = videoRef.current;
+    if (!el) return;
+    if (el.paused) void el.play().catch(() => undefined);
+    else el.pause();
+  };
 
   return (
-    <div className="k-viewer" role="dialog" aria-modal="true" aria-label="Post viewer">
-      <div className="k-viewer__topbar">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Post viewer"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 2147483000,
+        background: "#000",
+        display: "flex",
+        flexDirection: "column",
+        fontFamily: "inherit",
+      }}
+    >
+      <div
+        style={{
+          flex: "0 0 auto",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "10px 16px",
+          background: "rgba(0,0,0,0.7)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          zIndex: 10,
+        }}
+      >
         <PostManagementMenu
           video={video}
           onUpdated={desc => setVideo(v => ({ ...v, description: desc }))}
@@ -2511,45 +2750,131 @@ export function FocusedVideoViewer({
         />
         <button
           type="button"
-          className="k-viewer__back"
           onClick={onClose}
           aria-label="Close viewer"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            border: 0,
+            borderRadius: 8,
+            background: "rgba(255,255,255,0.08)",
+            color: "#fff",
+            fontSize: "0.8rem",
+            padding: "6px 12px",
+            cursor: "pointer",
+          }}
         >
           <ChevronLeft size={18} />
           <span>Back</span>
         </button>
       </div>
 
-      <div className="k-viewer__stage">
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          alignItems: "stretch",
+          gap: 0,
+          padding: 0,
+          overflow: "hidden",
+          minHeight: 0,
+        }}
+      >
         <div
-          className="k-viewer__media-wrap"
-          style={{ aspectRatio: `${videoW} / ${videoH}` }}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            minHeight: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#000",
+          }}
+          onClick={togglePlay}
         >
           {isImage ? (
             <img
               src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
               alt={video.title || "Post"}
               draggable={false}
+              style={{ display: "block", maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
             />
           ) : (
-            <QualityVideoPlayer video={video} active showPoster />
+            <video
+              ref={videoRef}
+              poster={posterUrl}
+              muted={muted}
+              loop
+              playsInline
+              preload="metadata"
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              onEnded={() => setPlaying(false)}
+              onTimeUpdate={() => {
+                const el = videoRef.current;
+                if (el) setCurrentTime(el.currentTime);
+              }}
+              style={{
+                display: "block",
+                maxWidth: "100%",
+                maxHeight: "100%",
+                width: "auto",
+                height: "auto",
+                objectFit: "contain",
+                background: "#000",
+              }}
+            />
           )}
         </div>
 
-        <div className="k-viewer__rail">
+        <div
+          style={{
+            flex: "0 0 auto",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 18,
+            width: 72,
+            padding: "12px 0",
+          }}
+        >
           <button
             type="button"
-            className={`k-viewer__rail-btn${current.viewerReacted ? " is-active" : ""}`}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 3,
+              background: "transparent",
+              border: 0,
+              color: current.viewerReacted ? "var(--kinba-coral, #ff5e56)" : "rgba(255,255,255,0.85)",
+              cursor: "pointer",
+              padding: 0,
+              minWidth: 56,
+            }}
             onClick={react}
             disabled={!!pending}
             aria-label={current.viewerReacted ? "Unlike" : "Like"}
           >
             <Heart size={28} fill={current.viewerReacted ? "currentColor" : "none"} />
-            <strong>{formatCount(current.reactionCount)}</strong>
+            <strong style={{ color: "inherit", fontSize: "0.62rem", fontWeight: 600 }}>{formatCount(current.reactionCount)}</strong>
           </button>
           <button
             type="button"
-            className="k-viewer__rail-btn"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 3,
+              background: "transparent",
+              border: 0,
+              color: "rgba(255,255,255,0.85)",
+              cursor: "pointer",
+              padding: 0,
+              minWidth: 56,
+            }}
             onClick={() => {
               if (!auth.isAuthenticated) return auth.openAuth();
               setCommentsOpen(v => !v);
@@ -2557,21 +2882,43 @@ export function FocusedVideoViewer({
             aria-label="Comments"
           >
             <MessageCircle size={28} />
-            <strong>{formatCount(current.commentCount)}</strong>
+            <strong style={{ fontSize: "0.62rem", fontWeight: 600 }}>{formatCount(current.commentCount)}</strong>
           </button>
           <button
             type="button"
-            className="k-viewer__rail-btn"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 3,
+              background: "transparent",
+              border: 0,
+              color: "rgba(255,255,255,0.85)",
+              cursor: "pointer",
+              padding: 0,
+              minWidth: 56,
+            }}
             onClick={share}
             disabled={!!pending}
             aria-label="Share"
           >
             <Share2 size={28} />
-            <strong>{formatCount(current.shareCount)}</strong>
+            <strong style={{ fontSize: "0.62rem", fontWeight: 600 }}>{formatCount(current.shareCount)}</strong>
           </button>
           <button
             type="button"
-            className={`k-viewer__rail-btn${bookmarked ? " is-active" : ""}`}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 3,
+              background: "transparent",
+              border: 0,
+              color: bookmarked ? "var(--kinba-coral, #ff5e56)" : "rgba(255,255,255,0.85)",
+              cursor: "pointer",
+              padding: 0,
+              minWidth: 56,
+            }}
             onClick={toggleBookmark}
             disabled={bookmarkMutation.isPending}
             aria-label={bookmarked ? "Unsave" : "Save"}
@@ -2581,17 +2928,35 @@ export function FocusedVideoViewer({
         </div>
       </div>
 
-      <div className="k-viewer__bottom">
-        <div className="k-viewer__creator">
+      <div
+        style={{
+          flex: "0 0 auto",
+          padding: "14px 18px 20px",
+          background: "rgba(0,0,0,0.85)",
+          backdropFilter: "blur(6px)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
           <a
-            className="k-viewer__creator-avatar"
             href={`/profile/${video.owner.id}`}
             onClick={event => navigateToProfile(event, video.owner.id)}
+            style={{
+              flex: "0 0 36px",
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              overflow: "hidden",
+              background: "rgba(255,255,255,0.08)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
             {video.owner.photoUrl ? (
               <img
                 src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
                 alt=""
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             ) : (
               <UserRound size={18} />
@@ -2599,16 +2964,16 @@ export function FocusedVideoViewer({
           </a>
           <div>
             <a
-              className="k-viewer__creator-name"
               href={`/profile/${video.owner.id}`}
               onClick={event => navigateToProfile(event, video.owner.id)}
+              style={{ color: "#fff", fontSize: "0.82rem", fontWeight: 600, textDecoration: "none" }}
             >
               {ownerName}
               {video.owner.isVerified && (
-                <BadgeCheck size={13} className="verified-badge" />
+                <BadgeCheck size={13} style={{ verticalAlign: "middle", marginLeft: 4 }} />
               )}
             </a>
-            <div className="k-viewer__creator-time">
+            <div style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.68rem" }}>
               {relativeTime(video.createdAt)}
               {!isImage && ` · ${video.kind === "SHORT" ? "Short" : "Video"}`}
             </div>
@@ -2616,9 +2981,9 @@ export function FocusedVideoViewer({
         </div>
 
         {(video.title || video.description) && (
-          <div className="k-viewer__caption">
-            {video.title && <p className="k-viewer__caption-title">{video.title}</p>}
-            {video.description && <p>{video.description}</p>}
+          <div style={{ margin: "0 0 8px", color: "rgba(255,255,255,0.8)", fontSize: "0.82rem", lineHeight: "1.45", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+            {video.title && <p style={{ color: "#fff", fontSize: "0.92rem", fontWeight: 600, margin: "0 0 4px" }}>{video.title}</p>}
+            {video.description && <p style={{ margin: 0 }}>{video.description}</p>}
           </div>
         )}
 
@@ -3756,10 +4121,9 @@ function SearchVideoCard({ video, onOpenVideo }: { video: VideoRecord; onOpenVid
             draggable={false}
           />
         ) : (
-          <QualityVideoPlayer
+          <InlineVideoPlayer
             video={video}
             active={false}
-            showPoster
           />
         )}
       </div>
