@@ -2635,8 +2635,9 @@ export function FocusedVideoViewer({
   const auth = useAuth();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
   const [muted, setMuted] = useState(true);
+  const [showPlayIcon, setShowPlayIcon] = useState(false);
+  const playIconTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const hlsRef = useRef<Hls | null>(null);
   const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
   const bookmarkMutation = trpc.videos.bookmark.useMutation();
@@ -2666,6 +2667,10 @@ export function FocusedVideoViewer({
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [onClose]);
+
+  useEffect(() => () => {
+    if (playIconTimer.current) clearTimeout(playIconTimer.current);
+  }, []);
 
   const isImage = video.mediaType === "IMAGE";
   const ownerName = displayName(video.owner.name, video.owner.username);
@@ -2711,9 +2716,16 @@ export function FocusedVideoViewer({
   const togglePlay = () => {
     const el = videoRef.current;
     if (!el) return;
-    if (el.paused) void el.play().catch(() => undefined);
+    if (el.paused) el.play().catch(() => undefined);
     else el.pause();
+    setShowPlayIcon(true);
+    if (playIconTimer.current) clearTimeout(playIconTimer.current);
+    playIconTimer.current = setTimeout(() => setShowPlayIcon(false), 900);
   };
+
+  const AVATAR_SIZE = 40;
+  const RAIL_W = 64;
+  const BOTTOM_PAD = 20;
 
   return (
     <div
@@ -2725,29 +2737,97 @@ export function FocusedVideoViewer({
         inset: 0,
         zIndex: 2147483000,
         background: "#000",
-        display: "flex",
-        flexDirection: "column",
         fontFamily: "inherit",
+        overflow: "hidden",
       }}
     >
+      {/* ── Video fills entire viewer ── */}
       <div
         style={{
-          flex: "0 0 auto",
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+        onClick={togglePlay}
+      >
+        {isImage ? (
+          <img
+            src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
+            alt={video.title || "Post"}
+            draggable={false}
+            style={{
+              display: "block",
+              maxWidth: "100%",
+              maxHeight: "100%",
+              objectFit: "contain",
+            }}
+          />
+        ) : (
+          <video
+            ref={videoRef}
+            poster={posterUrl}
+            muted={muted}
+            loop
+            playsInline
+            preload="metadata"
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+            style={{
+              display: "block",
+              maxWidth: "100%",
+              maxHeight: "100%",
+              objectFit: "contain",
+            }}
+          />
+        )}
+      </div>
+
+      {/* ── Center play/pause indicator ── */}
+      {showPlayIcon && (
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: 64,
+            height: 64,
+            borderRadius: "50%",
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: "none",
+            zIndex: 30,
+            animation: "kvp-fade 0.9s ease-out forwards",
+          }}
+        >
+          {playing ? (
+            <Pause size={28} color="#fff" />
+          ) : (
+            <Play size={28} color="#fff" style={{ marginLeft: 3 }} />
+          )}
+        </div>
+      )}
+
+      {/* ── Top bar overlay ── */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "10px 16px",
-          background: "rgba(0,0,0,0.7)",
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
-          zIndex: 10,
+          padding: "12px 14px",
+          background: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%)",
+          zIndex: 20,
         }}
       >
-        <PostManagementMenu
-          video={video}
-          onUpdated={desc => setVideo(v => ({ ...v, description: desc }))}
-          onDeleted={onClose}
-        />
         <button
           type="button"
           onClick={onClose}
@@ -2755,198 +2835,154 @@ export function FocusedVideoViewer({
           style={{
             display: "inline-flex",
             alignItems: "center",
-            gap: 6,
+            gap: 4,
             border: 0,
-            borderRadius: 8,
-            background: "rgba(255,255,255,0.08)",
+            borderRadius: 20,
+            background: "rgba(255,255,255,0.15)",
             color: "#fff",
-            fontSize: "0.8rem",
-            padding: "6px 12px",
+            fontSize: "0.82rem",
+            fontWeight: 500,
+            padding: "7px 14px",
             cursor: "pointer",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
           }}
         >
           <ChevronLeft size={18} />
           <span>Back</span>
         </button>
+        <PostManagementMenu
+          video={video}
+          onUpdated={desc => setVideo(v => ({ ...v, description: desc }))}
+          onDeleted={onClose}
+        />
       </div>
 
+      {/* ── Engagement rail — lower-right overlay ── */}
       <div
         style={{
-          flex: 1,
+          position: "absolute",
+          right: 12,
+          bottom: BOTTOM_PAD + AVATAR_SIZE + 56,
           display: "flex",
-          alignItems: "stretch",
-          gap: 0,
-          padding: 0,
-          overflow: "hidden",
-          minHeight: 0,
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 20,
+          zIndex: 20,
         }}
       >
-        <div
+        <button
+          type="button"
           style={{
-            flex: 1,
-            minWidth: 0,
-            minHeight: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "#000",
-          }}
-          onClick={togglePlay}
-        >
-          {isImage ? (
-            <img
-              src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
-              alt={video.title || "Post"}
-              draggable={false}
-              style={{ display: "block", maxWidth: "100%", maxHeight: "100%", objectFit: "contain" }}
-            />
-          ) : (
-            <video
-              ref={videoRef}
-              poster={posterUrl}
-              muted={muted}
-              loop
-              playsInline
-              preload="metadata"
-              onPlay={() => setPlaying(true)}
-              onPause={() => setPlaying(false)}
-              onEnded={() => setPlaying(false)}
-              onTimeUpdate={() => {
-                const el = videoRef.current;
-                if (el) setCurrentTime(el.currentTime);
-              }}
-              style={{
-                display: "block",
-                maxWidth: "100%",
-                maxHeight: "100%",
-                width: "auto",
-                height: "auto",
-                objectFit: "contain",
-                background: "#000",
-              }}
-            />
-          )}
-        </div>
-
-        <div
-          style={{
-            flex: "0 0 auto",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            justifyContent: "center",
-            gap: 18,
-            width: 72,
-            padding: "12px 0",
+            gap: 3,
+            background: "transparent",
+            border: 0,
+            color: current.viewerReacted ? "var(--kinba-coral, #ff5e56)" : "#fff",
+            cursor: "pointer",
+            padding: 0,
           }}
+          onClick={react}
+          disabled={!!pending}
+          aria-label={current.viewerReacted ? "Unlike" : "Like"}
         >
-          <button
-            type="button"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 3,
-              background: "transparent",
-              border: 0,
-              color: current.viewerReacted ? "var(--kinba-coral, #ff5e56)" : "rgba(255,255,255,0.85)",
-              cursor: "pointer",
-              padding: 0,
-              minWidth: 56,
-            }}
-            onClick={react}
-            disabled={!!pending}
-            aria-label={current.viewerReacted ? "Unlike" : "Like"}
-          >
-            <Heart size={28} fill={current.viewerReacted ? "currentColor" : "none"} />
-            <strong style={{ color: "inherit", fontSize: "0.62rem", fontWeight: 600 }}>{formatCount(current.reactionCount)}</strong>
-          </button>
-          <button
-            type="button"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 3,
-              background: "transparent",
-              border: 0,
-              color: "rgba(255,255,255,0.85)",
-              cursor: "pointer",
-              padding: 0,
-              minWidth: 56,
-            }}
-            onClick={() => {
-              if (!auth.isAuthenticated) return auth.openAuth();
-              setCommentsOpen(v => !v);
-            }}
-            aria-label="Comments"
-          >
-            <MessageCircle size={28} />
-            <strong style={{ fontSize: "0.62rem", fontWeight: 600 }}>{formatCount(current.commentCount)}</strong>
-          </button>
-          <button
-            type="button"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 3,
-              background: "transparent",
-              border: 0,
-              color: "rgba(255,255,255,0.85)",
-              cursor: "pointer",
-              padding: 0,
-              minWidth: 56,
-            }}
-            onClick={share}
-            disabled={!!pending}
-            aria-label="Share"
-          >
-            <Share2 size={28} />
-            <strong style={{ fontSize: "0.62rem", fontWeight: 600 }}>{formatCount(current.shareCount)}</strong>
-          </button>
-          <button
-            type="button"
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: 3,
-              background: "transparent",
-              border: 0,
-              color: bookmarked ? "var(--kinba-coral, #ff5e56)" : "rgba(255,255,255,0.85)",
-              cursor: "pointer",
-              padding: 0,
-              minWidth: 56,
-            }}
-            onClick={toggleBookmark}
-            disabled={bookmarkMutation.isPending}
-            aria-label={bookmarked ? "Unsave" : "Save"}
-          >
-            <Bookmark size={28} fill={bookmarked ? "currentColor" : "none"} />
-          </button>
-        </div>
+          <Heart size={26} fill={current.viewerReacted ? "currentColor" : "none"} />
+          <strong style={{ fontSize: "0.6rem", fontWeight: 600 }}>
+            {formatCount(current.reactionCount)}
+          </strong>
+        </button>
+        <button
+          type="button"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 3,
+            background: "transparent",
+            border: 0,
+            color: "#fff",
+            cursor: "pointer",
+            padding: 0,
+          }}
+          onClick={() => {
+            if (!auth.isAuthenticated) return auth.openAuth();
+            setCommentsOpen(v => !v);
+          }}
+          aria-label="Comments"
+        >
+          <MessageCircle size={26} />
+          <strong style={{ fontSize: "0.6rem", fontWeight: 600 }}>
+            {formatCount(current.commentCount)}
+          </strong>
+        </button>
+        <button
+          type="button"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 3,
+            background: "transparent",
+            border: 0,
+            color: "#fff",
+            cursor: "pointer",
+            padding: 0,
+          }}
+          onClick={share}
+          disabled={!!pending}
+          aria-label="Share"
+        >
+          <Share2 size={26} />
+          <strong style={{ fontSize: "0.6rem", fontWeight: 600 }}>
+            {formatCount(current.shareCount)}
+          </strong>
+        </button>
+        <button
+          type="button"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 3,
+            background: "transparent",
+            border: 0,
+            color: bookmarked ? "var(--kinba-coral, #ff5e56)" : "#fff",
+            cursor: "pointer",
+            padding: 0,
+          }}
+          onClick={toggleBookmark}
+          disabled={bookmarkMutation.isPending}
+          aria-label={bookmarked ? "Unsave" : "Save"}
+        >
+          <Bookmark size={26} fill={bookmarked ? "currentColor" : "none"} />
+        </button>
       </div>
 
+      {/* ── Bottom info overlay — lower-left ── */}
       <div
         style={{
-          flex: "0 0 auto",
-          padding: "14px 18px 20px",
-          background: "rgba(0,0,0,0.85)",
-          backdropFilter: "blur(6px)",
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: `${BOTTOM_PAD}px ${RAIL_W + 20}px ${BOTTOM_PAD}px 16px`,
+          background: "linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)",
+          zIndex: 20,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
           <a
             href={`/profile/${video.owner.id}`}
             onClick={event => navigateToProfile(event, video.owner.id)}
             style={{
-              flex: "0 0 36px",
-              width: 36,
-              height: 36,
+              flex: `0 0 ${AVATAR_SIZE}px`,
+              width: AVATAR_SIZE,
+              height: AVATAR_SIZE,
               borderRadius: "50%",
               overflow: "hidden",
-              background: "rgba(255,255,255,0.08)",
+              background: "rgba(255,255,255,0.12)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -2959,21 +2995,30 @@ export function FocusedVideoViewer({
                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
               />
             ) : (
-              <UserRound size={18} />
+              <UserRound size={20} />
             )}
           </a>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <a
               href={`/profile/${video.owner.id}`}
               onClick={event => navigateToProfile(event, video.owner.id)}
-              style={{ color: "#fff", fontSize: "0.82rem", fontWeight: 600, textDecoration: "none" }}
+              style={{
+                color: "#fff",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                textDecoration: "none",
+                display: "block",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
             >
               {ownerName}
               {video.owner.isVerified && (
                 <BadgeCheck size={13} style={{ verticalAlign: "middle", marginLeft: 4 }} />
               )}
             </a>
-            <div style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.68rem" }}>
+            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.68rem" }}>
               {relativeTime(video.createdAt)}
               {!isImage && ` · ${video.kind === "SHORT" ? "Short" : "Video"}`}
             </div>
@@ -2981,8 +3026,8 @@ export function FocusedVideoViewer({
         </div>
 
         {(video.title || video.description) && (
-          <div style={{ margin: "0 0 8px", color: "rgba(255,255,255,0.8)", fontSize: "0.82rem", lineHeight: "1.45", whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-            {video.title && <p style={{ color: "#fff", fontSize: "0.92rem", fontWeight: 600, margin: "0 0 4px" }}>{video.title}</p>}
+          <div style={{ color: "rgba(255,255,255,0.85)", fontSize: "0.82rem", lineHeight: "1.45", whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 4.4 * 14, overflow: "auto" }}>
+            {video.title && <p style={{ color: "#fff", fontSize: "0.9rem", fontWeight: 600, margin: "0 0 3px" }}>{video.title}</p>}
             {video.description && <p style={{ margin: 0 }}>{video.description}</p>}
           </div>
         )}
@@ -2994,6 +3039,15 @@ export function FocusedVideoViewer({
           onClose={() => setCommentsOpen(false)}
         />
       </div>
+
+      {/* ── Keyframes for fade ── */}
+      <style>{`
+        @keyframes kvp-fade {
+          0% { opacity: 1; }
+          60% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }
