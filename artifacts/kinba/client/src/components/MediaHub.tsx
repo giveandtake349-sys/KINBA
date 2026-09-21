@@ -70,6 +70,7 @@ type HomeTab = "videos" | "trendy" | "following" | "icons" | "spotlight";
 type VideoKind = "LONG" | "SHORT" | "WHEEL";
 type Quality = "ORIGINAL" | "1080P" | "720P" | "480P" | "240P";
 type VideoSource = { quality: Quality; videoUrl: string };
+export type ShortsViewerOrigin = "videos" | "search" | "profile";
 
 function isHlsMediaUrl(value: string) {
   return /\.m3u8(?:$|\?)/i.test(value);
@@ -2584,373 +2585,6 @@ function Caption({ text, maxLines = 4, className = "" }: { text: string; maxLine
   );
 }
 
-export function FocusedVideoViewer({
-  video: initialVideo,
-  onClose,
-}: {
-  video: VideoRecord;
-  onClose: () => void;
-}) {
-
-  const [video, setVideo] = useState(initialVideo);
-  const [commentsOpen, setCommentsOpen] = useState(false);
-  const auth = useAuth();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(true);
-  const [showPlayIcon, setShowPlayIcon] = useState(false);
-  const playIconTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const hlsRef = useRef<Hls | null>(null);
-  const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [captionExpanded, setCaptionExpanded] = useState(false);
-  const bookmarkMutation = trpc.videos.bookmark.useMutation();
-  const toggleBookmark = async () => {
-    if (!auth.isAuthenticated) return auth.openAuth();
-    if (bookmarkMutation.isPending) return;
-    try {
-      const engagement = await bookmarkMutation.mutateAsync({
-        videoId: video.id,
-      });
-      setBookmarked(engagement.viewerBookmarked);
-    } catch (error) {
-      notifyError(error);
-    }
-  };
-  const { current, react, share, pending } = useOptimisticEngagement(video);
-
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [onClose]);
-
-  useEffect(() => () => {
-    if (playIconTimer.current) clearTimeout(playIconTimer.current);
-  }, []);
-
-  const isImage = video.mediaType === "IMAGE";
-  const ownerName = displayName(video.owner.name, video.owner.username);
-
-  const sourceMap = useMemo(
-    () =>
-      new Map(
-        (Array.isArray(video.sources) ? video.sources : []).map(s => [
-          s.quality,
-          s.videoUrl,
-        ])
-      ),
-    [video.sources]
-  );
-  const directUrl = resolvePlaybackUrl(video.videoUrl);
-  const originalUrl = resolvePlaybackUrl(sourceMap.get("ORIGINAL"));
-  const sourceUrl =
-    directUrl && !isHlsMediaUrl(directUrl)
-      ? directUrl
-      : originalUrl || directUrl;
-  const posterUrl =
-    resolveMediaUrl(video.thumbnailUrl) ?? `/api/videos/${video.id}/thumbnail`;
-
-  useEffect(() => {
-    const el = videoRef.current;
-    if (!el || !sourceUrl) return;
-    setCurrentTime(0);
-    setDuration(0);
-    hlsRef.current?.destroy();
-    hlsRef.current = null;
-    if (isHlsMediaUrl(sourceUrl) && Hls.isSupported()) {
-      const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
-      hlsRef.current = hls;
-      hls.loadSource(sourceUrl);
-      hls.attachMedia(el);
-    } else {
-      el.src = sourceUrl;
-    }
-    return () => {
-      hlsRef.current?.destroy();
-      hlsRef.current = null;
-    };
-  }, [sourceUrl]);
-
-  const togglePlay = () => {
-    const el = videoRef.current;
-    if (!el) return;
-    if (el.paused) el.play().catch(() => undefined);
-    else el.pause();
-    setShowPlayIcon(true);
-    if (playIconTimer.current) clearTimeout(playIconTimer.current);
-    playIconTimer.current = setTimeout(() => setShowPlayIcon(false), 900);
-  };
-
-  const handleTimeUpdate = () => {
-    const el = videoRef.current;
-    if (el) setCurrentTime(el.currentTime);
-  };
-
-  const handleLoadedMetadata = () => {
-    const el = videoRef.current;
-    if (el) {
-      setDuration(el.duration);
-      if (el.videoWidth && el.videoHeight) {
-        console.log(`[Viewer] Video intrinsic: ${el.videoWidth}x${el.videoHeight}`);
-      }
-    }
-  };
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const el = videoRef.current;
-    if (el) {
-      el.currentTime = Number(e.target.value);
-      setCurrentTime(el.currentTime);
-    }
-  };
-
-  const skipBack = () => {
-    const el = videoRef.current;
-    if (el) {
-      el.currentTime = Math.max(0, el.currentTime - 5);
-      setCurrentTime(el.currentTime);
-    }
-  };
-
-  const skipForward = () => {
-    const el = videoRef.current;
-    if (el) {
-      el.currentTime = Math.min(el.duration || 0, el.currentTime + 5);
-      setCurrentTime(el.currentTime);
-    }
-  };
-
-  return (
-    <div className="k-viewer" role="dialog" aria-modal="true" aria-label="Post viewer">
-
-      {/* ── Video stage ── */}
-      <div className="k-viewer__stage" style={{ contain: "size layout paint style" }}>
-        <div className="k-viewer__media-wrap" onClick={togglePlay}>
-          {isImage ? (
-            <img
-              src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
-              alt={video.title || "Post"}
-              draggable={false}
-            />
-          ) : (
-            <video
-              ref={videoRef}
-              poster={posterUrl}
-              muted={muted}
-              loop
-              playsInline
-              controls={false}
-              preload="metadata"
-              onPlay={() => setPlaying(true)}
-              onPause={() => setPlaying(false)}
-              onEnded={() => setPlaying(false)}
-              onTimeUpdate={handleTimeUpdate}
-              onLoadedMetadata={handleLoadedMetadata}
-              style={{
-                display: "block",
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-                background: "#000",
-              }}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* ── Center play/pause indicator ── */}
-      {showPlayIcon && (
-        <div
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: 64,
-            height: 64,
-            borderRadius: "50%",
-            background: "rgba(0,0,0,0.55)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            pointerEvents: "none",
-            zIndex: 30,
-            animation: "kvp-fade 0.9s ease-out forwards",
-          }}
-        >
-          {playing ? (
-            <Pause size={28} color="#fff" />
-          ) : (
-            <Play size={28} color="#fff" style={{ marginLeft: 3 }} />
-          )}
-        </div>
-      )}
-
-      {/* ── Top bar ── */}
-      <div className="k-viewer__topbar">
-        <button
-          type="button"
-          className="k-viewer__back"
-          onClick={onClose}
-          aria-label="Close viewer"
-        >
-          <ChevronLeft size={18} />
-          <span>Back</span>
-        </button>
-        <PostManagementMenu
-          video={video}
-          onUpdated={desc => setVideo(v => ({ ...v, description: desc }))}
-          onDeleted={onClose}
-        />
-      </div>
-
-      {/* ── Engagement rail ── */}
-      <div className="k-viewer__rail">
-        <button
-          type="button"
-          className={`k-viewer__rail-btn ${current.viewerReacted ? "is-active" : ""}`}
-          onClick={react}
-          disabled={!!pending}
-          aria-label={current.viewerReacted ? "Unlike" : "Like"}
-        >
-          <Heart size={26} fill={current.viewerReacted ? "currentColor" : "none"} />
-          <strong>{formatCount(current.reactionCount)}</strong>
-        </button>
-        <button
-          type="button"
-          className="k-viewer__rail-btn"
-          onClick={() => {
-            if (!auth.isAuthenticated) return auth.openAuth();
-            setCommentsOpen(v => !v);
-          }}
-          aria-label="Comments"
-        >
-          <MessageCircle size={26} />
-          <strong>{formatCount(current.commentCount)}</strong>
-        </button>
-        <button
-          type="button"
-          className="k-viewer__rail-btn"
-          onClick={share}
-          disabled={!!pending}
-          aria-label="Share"
-        >
-          <Share2 size={26} />
-          <strong>{formatCount(current.shareCount)}</strong>
-        </button>
-        <button
-          type="button"
-          className={`k-viewer__rail-btn ${bookmarked ? "is-active" : ""}`}
-          onClick={toggleBookmark}
-          disabled={bookmarkMutation.isPending}
-          aria-label={bookmarked ? "Unsave" : "Save"}
-        >
-          <Bookmark size={26} fill={bookmarked ? "currentColor" : "none"} />
-        </button>
-      </div>
-
-      {/* ── Bottom overlay: creator + caption + playback controls ── */}
-      <div className="k-viewer__bottom">
-        <div className="k-viewer__creator">
-          <a
-            href={`/profile/${video.owner.id}`}
-            onClick={event => navigateToProfile(event, video.owner.id)}
-            className="k-viewer__creator-avatar"
-          >
-            {video.owner.photoUrl ? (
-              <img
-                src={resolveMediaUrl(video.owner.photoUrl, "avatars")}
-                alt=""
-              />
-            ) : (
-              <UserRound size={20} />
-            )}
-          </a>
-          <div style={{ minWidth: 0 }}>
-            <a
-              href={`/profile/${video.owner.id}`}
-              onClick={event => navigateToProfile(event, video.owner.id)}
-              className="k-viewer__creator-name"
-            >
-              {ownerName}
-              {video.owner.isVerified && (
-                <BadgeCheck size={13} className="verified-badge" />
-              )}
-            </a>
-            <div className="k-viewer__creator-time">
-              {relativeTime(video.createdAt)}
-              {!isImage && ` · ${video.kind === "SHORT" ? "Short" : "Video"}`}
-            </div>
-          </div>
-        </div>
-
-        {(() => {
-          const captionText = [video.title, video.description].filter(Boolean).join("\n\n");
-          return captionText ? (
-            <div className="k-viewer__caption">
-              <Caption text={captionText} maxLines={4} />
-            </div>
-          ) : null;
-        })()}
-
-        {!isImage && (
-          <div className="media-video-controls">
-            <button type="button" onClick={skipBack} aria-label="Skip back 5 seconds">
-              <SkipBack size={18} />
-            </button>
-            <button type="button" onClick={togglePlay} aria-label={playing ? "Pause" : "Play"}>
-              {playing ? <Pause size={18} /> : <Play size={18} />}
-            </button>
-            <button type="button" onClick={skipForward} aria-label="Skip forward 5 seconds">
-              <SkipForward size={18} />
-            </button>
-            <span style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.7rem", minWidth: 70, textAlign: "center" }}>
-              {formatDuration(Math.floor(currentTime))} / {formatDuration(Math.floor(duration))}
-            </span>
-            <input
-              type="range"
-              min={0}
-              max={duration || 0}
-              step={0.1}
-              value={currentTime}
-              onChange={handleSeek}
-              style={{ flex: 1, minWidth: 0 }}
-              aria-label="Seek"
-            />
-            <button type="button" onClick={() => setMuted(v => !v)} aria-label={muted ? "Unmute" : "Mute"}>
-              {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
-            </button>
-          </div>
-        )}
-
-        <CommentDrawer
-          postId={video.id}
-          postOwnerId={video.owner.id}
-          open={commentsOpen}
-          onClose={() => setCommentsOpen(false)}
-        />
-      </div>
-
-      <style>{`
-        @keyframes kvp-fade {
-          0% { opacity: 1; }
-          60% { opacity: 1; }
-          100% { opacity: 0; }
-        }
-      `}</style>
-    </div>
-  );
-}
-
 function HomeFeedPanel({
   tab,
   active = true,
@@ -3212,10 +2846,12 @@ export function ShortsFeed({
   active = true,
   initialVideoId,
   viewerMode = false,
+  standaloneVideo,
 }: {
   active?: boolean;
   initialVideoId?: number;
   viewerMode?: boolean;
+  standaloneVideo?: VideoRecord;
 }) {
   const query = trpc.home.feed.useQuery(
     { tab: "shorts" },
@@ -3236,7 +2872,12 @@ export function ShortsFeed({
   const gestureLockRef = useRef(false);
   const gestureUnlockTimerRef = useRef<number | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const videos = (query.data ?? []) as VideoRecord[];
+  const rawVideos = (query.data ?? []) as VideoRecord[];
+  const videos = useMemo(() => {
+    if (!standaloneVideo || !initialVideoId) return rawVideos;
+    if (rawVideos.some(v => v.id === initialVideoId)) return rawVideos;
+    return [standaloneVideo, ...rawVideos];
+  }, [rawVideos, standaloneVideo, initialVideoId]);
   useEffect(() => {
     if (initialVideoId === undefined || !videos.length) return;
     const nextIndex = Math.max(
@@ -3353,32 +2994,34 @@ export function ShortsFeed({
       className={`media-section shorts-section shorts-surface ${viewerMode ? "shorts-detail-feed" : "shorts-list-feed"} w-full max-w-full overflow-hidden box-border`}
       aria-labelledby="shorts-heading"
     >
-      <div className="media-section-heading shorts-header">
-        <div>
-          <h2 id="shorts-heading">Shorts</h2>
+      {!viewerMode && (
+        <div className="media-section-heading shorts-header">
+          <div>
+            <h2 id="shorts-heading">Shorts</h2>
+          </div>
+          <div className="shorts-controls">
+            <button
+              type="button"
+              onClick={() => goTo(activeIndex - 1)}
+              disabled={!videos.length || activeIndex === 0}
+              aria-label="Previous Short"
+            >
+              ↑
+            </button>
+            <span>
+              {videos.length ? `${activeIndex + 1} / ${videos.length}` : "0 / 0"}
+            </span>
+            <button
+              type="button"
+              onClick={() => goTo(activeIndex + 1)}
+              disabled={!videos.length || activeIndex === videos.length - 1}
+              aria-label="Next Short"
+            >
+              ↓
+            </button>
+          </div>
         </div>
-        <div className="shorts-controls">
-          <button
-            type="button"
-            onClick={() => goTo(activeIndex - 1)}
-            disabled={!videos.length || activeIndex === 0}
-            aria-label="Previous Short"
-          >
-            ↑
-          </button>
-          <span>
-            {videos.length ? `${activeIndex + 1} / ${videos.length}` : "0 / 0"}
-          </span>
-          <button
-            type="button"
-            onClick={() => goTo(activeIndex + 1)}
-            disabled={!videos.length || activeIndex === videos.length - 1}
-            aria-label="Next Short"
-          >
-            ↓
-          </button>
-        </div>
-      </div>
+      )}
       {query.isPending ? (
         <FeedSkeleton short />
       ) : videos.length ? (
@@ -3850,10 +3493,13 @@ export type FeedSection =
   | "qr"
   | "offline";
 
-export function SearchFeed() {
+export function SearchFeed({
+  onOpenVideo,
+}: {
+  onOpenVideo?: (video: VideoRecord) => void;
+} = {}) {
   const [rawTerm, setRawTerm] = useState("");
   const [debouncedTerm, setDebouncedTerm] = useState("");
-  const [videoViewer, setVideoViewer] = useState<VideoRecord | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -3976,20 +3622,12 @@ export function SearchFeed() {
             <h4 className="search-group-title">Content</h4>
             <div className="search-content-grid">
               {videos.map(video => (
-                <SearchVideoCard key={video.id} video={video} onOpenVideo={setVideoViewer} />
+                <SearchVideoCard key={video.id} video={video} onOpenVideo={onOpenVideo} />
               ))}
             </div>
           </div>
         )}
       </div>
-      {videoViewer &&
-        createPortal(
-          <FocusedVideoViewer
-            video={videoViewer}
-            onClose={() => setVideoViewer(null)}
-          />,
-          document.body
-        )}
     </section>
   );
 }
@@ -4125,12 +3763,9 @@ export default function MediaHub({
 }) {
   const [selectedSection, setSelectedSection] = useState<FeedSection>(section);
   const [shortsViewerId, setShortsViewerId] = useState<number | null>(null);
+  const [standaloneVideo, setStandaloneVideo] = useState<VideoRecord | null>(null);
+  const [shortsViewerOrigin, setShortsViewerOrigin] = useState<ShortsViewerOrigin | null>(null);
   const [photoViewer, setPhotoViewer] = useState<VideoRecord | null>(null);
-  const [videoViewer, _setVideoViewer] = useState<VideoRecord | null>(null);
-  const setVideoViewer = (v: VideoRecord | null) => {
-    console.log("[KINBA DIAGNOSTIC] setVideoViewer CALLED", { videoId: v?.id ?? null, timestamp: Date.now() });
-    _setVideoViewer(v);
-  };
 
   useEffect(() => {
     setSelectedSection(section);
@@ -4141,7 +3776,7 @@ export default function MediaHub({
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setShortsViewerId(null);
+      if (event.key === "Escape") { setShortsViewerId(null); setStandaloneVideo(null); setShortsViewerOrigin(null); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => {
@@ -4216,9 +3851,9 @@ export default function MediaHub({
               active
               showDetailsOverlay={false}
               showHeader={false}
-              onOpenShort={setShortsViewerId}
+              onOpenShort={(id) => { setShortsViewerId(id); setShortsViewerOrigin("videos"); }}
               onOpenPhoto={setPhotoViewer}
-              onOpenVideo={setVideoViewer}
+              onOpenVideo={(v) => { setShortsViewerId(v.id); setStandaloneVideo(v); setShortsViewerOrigin("videos"); }}
             />
           </ErrorBoundary>
         </div>
@@ -4242,12 +3877,13 @@ export default function MediaHub({
           <button
             type="button"
             className="shorts-viewer-close"
-            onClick={() => setShortsViewerId(null)}
+            onClick={() => { setShortsViewerId(null); setStandaloneVideo(null); setShortsViewerOrigin(null); }}
             aria-label="Close Shorts viewer"
           >
-            <X size={22} />
+            <span className="shorts-viewer-close-brand">JHILIK</span>
+            <X size={18} />
           </button>
-          <ShortsFeed active initialVideoId={shortsViewerId} viewerMode />
+          <ShortsFeed active initialVideoId={shortsViewerId} viewerMode standaloneVideo={standaloneVideo ?? undefined} />
         </div>
       )}
       {photoViewer && (
@@ -4258,14 +3894,6 @@ export default function MediaHub({
           onClose={() => setPhotoViewer(null)}
         />
       )}
-      {videoViewer &&
-        createPortal(
-          <FocusedVideoViewer
-            video={videoViewer}
-            onClose={() => setVideoViewer(null)}
-          />,
-          document.body
-        )}
     </div>
   );
 }

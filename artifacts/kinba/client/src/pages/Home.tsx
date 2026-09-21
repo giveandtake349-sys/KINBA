@@ -8,7 +8,6 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
-import { createPortal } from "react-dom";
 import {
   BadgeCheck,
   Bell,
@@ -61,8 +60,8 @@ import MediaHub, {
   SearchFeed,
   type FeedSection,
   type VideoRecord,
+  type ShortsViewerOrigin,
   FeedPhotoLightbox,
-  FocusedVideoViewer,
   ShortsFeed,
 } from "@/components/MediaHub";
 import ProfileView, { ProfileSkeleton } from "@/components/ProfileView";
@@ -1462,10 +1461,10 @@ function UploadVideoModal({
   );
 }
 
-function SearchModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+function SearchModal({ open, onClose, onOpenVideo }: { open: boolean; onClose: () => void; onOpenVideo?: (video: VideoRecord) => void }) {
   return (
     <ActionModal title="Search KINBA" open={open} onClose={onClose} className="search-action-modal">
-      <SearchFeed />
+      <SearchFeed onOpenVideo={onOpenVideo} />
     </ActionModal>
   );
 }
@@ -1726,8 +1725,9 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(() => location === "/profile");
   const [shortsViewerId, setShortsViewerId] = useState<number | null>(null);
+  const [standaloneVideo, setStandaloneVideo] = useState<VideoRecord | null>(null);
+  const [shortsViewerOrigin, setShortsViewerOrigin] = useState<ShortsViewerOrigin | null>(null);
   const [photoViewer, setPhotoViewer] = useState<VideoRecord | null>(null);
-  const [videoViewer, setVideoViewer] = useState<VideoRecord | null>(null);
   const profileQuery = trpc.profile.me.useQuery(undefined, {
     enabled: auth.isAuthenticated && !publicProfileId,
     refetchOnWindowFocus: false,
@@ -1913,9 +1913,9 @@ export default function Home() {
               isAdmin={auth.user?.role === "admin"}
               userId={publicProfileId}
               onBack={closeProfile}
-              onOpenShort={setShortsViewerId}
+              onOpenShort={(id) => { setShortsViewerId(id); setShortsViewerOrigin("profile"); }}
               onOpenPhoto={setPhotoViewer}
-              onOpenVideo={setVideoViewer}
+              onOpenVideo={(v) => { setShortsViewerId(v.id); setStandaloneVideo(v); setShortsViewerOrigin("profile"); }}
               ownerTools={
                 <>
                   <GetVerifiedPanel />
@@ -1947,7 +1947,7 @@ export default function Home() {
             }}
           />
         )}
-        {activeModal === "search" && <SearchModal open onClose={() => setActiveModal(null)} />}
+        {activeModal === "search" && <SearchModal open onClose={() => setActiveModal(null)} onOpenVideo={(v) => { setShortsViewerId(v.id); setStandaloneVideo(v); setShortsViewerOrigin("search"); }} />}
         {activeModal === "notifications" && (
           <NotificationDrawer open onClose={() => setActiveModal(null)} enabled={auth.isAuthenticated} />
         )}
@@ -1981,12 +1981,13 @@ export default function Home() {
             <button
               type="button"
               className="shorts-viewer-close"
-              onClick={() => setShortsViewerId(null)}
+              onClick={() => { setShortsViewerId(null); setStandaloneVideo(null); setShortsViewerOrigin(null); }}
               aria-label="Close Shorts viewer"
             >
-              <X size={22} />
+              <span className="shorts-viewer-close-brand">JHILIK</span>
+              <X size={18} />
             </button>
-            <ShortsFeed active initialVideoId={shortsViewerId} viewerMode />
+            <ShortsFeed active initialVideoId={shortsViewerId} viewerMode standaloneVideo={standaloneVideo ?? undefined} />
           </div>
         )}
         {photoViewer && (
@@ -1996,13 +1997,6 @@ export default function Home() {
             owner={photoViewer.owner}
             onClose={() => setPhotoViewer(null)}
           />
-        )}
-        {videoViewer && createPortal(
-          <FocusedVideoViewer
-            video={videoViewer}
-            onClose={() => setVideoViewer(null)}
-          />,
-          document.body
         )}
         <BottomNavigation
           className={
