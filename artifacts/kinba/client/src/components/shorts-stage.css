@@ -168,7 +168,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   min-height: 0 !important;
   max-height: none !important;
   aspect-ratio: auto !important;
-  object-fit: cover !important;
+  object-fit: contain !important;
   overflow: hidden !important;
   z-index: 1 !important;
 }
@@ -183,7 +183,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   min-height: 0 !important;
   max-height: none !important;
   aspect-ratio: auto !important;
-  object-fit: cover !important;
+  object-fit: contain !important;
   z-index: 1 !important;
 }
 
@@ -370,7 +370,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   min-height: 0 !important;
   max-height: none !important;
   aspect-ratio: auto !important;
-  object-fit: cover !important;
+  object-fit: contain !important;
   z-index: 1 !important;
 }
 
@@ -383,7 +383,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   min-height: 0 !important;
   max-height: none !important;
   aspect-ratio: auto !important;
-  object-fit: cover !important;
+  object-fit: contain !important;
   overflow: hidden !important;
   z-index: 1 !important;
 }
@@ -397,7 +397,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   min-height: 0 !important;
   max-height: none !important;
   aspect-ratio: auto !important;
-  object-fit: cover !important;
+  object-fit: contain !important;
   z-index: 1 !important;
 }
 

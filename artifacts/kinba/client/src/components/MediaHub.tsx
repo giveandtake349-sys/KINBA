@@ -868,14 +868,14 @@ function QualityVideoPlayer({
       ref={containerRef}
       className={
         vertical
-          ? "media-video-frame media-video-frame--short w-full h-full object-cover aspect-[9/16]"
+          ? "media-video-frame media-video-frame--short w-full h-full object-contain"
           : "media-video-frame media-video-frame--square w-full"
       }
     >
       <video
         src={sourceUrl}
         poster={showPoster ? posterUrl : undefined}
-        className={`w-full h-full ${vertical ? "object-cover aspect-[9/16]" : "object-contain"}`}
+        className={`w-full h-full ${vertical ? "object-contain" : "object-contain"}`}
         ref={ref}
         {...({ "webkit-playsinline": "true" } as Record<string, string>)}
         controls={false}
@@ -1971,11 +1971,14 @@ function PostManagementMenu({
   const updateMutation = trpc.videos.updateDescription.useMutation();
   const deleteMutation = trpc.videos.delete.useMutation();
   if (auth.user?.id !== video.owner.id) return null;
+  const [caption, setCaption] = useState([video.title, video.description].filter(Boolean).join("\n\n"));
+
   const saveCaption = async () => {
     try {
+      const captionText = caption.trim();
       const result = await updateMutation.mutateAsync({
         videoId: video.id,
-        description,
+        description: captionText,
       });
       onUpdated(result.description);
       setEditing(false);
@@ -2040,9 +2043,9 @@ function PostManagementMenu({
         >
           <strong>Edit Caption</strong>
           <textarea
-            value={description}
+            value={caption}
             maxLength={2000}
-            onChange={event => setDescription(event.target.value)}
+            onChange={event => setCaption(event.target.value)}
             autoFocus
           />
           <div className="post-management__dialog-actions">
@@ -2259,8 +2262,12 @@ function VideoCard({
               )}
             </div>
             <div className="k-post__bottom">
-              {video.title && <h3 className="k-post__title">{video.title}</h3>}
-              {description && <p className="k-post__caption">{description}</p>}
+              {(() => {
+                const captionText = [video.title, description].filter(Boolean).join("\n\n");
+                return captionText ? (
+                  <Caption text={captionText} maxLines={3} className="k-post__caption" />
+                ) : null;
+              })()}
               <p className="k-post__stats">
                 <span>{formatCount(views)} views</span>
                 <span>{relativeTime(video.createdAt)}</span>
@@ -2527,6 +2534,56 @@ export function FeedPhotoLightbox({
   );
 }
 
+function Caption({ text, maxLines = 4, className = "" }: { text: string; maxLines?: number; className?: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+
+  useEffect(() => {
+    if (ref.current) {
+      setIsOverflowing(ref.current.scrollHeight > ref.current.clientHeight);
+    }
+  }, [text, expanded]);
+
+  if (!text) return null;
+
+  return (
+    <div className={`caption-container ${className}`} style={{ maxHeight: expanded ? "none" : undefined }}>
+      <div
+        ref={ref}
+        style={{
+          maxHeight: expanded ? "none" : undefined,
+          overflow: "hidden",
+          display: "-webkit-box",
+          WebkitLineClamp: expanded ? undefined : maxLines,
+          WebkitBoxOrient: "vertical",
+        }}
+      >
+        {text}
+      </div>
+      {isOverflowing && (
+        <button
+          type="button"
+          onClick={() => setExpanded(e => !e)}
+          style={{
+            marginTop: 6,
+            padding: 0,
+            background: "none",
+            border: "none",
+            color: "rgba(255,255,255,0.8)",
+            fontSize: "0.82rem",
+            fontWeight: 500,
+            cursor: "pointer",
+            textAlign: "left",
+          }}
+        >
+          {expanded ? "See less" : "See more"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function FocusedVideoViewer({
   video: initialVideo,
   onClose,
@@ -2547,6 +2604,7 @@ export function FocusedVideoViewer({
   const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [captionExpanded, setCaptionExpanded] = useState(false);
   const bookmarkMutation = trpc.videos.bookmark.useMutation();
   const toggleBookmark = async () => {
     if (!auth.isAuthenticated) return auth.openAuth();
@@ -2639,7 +2697,12 @@ export function FocusedVideoViewer({
 
   const handleLoadedMetadata = () => {
     const el = videoRef.current;
-    if (el) setDuration(el.duration);
+    if (el) {
+      setDuration(el.duration);
+      if (el.videoWidth && el.videoHeight) {
+        console.log(`[Viewer] Video intrinsic: ${el.videoWidth}x${el.videoHeight}`);
+      }
+    }
   };
 
   const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2692,6 +2755,13 @@ export function FocusedVideoViewer({
               onEnded={() => setPlaying(false)}
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
+              style={{
+                display: "block",
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+                background: "#000",
+              }}
             />
           )}
         </div>
@@ -2823,12 +2893,14 @@ export function FocusedVideoViewer({
           </div>
         </div>
 
-        {(video.title || video.description) && (
-          <div className="k-viewer__caption">
-            {video.title && <p className="k-viewer__caption-title">{video.title}</p>}
-            {video.description && <p style={{ margin: 0 }}>{video.description}</p>}
-          </div>
-        )}
+        {(() => {
+          const captionText = [video.title, video.description].filter(Boolean).join("\n\n");
+          return captionText ? (
+            <div className="k-viewer__caption">
+              <Caption text={captionText} maxLines={4} />
+            </div>
+          ) : null;
+        })()}
 
         {!isImage && (
           <div className="media-video-controls">
@@ -3096,8 +3168,7 @@ function ShortVideoCard({
               </div>
             </a>
           </div>
-          <strong className="short-title">{video.title}</strong>
-          <p>{description}</p>
+          <Caption text={[video.title, description].filter(Boolean).join("\n\n")} maxLines={3} className="short-caption" />
           <p className="media-caption-tags">
             {ownerHandle(video.owner.name, video.owner.username)} ·{" "}
             {hashtagsFromDescription(video.description)}
@@ -4034,9 +4105,7 @@ function SearchVideoCard({ video, onOpenVideo }: { video: VideoRecord; onOpenVid
             </span>
           </a>
         </div>
-        {video.title && (
-          <h4 className="search-video-title">{video.title}</h4>
-        )}
+        <Caption text={[video.title, video.description].filter(Boolean).join("\n\n")} maxLines={2} className="search-video-caption" />
         <span className="search-video-meta">
           {formatCount(video.viewCount)} views · {relativeTime(video.createdAt)}
         </span>

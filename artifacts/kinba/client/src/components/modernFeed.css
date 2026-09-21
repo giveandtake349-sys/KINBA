@@ -104,6 +104,21 @@
   word-break: break-word;
 }
 
+.k-post__caption .caption-container button {
+  padding: 4px 0 0;
+  background: none;
+  border: none;
+  color: var(--kinba-coral, #ff5e56);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+
+.k-post__caption .caption-container button:hover {
+  text-decoration: underline;
+}
+
 .k-post__caption:empty {
   display: none;
 }
@@ -358,6 +373,29 @@
   font-size: 0.68rem;
 }
 
+.caption-container {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.caption-container button {
+  padding: 4px 0 0;
+  background: none;
+  border: none;
+  color: var(--kinba-coral, #ff5e56);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+
+.caption-container button:hover {
+  text-decoration: underline;
+}
+
 .k-viewer__caption {
   margin: 0;
   color: rgba(255, 255, 255, 0.8);
@@ -365,19 +403,10 @@
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 4.4em;
-  overflow: auto;
 }
 
 .k-viewer__caption:empty {
   display: none;
-}
-
-.k-viewer__caption-title {
-  color: #fff;
-  font-size: 0.9rem;
-  font-weight: 600;
-  margin: 0 0 3px;
 }
 
 /* ---- Playback controls inside bottom overlay ---- */

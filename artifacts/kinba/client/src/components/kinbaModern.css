@@ -1420,8 +1420,6 @@ body {
   width: 100% !important;
   height: auto !important;
   max-height: 620px !important;
-  aspect-ratio: 16 / 9 !important;
-  object-fit: cover !important;
 }
 
 /* Feed-only reference layout: continuous social posts, never viewport-snapped. */
@@ -2406,8 +2404,8 @@ body {
   height: auto !important;
   min-height: 0 !important;
   max-height: none !important;
-  aspect-ratio: 16 / 9 !important;
-  object-fit: cover !important;
+  aspect-ratio: auto !important;
+  object-fit: contain !important;
 }
 
 .media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .short-overlay {

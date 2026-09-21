@@ -1274,8 +1274,7 @@ function UploadVideoModal({
   const [mode, setMode] = useState<CreateUploaderMode>("menu");
   const [mediaMode, setMediaMode] = useState<"video" | "photo">("video");
   const [kind, setKind] = useState<"LONG" | "SHORT">("LONG");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [caption, setCaption] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1303,8 +1302,7 @@ function UploadVideoModal({
     setMode("menu");
     setFile(null);
     setImageDimensions(null);
-    setTitle("");
-    setDescription("");
+    setCaption("");
     setTextBody("");
     onClose();
   };
@@ -1366,16 +1364,17 @@ function UploadVideoModal({
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    if (!file || !title.trim() || (mediaMode === "photo" && !imageDimensions)) {
-      toast.error(mediaMode === "photo" ? "Add a title and image first." : "Add a title and an original video first.");
+    const captionText = caption.trim();
+    if (!file || !captionText || (mediaMode === "photo" && !imageDimensions)) {
+      toast.error(mediaMode === "photo" ? "Add a caption and image first." : "Add a caption and an original video first.");
       return;
     }
     setBusy(true);
     try {
       if (mediaMode === "photo" && imageDimensions) {
-        await publishPhoto(file, title.trim(), description.trim(), imageDimensions);
+        await publishPhoto(file, "", captionText, imageDimensions);
       } else {
-        await publishVideo(file, kind, title.trim(), description.trim());
+        await publishVideo(file, kind, "", captionText);
       }
       await onPublished();
       await Promise.all([mediaHistory.refetch(), textHistory.refetch()]);
@@ -1453,8 +1452,7 @@ function UploadVideoModal({
               <button type="button" className={kind === "SHORT" ? "active" : ""} onClick={safeClick(() => setKind("SHORT"))}>Short · up to 1 min</button>
             </div>
           )}
-          <label>Title<input value={title} onChange={event => setTitle(event.target.value)} placeholder={kind === "SHORT" ? "Give your Short a title" : "Give your post a title"} maxLength={180} required /></label>
-          <label>Caption<textarea value={description} onChange={event => setDescription(event.target.value)} placeholder="Tell viewers what this is about" maxLength={2400} rows={4} /></label>
+          <label>Caption<textarea value={caption} onChange={event => setCaption(event.target.value)} placeholder={kind === "SHORT" ? "Describe your Short" : "What's on your mind?"} maxLength={2400} rows={4} required /></label>
           <input ref={inputRef} type="file" accept={mediaMode === "photo" ? "image/jpeg,image/png,image/webp" : "video/*"} className="sr-only" onChange={selectFile} />
           <button type="button" className="modal-file-button" onClick={safeClick(() => inputRef.current?.click())}>{mediaMode === "photo" ? <ImagePlus size={18} /> : <Video size={18} />} {file ? file.name : mediaMode === "photo" ? "Choose JPG, PNG, or WEBP image" : "Choose original video"}</button>
           <div className="create-uploader-form-actions"><button type="button" className="muted-btn" onClick={safeClick(() => setMode("menu"))}>Back</button><button className="primary-btn" type="submit" disabled={busy}>{busy ? "Uploading…" : mediaMode === "photo" ? "Publish image" : kind === "SHORT" ? "Upload Short" : "Publish video"}</button></div>
