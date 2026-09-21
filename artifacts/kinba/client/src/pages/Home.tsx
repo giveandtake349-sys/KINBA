@@ -1764,6 +1764,24 @@ export default function Home() {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
+  useEffect(() => {
+    if (shortsViewerId === null) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShortsViewerId(null);
+        setStandaloneVideo(null);
+        setShortsViewerOrigin(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [shortsViewerId]);
+
   // The app chrome is a real fixed element; its actual height is the source of
   // truth for every viewport offset (feed clearance, Shorts stage) instead of
   // hardcoded 104/112/114px compensation. Publish the measured height once and
