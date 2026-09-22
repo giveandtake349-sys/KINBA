@@ -414,8 +414,8 @@ body {
 }
 
 .media-engagement-actions--overlay > button:not(.creator-follow-action) > svg {
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   filter: drop-shadow(0 2px 7px rgba(0, 0, 0, 0.66));
 }
 
@@ -2006,10 +2006,10 @@ body {
 }
 .media-hub .shorts-viewport > .short-card .media-engagement-actions--overlay > button {
   position: relative !important;
-  width: 48px !important;
-  min-width: 48px !important;
-  min-height: 48px !important;
-  padding: 7px 4px !important;
+  width: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  padding: 5px 3px !important;
   border: 1px solid rgba(255, 255, 255, 0.18) !important;
   border-radius: 999px !important;
   color: #fff !important;
@@ -2467,7 +2467,7 @@ body {
   width: 100vw !important;
   height: 100dvh !important;
   max-height: 100dvh !important;
-  padding: 64px 24px !important;
+  padding: 12px 8px !important;
   background: #000 !important;
   isolation: isolate !important;
 }
@@ -2475,9 +2475,9 @@ body {
 .media-hub .feed-photo-lightbox > img {
   display: block !important;
   width: auto !important;
-  max-width: min(100%, 1400px) !important;
+  max-width: 100% !important;
   height: auto !important;
-  max-height: calc(100dvh - 128px) !important;
+  max-height: calc(100dvh - 24px) !important;
   object-fit: contain !important;
   background: #000 !important;
 }
@@ -2496,9 +2496,9 @@ body {
   z-index: 10 !important;
   display: inline-flex !important;
   align-items: center !important;
-  gap: 10px !important;
+  gap: 8px !important;
   max-width: min(80vw, 340px) !important;
-  padding: 8px 12px 8px 8px !important;
+  padding: 6px 10px 6px 6px !important;
   border: 1px solid rgba(255,255,255,.2) !important;
   border-radius: 999px !important;
   color: #fff !important;
@@ -2521,7 +2521,7 @@ body {
 
 .media-hub .feed-photo-lightbox-owner small {
   color: rgba(255,255,255,.68) !important;
-  font-size: 11px !important;
+  font-size: 10px !important;
 }
 
 /* Profile links must preserve the existing identity-row layout everywhere. */

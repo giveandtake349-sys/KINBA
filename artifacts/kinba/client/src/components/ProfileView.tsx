@@ -665,7 +665,7 @@ export default function ProfileView({
                       >
                         {video.mediaType === "TEXT" ? (
                           <div className="pr-tile-text">
-                            <span className="pr-tile-text-content">{[video.title, video.description].filter(Boolean).join("\n\n")}</span>
+                            <span className="pr-tile-text-content">{video.title || video.description || ""}</span>
                           </div>
                         ) : video.mediaType === "IMAGE" ? (
                           <img

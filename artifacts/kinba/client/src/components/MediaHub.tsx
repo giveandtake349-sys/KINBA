@@ -2009,7 +2009,31 @@ function PostManagementMenu({
       });
     }
     setOpen(value => !value);
+    setEditing(false);
+    setConfirming(false);
   };
+  const closeAll = () => {
+    setOpen(false);
+    setEditing(false);
+    setConfirming(false);
+  };
+  useEffect(() => {
+    if (!open && !editing && !confirming) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeAll();
+    };
+    const onClickOutside = (event: Event) => {
+      const target = (event as any).target as HTMLElement;
+      if (target.closest(".post-management, .post-management__menu, .post-management__dialog")) return;
+      closeAll();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("mousedown", onClickOutside);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("mousedown", onClickOutside);
+    };
+  }, [open, editing, confirming]);
   const menuContent = (open || editing || confirming) ? createPortal(
     <>
       {open && !editing && !confirming && (
@@ -2052,7 +2076,7 @@ function PostManagementMenu({
           <div className="post-management__dialog-actions">
             <button
               type="button"
-              onClick={() => setEditing(false)}
+              onClick={() => { setEditing(false); setOpen(false); }}
               disabled={updateMutation.isPending}
             >
               Cancel
@@ -2080,7 +2104,7 @@ function PostManagementMenu({
           <div className="post-management__dialog-actions">
             <button
               type="button"
-              onClick={() => setConfirming(false)}
+              onClick={() => { setConfirming(false); setOpen(false); }}
               disabled={deleteMutation.isPending}
             >
               Cancel
@@ -2228,8 +2252,11 @@ function VideoCard({
 
         {isText ? (
           <div className="k-post__bottom">
-            {video.title && <h3 className="k-post__title">{video.title}</h3>}
-            {description && <p className="k-post__caption">{description}</p>}
+            {description ? (
+              <Caption text={description} maxLines={4} className="k-post__caption" />
+            ) : video.title ? (
+              <h3 className="k-post__title">{video.title}</h3>
+            ) : null}
             <p className="k-post__stats">
               <span>{formatCount(views)} views</span>
               <span>{relativeTime(video.createdAt)}</span>
@@ -2264,7 +2291,7 @@ function VideoCard({
             </div>
             <div className="k-post__bottom">
               {(() => {
-                const captionText = [video.title, description].filter(Boolean).join("\n\n");
+                const captionText = video.title || description || "";
                 return captionText ? (
                   <Caption text={captionText} maxLines={3} className="k-post__caption" />
                 ) : null;
@@ -2710,6 +2737,7 @@ function ShortVideoCard({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [description, setDescription] = useState(video.description);
   const [deleted, setDeleted] = useState(false);
+  const [shortMuted, setShortMuted] = useState(true);
   const auth = useAuth();
   const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
   const bookmarkMutation = trpc.videos.bookmark.useMutation();
@@ -2766,6 +2794,23 @@ function ShortVideoCard({
           onDeleted={() => setDeleted(true)}
         />
       </div>
+      <button
+        type="button"
+        className="shorts-mute-btn"
+        data-short-no-swipe
+        onClick={(e) => {
+          e.stopPropagation();
+          const card = (e.currentTarget as HTMLElement).closest(".short-card");
+          const vid = card?.querySelector("video") as HTMLVideoElement | null;
+          if (vid) {
+            vid.muted = !vid.muted;
+            setShortMuted(vid.muted);
+          }
+        }}
+        aria-label={shortMuted ? "Unmute video" : "Mute video"}
+      >
+        {shortMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+      </button>
       <div className="short-overlay">
         <div className="short-overlay-details">
           <div className="media-owner">
@@ -2806,7 +2851,7 @@ function ShortVideoCard({
               </div>
             </a>
           </div>
-          <Caption text={[video.title, description].filter(Boolean).join("\n\n")} maxLines={3} className="short-caption" />
+          <Caption text={video.title || description || ""} maxLines={3} className="short-caption" />
           <p className="media-caption-tags">
             {ownerHandle(video.owner.name, video.owner.username)} ·{" "}
             {hashtagsFromDescription(video.description)}
@@ -3742,7 +3787,7 @@ function SearchVideoCard({ video, onOpenVideo }: { video: VideoRecord; onOpenVid
             </span>
           </a>
         </div>
-        <Caption text={[video.title, video.description].filter(Boolean).join("\n\n")} maxLines={2} className="search-video-caption" />
+        <Caption text={video.title || video.description || ""} maxLines={2} className="search-video-caption" />
         <span className="search-video-meta">
           {formatCount(video.viewCount)} views · {relativeTime(video.createdAt)}
         </span>

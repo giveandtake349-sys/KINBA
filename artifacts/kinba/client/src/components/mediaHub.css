@@ -2531,7 +2531,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 56px 52px;
+  padding: 12px 8px;
   background: #000;
 }
 .feed-photo-lightbox img {
@@ -2553,10 +2553,10 @@
   cursor: pointer;
 }
 .feed-photo-lightbox-close {
-  top: 16px;
-  right: 16px;
-  width: 42px;
-  height: 42px;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
   z-index: 2;
 }
 .feed-photo-lightbox-counter {
@@ -2596,20 +2596,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 15px;
+  font-size: 13px;
 }
 .feed-photo-lightbox-owner small {
   color: rgba(255, 255, 255, 0.7);
-  font-size: 12px;
+  font-size: 11px;
 }
 .feed-photo-lightbox-owner .video-owner-avatar {
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
 }
 @media (max-width: 560px) {
   .feed-photo-lightbox {
-    padding: 56px 12px;
+    padding: 12px 4px;
   }
   .feed-photo-lightbox-nav {
     width: 38px;
