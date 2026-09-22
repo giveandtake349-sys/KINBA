@@ -60,9 +60,7 @@ import MediaHub, {
   SearchFeed,
   type FeedSection,
   type VideoRecord,
-  type ShortsViewerOrigin,
   FeedPhotoLightbox,
-  ShortsFeed,
 } from "@/components/MediaHub";
 import ProfileView, { ProfileSkeleton } from "@/components/ProfileView";
 import "./profile.css";
@@ -1724,9 +1722,8 @@ export default function Home() {
   const [activeModal, setActiveModal] = useState<AppModal>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(() => location === "/profile");
-  const [shortsViewerId, setShortsViewerId] = useState<number | null>(null);
-  const [standaloneVideo, setStandaloneVideo] = useState<VideoRecord | null>(null);
-  const [shortsViewerOrigin, setShortsViewerOrigin] = useState<ShortsViewerOrigin | null>(null);
+  const [initialShortId, setInitialShortId] = useState<number | null>(null);
+  const [initialShortVideo, setInitialShortVideo] = useState<VideoRecord | null>(null);
   const [photoViewer, setPhotoViewer] = useState<VideoRecord | null>(null);
   const profileQuery = trpc.profile.me.useQuery(undefined, {
     enabled: auth.isAuthenticated && !publicProfileId,
@@ -1764,23 +1761,10 @@ export default function Home() {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
+  // Clear initialShortId when navigating away from shorts tab
   useEffect(() => {
-    if (shortsViewerId === null) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setShortsViewerId(null);
-        setStandaloneVideo(null);
-        setShortsViewerOrigin(null);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [shortsViewerId]);
+    if (activeView !== "shorts") setInitialShortId(null);
+  }, [activeView]);
 
   // The app chrome is a real fixed element; its actual height is the source of
   // truth for every viewport offset (feed clearance, Shorts stage) instead of
@@ -1920,6 +1904,14 @@ export default function Home() {
                   section={activeView}
                   onSectionChange={showFeed}
                   showTabs={false}
+                  initialShortId={initialShortId ?? undefined}
+                  initialShortVideo={initialShortVideo ?? undefined}
+                  onBack={() => setActiveView("videos")}
+                  onOpenShort={(v) => {
+                    setInitialShortId(v.id);
+                    setInitialShortVideo(v);
+                    setActiveView("shorts");
+                  }}
                 />
               )}
             </section>
@@ -1931,9 +1923,13 @@ export default function Home() {
               isAdmin={auth.user?.role === "admin"}
               userId={publicProfileId}
               onBack={closeProfile}
-              onOpenShort={(id) => { setShortsViewerId(id); setShortsViewerOrigin("profile"); }}
+              onOpenShort={(id) => { setInitialShortId(id); setActiveView("shorts"); }}
               onOpenPhoto={setPhotoViewer}
-              onOpenVideo={(v) => { setShortsViewerId(v.id); setStandaloneVideo(v); setShortsViewerOrigin("profile"); }}
+              onOpenVideo={(v) => {
+                setInitialShortId(v.id);
+                setInitialShortVideo(v);
+                setActiveView("shorts");
+              }}
               ownerTools={
                 <>
                   <GetVerifiedPanel />
@@ -1965,7 +1961,12 @@ export default function Home() {
             }}
           />
         )}
-        {activeModal === "search" && <SearchModal open onClose={() => setActiveModal(null)} onOpenVideo={(v) => { setShortsViewerId(v.id); setStandaloneVideo(v); setShortsViewerOrigin("search"); }} />}
+        {activeModal === "search" && <SearchModal open onClose={() => setActiveModal(null)} onOpenVideo={(v) => {
+          setInitialShortId(v.id);
+          setInitialShortVideo(v);
+          setActiveView("shorts");
+          setActiveModal(null);
+        }} />}
         {activeModal === "notifications" && (
           <NotificationDrawer open onClose={() => setActiveModal(null)} enabled={auth.isAuthenticated} />
         )}
@@ -1988,25 +1989,6 @@ export default function Home() {
         )}
         {activeModal === "announcements" && (
           <AnnouncementsModal open onClose={() => setActiveModal(null)} />
-        )}
-        {shortsViewerId !== null && (
-          <div
-            className="shorts-viewer-layer"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Shorts viewer"
-          >
-            <button
-              type="button"
-              className="shorts-viewer-close"
-              onClick={() => { setShortsViewerId(null); setStandaloneVideo(null); setShortsViewerOrigin(null); }}
-              aria-label="Close Shorts viewer"
-            >
-              <span className="shorts-viewer-close-brand">JHILIK</span>
-              <X size={18} />
-            </button>
-            <ShortsFeed active initialVideoId={shortsViewerId} viewerMode standaloneVideo={standaloneVideo ?? undefined} />
-          </div>
         )}
         {photoViewer && (
           <FeedPhotoLightbox

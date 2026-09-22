@@ -566,6 +566,30 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   opacity: 0.92 !important;
 }
 
+/* Shorts header back button — shown when entering Shorts from another tab. */
+.shorts-back-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 6px 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 999px !important;
+  color: #fff !important;
+  background: rgba(12, 14, 22, 0.65) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  font-family: "Space Grotesk", "Inter", system-ui, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: background 0.15s ease, transform 0.1s ease !important;
+}
+
+.shorts-back-btn:active {
+  transform: scale(0.95) !important;
+  background: rgba(12, 14, 22, 0.85) !important;
+}
+
 /* Hide all known app chrome behind the sealed viewer. */
 body:has(.shorts-viewer-layer) .topbar,
 body:has(.shorts-viewer-layer) .top-navigation-wrapper,

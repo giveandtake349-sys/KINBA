@@ -2591,6 +2591,7 @@ function HomeFeedPanel({
   showDetailsOverlay = true,
   showHeader = true,
   onOpenShort,
+  onOpenShortVideo,
   onOpenPhoto,
   onOpenVideo,
 }: {
@@ -2599,6 +2600,7 @@ function HomeFeedPanel({
   showDetailsOverlay?: boolean;
   showHeader?: boolean;
   onOpenShort?: (videoId: number) => void;
+  onOpenShortVideo?: (video: VideoRecord) => void;
   onOpenPhoto?: (video: VideoRecord) => void;
   onOpenVideo?: (video: VideoRecord) => void;
 }) {
@@ -2666,13 +2668,15 @@ function HomeFeedPanel({
                   : undefined
               }
               onOpenViewer={
-                video.kind === "SHORT" && onOpenShort
-                  ? () => onOpenShort(video.id)
-                  : video.mediaType === "IMAGE" && onOpenPhoto
-                    ? () => onOpenPhoto(video)
-                    : video.mediaType === "VIDEO" && onOpenVideo
-                      ? () => onOpenVideo(video)
-                      : undefined
+                video.kind === "SHORT" && onOpenShortVideo
+                  ? () => onOpenShortVideo(video)
+                  : video.kind === "SHORT" && onOpenShort
+                    ? () => onOpenShort(video.id)
+                    : video.mediaType === "IMAGE" && onOpenPhoto
+                      ? () => onOpenPhoto(video)
+                      : video.mediaType === "VIDEO" && onOpenVideo
+                        ? () => onOpenVideo(video)
+                        : undefined
               }
             />
           ))}
@@ -2847,11 +2851,15 @@ export function ShortsFeed({
   initialVideoId,
   viewerMode = false,
   standaloneVideo,
+  source,
+  onBack,
 }: {
   active?: boolean;
   initialVideoId?: number;
   viewerMode?: boolean;
   standaloneVideo?: VideoRecord;
+  source?: "videos" | "profile" | "search";
+  onBack?: () => void;
 }) {
   const query = trpc.home.feed.useQuery(
     { tab: "shorts" },
@@ -2997,7 +3005,19 @@ export function ShortsFeed({
       {!viewerMode && (
         <div className="media-section-heading shorts-header">
           <div>
-            <h2 id="shorts-heading">Shorts</h2>
+            {source ? (
+              <button
+                type="button"
+                className="shorts-back-btn"
+                onClick={onBack}
+                aria-label="Go back"
+              >
+                <ChevronLeft size={20} />
+                <span>Back</span>
+              </button>
+            ) : (
+              <h2 id="shorts-heading">Shorts</h2>
+            )}
           </div>
           <div className="shorts-controls">
             <button
@@ -3756,34 +3776,25 @@ export default function MediaHub({
   section = "videos",
   onSectionChange,
   showTabs = true,
+  initialShortId,
+  initialShortVideo,
+  onBack,
+  onOpenShort,
 }: {
   section?: FeedSection;
   onSectionChange?: (section: FeedSection) => void;
   showTabs?: boolean;
+  initialShortId?: number;
+  initialShortVideo?: VideoRecord;
+  onBack?: () => void;
+  onOpenShort?: (video: VideoRecord) => void;
 }) {
   const [selectedSection, setSelectedSection] = useState<FeedSection>(section);
-  const [shortsViewerId, setShortsViewerId] = useState<number | null>(null);
-  const [standaloneVideo, setStandaloneVideo] = useState<VideoRecord | null>(null);
-  const [shortsViewerOrigin, setShortsViewerOrigin] = useState<ShortsViewerOrigin | null>(null);
   const [photoViewer, setPhotoViewer] = useState<VideoRecord | null>(null);
 
   useEffect(() => {
     setSelectedSection(section);
   }, [section]);
-
-  useEffect(() => {
-    if (shortsViewerId === null) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { setShortsViewerId(null); setStandaloneVideo(null); setShortsViewerOrigin(null); }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [shortsViewerId]);
 
   const activeSection =
     selectedSection === "publish" || selectedSection === "search"
@@ -3851,9 +3862,16 @@ export default function MediaHub({
               active
               showDetailsOverlay={false}
               showHeader={false}
-              onOpenShort={(id) => { setShortsViewerId(id); setShortsViewerOrigin("videos"); }}
+              onOpenShort={(id) => { select("shorts"); }}
+              onOpenShortVideo={(v) => {
+                if (onOpenShort) onOpenShort(v);
+                select("shorts");
+              }}
               onOpenPhoto={setPhotoViewer}
-              onOpenVideo={(v) => { setShortsViewerId(v.id); setStandaloneVideo(v); setShortsViewerOrigin("videos"); }}
+              onOpenVideo={(v) => {
+                if (onOpenShort) onOpenShort(v);
+                select("shorts");
+              }}
             />
           </ErrorBoundary>
         </div>
@@ -3861,31 +3879,18 @@ export default function MediaHub({
       {activeSection === "shorts" && (
         <div className="media-tab-panel shorts-tab-panel">
           <ErrorBoundary fallback={<FeedRecovery />}>
-            <ShortsFeed active />
+            <ShortsFeed
+              active
+              initialVideoId={initialShortId}
+              standaloneVideo={initialShortVideo}
+              source={initialShortId ? "videos" : undefined}
+              onBack={onBack}
+            />
           </ErrorBoundary>
         </div>
       )}
 
       {activeSection === "announcements" && <CommunityAnnouncements />}
-      {shortsViewerId !== null && (
-        <div
-          className="shorts-viewer-layer"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Shorts viewer"
-        >
-          <button
-            type="button"
-            className="shorts-viewer-close"
-            onClick={() => { setShortsViewerId(null); setStandaloneVideo(null); setShortsViewerOrigin(null); }}
-            aria-label="Close Shorts viewer"
-          >
-            <span className="shorts-viewer-close-brand">JHILIK</span>
-            <X size={18} />
-          </button>
-          <ShortsFeed active initialVideoId={shortsViewerId} viewerMode standaloneVideo={standaloneVideo ?? undefined} />
-        </div>
-      )}
       {photoViewer && (
         <FeedPhotoLightbox
           imageUrl={photoViewer.videoUrl}
