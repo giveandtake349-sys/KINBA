@@ -1,23 +1,19 @@
 /* ============================================================================
    KINBA SHORTS STAGE — single source of truth for the Shorts UX.
-   Imported LAST in MediaHub.tsx so it always wins the cascade. It owns the tab
-   stage geometry (snap pager), the edge-to-edge 9:16 viewer, the engagement
-   rail, and the app chrome that must surrender to the immersive stage.
-   ============================================================================
+   Imported LAST in MediaHub.tsx so it always wins the cascade.
 
-   1. App chrome hand-off while the Shorts tab is active.
-   2. Tab stage: fixed screen, flex column (header + flex:1 viewport).
-   3. Snap pager contract (viewport owns scrolling; cards are full-stage frames).
-   4. Media geometry: absolute, inset 0, cover, no intrinsic cropping.
-   5. Content details + engagement rail.
-   6. Detail viewer layer (sealed full-screen stage).
+   This file owns:
+   1. App chrome hand-off (bottom nav / drawer hidden while Shorts active).
+   2. Tab stage geometry (header + snap pager).
+   3. Snap pager contract (viewport scrolls; cards are full-frame).
+   4. Media geometry (absolute inset-0, preserve intrinsic ratio).
+   5. Overlay + engagement rail (premium floating UI).
+   6. Detail viewer layer (sealed full-screen immersive stage).
+   7. Desktop stage (centered column).
    ========================================================================== */
 
 /* ---------------------------------------------------------------------------
    1. App chrome hand-off.
-   While the Shorts tab is mounted, the bottom nav / mobile drawer must not
-   cover the stage, and the app columns must not add clearance under the
-   full-bleed stage.
    --------------------------------------------------------------------------- */
 
 body:has(.shorts-tab-panel) .bottom-navigation,
@@ -34,9 +30,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
 }
 
 /* ---------------------------------------------------------------------------
-   2. Tab stage. The panel is the exact area between the real fixed chrome
-   (header + tabs, measured by Home and published as --kinba-chrome-h) and the
-   bottom of the viewport.
+   2. Tab stage.
    --------------------------------------------------------------------------- */
 
 .shorts-tab-panel,
@@ -60,15 +54,11 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   }
 }
 
-/* When the app chrome collapses on scroll-down (Home adds chrome-collapsed),
-   the Shorts stage grows to a full-bleed 100dvh so it replaces the freed
-   header clearance and the snap pager fills the viewport. */
 .app-main-content.chrome-collapsed .shorts-tab-panel,
 .app-main-content.chrome-collapsed .media-hub .shorts-tab-panel {
   height: 100dvh !important;
 }
 
-/* The section is the flex column inside the stage: header + viewport. */
 .shorts-tab-panel .shorts-section,
 .media-hub .shorts-tab-panel .shorts-section {
   display: flex !important;
@@ -86,8 +76,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
 }
 
 /* ---------------------------------------------------------------------------
-   3. Snap pager contract. The viewport is the ONLY scroll surface; it owns
-   vertical scrolling and native swipes. Cards are full-stage frames.
+   3. Snap pager contract.
    --------------------------------------------------------------------------- */
 
 .media-hub .shorts-tab-panel .shorts-viewport {
@@ -141,8 +130,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
 }
 
 /* ---------------------------------------------------------------------------
-   4. Media geometry. Edge-to-edge, fully covering the card, no cropping by
-   any intrinsic ratio or layout box.
+   4. Media geometry — absolute inset-0, preserve intrinsic ratio.
    --------------------------------------------------------------------------- */
 
 .media-hub .shorts-tab-panel .shorts-viewport > .short-card > img {
@@ -154,7 +142,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   min-height: 0 !important;
   max-height: none !important;
   aspect-ratio: auto !important;
-  object-fit: cover !important;
+  object-fit: contain !important;
   z-index: 1 !important;
 }
 
@@ -171,6 +159,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   object-fit: contain !important;
   overflow: hidden !important;
   z-index: 1 !important;
+  contain: layout paint !important;
 }
 
 .media-hub .shorts-tab-panel .shorts-viewport > .short-card .media-video-frame video,
@@ -187,8 +176,13 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   z-index: 1 !important;
 }
 
+/* Hide playback controls in the Shorts experience — tap-to-toggle only. */
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .media-video-frame > .media-video-controls {
+  display: none !important;
+}
+
 /* ---------------------------------------------------------------------------
-   5. Content details + engagement rail.
+   5. Overlay + engagement rail — floating media-first UI.
    --------------------------------------------------------------------------- */
 
 .media-hub .shorts-tab-panel .shorts-viewport > .short-card .short-overlay {
@@ -202,8 +196,9 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   margin: 0 !important;
   background: linear-gradient(
     180deg,
-    rgba(0, 0, 0, 0) 55%,
-    rgba(0, 0, 0, 0.62) 100%
+    rgba(0, 0, 0, 0) 48%,
+    rgba(0, 0, 0, 0.28) 72%,
+    rgba(0, 0, 0, 0.68) 100%
   ) !important;
   pointer-events: none !important;
 }
@@ -214,37 +209,33 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
 
 .media-hub .shorts-tab-panel .shorts-viewport > .short-card .short-overlay-details {
   position: absolute !important;
-  left: 14px !important;
-  right: 76px !important;
-  bottom: 18px !important;
+  left: 16px !important;
+  right: 72px !important;
+  bottom: 20px !important;
   top: auto !important;
   z-index: 25 !important;
-  max-width: calc(100% - 92px) !important;
+  max-width: calc(100% - 88px) !important;
   padding: 0 !important;
   margin: 0 !important;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.65);
   pointer-events: auto;
 }
 
-/* Legacy, intentional: the rail follow avatar carries identity, so the inline
-   owner block stays hidden in Shorts details. */
 .media-hub .shorts-tab-panel .shorts-viewport > .short-card .media-owner {
   display: none !important;
 }
 
-/* Engagement rail: a right-edge column pinned above the content, with the
-   circular action buttons kept in normal flow inside it. */
 .media-hub .shorts-tab-panel .shorts-viewport > .short-card .shorts-overlay-actions {
   position: absolute !important;
   top: auto !important;
-  right: 12px !important;
-  bottom: 64px !important;
+  right: 10px !important;
+  bottom: 72px !important;
   left: auto !important;
   z-index: 30 !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  gap: 16px !important;
+  gap: 18px !important;
   width: auto !important;
   min-width: 0 !important;
   max-width: none !important;
@@ -261,7 +252,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  gap: 16px !important;
+  gap: 18px !important;
   width: auto !important;
   min-width: 0 !important;
   max-width: none !important;
@@ -271,9 +262,55 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   pointer-events: auto !important;
 }
 
+/* Engagement action buttons — premium glass-morphic circles. */
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .media-engagement-actions--overlay > button,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .media-engagement-actions--overlay > button {
+  position: relative !important;
+  width: 46px !important;
+  min-width: 46px !important;
+  min-height: 46px !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 50% !important;
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25) !important;
+  pointer-events: auto !important;
+  transition: transform 0.15s ease, background 0.15s ease !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .media-engagement-actions--overlay > button:active,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .media-engagement-actions--overlay > button:active {
+  transform: scale(0.92) !important;
+  background: rgba(255, 255, 255, 0.22) !important;
+}
+
+/* Engagement count labels — refined micro-text. */
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .media-engagement-actions--overlay > button > strong,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .media-engagement-actions--overlay > button > strong {
+  position: absolute !important;
+  top: calc(100% + 3px) !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+  white-space: nowrap !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+  pointer-events: none !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .media-engagement-actions--overlay > button > span,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .media-engagement-actions--overlay > button > span {
+  display: none !important;
+}
+
 /* ---------------------------------------------------------------------------
-   6. Detail viewer layer: a sealed full-screen stage over everything, with
-   its own close control and no app chrome behind it.
+   6. Detail viewer layer — sealed full-screen immersive stage.
+   Used when opening a video from Videos/Profile/Search (not the Shorts tab).
    --------------------------------------------------------------------------- */
 
 .shorts-viewer-layer,
@@ -281,7 +318,8 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   position: fixed !important;
   inset: 0 !important;
   z-index: 2147483000 !important;
-  display: block !important;
+  display: flex !important;
+  flex-direction: column !important;
   width: 100% !important;
   height: 100dvh !important;
   max-height: 100dvh !important;
@@ -292,6 +330,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   isolation: isolate !important;
 }
 
+/* The section inside the viewer layer. */
 .media-hub .shorts-viewer-layer .shorts-section.shorts-detail-feed {
   display: flex !important;
   flex-direction: column !important;
@@ -311,6 +350,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   display: none !important;
 }
 
+/* The scrollable viewport inside the viewer. */
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport {
   display: flex !important;
   flex-direction: column !important;
@@ -338,7 +378,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   height: 0 !important;
 }
 
-/* Reuse the exact frame, media, and rail contract for viewer cards. */
+/* Viewer cards — full-frame snap items. */
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card {
   flex: 0 0 100% !important;
   width: 100% !important;
@@ -361,6 +401,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   scroll-snap-stop: always !important;
 }
 
+/* Viewer media — absolute inset-0, preserve intrinsic ratio. */
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card > img {
   position: absolute !important;
   inset: 0 !important;
@@ -406,6 +447,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   z-index: 1 !important;
 }
 
+/* Viewer overlay — same design language as tab overlay. */
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .short-overlay {
   position: absolute !important;
   inset: 0 !important;
@@ -413,10 +455,13 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   display: flex !important;
   flex-direction: column !important;
   justify-content: flex-end !important;
+  padding: 0 !important;
+  margin: 0 !important;
   background: linear-gradient(
     180deg,
-    rgba(0, 0, 0, 0) 55%,
-    rgba(0, 0, 0, 0.62) 100%
+    rgba(0, 0, 0, 0) 48%,
+    rgba(0, 0, 0, 0.28) 72%,
+    rgba(0, 0, 0, 0.68) 100%
   ) !important;
   pointer-events: none !important;
 }
@@ -426,13 +471,16 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
 }
 
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .short-overlay-details {
-  left: 14px !important;
-  right: 76px !important;
-  bottom: 18px !important;
+  left: 16px !important;
+  right: 72px !important;
+  bottom: 20px !important;
   top: auto !important;
   z-index: 25 !important;
-  max-width: calc(100% - 92px) !important;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
+  max-width: calc(100% - 88px) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.65);
+  pointer-events: auto;
 }
 
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .media-owner {
@@ -441,17 +489,19 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
 
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .shorts-overlay-actions {
   top: auto !important;
-  right: 12px !important;
-  bottom: 64px !important;
+  right: 10px !important;
+  bottom: 72px !important;
   left: auto !important;
   z-index: 30 !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  gap: 16px !important;
+  gap: 18px !important;
   width: auto !important;
   min-width: 0 !important;
   max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
   transform: none !important;
   pointer-events: auto !important;
 }
@@ -463,45 +513,60 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  gap: 16px !important;
+  gap: 18px !important;
   width: auto !important;
   min-width: 0 !important;
   max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
   transform: none !important;
   pointer-events: auto !important;
 }
 
-/* Viewer close control. */
+/* ---------------------------------------------------------------------------
+   6b. Viewer close control — frosted-glass pill.
+   --------------------------------------------------------------------------- */
+
 .shorts-viewer-close {
   position: fixed !important;
-  top: 12px !important;
-  right: 12px !important;
+  top: 14px !important;
+  right: 14px !important;
   z-index: 2147483001 !important;
   display: flex !important;
   align-items: center !important;
-  gap: 6px !important;
+  gap: 7px !important;
   width: auto !important;
-  height: 40px !important;
+  height: 38px !important;
   padding: 0 14px !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
   border-radius: 999px !important;
   color: #fff !important;
-  background: rgba(8, 12, 20, 0.72) !important;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.28) !important;
+  background: rgba(12, 14, 22, 0.65) !important;
+  backdrop-filter: blur(16px) saturate(1.4) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.4) !important;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.3),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.08) !important;
   cursor: pointer !important;
+  transition: background 0.15s ease, transform 0.1s ease !important;
+}
+
+.shorts-viewer-close:active {
+  transform: scale(0.95) !important;
+  background: rgba(12, 14, 22, 0.8) !important;
 }
 
 .shorts-viewer-close-brand {
-  font-family: "Inter", "SF Pro Display", system-ui, sans-serif !important;
+  font-family: "Space Grotesk", "Inter", "SF Pro Display", system-ui, sans-serif !important;
   font-size: 11px !important;
   font-weight: 700 !important;
-  letter-spacing: 1.5px !important;
+  letter-spacing: 1.8px !important;
   text-transform: uppercase !important;
   color: #fff !important;
-  opacity: 0.9 !important;
+  opacity: 0.92 !important;
 }
 
-/* Hide all known app chrome and modal surfaces behind the sealed viewer. */
+/* Hide all known app chrome behind the sealed viewer. */
 body:has(.shorts-viewer-layer) .topbar,
 body:has(.shorts-viewer-layer) .top-navigation-wrapper,
 body:has(.shorts-viewer-layer) .home-feed-tabs,
@@ -513,7 +578,7 @@ body:has(.shorts-viewer-layer) .action-modal-layer {
 }
 
 /* ---------------------------------------------------------------------------
-   Desktop stage: center a 9:16 column for both the tab and the viewer.
+   7. Desktop stage — centered column.
    --------------------------------------------------------------------------- */
 
 @media (min-width: 768px) {
@@ -523,6 +588,6 @@ body:has(.shorts-viewer-layer) .action-modal-layer {
   }
 
   .media-hub .shorts-viewer-layer .shorts-viewer-close {
-    right: max(12px, calc((100% - 420px) / 2 - 52px)) !important;
+    right: max(14px, calc((100% - 420px) / 2 - 52px)) !important;
   }
 }
