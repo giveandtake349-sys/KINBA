@@ -2184,80 +2184,7 @@ body {
   scroll-snap-stop: normal !important;
 }
 
-/* A detail viewer is a sealed layer above app chrome and the feed. */
-.media-hub .shorts-viewer-layer {
-  position: fixed !important;
-  z-index: 2000 !important;
-  inset: 0 !important;
-  display: block !important;
-  width: 100vw !important;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  isolation: isolate !important;
-  background: #000 !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-feed,
-.media-hub .shorts-viewer-layer .shorts-detail-viewport {
-  width: 100% !important;
-  max-width: none !important;
-  background: #000 !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-feed {
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-}
-
-.media-hub .shorts-viewer-layer .media-section-heading,
-.media-hub .shorts-viewer-layer .media-publish-panel,
-.media-hub .shorts-viewer-layer .shorts-controls,
-.media-hub .shorts-viewer-layer .shorts-detail-feed > .upload-video-panel {
-  display: none !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-viewport {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 12px !important;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  margin: 0 !important;
-  padding: 12px 0 calc(12px + env(safe-area-inset-bottom)) !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  scroll-snap-type: y mandatory !important;
-  background: #000 !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card {
-  width: 100% !important;
-  height: auto !important;
-  min-height: calc(100dvh - 24px) !important;
-  max-height: none !important;
-  flex: 0 0 auto !important;
-  margin: 0 0 12px !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: #242526 !important;
-  scroll-snap-align: start !important;
-  scroll-snap-stop: always !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-viewer-close {
-  z-index: 2050 !important;
-}
+/* Viewer layer rules live exclusively in shorts-stage.css — do not duplicate here. */
 
 @media (max-width: 760px) {
   .media-hub .shorts-tab-panel .shorts-list-viewport {
@@ -2266,10 +2193,6 @@ body {
 
   .media-hub .shorts-tab-panel .shorts-list-viewport > .short-card {
     margin-bottom: 16px !important;
-  }
-
-  .media-hub .shorts-viewer-layer .shorts-detail-viewport {
-    gap: 12px !important;
   }
 }
 
@@ -2336,122 +2259,8 @@ body {
   padding: 0 !important;
 }
 
-/* The detail viewer is a sealed screen, not another layer in the feed flow. */
-.media-hub .shorts-viewer-layer {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 2147483000 !important;
-  display: block !important;
-  width: 100vw !important;
-  height: 100dvh !important;
-  max-height: 100dvh !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important;
-  isolation: isolate !important;
-  contain: strict !important;
-  background: #000 !important;
-}
+/* Viewer layer rules live exclusively in shorts-stage.css — do not duplicate here. */
 
-.media-hub .shorts-viewer-layer .shorts-detail-feed,
-.media-hub .shorts-viewer-layer .shorts-detail-viewport {
-  position: relative !important;
-  z-index: 1 !important;
-  width: 100% !important;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  margin: 0 !important;
-  background: #000 !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-feed > .media-section-heading,
-.media-hub .shorts-viewer-layer .shorts-controls,
-.media-hub .shorts-viewer-layer .shorts-detail-feed > .upload-video-panel,
-.media-hub .shorts-viewer-layer .shorts-detail-feed > .media-publish-panel {
-  display: none !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-viewport {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 8px !important;
-  padding: 8px 0 calc(8px + env(safe-area-inset-bottom)) !important;
-  overflow-x: hidden !important;
-  overflow-y: auto !important;
-  scroll-snap-type: y mandatory !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card {
-  position: relative !important;
-  z-index: 1 !important;
-  flex: 0 0 auto !important;
-  width: 100% !important;
-  min-height: 0 !important;
-  height: auto !important;
-  margin: 0 0 8px !important;
-  border: 1px solid #3a3b3c !important;
-  border-radius: 10px !important;
-  background: #242526 !important;
-  overflow: hidden !important;
-  scroll-snap-align: start !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card > .media-video-frame,
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card > img {
-  display: block !important;
-  width: 100% !important;
-  height: auto !important;
-  min-height: 0 !important;
-  max-height: none !important;
-  aspect-ratio: auto !important;
-  object-fit: contain !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .short-overlay {
-  position: static !important;
-  inset: auto !important;
-  min-height: 0 !important;
-  padding: 10px 12px 8px !important;
-  background: #242526 !important;
-  z-index: 1 !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card .shorts-overlay-actions {
-  position: static !important;
-  inset: auto !important;
-  width: 100% !important;
-  padding: 0 !important;
-  z-index: 2 !important;
-}
-
-/* Do not allow app chrome or an older modal layer to paint over the sealed viewer. */
-body:has(.shorts-viewer-layer) .topbar,
-body:has(.shorts-viewer-layer) .top-navigation-wrapper,
-body:has(.shorts-viewer-layer) .home-feed-tabs,
-body:has(.shorts-viewer-layer) .bottom-navigation,
-body:has(.shorts-viewer-layer) .mobile-drawer,
-body:has(.shorts-viewer-layer) .action-modal-layer {
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
-
-@media (max-width: 760px) {
-  .media-hub .shorts-tab-panel .shorts-list-viewport > .short-card {
-    margin-bottom: 16px !important;
-    border-radius: 10px !important;
-  }
-
-  .media-hub .shorts-viewer-layer .shorts-detail-viewport {
-    gap: 6px !important;
-    padding-top: 6px !important;
-  }
-
-  .media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card {
-    margin-bottom: 6px !important;
-    border-radius: 8px !important;
-  }
-}
 
 
 /* Final professional Shorts repair: strict card heights, explicit header flex, and sealed stacking. */
@@ -2558,92 +2367,7 @@ body:has(.shorts-viewer-layer) .action-modal-layer {
   object-fit: contain !important;
 }
 
-/* Detail mode: one full-height card at a time, with no collapsed children or feed bleed. */
-.media-hub .shorts-viewer-layer {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 2147483000 !important;
-  width: 100vw !important;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  overflow: hidden !important;
-  background: #000 !important;
-  isolation: isolate !important;
-  contain: strict !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-surface,
-.media-hub .shorts-viewer-layer .shorts-detail-feed,
-.media-hub .shorts-viewer-layer .shorts-detail-viewport {
-  position: relative !important;
-  z-index: 999 !important;
-  width: 100% !important;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  background: #000 !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-viewport {
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 8px !important;
-  padding: 8px 0 calc(8px + env(safe-area-inset-bottom)) !important;
-  overflow-x: hidden !important;
-  overflow-y: auto !important;
-  scroll-snap-type: y mandatory !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card {
-  display: flex !important;
-  flex: 0 0 calc(100dvh - 16px) !important;
-  flex-direction: column !important;
-  width: 100% !important;
-  height: calc(100dvh - 16px) !important;
-  min-height: 560px !important;
-  max-height: none !important;
-  margin: 0 !important;
-  box-sizing: border-box !important;
-  border: 1px solid #3a3b3c !important;
-  border-radius: 10px !important;
-  background: #242526 !important;
-  overflow: hidden !important;
-  position: relative !important;
-  z-index: 1000 !important;
-  scroll-snap-align: start !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card > .media-video-frame,
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card > img {
-  flex: 1 1 auto !important;
-  width: 100% !important;
-  height: auto !important;
-  min-height: 0 !important;
-  max-height: none !important;
-  aspect-ratio: auto !important;
-  object-fit: cover !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card > .media-video-frame video {
-  width: 100% !important;
-  height: 100% !important;
-  min-height: 0 !important;
-  object-fit: cover !important;
-}
-
-/* Hide all known app chrome and modal surfaces while the detail screen is mounted. */
-body:has(.shorts-viewer-layer) .topbar,
-body:has(.shorts-viewer-layer) .top-navigation-wrapper,
-body:has(.shorts-viewer-layer) .home-feed-tabs,
-body:has(.shorts-viewer-layer) .bottom-navigation,
-body:has(.shorts-viewer-layer) .mobile-drawer,
-body:has(.shorts-viewer-layer) .action-modal-layer,
-body:has(.shorts-viewer-layer) .auth-dialog,
-body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
+/* Viewer layer rules live exclusively in shorts-stage.css — do not duplicate here. */
 
 @media (max-width: 760px) {
   .media-hub .shorts-list-feed > .shorts-header {
@@ -2667,13 +2391,6 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
     height: 80vh !important;
     min-height: 480px !important;
     border-radius: 10px !important;
-  }
-
-  .media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card {
-    flex-basis: calc(100dvh - 12px) !important;
-    height: calc(100dvh - 12px) !important;
-    min-height: 480px !important;
-    border-radius: 8px !important;
   }
 }
 
@@ -2718,28 +2435,6 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
   touch-action: pan-y !important;
 }
 
-.media-hub .shorts-viewer-layer .shorts-detail-viewport {
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  max-height: 100dvh !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  -webkit-overflow-scrolling: touch !important;
-  overscroll-behavior-y: contain !important;
-  scroll-snap-type: y mandatory !important;
-  scroll-behavior: smooth !important;
-  touch-action: pan-y !important;
-}
-
-.media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card {
-  flex: 0 0 calc(100dvh - 16px) !important;
-  height: calc(100dvh - 16px) !important;
-  min-height: 480px !important;
-  scroll-snap-align: start !important;
-  scroll-snap-stop: always !important;
-  touch-action: pan-y !important;
-}
-
 @media (max-width: 760px) {
   .media-hub .shorts-list-feed > .shorts-list-viewport {
     height: calc(100dvh - 68px) !important;
@@ -2748,11 +2443,6 @@ body:has(.shorts-viewer-layer) [role="dialog"]:not(.shorts-viewer-layer) {
   .media-hub .shorts-list-feed > .shorts-list-viewport > .short-card {
     flex-basis: 100% !important;
     height: 100% !important;
-  }
-
-  .media-hub .shorts-viewer-layer .shorts-detail-viewport > .short-card {
-    flex-basis: calc(100dvh - 12px) !important;
-    height: calc(100dvh - 12px) !important;
   }
 }
 

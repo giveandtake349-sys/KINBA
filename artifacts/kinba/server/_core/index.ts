@@ -21,8 +21,13 @@ async function startServer() {
   // the first proxy keeps secure session cookies stable for protected mutations.
   app.set("trust proxy", 1);
 
-  // --- Health check: liveness + optional DB readiness ---
-  app.get("/api/health", async (_req, res) => {
+  // --- Health check: fast liveness probe (no DB dependency) ---
+  app.get("/api/health", (_req, res) => {
+    res.status(200).json({ ok: true });
+  });
+
+  // --- Readiness check: includes DB connectivity (used by monitoring, not by Render routing) ---
+  app.get("/api/ready", async (_req, res) => {
     try {
       const db = await getDb();
       if (!db) {
@@ -32,7 +37,7 @@ async function startServer() {
       await db.execute(sql`SELECT 1`);
       res.status(200).json({ ok: true, db: "connected" });
     } catch (error) {
-      console.error("[Health] Database readiness check failed:", error);
+      console.error("[Readiness] Database check failed:", error);
       res.status(503).json({ ok: false, db: "unreachable" });
     }
   });
@@ -145,6 +150,10 @@ async function startServer() {
   });
 
   const port = Number(process.env.PORT || 10000);
+
+  // Eagerly initialize DB pool so it's ready when the first API request arrives.
+  // This avoids lazy-init latency on cold start.
+  getDb().catch(() => {});
 
   server.listen(port, "0.0.0.0", () => {
     console.log(
