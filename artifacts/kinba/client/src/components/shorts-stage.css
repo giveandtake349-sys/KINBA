@@ -315,17 +315,15 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   display: none !important;
 }
 
-/* Shorts mute toggle button — small speaker icon at bottom-right. */
-.media-hub .shorts-tab-panel .shorts-viewport > .short-card .shorts-mute-btn {
-  position: absolute !important;
-  bottom: 88px !important;
-  right: 10px !important;
-  z-index: 35 !important;
+/* Shorts mute toggle button — last item in right-side action rail. */
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .shorts-overlay-actions .shorts-mute-btn,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .shorts-overlay-actions .shorts-mute-btn {
+  position: relative !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 34px !important;
-  height: 34px !important;
+  width: 40px !important;
+  height: 40px !important;
   padding: 0 !important;
   border: none !important;
   border-radius: 50% !important;
@@ -336,9 +334,11 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   cursor: pointer !important;
   pointer-events: auto !important;
   transition: background 0.15s ease !important;
+  flex-shrink: 0 !important;
 }
 
-.media-hub .shorts-tab-panel .shorts-viewport > .short-card .shorts-mute-btn:active {
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .shorts-overlay-actions .shorts-mute-btn:active,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .shorts-overlay-actions .shorts-mute-btn:active {
   background: rgba(0, 0, 0, 0.65) !important;
   transform: scale(0.92) !important;
 }

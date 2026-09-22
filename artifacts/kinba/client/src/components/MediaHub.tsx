@@ -2794,23 +2794,6 @@ function ShortVideoCard({
           onDeleted={() => setDeleted(true)}
         />
       </div>
-      <button
-        type="button"
-        className="shorts-mute-btn"
-        data-short-no-swipe
-        onClick={(e) => {
-          e.stopPropagation();
-          const card = (e.currentTarget as HTMLElement).closest(".short-card");
-          const vid = card?.querySelector("video") as HTMLVideoElement | null;
-          if (vid) {
-            vid.muted = !vid.muted;
-            setShortMuted(vid.muted);
-          }
-        }}
-        aria-label={shortMuted ? "Unmute video" : "Mute video"}
-      >
-        {shortMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-      </button>
       <div className="short-overlay">
         <div className="short-overlay-details">
           <div className="media-owner">
@@ -2877,6 +2860,23 @@ function ShortVideoCard({
             onBookmark={toggleBookmark}
             owner={video.owner}
           />
+          <button
+            type="button"
+            className="shorts-mute-btn"
+            data-short-no-swipe
+            onClick={(e) => {
+              e.stopPropagation();
+              const card = (e.currentTarget as HTMLElement).closest(".short-card");
+              const vid = card?.querySelector("video") as HTMLVideoElement | null;
+              if (vid) {
+                vid.muted = !vid.muted;
+                setShortMuted(vid.muted);
+              }
+            }}
+            aria-label={shortMuted ? "Unmute video" : "Mute video"}
+          >
+            {shortMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+          </button>
         </div>
       </div>
       <CommentDrawer
