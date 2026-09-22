@@ -386,6 +386,11 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   object-fit: contain !important;
   overflow: hidden !important;
   z-index: 1 !important;
+  contain: layout paint !important;
+}
+
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card > .media-video-frame > .media-video-controls {
+  display: none !important;
 }
 
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card > .media-video-frame > video {
@@ -402,6 +407,8 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
 }
 
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .short-overlay {
+  position: absolute !important;
+  inset: 0 !important;
   z-index: 20 !important;
   display: flex !important;
   flex-direction: column !important;
