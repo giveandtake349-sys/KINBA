@@ -253,7 +253,7 @@ export function registerVideoUploadRoute(app: Express) {
           ? MAX_SHORT_VIDEO_DURATION_SECONDS
           : MAX_LONG_VIDEO_DURATION_SECONDS;
       if (
-        title.length < 3 ||
+        (title.length > 0 && title.length < 3) ||
         title.length > 180 ||
         !videoUrl ||
         !Number.isFinite(durationSeconds) ||
@@ -302,7 +302,7 @@ export function registerVideoUploadRoute(app: Express) {
       const imageUrl = String(req.body?.imageUrl ?? "").trim();
       const width = Number(req.body?.width);
       const height = Number(req.body?.height);
-      if (title.length < 3 || title.length > 180) {
+      if ((title.length > 0 && title.length < 3) || title.length > 180) {
         res
           .status(400)
           .json({ error: "Title must be between 3 and 180 characters." });
@@ -389,7 +389,7 @@ export function registerVideoUploadRoute(app: Express) {
       const description = String(req.body.description ?? "").trim();
       const width = Number(req.body.width);
       const height = Number(req.body.height);
-      if (title.length < 3 || title.length > 180) {
+      if ((title.length > 0 && title.length < 3) || title.length > 180) {
         res
           .status(400)
           .json({ error: "Title must be between 3 and 180 characters." });

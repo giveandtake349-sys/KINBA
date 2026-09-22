@@ -1860,6 +1860,17 @@ export default function Home() {
         {authDialog}
       </>
     );
+  if (auth.loading)
+    return (
+      <div className="kinba-app max-w-vw overflow-x-hidden box-border">
+        <div className="media-empty" role="status">
+          <div className="feed-skeleton" aria-hidden="true">
+            <span /><span /><span />
+          </div>
+          <p>Loading KINBA…</p>
+        </div>
+      </div>
+    );
   return (
     <>
       <div
