@@ -222,7 +222,8 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
 }
 
 .media-hub .shorts-tab-panel .shorts-viewport > .short-card .media-owner {
-  display: none !important;
+  display: block !important;
+  margin-bottom: 6px !important;
 }
 
 .media-hub .shorts-tab-panel .shorts-viewport > .short-card .shorts-overlay-actions {
@@ -484,7 +485,8 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
 }
 
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .media-owner {
-  display: none !important;
+  display: block !important;
+  margin-bottom: 6px !important;
 }
 
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .shorts-overlay-actions {
@@ -599,6 +601,60 @@ body:has(.shorts-viewer-layer) .mobile-drawer,
 body:has(.shorts-viewer-layer) .action-modal-layer {
   visibility: hidden !important;
   pointer-events: none !important;
+}
+
+/* ---------------------------------------------------------------------------
+   6c. Premium overlay typography.
+   --------------------------------------------------------------------------- */
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .short-overlay-details {
+  font-family: "Space Grotesk", "Inter", system-ui, sans-serif !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .video-owner-identity {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .video-owner-name {
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #fff !important;
+  letter-spacing: -0.01em !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .video-owner-avatar {
+  width: 34px !important;
+  height: 34px !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .video-owner-avatar img {
+  border: 2px solid rgba(255, 255, 255, 0.9) !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .video-owner-identity > div > span {
+  font-size: 12px !important;
+  color: rgba(255, 255, 255, 0.65) !important;
+  font-weight: 500 !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .short-caption {
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .media-caption-tags {
+  font-size: 12px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  margin-top: 5px !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .media-sound-track {
+  font-size: 12px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  margin-top: 6px !important;
 }
 
 /* ---------------------------------------------------------------------------

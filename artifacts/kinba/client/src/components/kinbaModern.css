@@ -372,8 +372,7 @@ body {
   font-weight: 600;
 }
 
-.media-overlay-details .media-owner,
-.short-overlay-details .media-owner {
+.media-overlay-details .media-owner {
   display: none !important;
 }
 

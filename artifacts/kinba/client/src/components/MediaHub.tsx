@@ -3019,27 +3019,6 @@ export function ShortsFeed({
               <h2 id="shorts-heading">Shorts</h2>
             )}
           </div>
-          <div className="shorts-controls">
-            <button
-              type="button"
-              onClick={() => goTo(activeIndex - 1)}
-              disabled={!videos.length || activeIndex === 0}
-              aria-label="Previous Short"
-            >
-              ↑
-            </button>
-            <span>
-              {videos.length ? `${activeIndex + 1} / ${videos.length}` : "0 / 0"}
-            </span>
-            <button
-              type="button"
-              onClick={() => goTo(activeIndex + 1)}
-              disabled={!videos.length || activeIndex === videos.length - 1}
-              aria-label="Next Short"
-            >
-              ↓
-            </button>
-          </div>
         </div>
       )}
       {query.isPending ? (
