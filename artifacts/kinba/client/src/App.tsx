@@ -7,6 +7,7 @@ import { SupabaseAuthProvider } from "./contexts/SupabaseAuthContext";
 import Home from "./pages/Home";
 import Admin from "./pages/Admin";
 import HypeRooms from "./pages/HypeRooms";
+import CreateHypeRoom from "./pages/CreateHypeRoom";
 import HypeRoomDetail from "./pages/HypeRoomDetail";
 import Drops from "./pages/Drops";
 import DropDetail from "./pages/DropDetail";
@@ -26,6 +27,8 @@ export default function App() {
             <ThemedToaster />
             <Switch>
               <Route path="/admin" component={Admin} />
+              {/* /rooms/new must be registered before /rooms/:id so "new" is not captured as an id. */}
+              <Route path="/rooms/new" component={CreateHypeRoom} />
               <Route path="/rooms/:id" component={HypeRoomDetail} />
               <Route path="/rooms" component={HypeRooms} />
               <Route path="/drops/:id" component={DropDetail} />

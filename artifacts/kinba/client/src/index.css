@@ -1575,6 +1575,18 @@ h3 {
   border-color: rgba(255, 141, 141, 0.4);
   background: rgba(255, 141, 141, 0.1);
 }
+/* Milestone A — Admin Feature Flags panel */
+.admin-flag-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: flex-end;
+}
+.admin-flags-section .form-message {
+  margin: 0 0 0.75rem;
+}
+
 /* Gate 6 — Admin Reports section */
 .admin-reports-filters {
   display: flex;

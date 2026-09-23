@@ -6,12 +6,14 @@ import {
   Flag,
   EyeOff,
   ShieldCheck,
+  SlidersHorizontal,
   WalletCards,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { getTrpcCode } from "@/pages/HypeRooms";
+import type { FeatureFlagKey } from "@shared/featureFlags";
 
 type ReportStatusFilter = "all" | "open" | "resolved";
 type ReportTargetFilter =
@@ -79,8 +81,51 @@ export default function Admin() {
   const resolveReport = trpc.admin.reports.resolve.useMutation();
   const hideMessage = trpc.admin.messages.hide.useMutation();
 
+  const featureFlagsQuery = trpc.admin.featureFlags.list.useQuery(undefined, {
+    enabled: !auth.loading && isAdmin,
+    refetchOnWindowFocus: false,
+    staleTime: 10_000,
+  });
+  const setFeatureFlag = trpc.admin.featureFlags.set.useMutation();
+  const [pendingFlag, setPendingFlag] = useState<string | null>(null);
+  const [flagNotice, setFlagNotice] = useState<{
+    ok: boolean;
+    message: string;
+  } | null>(null);
+
   const refreshReports = async () => {
     await utils.admin.reports.list.invalidate();
+  };
+
+  const refreshFeatureFlags = async () => {
+    await utils.admin.featureFlags.list.invalidate();
+  };
+
+  const handleToggleFlag = async (
+    flagKey: FeatureFlagKey,
+    enabled: boolean
+  ) => {
+    if (pendingFlag || setFeatureFlag.isPending) return;
+    setPendingFlag(flagKey);
+    setFlagNotice(null);
+    try {
+      await setFeatureFlag.mutateAsync({ flagKey, enabled });
+      setFlagNotice({
+        ok: true,
+        message: `${flagKey} is now ${enabled ? "enabled" : "disabled"}.`,
+      });
+      await refreshFeatureFlags();
+    } catch (error) {
+      setFlagNotice({
+        ok: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to update feature flag.",
+      });
+    } finally {
+      setPendingFlag(null);
+    }
   };
 
   useEffect(() => {
@@ -419,6 +464,84 @@ export default function Admin() {
                   ) : null}
                 </div>
               </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="admin-card admin-flags-section" aria-label="Feature flags">
+        <div className="admin-section-heading">
+          <div>
+            <p className="eyebrow">Feature flags</p>
+            <h2>Runtime feature toggles</h2>
+          </div>
+          <SlidersHorizontal size={22} />
+        </div>
+        <p className="admin-help">
+          Server is authoritative. Changes apply immediately; unset flags stay
+          fail-closed (disabled).
+        </p>
+        {flagNotice ? (
+          <p
+            className={`form-message${flagNotice.ok ? "" : " form-message--error"}`}
+            role="status"
+          >
+            {flagNotice.message}
+          </p>
+        ) : null}
+        {featureFlagsQuery.isPending ? (
+          <p className="admin-reports-empty">Loading feature flags…</p>
+        ) : featureFlagsQuery.isError ? (
+          <div className="admin-reports-empty">
+            <p>Could not load feature flags.</p>
+            <button
+              type="button"
+              className="muted-btn"
+              onClick={() => void featureFlagsQuery.refetch()}
+            >
+              Retry
+            </button>
+          </div>
+        ) : (featureFlagsQuery.data ?? []).length === 0 ? (
+          <p className="admin-reports-empty">No feature flags returned.</p>
+        ) : (
+          <div className="admin-session-list">
+            {(featureFlagsQuery.data ?? []).map(flag => (
+              <div className="admin-session-row" key={flag.flagKey}>
+                <div>
+                  <strong>{flag.flagKey}</strong>
+                  <span>
+                    {flag.enabled ? "Enabled" : "Disabled"}
+                    {flag.updatedAt
+                      ? ` · Updated ${formatDate(flag.updatedAt)}`
+                      : ""}
+                  </span>
+                </div>
+                <div className="admin-flag-actions">
+                  <span
+                    className={`status-chip${flag.enabled ? " status-chip--approved" : ""}`}
+                    aria-live="polite"
+                  >
+                    {flag.enabled ? "ON" : "OFF"}
+                  </span>
+                  <button
+                    type="button"
+                    className={flag.enabled ? "danger-btn" : "primary-btn"}
+                    disabled={pendingFlag !== null || setFeatureFlag.isPending}
+                    onClick={() =>
+                      void handleToggleFlag(flag.flagKey, !flag.enabled)
+                    }
+                  >
+                    {pendingFlag === flag.flagKey
+                      ? flag.enabled
+                        ? "Disabling…"
+                        : "Enabling…"
+                      : flag.enabled
+                        ? "Disable"
+                        : "Enable"}
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
         )}

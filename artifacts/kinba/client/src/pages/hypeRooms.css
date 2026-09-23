@@ -32,6 +32,14 @@
   color: var(--accent);
 }
 
+.hype-rooms-header {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+}
+
 .hype-rooms-header h1 {
   font-family: "Space Grotesk", sans-serif;
   font-size: clamp(1.7rem, 4vw, 2.35rem);
@@ -607,7 +615,123 @@
     box-shadow: 0 0 0 8px rgba(255, 94, 86, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 94, 86, 0);
+    box-shadow: 0 0 0 0 rgba(255, 94, 86, 0.55);
+  }
+}
+
+/* S5 — Create Hype Room */
+
+.hype-rooms-create-cta {
+  flex-shrink: 0;
+}
+
+.hype-create-page {
+  display: grid;
+  gap: 1.1rem;
+  margin: 0 auto;
+  max-width: 720px;
+  padding: 28px clamp(14px, 4vw, 48px) 110px;
+}
+
+.hype-create-status {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.hype-create-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  display: grid;
+  gap: 14px;
+  padding: 18px 16px;
+}
+
+.hype-create-form label {
+  color: var(--muted);
+  display: grid;
+  font-size: 0.8rem;
+  font-weight: 700;
+  gap: 6px;
+  letter-spacing: 0.02em;
+}
+
+.hype-create-form input,
+.hype-create-form select,
+.hype-create-form textarea {
+  background: color-mix(in srgb, var(--page-bg) 70%, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  padding: 11px 12px;
+  text-transform: none;
+  width: 100%;
+}
+
+.hype-create-form textarea {
+  line-height: 1.45;
+  min-height: 110px;
+  resize: vertical;
+}
+
+.hype-create-form input:focus-visible,
+.hype-create-form select:focus-visible,
+.hype-create-form textarea:focus-visible {
+  border-color: var(--accent-border);
+  outline: none;
+}
+
+.hype-create-form-row {
+  display: grid;
+  gap: 14px;
+}
+
+.hype-create-optional {
+  color: var(--muted);
+  font-weight: 500;
+  letter-spacing: normal;
+}
+
+.hype-create-field-error {
+  color: #ba4e45;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.dark .hype-create-field-error {
+  color: #f3a196;
+}
+
+.hype-create-hint {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.hype-create-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+@media (min-width: 720px) {
+  .hype-create-form {
+    padding: 22px 22px;
+  }
+
+  .hype-create-form-row {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
@@ -626,6 +750,15 @@
 @media (max-width: 560px) {
   .hype-rooms-page {
     padding-top: 18px;
+  }
+
+  .hype-rooms-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hype-rooms-create-cta {
+    width: 100%;
   }
 
   .hype-room-filters {

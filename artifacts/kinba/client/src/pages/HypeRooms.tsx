@@ -5,6 +5,7 @@ import {
   Clock3,
   Eye,
   Lock,
+  Plus,
   Radio,
   RefreshCw,
   Users,
@@ -292,6 +293,14 @@ export default function HypeRooms() {
               Live and scheduled rooms for real-time community energy.
             </p>
           </div>
+          <button
+            type="button"
+            className="primary-btn hype-rooms-create-cta"
+            onClick={() => navigate("/rooms/new")}
+          >
+            <Plus size={15} aria-hidden="true" />
+            Create Hype Room
+          </button>
         </header>
 
         <nav className="hype-room-filters" aria-label="Hype Room filters" role="tablist">
@@ -372,6 +381,16 @@ export default function HypeRooms() {
               icon={<Radio size={22} />}
               title={EMPTY_COPY[filter].title}
               body={EMPTY_COPY[filter].body}
+              action={
+                <button
+                  type="button"
+                  className="primary-btn"
+                  onClick={() => navigate("/rooms/new")}
+                >
+                  <Plus size={15} aria-hidden="true" />
+                  Create Hype Room
+                </button>
+              }
             />
           ) : (
             <div className="hype-room-grid">
