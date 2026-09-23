@@ -70,6 +70,11 @@ import {
 } from "./featureFlags";
 import { getCoinBalance, listRewardHistory } from "./rewardLedger";
 import {
+  getUnreadNotificationCount,
+  listUserNotifications,
+  markUserNotificationsRead,
+} from "./notifications";
+import {
   cancelHypeRoom,
   createHypeRoom,
   endHypeRoom,
@@ -372,6 +377,19 @@ const dropListInput = z
   })
   .optional();
 
+// M7 — durable notification reads (no new feature flag; home.notifications unchanged).
+const notificationListInput = z
+  .object({
+    limit: z.number().int().min(1).max(100).optional(),
+  })
+  .optional();
+
+const notificationMarkReadInput = z
+  .object({
+    ids: z.array(z.number().int().positive()).max(200).optional(),
+  })
+  .optional();
+
 // M6 — lobby filters only (spec §18.3). Default preserves M1 active list.
 const hypeRoomListInput = z
   .object({
@@ -440,6 +458,23 @@ export const appRouter = router({
         })
       )
       .query(({ ctx, input }) => listHomeFeed(input.tab, ctx.user?.id)),
+  }),
+  // M7 — durable notifications (§21.1 / §22). Protected; no feature flag.
+  // home.notifications remains the separate derived activity feed.
+  notifications: router({
+    list: protectedProcedure
+      .input(notificationListInput)
+      .query(({ ctx, input }) =>
+        listUserNotifications(ctx.user.id, input?.limit)
+      ),
+    unreadCount: protectedProcedure.query(({ ctx }) =>
+      getUnreadNotificationCount(ctx.user.id)
+    ),
+    markRead: protectedProcedure
+      .input(notificationMarkReadInput)
+      .mutation(({ ctx, input }) =>
+        markUserNotificationsRead(ctx.user.id, input?.ids)
+      ),
   }),
   rawPulse: router({
     get: publicProcedure

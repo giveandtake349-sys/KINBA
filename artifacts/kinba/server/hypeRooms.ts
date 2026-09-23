@@ -8,7 +8,8 @@
  *     host/create eligibility (default verified company/creator, §16).
  * Lifecycle is server-authoritative from persisted startsAt/endsAt.
  * Flag: time_limited_communities (fail-closed via router gate).
- * No drops, claims, rewards, or notifications in this module.
+ * No drops, claims, or rewards in this module.
+ * M7: durable notifications fire only on actual status transitions (§22).
  */
 import { and, asc, eq, inArray, isNull, isNotNull } from "drizzle-orm";
 import {
@@ -27,6 +28,11 @@ import {
   type HypeRoomStatus,
 } from "@shared/stateMachines";
 import { getDb } from "./db";
+import {
+  notifyMemberRemoved,
+  notifyRoomExpired,
+  notifyRoomWentLive,
+} from "./notifications";
 
 /** Membership row from hype_room_members. */
 export type HypeRoomMemberRow = typeof hypeRoomMembers.$inferSelect;
@@ -249,6 +255,7 @@ async function persistResolvedRoom(
   room: HypeRoomRow,
   now: Date
 ): Promise<HypeRoomRow> {
+  const fromStatus = room.status;
   const resolution = resolveRoomLifecycle(room, now);
   if (!resolution.changed) return room;
   const patch: Partial<typeof hypeRooms.$inferInsert> = {
@@ -271,7 +278,43 @@ async function persistResolvedRoom(
       )
     )
     .returning();
-  return updated ?? { ...room, ...patch };
+  if (!updated) {
+    // Lost optimistic race — another writer already advanced; do not notify.
+    return { ...room, ...patch };
+  }
+  // §22 writers only on the actual transition row (never on unchanged reads).
+  if (fromStatus === "scheduled" && updated.status === "live") {
+    await notifyRoomWentLive(
+      { id: updated.id, title: updated.title, hostId: updated.hostId },
+      await listActiveMemberIds(db, updated.id),
+      db
+    );
+  }
+  if (updated.status === "expired" && fromStatus !== "expired") {
+    await notifyRoomExpired(
+      {
+        id: updated.id,
+        title: updated.title,
+        hostId: updated.hostId,
+      },
+      db
+    );
+  }
+  return updated;
+}
+
+/** Active (not left) member user ids for fanout (host included by writer). */
+async function listActiveMemberIds(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  roomId: number
+): Promise<number[]> {
+  const rows = await db
+    .select({ userId: hypeRoomMembers.userId })
+    .from(hypeRoomMembers)
+    .where(
+      and(eq(hypeRoomMembers.roomId, roomId), isNull(hypeRoomMembers.leftAt))
+    );
+  return rows.map(r => r.userId);
 }
 
 /**
@@ -904,6 +947,11 @@ export async function endHypeRoom(
     .where(and(eq(hypeRooms.id, roomId), eq(hypeRooms.status, "live")))
     .returning();
   if (!updated) throw new Error("Only a live room can be ended by the host.");
+  // §22 — host expired notification only on successful live→expired transition.
+  await notifyRoomExpired(
+    { id: updated.id, title: updated.title, hostId: updated.hostId },
+    db
+  );
   return updated;
 }
 
@@ -1048,6 +1096,12 @@ export async function removeHypeRoomMember(
       )
       .returning();
     if (!removed) throw new Error("You are not an active member of this room.");
+    // §22 — notify removed user only after successful soft-remove.
+    await notifyMemberRemoved(
+      { id: roomRow.id, title: roomRow.title },
+      removed.userId,
+      tx as never
+    );
     return removed;
   });
 }

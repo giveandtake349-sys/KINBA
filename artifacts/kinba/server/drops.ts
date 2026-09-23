@@ -19,6 +19,7 @@ import {
   type DropStatus,
 } from "@shared/stateMachines";
 import { getDb } from "./db";
+import { notifyClaimStatusChange, notifyDropSoldOut } from "./notifications";
 
 export type DropClaimRow = typeof dropClaims.$inferSelect;
 
@@ -608,6 +609,18 @@ export async function claimDrop(
         .where(and(eq(drops.id, dropId), eq(drops.status, "live")))
         .returning();
       finalDrop = soldOut ?? { ...decremented, status: "sold_out" };
+      // §22 — only on the actual live→sold_out row update (not on re-reads).
+      if (soldOut) {
+        const claimerRows = await tx
+          .select({ userId: dropClaims.userId })
+          .from(dropClaims)
+          .where(eq(dropClaims.dropId, dropId));
+        await notifyDropSoldOut(
+          { id: dropId, title: finalDrop.title },
+          claimerRows.map(r => r.userId),
+          tx as never
+        );
+      }
     }
 
     return { claim: inserted, drop: finalDrop, created: true, serverNow: now };
@@ -708,6 +721,13 @@ async function transitionClaimForSeller(
   if (!updated) {
     throw new Error("Claim is no longer in claimed state.");
   }
+  // §22 — claimer notification only after successful claimed→terminal transition.
+  await notifyClaimStatusChange(
+    { userId: updated.userId, dropId: updated.dropId },
+    { title: drop.title },
+    target === "fulfilled" ? "fulfilled" : "cancelled",
+    db
+  );
   return updated;
 }
 
