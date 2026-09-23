@@ -694,7 +694,6 @@ function AppHeader({
   onHome,
   onSelectFeed,
   onOpenModal,
-  onOpenHypeRooms,
   onMenu,
   onProfile,
   onLogout,
@@ -704,7 +703,6 @@ function AppHeader({
   onHome: () => void;
   onSelectFeed: (section: FeedSection) => void;
   onOpenModal: (modal: Exclude<AppModal, null>) => void;
-  onOpenHypeRooms: () => void;
   onMenu: () => void;
   onProfile: () => void;
   onLogout: () => void;
@@ -737,12 +735,12 @@ function AppHeader({
         </button>
         <button
           type="button"
-          className="topbar-icon-button topbar-hype-rooms-button"
-          onClick={safeClick(onOpenHypeRooms)}
-          aria-label="Hype Rooms"
-          title="Hype Rooms"
+          className="topbar-icon-button"
+          onClick={safeClick(() => onOpenModal("search"))}
+          aria-label="Search"
+          title="Search"
         >
-          <Radio size={18} />
+          <Search size={18} />
         </button>
         <button
           type="button"
@@ -813,7 +811,7 @@ function BottomNavigation({
   activePanel,
   menuOpen,
   onHome,
-  onSearch,
+  onOpenHypeRooms,
   onPublish,
   onNotifications,
   onMenu,
@@ -822,7 +820,7 @@ function BottomNavigation({
   activePanel: FeedSection;
   menuOpen: boolean;
   onHome: () => void;
-  onSearch: () => void;
+  onOpenHypeRooms: () => void;
   onPublish: () => void;
   onNotifications: () => void;
   onMenu: () => void;
@@ -844,12 +842,13 @@ function BottomNavigation({
       </button>
       <button
         type="button"
-        className={activePanel === "search" ? "active" : ""}
-        onClick={safeClick(onSearch)}
-        aria-current={activePanel === "search" ? "page" : undefined}
+        className="bottom-nav-hype-rooms"
+        onClick={safeClick(onOpenHypeRooms)}
+        aria-label="Hype Rooms"
+        title="Hype Rooms"
       >
-        <Search size={23} />
-        <span>Search</span>
+        <Radio size={23} />
+        <span>Rooms</span>
       </button>
       <button
         type="button"
@@ -1882,11 +1881,6 @@ export default function Home() {
             onHome={() => showFeed("videos")}
             onSelectFeed={showFeed}
             onOpenModal={openModal}
-            onOpenHypeRooms={() => {
-              setMenuOpen(false);
-              setActiveModal(null);
-              navigate("/rooms");
-            }}
             onMenu={() => setMenuOpen(value => !value)}
             onProfile={openProfile}
             onLogout={logout}
@@ -2014,7 +2008,7 @@ export default function Home() {
           activePanel={activeView}
           menuOpen={menuOpen}
           onHome={goHome}
-          onSearch={() => openModal("search")}
+          onOpenHypeRooms={() => navigate("/rooms")}
           onPublish={() => openModal("upload")}
           onNotifications={showNotifications}
           onMenu={() => setMenuOpen(value => !value)}
