@@ -8,6 +8,8 @@ import Home from "./pages/Home";
 import Admin from "./pages/Admin";
 import HypeRooms from "./pages/HypeRooms";
 import HypeRoomDetail from "./pages/HypeRoomDetail";
+import Drops from "./pages/Drops";
+import DropDetail from "./pages/DropDetail";
 import NotFound from "./pages/NotFound";
 
 function ThemedToaster() {
@@ -26,6 +28,8 @@ export default function App() {
               <Route path="/admin" component={Admin} />
               <Route path="/rooms/:id" component={HypeRoomDetail} />
               <Route path="/rooms" component={HypeRooms} />
+              <Route path="/drops/:id" component={DropDetail} />
+              <Route path="/drops" component={Drops} />
               <Route path="/login" component={Home} />
               <Route path="/" component={Home} />
               <Route path="/profile" component={Home} />
