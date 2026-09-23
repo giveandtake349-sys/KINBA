@@ -69,6 +69,13 @@ import {
   setFeatureFlag,
 } from "./featureFlags";
 import { getCoinBalance, listRewardHistory } from "./rewardLedger";
+import {
+  createHypeRoom,
+  getHypeRoom,
+  listActiveHypeRooms,
+  resolveHypeRoomExpiry,
+  ROOM_DURATION_HOURS,
+} from "./hypeRooms";
 
 async function requireFeatureFlag(key: (typeof FEATURE_FLAG_KEYS)[number]) {
   const enabled = await isFeatureFlagEnabled(key);
@@ -128,6 +135,20 @@ const paymentInput = z.object({
     .min(4)
     .max(128)
     .regex(/^[a-z0-9_-]+$/i, "Enter a valid transaction ID."),
+});
+
+const hypeRoomCreateInput = z.object({
+  title: z.string().trim().min(3).max(180),
+  topic: z.string().trim().max(120).nullable().optional(),
+  description: z.string().trim().max(2000).nullable().optional(),
+  durationHours: z.union([
+    z.literal(ROOM_DURATION_HOURS[0]),
+    z.literal(ROOM_DURATION_HOURS[1]),
+    z.literal(ROOM_DURATION_HOURS[2]),
+    z.literal(ROOM_DURATION_HOURS[3]),
+  ]),
+  visibility: z.enum(["public", "link_only"]).default("public"),
+  startsAt: z.string().datetime({ offset: true }).optional(),
 });
 
 export const appRouter = router({
@@ -410,6 +431,39 @@ export const appRouter = router({
       await requireFeatureFlag("jhilik_rewards");
       return listRewardHistory(ctx.user.id);
     }),
+  }),
+  // Temporary Hype/Community rooms — fail-closed behind time_limited_communities.
+  hypeRooms: router({
+    create: protectedProcedure
+      .input(hypeRoomCreateInput)
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        await ensureProfile(ctx.user.id);
+        return createHypeRoom(ctx.user.id, {
+          title: input.title,
+          topic: input.topic ?? null,
+          description: input.description ?? null,
+          durationHours: input.durationHours,
+          visibility: input.visibility,
+          startsAt: input.startsAt ?? null,
+        });
+      }),
+    byId: publicProcedure
+      .input(z.object({ roomId: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        return getHypeRoom(input.roomId);
+      }),
+    list: publicProcedure.query(async () => {
+      await requireFeatureFlag("time_limited_communities");
+      return listActiveHypeRooms();
+    }),
+    resolve: publicProcedure
+      .input(z.object({ roomId: z.number().int().positive() }))
+      .mutation(async ({ input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        return resolveHypeRoomExpiry(input.roomId);
+      }),
   }),
   community: router({
     list: publicProcedure.query(() => listCommunityAnnouncements()),
