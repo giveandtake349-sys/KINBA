@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   CalendarClock,
@@ -41,14 +41,14 @@ const EMPTY_COPY: Record<LobbyFilter, { title: string; body: string }> = {
   },
 };
 
-function getTrpcCode(error: unknown): string | undefined {
+export function getTrpcCode(error: unknown): string | undefined {
   if (error instanceof TRPCClientError) {
     return error.data?.code;
   }
   return undefined;
 }
 
-function formatRoomTime(value: Date | string): string {
+export function formatRoomTime(value: Date | string): string {
   return new Date(value).toLocaleString(undefined, {
     month: "short",
     day: "numeric",
@@ -57,7 +57,27 @@ function formatRoomTime(value: Date | string): string {
   });
 }
 
-function StatusChip({ status }: { status: string }) {
+/** Client wall-clock tick for countdowns — no serverNow yet (Gate 3). */
+export function useNow(intervalMs = 1000): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), intervalMs);
+    return () => window.clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
+export function formatCountdown(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(totalSec / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const seconds = totalSec % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
+export function StatusChip({ status }: { status: string }) {
   const label =
     status === "live"
       ? "Live"
@@ -79,7 +99,7 @@ function StatusChip({ status }: { status: string }) {
   );
 }
 
-type RoomCard = {
+export type RoomCard = {
   id: number;
   title: string;
   topic: string | null;
@@ -93,9 +113,49 @@ type RoomCard = {
   hostId: number;
 };
 
-function RoomCard({ room, isHost }: { room: RoomCard; isHost: boolean }) {
+function countdownFor(
+  room: Pick<RoomCard, "status" | "startsAt" | "endsAt">,
+  nowMs: number
+): { label: string; remaining: string } | null {
+  if (room.status === "scheduled") {
+    const remainingMs = new Date(room.startsAt).getTime() - nowMs;
+    if (remainingMs <= 0) return null;
+    return { label: "Starts in", remaining: formatCountdown(remainingMs) };
+  }
+  if (room.status === "live") {
+    const remainingMs = new Date(room.endsAt).getTime() - nowMs;
+    if (remainingMs <= 0) return null;
+    return { label: "Ends in", remaining: formatCountdown(remainingMs) };
+  }
+  return null;
+}
+
+function RoomCard({
+  room,
+  isHost,
+  onOpen,
+  nowMs,
+}: {
+  room: RoomCard;
+  isHost: boolean;
+  onOpen: () => void;
+  nowMs: number;
+}) {
+  const countdown = countdownFor(room, nowMs);
   return (
-    <article className="hype-room-card" aria-labelledby={`hype-room-${room.id}`}>
+    <article
+      className="hype-room-card hype-room-card--interactive"
+      aria-labelledby={`hype-room-${room.id}`}
+      role="link"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen();
+        }
+      }}
+    >
       {room.coverUrl ? (
         <div className="hype-room-card-cover">
           <img src={room.coverUrl} alt="" loading="lazy" />
@@ -114,6 +174,12 @@ function RoomCard({ room, isHost }: { room: RoomCard; isHost: boolean }) {
         {room.topic ? <p className="hype-room-topic">{room.topic}</p> : null}
         {room.description ? (
           <p className="hype-room-desc">{room.description}</p>
+        ) : null}
+        {countdown ? (
+          <p className="hype-room-countdown" aria-live="polite">
+            <Clock3 size={13} aria-hidden="true" />
+            {countdown.label} {countdown.remaining}
+          </p>
         ) : null}
         <dl className="hype-room-meta">
           <div>
@@ -170,6 +236,7 @@ export default function HypeRooms() {
   const [, navigate] = useLocation();
   const auth = useAuth();
   const [filter, setFilter] = useState<LobbyFilter>("live");
+  const nowMs = useNow(1000);
 
   const needsAuth = filter === "mine";
   const blockedByAuth =
@@ -201,6 +268,7 @@ export default function HypeRooms() {
     blockedByAuth || errorCode === "UNAUTHORIZED";
 
   const goHome = () => navigate("/");
+  const openRoom = (roomId: number) => navigate(`/rooms/${roomId}`);
 
   const retry = () => {
     void query.refetch();
@@ -311,9 +379,11 @@ export default function HypeRooms() {
                 <RoomCard
                   key={room.id}
                   room={room}
+                  nowMs={nowMs}
                   isHost={
                     Boolean(auth.user?.id) && room.hostId === auth.user?.id
                   }
+                  onOpen={() => openRoom(room.id)}
                 />
               ))}
             </div>

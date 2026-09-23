@@ -7,6 +7,7 @@ import { SupabaseAuthProvider } from "./contexts/SupabaseAuthContext";
 import Home from "./pages/Home";
 import Admin from "./pages/Admin";
 import HypeRooms from "./pages/HypeRooms";
+import HypeRoomDetail from "./pages/HypeRoomDetail";
 import NotFound from "./pages/NotFound";
 
 function ThemedToaster() {
@@ -23,6 +24,7 @@ export default function App() {
             <ThemedToaster />
             <Switch>
               <Route path="/admin" component={Admin} />
+              <Route path="/rooms/:id" component={HypeRoomDetail} />
               <Route path="/rooms" component={HypeRooms} />
               <Route path="/login" component={Home} />
               <Route path="/" component={Home} />
