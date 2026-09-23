@@ -914,7 +914,9 @@ export const hypeRoomMembers = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: hypeRoomMemberRole("role").default("member").notNull(),
-    joinedAt: createdAt(),
+    joinedAt: timestamp("joinedAt", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
     leftAt: timestamp("leftAt", { withTimezone: true }),
     bannedAt: timestamp("bannedAt", { withTimezone: true }),
     removedBy: integer("removedBy").references(() => users.id, {
