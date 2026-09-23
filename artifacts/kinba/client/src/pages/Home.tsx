@@ -909,12 +909,91 @@ function Landing({ onLogin }: { onLogin: () => void }) {
   );
 }
 
+type DurableNotification = {
+  id: number;
+  type: string;
+  title: string;
+  body: string | null;
+  entityType: string | null;
+  entityId: number | null;
+  link: string | null;
+  readAt: Date | string | null;
+  createdAt: Date | string;
+};
+
+function durableNotificationTarget(
+  item: DurableNotification
+): string | null {
+  if (item.link && item.link.startsWith("/")) return item.link;
+  if (item.entityType === "drop" && item.entityId != null) {
+    return `/drops/${item.entityId}`;
+  }
+  if (item.entityType === "hype_room" && item.entityId != null) {
+    return `/rooms/${item.entityId}`;
+  }
+  return null;
+}
+
 function NotificationsPanel({ enabled }: { enabled: boolean }) {
-  const query = trpc.home.notifications.useQuery(undefined, {
+  const [, navigate] = useLocation();
+  const durableQuery = trpc.notifications.list.useQuery(
+    { limit: 50 },
+    {
+      enabled,
+      refetchOnWindowFocus: false,
+      staleTime: 15_000,
+    }
+  );
+  const activityQuery = trpc.home.notifications.useQuery(undefined, {
     enabled,
     refetchOnWindowFocus: false,
     staleTime: 30_000,
   });
+  const utils = trpc.useUtils();
+  const markReadMut = trpc.notifications.markRead.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.notifications.unreadCount.invalidate(),
+        utils.notifications.list.invalidate(),
+      ]);
+    },
+  });
+
+  const durableItems = (durableQuery.data ?? []) as DurableNotification[];
+  const unreadDurable = durableItems.filter(item => item.readAt == null);
+  const activityItems = activityQuery.data ?? [];
+  const hasDurable = durableItems.length > 0;
+  const hasActivity = activityItems.length > 0;
+  const durableLoading = enabled && durableQuery.isPending;
+  const activityLoading = enabled && activityQuery.isPending;
+  const anyLoading = durableLoading && activityLoading;
+
+  const markOne = async (id: number) => {
+    if (markReadMut.isPending) return;
+    try {
+      await markReadMut.mutateAsync({ ids: [id] });
+    } catch {
+      // Badge/list stay consistent; user can retry by clicking again.
+    }
+  };
+
+  const markAll = async () => {
+    if (markReadMut.isPending || unreadDurable.length === 0) return;
+    try {
+      await markReadMut.mutateAsync({});
+    } catch {
+      // Ignore — next open retries.
+    }
+  };
+
+  const openDurable = async (item: DurableNotification) => {
+    const target = durableNotificationTarget(item);
+    if (item.readAt == null) {
+      await markOne(item.id);
+    }
+    if (target) navigate(target);
+  };
+
   return (
     <section
       className="media-section utility-section"
@@ -925,51 +1004,139 @@ function NotificationsPanel({ enabled }: { enabled: boolean }) {
           <p className="eyebrow">Notifications</p>
           <h2 id="notifications-heading">Your latest activity.</h2>
         </div>
+        {enabled && unreadDurable.length > 0 ? (
+          <button
+            type="button"
+            className="muted-btn"
+            disabled={markReadMut.isPending}
+            onClick={() => void markAll()}
+          >
+            {markReadMut.isPending ? "Marking…" : "Mark all read"}
+          </button>
+        ) : null}
       </div>
-      {query.isPending ? (
-        <div className="utility-loading">Loading notifications…</div>
-      ) : query.isError ? (
-        <div className="media-empty">
-          <h3>Notifications are temporarily unavailable.</h3>
-          <p>Try again in a moment.</p>
-        </div>
-      ) : query.data?.length ? (
-        <div className="notification-list">
-          {query.data.map(item => (
-            <article
-              className="notification-item"
-              key={`${item.kind}-${item.id}`}
-            >
-              <Bell size={16} />
-              <p>
-                <strong>{item.actorName ?? "Someone"}</strong>
-                {item.kind === "reaction"
-                  ? " reacted to your video"
-                  : item.kind === "share"
-                    ? " shared your video"
-                    : item.kind === "comment"
-                      ? " commented on your video"
-                      : " started following you"}
-                {item.videoTitle ? (
-                  <>
-                    : <span>{item.videoTitle}</span>
-                  </>
-                ) : null}
-              </p>
-              <time dateTime={new Date(item.createdAt).toISOString()}>
-                {new Date(item.createdAt).toLocaleDateString()}
-              </time>
-            </article>
-          ))}
-        </div>
-      ) : (
+
+      {!enabled ? (
         <div className="media-empty">
           <Bell size={18} />
-          <h3>No notifications yet.</h3>
-          <p>
-            Reactions, comments, shares, and new followers will appear here.
-          </p>
+          <h3>Sign in to see notifications.</h3>
+          <p>Sign in for durable alerts and your activity feed.</p>
         </div>
+      ) : anyLoading ? (
+        <div className="utility-loading">Loading notifications…</div>
+      ) : (
+        <>
+          {durableQuery.isError ? (
+            <div className="media-empty">
+              <h3>Notifications are temporarily unavailable.</h3>
+              <p>Try again in a moment.</p>
+            </div>
+          ) : hasDurable ? (
+            <div className="notification-list" aria-label="System notifications">
+              {durableItems.map(item => {
+                const unread = item.readAt == null;
+                const target = durableNotificationTarget(item);
+                return (
+                  <article
+                    className={`notification-item${unread ? " notification-item--unread" : ""}`}
+                    key={`durable-${item.id}`}
+                  >
+                    <Bell size={16} />
+                    <p>
+                      <strong>{item.title}</strong>
+                      {item.body ? <> — {item.body}</> : null}
+                    </p>
+                    <div className="notification-item-side">
+                      <time dateTime={new Date(item.createdAt).toISOString()}>
+                        {new Date(item.createdAt).toLocaleDateString()}
+                      </time>
+                      {unread ? (
+                        <button
+                          type="button"
+                          className="notification-read-btn"
+                          aria-label={`Mark "${item.title}" as read`}
+                          disabled={markReadMut.isPending}
+                          onClick={() => {
+                            void openDurable(item);
+                          }}
+                        >
+                          {target ? "Open" : "Mark read"}
+                        </button>
+                      ) : target ? (
+                        <button
+                          type="button"
+                          className="notification-read-btn"
+                          aria-label={`Open "${item.title}"`}
+                          onClick={() => navigate(target)}
+                        >
+                          Open
+                        </button>
+                      ) : null}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : !durableQuery.isError ? (
+            <div className="media-empty">
+              <Bell size={18} />
+              <h3>No notifications yet.</h3>
+              <p>
+                Drops and Hype Room alerts will appear here when they happen.
+              </p>
+            </div>
+          ) : null}
+
+          {activityQuery.isError ? (
+            <div className="media-empty">
+              <h3>Activity is temporarily unavailable.</h3>
+              <p>Try again in a moment.</p>
+            </div>
+          ) : activityLoading && !hasActivity ? (
+            <div className="utility-loading">Loading activity…</div>
+          ) : hasActivity ? (
+            <>
+              <p className="eyebrow" style={{ marginTop: "0.75rem" }}>
+                Recent activity
+              </p>
+              <div className="notification-list" aria-label="Activity feed">
+                {activityItems.map(item => (
+                  <article
+                    className="notification-item"
+                    key={`${item.kind}-${item.id}`}
+                  >
+                    <Bell size={16} />
+                    <p>
+                      <strong>{item.actorName ?? "Someone"}</strong>
+                      {item.kind === "reaction"
+                        ? " reacted to your video"
+                        : item.kind === "share"
+                          ? " shared your video"
+                          : item.kind === "comment"
+                            ? " commented on your video"
+                            : " started following you"}
+                      {item.videoTitle ? (
+                        <>
+                          : <span>{item.videoTitle}</span>
+                        </>
+                      ) : null}
+                    </p>
+                    <time dateTime={new Date(item.createdAt).toISOString()}>
+                      {new Date(item.createdAt).toLocaleDateString()}
+                    </time>
+                  </article>
+                ))}
+              </div>
+            </>
+          ) : hasDurable ? null : !durableQuery.isError ? (
+            <div className="media-empty">
+              <p>
+                Reactions, comments, shares, and new followers will appear
+                here.
+              </p>
+            </div>
+          ) : null}
+        </>
       )}
     </section>
   );
@@ -1735,12 +1902,12 @@ export default function Home() {
     { userId: publicProfileId as number },
     { enabled: Boolean(publicProfileId), refetchOnWindowFocus: false, staleTime: 30_000 }
   );
-  const notificationQuery = trpc.home.notifications.useQuery(undefined, {
+  const unreadCountQuery = trpc.notifications.unreadCount.useQuery(undefined, {
     enabled: auth.isAuthenticated,
     refetchOnWindowFocus: false,
-    staleTime: 30_000,
+    staleTime: 15_000,
   });
-  const notificationCount = Math.min(notificationQuery.data?.length ?? 0, 99);
+  const notificationCount = Math.min(unreadCountQuery.data ?? 0, 99);
   const publicProfileData = publicProfileQuery.data;
   const ownProfileData = profileQuery.data;
   const profile = (publicProfileId ? publicProfileData : ownProfileData) as ProfileSnapshot | undefined;

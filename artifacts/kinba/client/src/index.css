@@ -841,8 +841,42 @@ h3 {
 }
 .notification-item time {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 0.75rem;
+}
+
+.notification-item--unread {
+  border-color: var(--accent-border);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.notification-item-side {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: space-between;
+}
+
+.notification-read-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  text-transform: uppercase;
   white-space: nowrap;
+}
+
+.notification-read-btn:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.notification-read-btn:disabled {
+  opacity: 0.55;
 }
 .settings-list {
   background: var(--surface);
