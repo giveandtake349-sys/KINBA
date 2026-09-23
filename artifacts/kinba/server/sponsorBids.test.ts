@@ -12,6 +12,16 @@ const databaseMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("./db", () => databaseMocks);
+vi.mock("./moderation", async importOriginal => {
+  const actual = await importOriginal<typeof import("./moderation")>();
+  return {
+    ...actual,
+    createModerationReport: vi.fn(),
+    listModerationReports: vi.fn(),
+    resolveModerationReport: vi.fn(),
+    adminHideRoomMessage: vi.fn(),
+  };
+});
 
 import { appRouter } from "./routers";
 

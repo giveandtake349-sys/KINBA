@@ -15,6 +15,7 @@ export const FEATURE_FLAG_KEYS = [
   "video_rewards",
   "milestone_rewards",
   "free_verification",
+  "moderation_v1",
 ] as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_KEYS)[number];

@@ -114,6 +114,13 @@ import {
   saveDraftDrop,
   scheduleDrop,
 } from "./drops";
+import {
+  MODERATION_TARGET_TYPES,
+  adminHideRoomMessage,
+  createModerationReport,
+  listModerationReports,
+  resolveModerationReport,
+} from "./moderation";
 
 async function requireFeatureFlag(key: (typeof FEATURE_FLAG_KEYS)[number]) {
   const enabled = await isFeatureFlagEnabled(key);
@@ -271,6 +278,48 @@ function mapDropError(error: unknown, _op: string): TRPCError {
   }
   if (message === "Failed to update drop featured state.") {
     return new TRPCError({ code: "CONFLICT", message });
+  }
+  if (error instanceof Error) {
+    return new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: error.message,
+      cause: error,
+    });
+  }
+  return new TRPCError({ code: "INTERNAL_SERVER_ERROR", cause: error });
+}
+
+/** Map M9 moderation service errors to controlled tRPC codes. */
+function mapModerationError(error: unknown, _op: string): TRPCError {
+  if (error instanceof TRPCError) return error;
+  const message = error instanceof Error ? error.message : "";
+  if (
+    message === "Report target not found." ||
+    message === "Report not found." ||
+    message === "Message not found."
+  ) {
+    return new TRPCError({ code: "NOT_FOUND", message });
+  }
+  if (
+    message === "You already have an open report for this target." ||
+    message === "Report is not open." ||
+    message === "Message is already hidden."
+  ) {
+    return new TRPCError({ code: "CONFLICT", message });
+  }
+  if (message === "You cannot report yourself.") {
+    return new TRPCError({ code: "FORBIDDEN", message });
+  }
+  if (
+    message.startsWith("Report reason") ||
+    message.startsWith("Report details") ||
+    message.startsWith("Resolution reason") ||
+    message.startsWith("Hide reason") ||
+    message === "Report targetId is required." ||
+    message === "Report id is required." ||
+    message === "Message id is required."
+  ) {
+    return new TRPCError({ code: "BAD_REQUEST", message });
   }
   if (error instanceof Error) {
     return new TRPCError({
@@ -845,6 +894,96 @@ export const appRouter = router({
           }
         }),
     }),
+    // M9 — admin report queue + resolve + message soft-hide (flag moderation_v1).
+    reports: router({
+      list: adminProcedure
+        .input(
+          z
+            .object({
+              status: z.enum(["open", "resolved"]).optional(),
+              targetType: z.enum(MODERATION_TARGET_TYPES).optional(),
+              limit: z.number().int().min(1).max(100).optional(),
+            })
+            .optional()
+        )
+        .query(async ({ input }) => {
+          await requireFeatureFlag("moderation_v1");
+          try {
+            return await listModerationReports({
+              status: input?.status,
+              targetType: input?.targetType,
+              limit: input?.limit,
+            });
+          } catch (error) {
+            throw mapModerationError(error, "admin.reports.list");
+          }
+        }),
+      resolve: adminProcedure
+        .input(
+          z.object({
+            reportId: z.number().int().positive(),
+            reason: z.string().trim().min(1).max(500),
+          })
+        )
+        .mutation(async ({ ctx, input }) => {
+          await requireFeatureFlag("moderation_v1");
+          try {
+            return await resolveModerationReport(
+              ctx.user.id,
+              input.reportId,
+              input.reason
+            );
+          } catch (error) {
+            throw mapModerationError(error, "admin.reports.resolve");
+          }
+        }),
+    }),
+    messages: router({
+      hide: adminProcedure
+        .input(
+          z.object({
+            messageId: z.number().int().positive(),
+            reason: z.string().trim().min(1).max(500),
+          })
+        )
+        .mutation(async ({ ctx, input }) => {
+          await requireFeatureFlag("moderation_v1");
+          try {
+            return await adminHideRoomMessage(
+              ctx.user.id,
+              input.messageId,
+              input.reason
+            );
+          } catch (error) {
+            throw mapModerationError(error, "admin.messages.hide");
+          }
+        }),
+    }),
+  }),
+  // M9 — user report creation (protected; flag moderation_v1; rate-limited middleware).
+  reports: router({
+    create: protectedProcedure
+      .input(
+        z.object({
+          targetType: z.enum(MODERATION_TARGET_TYPES),
+          targetId: z.number().int().positive(),
+          reason: z.string().trim().min(1).max(120),
+          details: z.string().trim().max(2000).nullable().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("moderation_v1");
+        try {
+          return await createModerationReport(ctx.user.id, {
+            targetType: input.targetType,
+            targetId: input.targetId,
+            reason: input.reason,
+            details: input.details ?? null,
+          });
+        } catch (error) {
+          throw mapModerationError(error, "create");
+        }
+      }),
   }),
   rewards: router({
     balance: protectedProcedure.query(async ({ ctx }) => {

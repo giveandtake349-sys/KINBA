@@ -125,6 +125,9 @@ async function startServer() {
   // Room messages: 20 req/min — spec §21.4 proposal for sendMessage
   app.use("/api/trpc/hypeRooms.sendMessage", rateLimit({ windowMs: 60_000, max: 20, keyPrefix: "roommsg" }));
 
+  // M9 reports: 10 req/min — E13 (rate limiter keys by client IP)
+  app.use("/api/trpc/reports.create", rateLimit({ windowMs: 60_000, max: 10, keyPrefix: "rpt" }));
+
   // Profile updates: 5 req/min
   app.use("/api/trpc/profile.update", rateLimit({ windowMs: 60_000, max: 5, keyPrefix: "prof" }));
 

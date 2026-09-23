@@ -105,6 +105,7 @@ const featureFlagMocks = vi.hoisted(() => ({
     "video_rewards",
     "milestone_rewards",
     "free_verification",
+    "moderation_v1",
   ],
   FEATURE_FLAG_DEFAULTS: {},
   isFeatureFlagKey: vi.fn(),
@@ -121,6 +122,16 @@ vi.mock("./drops", () => dropsMocks);
 vi.mock("./featureFlags", () => featureFlagMocks);
 vi.mock("./rewardLedger", () => rewardMocks);
 vi.mock("./hlsProcessor", () => ({ queueVideoTranscode: vi.fn() }));
+vi.mock("./moderation", async importOriginal => {
+  const actual = await importOriginal<typeof import("./moderation")>();
+  return {
+    ...actual,
+    createModerationReport: vi.fn(),
+    listModerationReports: vi.fn(),
+    resolveModerationReport: vi.fn(),
+    adminHideRoomMessage: vi.fn(),
+  };
+});
 
 import { appRouter } from "./routers";
 

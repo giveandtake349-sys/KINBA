@@ -58,6 +58,7 @@ export const featureFlagKey = pgEnum("feature_flag_key", [
   "video_rewards",
   "milestone_rewards",
   "free_verification",
+  "moderation_v1",
 ]);
 export const hypeRoomStatus = pgEnum("hype_room_status", [
   "scheduled",
@@ -1197,9 +1198,71 @@ export const notifications = pgTable(
   ]
 );
 
+// ---------------------------------------------------------------------------
+// JHILIK Phase 2 M9 — moderation (additive only; legacy `reports` untouched).
+// Spec §20.2 moderation_actions + §25 multi-target user reports.
+// ---------------------------------------------------------------------------
+
+export const moderationReports = pgTable(
+  "moderation_reports",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    reporterId: integer("reporterId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    targetType: varchar("targetType", { length: 32 }).notNull(),
+    targetId: integer("targetId").notNull(),
+    reason: varchar("reason", { length: 120 }).notNull(),
+    details: text("details"),
+    status: varchar("status", { length: 16 }).default("open").notNull(),
+    resolvedAt: timestamp("resolvedAt", { withTimezone: true }),
+    resolvedBy: integer("resolvedBy").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+  },
+  table => [
+    index("moderation_reports_target_idx").on(table.targetType, table.targetId),
+    index("moderation_reports_status_created_idx").on(
+      table.status,
+      table.createdAt
+    ),
+    index("moderation_reports_reporter_target_idx").on(
+      table.reporterId,
+      table.targetType,
+      table.targetId
+    ),
+  ]
+);
+
+export const moderationActions = pgTable(
+  "moderation_actions",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    adminId: integer("adminId")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    action: varchar("action", { length: 64 }).notNull(),
+    targetType: varchar("targetType", { length: 32 }).notNull(),
+    targetId: integer("targetId").notNull(),
+    reason: text("reason").notNull(),
+    metadata: jsonb("metadata"),
+    createdAt: createdAt(),
+  },
+  table => [
+    index("moderation_actions_target_idx").on(table.targetType, table.targetId),
+    index("moderation_actions_admin_created_idx").on(
+      table.adminId,
+      table.createdAt
+    ),
+  ]
+);
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type FeatureFlagRow = typeof featureFlags.$inferSelect;
 export type RewardLedgerEntry = typeof rewardLedgerEntries.$inferSelect;
 export type HypeRoomRow = typeof hypeRooms.$inferSelect;
 export type DropRow = typeof drops.$inferSelect;
+export type ModerationReportRow = typeof moderationReports.$inferSelect;
+export type ModerationActionRow = typeof moderationActions.$inferSelect;
