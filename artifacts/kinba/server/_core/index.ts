@@ -122,6 +122,9 @@ async function startServer() {
   // Profile updates: 5 req/min
   app.use("/api/trpc/profile.update", rateLimit({ windowMs: 60_000, max: 5, keyPrefix: "prof" }));
 
+  // Feature flag toggles: 20 req/min — rare admin action
+  app.use("/api/trpc/admin.featureFlags.set", rateLimit({ windowMs: 60_000, max: 20, keyPrefix: "flag" }));
+
   // Global catch-all for any tRPC route not explicitly limited: 120 req/min
   app.use("/api/trpc", rateLimit({ windowMs: 60_000, max: 120, keyPrefix: "tRPC" }));
 

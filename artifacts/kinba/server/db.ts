@@ -219,7 +219,10 @@ export async function getVerificationStatus(userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const [profile] = await db
-    .select({ isVerified: profiles.isVerified })
+    .select({
+      isVerified: profiles.isVerified,
+      verificationStatus: profiles.verificationStatus,
+    })
     .from(profiles)
     .where(eq(profiles.userId, userId))
     .limit(1);
@@ -231,6 +234,9 @@ export async function getVerificationStatus(userId: number) {
     .limit(1);
   return {
     isVerified: Boolean(profile?.isVerified),
+    verificationStatus:
+      profile?.verificationStatus ??
+      (profile?.isVerified ? "verified" : "none"),
     latestTransaction: latest ?? null,
   };
 }
@@ -295,6 +301,10 @@ export async function submitVerificationTransaction(
       status: "pending",
     })
     .returning();
+  await db
+    .update(profiles)
+    .set({ verificationStatus: "pending", updatedAt: new Date() })
+    .where(eq(profiles.userId, userId));
   return created;
 }
 
@@ -345,11 +355,29 @@ export async function approveVerificationTransaction(
     if (!updated) {
       throw new Error("This transaction has already been reviewed.");
     }
-    if (status === "approved")
+    if (status === "approved") {
       await tx
         .update(profiles)
-        .set({ isVerified: true, phoneVerified: true, accountType, updatedAt: new Date() })
+        .set({
+          isVerified: true,
+          phoneVerified: true,
+          accountType,
+          verificationStatus:
+            accountType === "company" ? "business_verified" : "verified",
+          updatedAt: new Date(),
+        })
         .where(eq(profiles.userId, transaction.userId));
+    } else {
+      await tx
+        .update(profiles)
+        .set({ verificationStatus: "none", updatedAt: new Date() })
+        .where(
+          and(
+            eq(profiles.userId, transaction.userId),
+            eq(profiles.verificationStatus, "pending")
+          )
+        );
+    }
     return updated;
   });
 }

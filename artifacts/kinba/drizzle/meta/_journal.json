@@ -141,6 +141,13 @@
       "when": 1789795200000,
       "tag": "0029_add_text_media_type",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1789800000000,
+      "tag": "0030_jhilik_phase1_foundation",
+      "breakpoints": true
     }
   ]
 }

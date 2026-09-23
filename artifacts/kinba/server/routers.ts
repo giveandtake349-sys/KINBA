@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { systemRouter } from "./_core/systemRouter";
 import {
   adminProcedure,
@@ -60,6 +61,24 @@ import {
   createTextPost,
 } from "./db";
 import { communityAnnouncementInput, textPostInput, videoInput } from "./mediaValidation";
+import {
+  FEATURE_FLAG_KEYS,
+  getActiveFeatureFlags,
+  isFeatureFlagEnabled,
+  listFeatureFlagRows,
+  setFeatureFlag,
+} from "./featureFlags";
+import { getCoinBalance, listRewardHistory } from "./rewardLedger";
+
+async function requireFeatureFlag(key: (typeof FEATURE_FLAG_KEYS)[number]) {
+  const enabled = await isFeatureFlagEnabled(key);
+  if (!enabled) {
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "This feature is currently disabled.",
+    });
+  }
+}
 
 const videoIdInput = z.object({ videoId: z.number().int().positive() });
 const announcementIdInput = z.object({
@@ -113,6 +132,9 @@ const paymentInput = z.object({
 
 export const appRouter = router({
   system: systemRouter,
+  features: router({
+    active: publicProcedure.query(() => getActiveFeatureFlags()),
+  }),
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     logout: publicProcedure.mutation(() => ({ success: true }) as const),
@@ -325,6 +347,33 @@ export const appRouter = router({
   }),
   admin: router({
     dashboard: adminProcedure.query(() => adminListDashboard()),
+    featureFlags: router({
+      list: adminProcedure.query(() => listFeatureFlagRows()),
+      set: adminProcedure
+        .input(
+          z.object({
+            flagKey: z.enum(FEATURE_FLAG_KEYS),
+            enabled: z.boolean(),
+          })
+        )
+        .mutation(async ({ ctx, input }) => {
+          try {
+            return await setFeatureFlag(
+              input.flagKey,
+              input.enabled,
+              ctx.user.id
+            );
+          } catch (error) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Failed to update feature flag.",
+            });
+          }
+        }),
+    }),
     createSession: adminProcedure
       .input(
         z.object({
@@ -351,6 +400,16 @@ export const appRouter = router({
       .mutation(({ input }) =>
         adminSetSponsorStatus(input.sponsorId, input.status)
       ),
+  }),
+  rewards: router({
+    balance: protectedProcedure.query(async ({ ctx }) => {
+      await requireFeatureFlag("jhilik_rewards");
+      return getCoinBalance(ctx.user.id);
+    }),
+    history: protectedProcedure.query(async ({ ctx }) => {
+      await requireFeatureFlag("jhilik_rewards");
+      return listRewardHistory(ctx.user.id);
+    }),
   }),
   community: router({
     list: publicProcedure.query(() => listCommunityAnnouncements()),

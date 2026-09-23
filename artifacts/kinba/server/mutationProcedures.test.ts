@@ -145,7 +145,8 @@ describe("KINBA protected procedures", () => {
     expect(databaseMocks.approveVerificationTransaction).toHaveBeenCalledWith(
       91,
       adminUser.id,
-      "approved"
+      "approved",
+      "creator"
     );
 
     await expect(
