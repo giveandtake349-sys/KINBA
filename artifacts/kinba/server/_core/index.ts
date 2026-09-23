@@ -119,6 +119,9 @@ async function startServer() {
   // Community post creation: 5 req/min
   app.use("/api/trpc/community.create", rateLimit({ windowMs: 60_000, max: 5, keyPrefix: "create" }));
 
+  // Drop claims: 10 req/min — spec §21.4; prevents claim-spam races
+  app.use("/api/trpc/drops.claim", rateLimit({ windowMs: 60_000, max: 10, keyPrefix: "claim" }));
+
   // Profile updates: 5 req/min
   app.use("/api/trpc/profile.update", rateLimit({ windowMs: 60_000, max: 5, keyPrefix: "prof" }));
 

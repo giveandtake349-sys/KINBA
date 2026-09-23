@@ -79,6 +79,18 @@ import {
   resolveHypeRoomExpiry,
   ROOM_DURATION_HOURS,
 } from "./hypeRooms";
+import {
+  assertDropOwner,
+  claimDrop,
+  endDrop,
+  getDrop,
+  getMyClaim,
+  listDrops,
+  listDropClaims,
+  publishDrop,
+  saveDraftDrop,
+  scheduleDrop,
+} from "./drops";
 
 async function requireFeatureFlag(key: (typeof FEATURE_FLAG_KEYS)[number]) {
   const enabled = await isFeatureFlagEnabled(key);
@@ -118,6 +130,66 @@ function mapHypeRoomMemberError(error: unknown, _op: string): TRPCError {
     });
   }
   // Preserve original error for anything else (DB/driver/internal).
+  if (error instanceof Error) {
+    return new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: error.message,
+      cause: error,
+    });
+  }
+  return new TRPCError({ code: "INTERNAL_SERVER_ERROR", cause: error });
+}
+
+/**
+ * Map service drop/claim errors to controlled tRPC codes (M3).
+ * Unknown errors are rethrown unchanged (preserves M1/M2 behavior).
+ */
+function mapDropError(error: unknown, _op: string): TRPCError {
+  if (error instanceof TRPCError) return error;
+  const message = error instanceof Error ? error.message : "";
+  if (message === "Drop not found.") {
+    return new TRPCError({ code: "NOT_FOUND", message });
+  }
+  if (
+    message === "This drop is sold out." ||
+    message === "This drop is no longer available." ||
+    message.includes("already claimed") ||
+    message.includes("Invalid drop transition") ||
+    message.includes("Only draft drops") ||
+    message.includes("cannot be ended") ||
+    message.includes("Failed to")
+  ) {
+    return new TRPCError({ code: "CONFLICT", message });
+  }
+  if (
+    message === "This drop has ended." ||
+    message === "This drop is not live yet."
+  ) {
+    return new TRPCError({ code: "PRECONDITION_FAILED", message });
+  }
+  if (
+    message === "You do not own this drop." ||
+    message.startsWith("Only eligible sellers")
+  ) {
+    return new TRPCError({ code: "FORBIDDEN", message });
+  }
+  if (
+    message.includes("Drop title") ||
+    message.includes("Discounted price") ||
+    message.includes("Original price") ||
+    message.includes("Quantity must") ||
+    message.includes("Start and end") ||
+    message.includes("End time") ||
+    message.includes("Idempotency key") ||
+    message.includes("Description") ||
+    message.includes("Terms") ||
+    message.includes("Media URL") ||
+    message.includes("remaining quantity") ||
+    message.includes("Date is invalid") ||
+    message.includes("Start or end")
+  ) {
+    return new TRPCError({ code: "BAD_REQUEST", message });
+  }
   if (error instanceof Error) {
     return new TRPCError({
       code: "INTERNAL_SERVER_ERROR",
@@ -191,6 +263,54 @@ const hypeRoomCreateInput = z.object({
   visibility: z.enum(["public", "link_only"]).default("public"),
   startsAt: z.string().datetime({ offset: true }).optional(),
 });
+
+const dropIdInput = z.object({ dropId: z.number().int().positive() });
+
+const dropSaveDraftInput = z.object({
+  dropId: z.number().int().positive().nullable().optional(),
+  title: z.string().trim().min(3).max(180),
+  description: z.string().trim().min(1).max(4000),
+  terms: z.string().trim().min(1).max(4000),
+  mediaUrl: z.string().trim().min(1).max(1024),
+  mediaWidth: z.number().int().positive().nullable().optional(),
+  mediaHeight: z.number().int().positive().nullable().optional(),
+  originalPrice: z.string().regex(/^\d+(\.\d{1,2})?$/, "Enter a valid price."),
+  discountedPrice: z.string().regex(/^\d+(\.\d{1,2})?$/, "Enter a valid price."),
+  quantity: z.number().int().positive(),
+  startsAt: z
+    .union([z.string().datetime({ offset: true }), z.date()])
+    .nullable()
+    .optional(),
+  endsAt: z
+    .union([z.string().datetime({ offset: true }), z.date()])
+    .nullable()
+    .optional(),
+});
+
+const dropWindowInput = z.object({
+  dropId: z.number().int().positive(),
+  startsAt: z
+    .union([z.string().datetime({ offset: true }), z.date()])
+    .nullable()
+    .optional(),
+  endsAt: z
+    .union([z.string().datetime({ offset: true }), z.date()])
+    .nullable()
+    .optional(),
+  mode: z.enum(["publish", "schedule"]).optional(),
+});
+
+const dropClaimInput = z.object({
+  dropId: z.number().int().positive(),
+  idempotencyKey: z.string().trim().min(1).max(160).optional(),
+});
+
+const dropListInput = z
+  .object({
+    filter: z.enum(["live", "upcoming", "mine", "all"]).default("live"),
+    limit: z.number().int().min(1).max(100).optional(),
+  })
+  .optional();
 
 export const appRouter = router({
   system: systemRouter,
@@ -537,6 +657,94 @@ export const appRouter = router({
           throw mapHypeRoomMemberError(error, "members");
         }
       }),
+  }),
+  // M3 — Drops + Claims/Reservations — fail-closed behind jhilik_drops.
+  // Social reservation only; no payment/checkout/wallet. Claim needs no room membership.
+  drops: router({
+    list: publicProcedure.input(dropListInput).query(async ({ input, ctx }) => {
+      await requireFeatureFlag("jhilik_drops");
+      try {
+        return await listDrops({
+          filter: input?.filter ?? "live",
+          userId: ctx.user?.id ?? null,
+          limit: input?.limit,
+        });
+      } catch (error) {
+        throw mapDropError(error, "list");
+      }
+    }),
+    byId: publicProcedure.input(dropIdInput).query(async ({ input }) => {
+      await requireFeatureFlag("jhilik_drops");
+      try {
+        const drop = await getDrop(input.dropId);
+        if (!drop) throw new TRPCError({ code: "NOT_FOUND", message: "Drop not found." });
+        return { drop, serverNow: new Date() };
+      } catch (error) {
+        throw mapDropError(error, "byId");
+      }
+    }),
+    claim: protectedProcedure.input(dropClaimInput).mutation(async ({ ctx, input }) => {
+      await requireFeatureFlag("jhilik_drops");
+      await ensureProfile(ctx.user.id);
+      try {
+        return await claimDrop(input.dropId, ctx.user.id, input.idempotencyKey);
+      } catch (error) {
+        throw mapDropError(error, "claim");
+      }
+    }),
+    myClaim: protectedProcedure.input(dropIdInput).query(async ({ ctx, input }) => {
+      await requireFeatureFlag("jhilik_drops");
+      try {
+        return await getMyClaim(input.dropId, ctx.user.id);
+      } catch (error) {
+        throw mapDropError(error, "myClaim");
+      }
+    }),
+    saveDraft: protectedProcedure.input(dropSaveDraftInput).mutation(async ({ ctx, input }) => {
+      await requireFeatureFlag("jhilik_drops");
+      await ensureProfile(ctx.user.id);
+      try {
+        return await saveDraftDrop(ctx.user.id, input);
+      } catch (error) {
+        throw mapDropError(error, "saveDraft");
+      }
+    }),
+    publish: protectedProcedure.input(dropWindowInput).mutation(async ({ ctx, input }) => {
+      await requireFeatureFlag("jhilik_drops");
+      await ensureProfile(ctx.user.id);
+      try {
+        return await publishDrop(ctx.user.id, input);
+      } catch (error) {
+        throw mapDropError(error, "publish");
+      }
+    }),
+    schedule: protectedProcedure.input(dropWindowInput).mutation(async ({ ctx, input }) => {
+      await requireFeatureFlag("jhilik_drops");
+      await ensureProfile(ctx.user.id);
+      try {
+        return await scheduleDrop(ctx.user.id, input);
+      } catch (error) {
+        throw mapDropError(error, "schedule");
+      }
+    }),
+    end: protectedProcedure.input(dropIdInput).mutation(async ({ ctx, input }) => {
+      await requireFeatureFlag("jhilik_drops");
+      await ensureProfile(ctx.user.id);
+      try {
+        return await endDrop(ctx.user.id, input.dropId);
+      } catch (error) {
+        throw mapDropError(error, "end");
+      }
+    }),
+    claims: protectedProcedure.input(dropIdInput).query(async ({ ctx, input }) => {
+      await requireFeatureFlag("jhilik_drops");
+      try {
+        await assertDropOwner(input.dropId, ctx.user.id);
+        return await listDropClaims(input.dropId);
+      } catch (error) {
+        throw mapDropError(error, "claims");
+      }
+    }),
   }),
   community: router({
     list: publicProcedure.query(() => listCommunityAnnouncements()),
