@@ -122,6 +122,9 @@ async function startServer() {
   // Drop claims: 10 req/min — spec §21.4; prevents claim-spam races
   app.use("/api/trpc/drops.claim", rateLimit({ windowMs: 60_000, max: 10, keyPrefix: "claim" }));
 
+  // Room messages: 20 req/min — spec §21.4 proposal for sendMessage
+  app.use("/api/trpc/hypeRooms.sendMessage", rateLimit({ windowMs: 60_000, max: 20, keyPrefix: "roommsg" }));
+
   // Profile updates: 5 req/min
   app.use("/api/trpc/profile.update", rateLimit({ windowMs: 60_000, max: 5, keyPrefix: "prof" }));
 

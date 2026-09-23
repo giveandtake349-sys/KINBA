@@ -71,13 +71,20 @@ import {
 import { getCoinBalance, listRewardHistory } from "./rewardLedger";
 import {
   createHypeRoom,
+  endHypeRoom,
   getHypeRoom,
   joinHypeRoom,
   leaveHypeRoom,
   listActiveHypeRooms,
   listHypeRoomMembers,
+  listRoomMessages,
+  pinHypeRoomMessage,
+  removeHypeRoomMember,
   resolveHypeRoomExpiry,
+  sendHypeRoomMessage,
+  unpinHypeRoomMessage,
   ROOM_DURATION_HOURS,
+  ROOM_MESSAGE_MAX_LENGTH,
 } from "./hypeRooms";
 import {
   assertDropOwner,
@@ -128,6 +135,34 @@ function mapHypeRoomMemberError(error: unknown, _op: string): TRPCError {
       code: "PRECONDITION_FAILED",
       message,
     });
+  }
+  // M4 — messages / host controls (extend without changing M1/M2 branches).
+  if (
+    message === "Message not found." ||
+    message === "Member not found in this room."
+  ) {
+    return new TRPCError({ code: "NOT_FOUND", message });
+  }
+  if (
+    message === "Only the host can end the room." ||
+    message === "Only the host can pin messages." ||
+    message === "Only the host can remove members." ||
+    message === "The host cannot be removed from the room."
+  ) {
+    return new TRPCError({ code: "FORBIDDEN", message });
+  }
+  if (
+    message === "The room has already ended." ||
+    message === "Only a live room can be ended by the host." ||
+    message === "Messages can only be sent while the room is live."
+  ) {
+    return new TRPCError({ code: "PRECONDITION_FAILED", message });
+  }
+  if (
+    message === "Message body is required." ||
+    message.startsWith("Message body must be at most")
+  ) {
+    return new TRPCError({ code: "BAD_REQUEST", message });
   }
   // Preserve original error for anything else (DB/driver/internal).
   if (error instanceof Error) {
@@ -655,6 +690,85 @@ export const appRouter = router({
           return await listHypeRoomMembers(input.roomId);
         } catch (error) {
           throw mapHypeRoomMemberError(error, "members");
+        }
+      }),
+    // M4 — messages + host controls (same fail-closed flag; M1–M3 untouched).
+    messages: publicProcedure
+      .input(z.object({ roomId: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await listRoomMessages(input.roomId);
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "messages");
+        }
+      }),
+    sendMessage: protectedProcedure
+      .input(
+        z.object({
+          roomId: z.number().int().positive(),
+          body: z.string().trim().min(1).max(ROOM_MESSAGE_MAX_LENGTH),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await sendHypeRoomMessage(
+            input.roomId,
+            ctx.user.id,
+            input.body
+          );
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "sendMessage");
+        }
+      }),
+    end: protectedProcedure
+      .input(z.object({ roomId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await endHypeRoom(input.roomId, ctx.user.id);
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "end");
+        }
+      }),
+    pin: protectedProcedure
+      .input(z.object({ messageId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await pinHypeRoomMessage(input.messageId, ctx.user.id);
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "pin");
+        }
+      }),
+    unpin: protectedProcedure
+      .input(z.object({ roomId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await unpinHypeRoomMessage(input.roomId, ctx.user.id);
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "unpin");
+        }
+      }),
+    removeMember: protectedProcedure
+      .input(
+        z.object({
+          roomId: z.number().int().positive(),
+          userId: z.number().int().positive(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await removeHypeRoomMember(
+            input.roomId,
+            ctx.user.id,
+            input.userId
+          );
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "removeMember");
         }
       }),
   }),

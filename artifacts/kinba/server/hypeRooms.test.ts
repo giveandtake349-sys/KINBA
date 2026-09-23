@@ -30,6 +30,13 @@ const hypeRoomsMocks = vi.hoisted(() => ({
   joinHypeRoom: vi.fn(),
   leaveHypeRoom: vi.fn(),
   listHypeRoomMembers: vi.fn(),
+  // M4
+  listRoomMessages: vi.fn(),
+  sendHypeRoomMessage: vi.fn(),
+  endHypeRoom: vi.fn(),
+  pinHypeRoomMessage: vi.fn(),
+  unpinHypeRoomMessage: vi.fn(),
+  removeHypeRoomMember: vi.fn(),
   isValidDurationHours: vi.fn(),
   assertValidDurationHours: vi.fn(),
   computeEndsAt: vi.fn(),
@@ -40,8 +47,15 @@ const hypeRoomsMocks = vi.hoisted(() => ({
   resolveMemberRole: vi.fn(),
   decideJoinAction: vi.fn(),
   canLeaveMembership: vi.fn(),
+  validateRoomMessageBody: vi.fn(),
+  canSendRoomMessage: vi.fn(),
+  isRoomHost: vi.fn(),
+  canHostEndRoom: vi.fn(),
+  decideRemoveMember: vi.fn(),
   ROOM_DURATION_HOURS: [4, 6, 12, 24],
   ROOM_MAX_LEAD_MS: 7 * 24 * 60 * 60 * 1000,
+  ROOM_MESSAGE_MIN_LENGTH: 1,
+  ROOM_MESSAGE_MAX_LENGTH: 5000,
 }));
 
 const featureFlagMocks = vi.hoisted(() => ({
@@ -174,6 +188,100 @@ describe("hypeRooms procedures — feature flag fail-closed", () => {
       appRouter.createCaller(context()).hypeRooms.members({ roomId: 1 })
     ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
     expect(hypeRoomsMocks.listHypeRoomMembers).not.toHaveBeenCalled();
+  });
+
+  it("rejects messages when the flag is disabled", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.messages({ roomId: 1 })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(hypeRoomsMocks.listRoomMessages).not.toHaveBeenCalled();
+  });
+
+  it("rejects sendMessage when the flag is disabled", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.sendMessage({
+        roomId: 1,
+        body: "hello",
+      })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(hypeRoomsMocks.sendHypeRoomMessage).not.toHaveBeenCalled();
+  });
+
+  it("rejects end when the flag is disabled", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.end({ roomId: 1 })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(hypeRoomsMocks.endHypeRoom).not.toHaveBeenCalled();
+  });
+
+  it("rejects pin when the flag is disabled", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.pin({ messageId: 1 })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(hypeRoomsMocks.pinHypeRoomMessage).not.toHaveBeenCalled();
+  });
+
+  it("rejects unpin when the flag is disabled", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.unpin({ roomId: 1 })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(hypeRoomsMocks.unpinHypeRoomMessage).not.toHaveBeenCalled();
+  });
+
+  it("rejects removeMember when the flag is disabled", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.removeMember({
+        roomId: 1,
+        userId: 2,
+      })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(hypeRoomsMocks.removeHypeRoomMember).not.toHaveBeenCalled();
+  });
+
+  it("rejects unauthenticated sendMessage even if flag checks were skipped", async () => {
+    featureFlagMocks.isFeatureFlagEnabled.mockResolvedValue(true);
+    await expect(
+      appRouter.createCaller(context(null)).hypeRooms.sendMessage({
+        roomId: 1,
+        body: "hello",
+      })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(hypeRoomsMocks.sendHypeRoomMessage).not.toHaveBeenCalled();
+  });
+
+  it("rejects unauthenticated end even if flag checks were skipped", async () => {
+    featureFlagMocks.isFeatureFlagEnabled.mockResolvedValue(true);
+    await expect(
+      appRouter.createCaller(context(null)).hypeRooms.end({ roomId: 1 })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(hypeRoomsMocks.endHypeRoom).not.toHaveBeenCalled();
+  });
+
+  it("rejects unauthenticated pin even if flag checks were skipped", async () => {
+    featureFlagMocks.isFeatureFlagEnabled.mockResolvedValue(true);
+    await expect(
+      appRouter.createCaller(context(null)).hypeRooms.pin({ messageId: 1 })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(hypeRoomsMocks.pinHypeRoomMessage).not.toHaveBeenCalled();
+  });
+
+  it("rejects unauthenticated unpin even if flag checks were skipped", async () => {
+    featureFlagMocks.isFeatureFlagEnabled.mockResolvedValue(true);
+    await expect(
+      appRouter.createCaller(context(null)).hypeRooms.unpin({ roomId: 1 })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(hypeRoomsMocks.unpinHypeRoomMessage).not.toHaveBeenCalled();
+  });
+
+  it("rejects unauthenticated removeMember even if flag checks were skipped", async () => {
+    featureFlagMocks.isFeatureFlagEnabled.mockResolvedValue(true);
+    await expect(
+      appRouter.createCaller(context(null)).hypeRooms.removeMember({
+        roomId: 1,
+        userId: 2,
+      })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(hypeRoomsMocks.removeHypeRoomMember).not.toHaveBeenCalled();
   });
 
   it("rejects unauthenticated join even if flag checks were skipped", async () => {
@@ -404,5 +512,281 @@ describe("hypeRooms procedures — M2 members", () => {
       appRouter.createCaller(context()).hypeRooms.join({ roomId: 0 })
     ).rejects.toThrow();
     expect(hypeRoomsMocks.joinHypeRoom).not.toHaveBeenCalled();
+  });
+});
+
+describe("hypeRooms procedures — M4 messages and host controls", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    databaseMocks.ensureProfile.mockResolvedValue(undefined);
+    featureFlagMocks.isFeatureFlagEnabled.mockResolvedValue(true);
+  });
+
+  it("lists messages publicly after flag check (expired transcript allowed)", async () => {
+    const messages = [
+      {
+        message: { id: 1, roomId: 11, body: "hello", pinned: false },
+        user: { id: 41, name: "Host", openId: "o1", photoUrl: null, username: null },
+      },
+    ];
+    hypeRoomsMocks.listRoomMessages.mockResolvedValue(messages);
+    await expect(
+      appRouter.createCaller(context(null)).hypeRooms.messages({ roomId: 11 })
+    ).resolves.toEqual(messages);
+    expect(hypeRoomsMocks.listRoomMessages).toHaveBeenCalledWith(11);
+  });
+
+  it("maps messages on missing room to NOT_FOUND", async () => {
+    hypeRoomsMocks.listRoomMessages.mockRejectedValue(
+      new Error("Room not found.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.messages({ roomId: 999 })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("sends a message as the authenticated user", async () => {
+    const msg = { id: 9, roomId: 11, userId: user.id, body: "hi there" };
+    hypeRoomsMocks.sendHypeRoomMessage.mockResolvedValue(msg);
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.sendMessage({
+        roomId: 11,
+        body: "  hi there  ",
+      })
+    ).resolves.toEqual(msg);
+    // Zod .trim() normalizes before the service call.
+    expect(hypeRoomsMocks.sendHypeRoomMessage).toHaveBeenCalledWith(
+      11,
+      user.id,
+      "hi there"
+    );
+  });
+
+  it("rejects empty sendMessage body before the service", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.sendMessage({
+        roomId: 11,
+        body: "   ",
+      })
+    ).rejects.toThrow();
+    expect(hypeRoomsMocks.sendHypeRoomMessage).not.toHaveBeenCalled();
+  });
+
+  it("rejects over-length sendMessage body before the service", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.sendMessage({
+        roomId: 11,
+        body: "x".repeat(5001),
+      })
+    ).rejects.toThrow();
+    expect(hypeRoomsMocks.sendHypeRoomMessage).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-positive ids on M4 mutations before the service", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.sendMessage({
+        roomId: 0,
+        body: "hi",
+      })
+    ).rejects.toThrow();
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.end({ roomId: -1 })
+    ).rejects.toThrow();
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.pin({ messageId: 0 })
+    ).rejects.toThrow();
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.removeMember({
+        roomId: 0,
+        userId: 2,
+      })
+    ).rejects.toThrow();
+    expect(hypeRoomsMocks.sendHypeRoomMessage).not.toHaveBeenCalled();
+    expect(hypeRoomsMocks.endHypeRoom).not.toHaveBeenCalled();
+    expect(hypeRoomsMocks.pinHypeRoomMessage).not.toHaveBeenCalled();
+    expect(hypeRoomsMocks.removeHypeRoomMember).not.toHaveBeenCalled();
+  });
+
+  it("maps non-live sendMessage to PRECONDITION_FAILED", async () => {
+    hypeRoomsMocks.sendHypeRoomMessage.mockRejectedValue(
+      new Error("Messages can only be sent while the room is live.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.sendMessage({
+        roomId: 11,
+        body: "hi",
+      })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+  });
+
+  it("maps inactive membership sendMessage to CONFLICT", async () => {
+    hypeRoomsMocks.sendHypeRoomMessage.mockRejectedValue(
+      new Error("You are not an active member of this room.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.sendMessage({
+        roomId: 11,
+        body: "hi",
+      })
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("maps banned sendMessage to FORBIDDEN", async () => {
+    hypeRoomsMocks.sendHypeRoomMessage.mockRejectedValue(
+      new Error("You are banned from this room.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.sendMessage({
+        roomId: 11,
+        body: "hi",
+      })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("ends a live room as the host", async () => {
+    const room = { id: 11, hostId: user.id, status: "expired" as const };
+    hypeRoomsMocks.endHypeRoom.mockResolvedValue(room);
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.end({ roomId: 11 })
+    ).resolves.toEqual(room);
+    expect(hypeRoomsMocks.endHypeRoom).toHaveBeenCalledWith(11, user.id);
+  });
+
+  it("maps non-host end to FORBIDDEN", async () => {
+    hypeRoomsMocks.endHypeRoom.mockRejectedValue(
+      new Error("Only the host can end the room.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.end({ roomId: 11 })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("maps already-ended room to PRECONDITION_FAILED", async () => {
+    hypeRoomsMocks.endHypeRoom.mockRejectedValue(
+      new Error("The room has already ended.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.end({ roomId: 11 })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+  });
+
+  it("pins a message as the host", async () => {
+    const room = { id: 11, pinnedMessageId: 9 };
+    hypeRoomsMocks.pinHypeRoomMessage.mockResolvedValue(room);
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.pin({ messageId: 9 })
+    ).resolves.toEqual(room);
+    expect(hypeRoomsMocks.pinHypeRoomMessage).toHaveBeenCalledWith(9, user.id);
+  });
+
+  it("maps non-host pin to FORBIDDEN", async () => {
+    hypeRoomsMocks.pinHypeRoomMessage.mockRejectedValue(
+      new Error("Only the host can pin messages.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.pin({ messageId: 9 })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("maps missing message pin to NOT_FOUND", async () => {
+    hypeRoomsMocks.pinHypeRoomMessage.mockRejectedValue(
+      new Error("Message not found.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.pin({ messageId: 999 })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("unpins as the host", async () => {
+    const room = { id: 11, pinnedMessageId: null };
+    hypeRoomsMocks.unpinHypeRoomMessage.mockResolvedValue(room);
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.unpin({ roomId: 11 })
+    ).resolves.toEqual(room);
+    expect(hypeRoomsMocks.unpinHypeRoomMessage).toHaveBeenCalledWith(
+      11,
+      user.id
+    );
+  });
+
+  it("removes a member as the host", async () => {
+    const membership = {
+      id: 5,
+      roomId: 11,
+      userId: 99,
+      leftAt: new Date(),
+      removedBy: user.id,
+    };
+    hypeRoomsMocks.removeHypeRoomMember.mockResolvedValue(membership);
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.removeMember({
+        roomId: 11,
+        userId: 99,
+      })
+    ).resolves.toEqual(membership);
+    expect(hypeRoomsMocks.removeHypeRoomMember).toHaveBeenCalledWith(
+      11,
+      user.id,
+      99
+    );
+  });
+
+  it("maps non-host removeMember to FORBIDDEN", async () => {
+    hypeRoomsMocks.removeHypeRoomMember.mockRejectedValue(
+      new Error("Only the host can remove members.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.removeMember({
+        roomId: 11,
+        userId: 99,
+      })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("maps removeMember missing target to NOT_FOUND", async () => {
+    hypeRoomsMocks.removeHypeRoomMember.mockRejectedValue(
+      new Error("Member not found in this room.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.removeMember({
+        roomId: 11,
+        userId: 99,
+      })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
+describe("M1/M2/M3 regression — flags stay separated", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    databaseMocks.ensureProfile.mockResolvedValue(undefined);
+  });
+
+  it("drops still gated on jhilik_drops independently of rooms flag", async () => {
+    featureFlagMocks.isFeatureFlagEnabled.mockResolvedValue(false);
+    await expect(
+      appRouter.createCaller(context()).drops.list()
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.messages({ roomId: 1 })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+  });
+
+  it("M1 create wiring still works when rooms flag is on", async () => {
+    featureFlagMocks.isFeatureFlagEnabled.mockResolvedValue(true);
+    hypeRoomsMocks.createHypeRoom.mockResolvedValue({ id: 1, status: "live" });
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.create(createInput)
+    ).resolves.toEqual({ id: 1, status: "live" });
+  });
+
+  it("M3 claim still uses drops service and flag", async () => {
+    featureFlagMocks.isFeatureFlagEnabled.mockImplementation(
+      async key => key === "jhilik_drops"
+    );
+    // drops module is not mocked in this file — use flag-off path for claim
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.list()
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
   });
 });

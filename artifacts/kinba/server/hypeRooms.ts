@@ -1,15 +1,17 @@
 /**
- * JHILIK temporary Hype/Community rooms (Phase 2 Milestones 1–2).
+ * JHILIK temporary Hype/Community rooms (Phase 2 Milestones 1–4).
  *
  * M1: create / get / list active / resolve expiry.
  * M2: join / leave / list members (hype_room_members).
+ * M4: messages list/send, host end (live→expired), pin/unpin, removeMember.
  * Lifecycle is server-authoritative from persisted startsAt/endsAt.
  * Flag: time_limited_communities (fail-closed via router gate).
- * No drops, claims, rewards, or chat wiring yet.
+ * No drops, claims, rewards, notifications, or scheduled-cancel in this module.
  */
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, isNotNull } from "drizzle-orm";
 import {
   hypeRoomMembers,
+  hypeRoomMessages,
   hypeRooms,
   profiles,
   users,
@@ -27,6 +29,9 @@ import { getDb } from "./db";
 /** Membership row from hype_room_members. */
 export type HypeRoomMemberRow = typeof hypeRoomMembers.$inferSelect;
 
+/** Message row from hype_room_messages. */
+export type HypeRoomMessageRow = typeof hypeRoomMessages.$inferSelect;
+
 /** Membership row joined with basic user display fields. */
 export type HypeRoomMemberWithUser = {
   membership: HypeRoomMemberRow;
@@ -34,6 +39,18 @@ export type HypeRoomMemberWithUser = {
     id: number;
     name: string | null;
     openId: string;
+    photoUrl: string | null;
+    username: string | null;
+  };
+};
+
+/** Message row joined with author display fields (nullable author after SET NULL). */
+export type HypeRoomMessageWithUser = {
+  message: HypeRoomMessageRow;
+  user: {
+    id: number | null;
+    name: string | null;
+    openId: string | null;
     photoUrl: string | null;
     username: string | null;
   };
@@ -490,4 +507,384 @@ export async function listHypeRoomMembers(
     .orderBy(asc(hypeRoomMembers.joinedAt), asc(hypeRoomMembers.id));
 
   return rows;
+}
+
+// ---------------------------------------------------------------------------
+// M4 — Messages, host end, pin/unpin, removeMember
+// ---------------------------------------------------------------------------
+
+/** Message body length bounds (reuse comment-style limits; text-only M4). */
+export const ROOM_MESSAGE_MIN_LENGTH = 1;
+export const ROOM_MESSAGE_MAX_LENGTH = 5000;
+
+export function validateRoomMessageBody(body: string): string {
+  const trimmed = body.trim();
+  if (trimmed.length < ROOM_MESSAGE_MIN_LENGTH) {
+    throw new Error("Message body is required.");
+  }
+  if (trimmed.length > ROOM_MESSAGE_MAX_LENGTH) {
+    throw new Error(
+      `Message body must be at most ${ROOM_MESSAGE_MAX_LENGTH} characters.`
+    );
+  }
+  return trimmed;
+}
+
+/**
+ * Send authorization (product decisions A2 + A5):
+ * - room must be live
+ * - caller needs an active membership (leftAt null, not banned)
+ * - host has no bypass — must also hold an active membership row
+ */
+export function canSendRoomMessage(
+  roomStatus: HypeRoomStatus,
+  membership:
+    | Pick<HypeRoomMemberRow, "leftAt" | "bannedAt">
+    | null
+    | undefined
+): boolean {
+  if (roomStatus !== "live") return false;
+  if (!membership) return false;
+  if (membership.leftAt != null) return false;
+  if (membership.bannedAt != null) return false;
+  return true;
+}
+
+/** Host control authorization is by room.hostId (not membership bypass for send). */
+export function isRoomHost(roomHostId: number, userId: number): boolean {
+  return roomHostId === userId;
+}
+
+/** Host end (A3): only live → expired. No scheduled cancel in M4. */
+export function canHostEndRoom(status: HypeRoomStatus): boolean {
+  return status === "live";
+}
+
+export type RemoveMemberDecision =
+  | "ok"
+  | "not_host"
+  | "target_missing"
+  | "target_already_left"
+  | "cannot_remove_host";
+
+/** Pure host remove-member decision (soft-remove active non-host only). */
+export function decideRemoveMember(
+  roomHostId: number,
+  actorId: number,
+  target:
+    | Pick<
+        HypeRoomMemberRow,
+        "userId" | "leftAt" | "bannedAt" | "role"
+      >
+    | null
+    | undefined
+): RemoveMemberDecision {
+  if (!isRoomHost(roomHostId, actorId)) return "not_host";
+  if (!target) return "target_missing";
+  if (target.userId === roomHostId || target.role === "host") {
+    return "cannot_remove_host";
+  }
+  if (target.leftAt != null) return "target_already_left";
+  return "ok";
+}
+
+async function loadActiveMembership(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>> | Parameters<
+    Parameters<NonNullable<Awaited<ReturnType<typeof getDb>>>["transaction"]>[0]
+  >[0],
+  roomId: number,
+  userId: number
+): Promise<HypeRoomMemberRow | null> {
+  const [membership] = await db
+    .select()
+    .from(hypeRoomMembers)
+    .where(
+      and(
+        eq(hypeRoomMembers.roomId, roomId),
+        eq(hypeRoomMembers.userId, userId)
+      )
+    )
+    .limit(1);
+  return membership ?? null;
+}
+
+/**
+ * Read room transcript (ordered by createdAt).
+ * Works while scheduled/live and remains readable after expire (spec §18.4).
+ * Hidden/moderated messages (hiddenAt set) are excluded.
+ */
+export async function listRoomMessages(
+  roomId: number
+): Promise<HypeRoomMessageWithUser[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const [room] = await db
+    .select({ id: hypeRooms.id })
+    .from(hypeRooms)
+    .where(eq(hypeRooms.id, roomId))
+    .limit(1);
+  if (!room) throw new Error("Room not found.");
+
+  const rows = await db
+    .select({
+      message: hypeRoomMessages,
+      user: {
+        id: users.id,
+        name: users.name,
+        openId: users.openId,
+        photoUrl: profiles.photoUrl,
+        username: profiles.username,
+      },
+    })
+    .from(hypeRoomMessages)
+    .leftJoin(users, eq(hypeRoomMessages.userId, users.id))
+    .leftJoin(profiles, eq(profiles.userId, users.id))
+    .where(
+      and(eq(hypeRoomMessages.roomId, roomId), isNull(hypeRoomMessages.hiddenAt))
+    )
+    .orderBy(asc(hypeRoomMessages.createdAt), asc(hypeRoomMessages.id));
+
+  return rows;
+}
+
+/**
+ * Insert a text message while the room is live.
+ * Requires active membership (host included — no host bypass).
+ */
+export async function sendHypeRoomMessage(
+  roomId: number,
+  userId: number,
+  body: string
+): Promise<HypeRoomMessageRow> {
+  const validated = validateRoomMessageBody(body);
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  return db.transaction(async tx => {
+    const [roomRow] = await tx
+      .select()
+      .from(hypeRooms)
+      .where(eq(hypeRooms.id, roomId))
+      .limit(1);
+    if (!roomRow) throw new Error("Room not found.");
+    const room = await persistResolvedRoom(tx as never, roomRow, new Date());
+
+    const membership = await loadActiveMembership(tx as never, roomId, userId);
+    if (membership?.bannedAt) {
+      throw new Error("You are banned from this room.");
+    }
+    if (!membership || membership.leftAt != null) {
+      throw new Error("You are not an active member of this room.");
+    }
+    if (!canSendRoomMessage(room.status, membership)) {
+      if (room.status !== "live") {
+        throw new Error("Messages can only be sent while the room is live.");
+      }
+      throw new Error("Messages can only be sent while the room is live.");
+    }
+
+    const now = new Date();
+    const [inserted] = await tx
+      .insert(hypeRoomMessages)
+      .values({
+        roomId,
+        userId,
+        body: validated,
+        pinned: false,
+        createdAt: now,
+      })
+      .returning();
+    if (!inserted) throw new Error("Failed to send message.");
+    return inserted;
+  });
+}
+
+/**
+ * Host end early: live → expired only (product decision A3).
+ * Owner is room.hostId. No scheduled-room cancellation in M4.
+ */
+export async function endHypeRoom(
+  roomId: number,
+  userId: number
+): Promise<HypeRoomRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const [roomRow] = await db
+    .select()
+    .from(hypeRooms)
+    .where(eq(hypeRooms.id, roomId))
+    .limit(1);
+  if (!roomRow) throw new Error("Room not found.");
+  const room = await persistResolvedRoom(db, roomRow, new Date());
+
+  if (!isRoomHost(room.hostId, userId)) {
+    throw new Error("Only the host can end the room.");
+  }
+  if (!canHostEndRoom(room.status)) {
+    if (room.status === "expired") {
+      throw new Error("The room has already ended.");
+    }
+    throw new Error("Only a live room can be ended by the host.");
+  }
+  assertRoomTransition(room.status, "expired");
+
+  const now = new Date();
+  const [updated] = await db
+    .update(hypeRooms)
+    .set({
+      status: "expired",
+      expiredAt: room.expiredAt ?? now,
+      updatedAt: now,
+    })
+    .where(and(eq(hypeRooms.id, roomId), eq(hypeRooms.status, "live")))
+    .returning();
+  if (!updated) throw new Error("Only a live room can be ended by the host.");
+  return updated;
+}
+
+/** Host pins an existing message that belongs to their room. */
+export async function pinHypeRoomMessage(
+  messageId: number,
+  userId: number
+): Promise<HypeRoomRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  return db.transaction(async tx => {
+    const [message] = await tx
+      .select()
+      .from(hypeRoomMessages)
+      .where(eq(hypeRoomMessages.id, messageId))
+      .limit(1);
+    if (!message) throw new Error("Message not found.");
+    if (message.hiddenAt) throw new Error("Message not found.");
+
+    const [roomRow] = await tx
+      .select()
+      .from(hypeRooms)
+      .where(eq(hypeRooms.id, message.roomId))
+      .limit(1);
+    if (!roomRow) throw new Error("Room not found.");
+    if (!isRoomHost(roomRow.hostId, userId)) {
+      throw new Error("Only the host can pin messages.");
+    }
+
+    const now = new Date();
+    // Clear previous pin flags in this room, set the new pin.
+    await tx
+      .update(hypeRoomMessages)
+      .set({ pinned: false })
+      .where(
+        and(eq(hypeRoomMessages.roomId, roomRow.id), eq(hypeRoomMessages.pinned, true))
+      );
+    const [pinnedMsg] = await tx
+      .update(hypeRoomMessages)
+      .set({ pinned: true })
+      .where(eq(hypeRoomMessages.id, messageId))
+      .returning();
+    if (!pinnedMsg) throw new Error("Message not found.");
+
+    const [updated] = await tx
+      .update(hypeRooms)
+      .set({ pinnedMessageId: messageId, updatedAt: now })
+      .where(eq(hypeRooms.id, roomRow.id))
+      .returning();
+    if (!updated) throw new Error("Failed to pin message.");
+    return updated;
+  });
+}
+
+/** Host clears the room pin. */
+export async function unpinHypeRoomMessage(
+  roomId: number,
+  userId: number
+): Promise<HypeRoomRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  return db.transaction(async tx => {
+    const [roomRow] = await tx
+      .select()
+      .from(hypeRooms)
+      .where(eq(hypeRooms.id, roomId))
+      .limit(1);
+    if (!roomRow) throw new Error("Room not found.");
+    if (!isRoomHost(roomRow.hostId, userId)) {
+      throw new Error("Only the host can pin messages.");
+    }
+
+    const now = new Date();
+    if (roomRow.pinnedMessageId != null) {
+      await tx
+        .update(hypeRoomMessages)
+        .set({ pinned: false })
+        .where(
+          and(
+            eq(hypeRoomMessages.roomId, roomId),
+            eq(hypeRoomMessages.pinned, true)
+          )
+        );
+    }
+    const [updated] = await tx
+      .update(hypeRooms)
+      .set({ pinnedMessageId: null, updatedAt: now })
+      .where(eq(hypeRooms.id, roomId))
+      .returning();
+    if (!updated) throw new Error("Room not found.");
+    return updated;
+  });
+}
+
+/**
+ * Host soft-removes an active non-host member (sets leftAt + removedBy).
+ * Cannot remove self/host; already-left is a controlled conflict.
+ */
+export async function removeHypeRoomMember(
+  roomId: number,
+  actorId: number,
+  targetUserId: number
+): Promise<HypeRoomMemberRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  return db.transaction(async tx => {
+    const [roomRow] = await tx
+      .select()
+      .from(hypeRooms)
+      .where(eq(hypeRooms.id, roomId))
+      .limit(1);
+    if (!roomRow) throw new Error("Room not found.");
+
+    const target = await loadActiveMembership(tx as never, roomId, targetUserId);
+    const decision = decideRemoveMember(roomRow.hostId, actorId, target);
+    if (decision === "not_host") {
+      throw new Error("Only the host can remove members.");
+    }
+    if (decision === "target_missing") {
+      throw new Error("Member not found in this room.");
+    }
+    if (decision === "cannot_remove_host") {
+      throw new Error("The host cannot be removed from the room.");
+    }
+    if (decision === "target_already_left") {
+      throw new Error("You are not an active member of this room.");
+    }
+
+    const now = new Date();
+    const [removed] = await tx
+      .update(hypeRoomMembers)
+      .set({ leftAt: now, removedBy: actorId })
+      .where(
+        and(
+          eq(hypeRoomMembers.id, target!.id),
+          isNull(hypeRoomMembers.leftAt),
+          isNotNull(hypeRoomMembers.id)
+        )
+      )
+      .returning();
+    if (!removed) throw new Error("You are not an active member of this room.");
+    return removed;
+  });
 }

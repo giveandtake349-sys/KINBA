@@ -13,16 +13,22 @@ import {
 import {
   assertRoomTransition,
   assertValidDurationHours,
+  canHostEndRoom,
   canJoinRoomStatus,
   canLeaveMembership,
+  canSendRoomMessage,
   computeEndsAt,
   decideJoinAction,
+  decideRemoveMember,
+  isRoomHost,
   isValidDurationHours,
   normalizeStartsAt,
   resolveMemberRole,
   resolveRoomLifecycle,
   ROOM_DURATION_HOURS,
   ROOM_MAX_LEAD_MS,
+  ROOM_MESSAGE_MAX_LENGTH,
+  validateRoomMessageBody,
 } from "./hypeRooms";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -332,5 +338,84 @@ describe("M2 member pure helpers", () => {
     );
     expect(canLeaveMembership(left, 41)).toBe(false);
     expect(canLeaveMembership(null, 41)).toBe(false);
+  });
+});
+
+describe("M4 message pure helpers", () => {
+  const active = { leftAt: null, bannedAt: null };
+  const left = { leftAt: new Date(), bannedAt: null };
+  const banned = { leftAt: null, bannedAt: new Date() };
+
+  it("validates and trims message bodies", () => {
+    expect(validateRoomMessageBody("  hello  ")).toBe("hello");
+    expect(validateRoomMessageBody("x".repeat(ROOM_MESSAGE_MAX_LENGTH))).toHaveLength(
+      ROOM_MESSAGE_MAX_LENGTH
+    );
+    expect(() => validateRoomMessageBody("")).toThrow(/required/i);
+    expect(() => validateRoomMessageBody("   ")).toThrow(/required/i);
+    expect(() =>
+      validateRoomMessageBody("x".repeat(ROOM_MESSAGE_MAX_LENGTH + 1))
+    ).toThrow(/at most/i);
+  });
+
+  it("allows send only when room is live AND membership is active (A2/A5)", () => {
+    expect(canSendRoomMessage("live", active)).toBe(true);
+    expect(canSendRoomMessage("live", left)).toBe(false);
+    expect(canSendRoomMessage("live", banned)).toBe(false);
+    expect(canSendRoomMessage("live", null)).toBe(false);
+    expect(canSendRoomMessage("scheduled", active)).toBe(false);
+    expect(canSendRoomMessage("expired", active)).toBe(false);
+    expect(canSendRoomMessage("archived", active)).toBe(false);
+  });
+
+  it("treats host like any member for send — no host bypass (A2)", () => {
+    // Host without active membership row cannot send.
+    expect(canSendRoomMessage("live", null)).toBe(false);
+    expect(canSendRoomMessage("live", left)).toBe(false);
+    // Host with active membership can send only while live.
+    expect(canSendRoomMessage("live", active)).toBe(true);
+    expect(canSendRoomMessage("expired", active)).toBe(false);
+  });
+
+  it("host identity is hostId comparison", () => {
+    expect(isRoomHost(41, 41)).toBe(true);
+    expect(isRoomHost(41, 99)).toBe(false);
+  });
+
+  it("host end only allowed from live (A3)", () => {
+    expect(canHostEndRoom("live")).toBe(true);
+    expect(canHostEndRoom("scheduled")).toBe(false);
+    expect(canHostEndRoom("expired")).toBe(false);
+    expect(canHostEndRoom("archived")).toBe(false);
+    // No scheduled cancel transition invented.
+    expect(canTransition(HYPE_ROOM_TRANSITIONS, "scheduled", "expired")).toBe(
+      false
+    );
+    expect(canTransition(HYPE_ROOM_TRANSITIONS, "live", "expired")).toBe(true);
+  });
+
+  it("decides removeMember with host-only authorization", () => {
+    const target = {
+      userId: 99,
+      leftAt: null,
+      bannedAt: null,
+      role: "member" as const,
+    };
+    expect(decideRemoveMember(41, 41, target)).toBe("ok");
+    expect(decideRemoveMember(41, 99, target)).toBe("not_host");
+    expect(decideRemoveMember(41, 41, null)).toBe("target_missing");
+    expect(
+      decideRemoveMember(41, 41, {
+        ...target,
+        userId: 41,
+        role: "host" as const,
+      })
+    ).toBe("cannot_remove_host");
+    expect(
+      decideRemoveMember(41, 41, { ...target, role: "host" as const })
+    ).toBe("cannot_remove_host");
+    expect(
+      decideRemoveMember(41, 41, { ...target, leftAt: new Date() })
+    ).toBe("target_already_left");
   });
 });

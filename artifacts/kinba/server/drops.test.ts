@@ -31,6 +31,12 @@ const hypeRoomsMocks = vi.hoisted(() => ({
   joinHypeRoom: vi.fn(),
   leaveHypeRoom: vi.fn(),
   listHypeRoomMembers: vi.fn(),
+  listRoomMessages: vi.fn(),
+  sendHypeRoomMessage: vi.fn(),
+  endHypeRoom: vi.fn(),
+  pinHypeRoomMessage: vi.fn(),
+  unpinHypeRoomMessage: vi.fn(),
+  removeHypeRoomMember: vi.fn(),
   isValidDurationHours: vi.fn(),
   assertValidDurationHours: vi.fn(),
   computeEndsAt: vi.fn(),
@@ -41,8 +47,15 @@ const hypeRoomsMocks = vi.hoisted(() => ({
   resolveMemberRole: vi.fn(),
   decideJoinAction: vi.fn(),
   canLeaveMembership: vi.fn(),
+  validateRoomMessageBody: vi.fn(),
+  canSendRoomMessage: vi.fn(),
+  isRoomHost: vi.fn(),
+  canHostEndRoom: vi.fn(),
+  decideRemoveMember: vi.fn(),
   ROOM_DURATION_HOURS: [4, 6, 12, 24],
   ROOM_MAX_LEAD_MS: 7 * 24 * 60 * 60 * 1000,
+  ROOM_MESSAGE_MIN_LENGTH: 1,
+  ROOM_MESSAGE_MAX_LENGTH: 5000,
 }));
 
 const dropsMocks = vi.hoisted(() => ({
