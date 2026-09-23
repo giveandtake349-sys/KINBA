@@ -694,6 +694,7 @@ function AppHeader({
   onHome,
   onSelectFeed,
   onOpenModal,
+  onOpenHypeRooms,
   onMenu,
   onProfile,
   onLogout,
@@ -703,6 +704,7 @@ function AppHeader({
   onHome: () => void;
   onSelectFeed: (section: FeedSection) => void;
   onOpenModal: (modal: Exclude<AppModal, null>) => void;
+  onOpenHypeRooms: () => void;
   onMenu: () => void;
   onProfile: () => void;
   onLogout: () => void;
@@ -735,12 +737,12 @@ function AppHeader({
         </button>
         <button
           type="button"
-          className="topbar-icon-button"
-          onClick={safeClick(() => onOpenModal("search"))}
-          aria-label="Search"
-          title="Search"
+          className="topbar-icon-button topbar-hype-rooms-button"
+          onClick={safeClick(onOpenHypeRooms)}
+          aria-label="Hype Rooms"
+          title="Hype Rooms"
         >
-          <Search size={18} />
+          <Radio size={18} />
         </button>
         <button
           type="button"
@@ -1880,6 +1882,11 @@ export default function Home() {
             onHome={() => showFeed("videos")}
             onSelectFeed={showFeed}
             onOpenModal={openModal}
+            onOpenHypeRooms={() => {
+              setMenuOpen(false);
+              setActiveModal(null);
+              navigate("/rooms");
+            }}
             onMenu={() => setMenuOpen(value => !value)}
             onProfile={openProfile}
             onLogout={logout}

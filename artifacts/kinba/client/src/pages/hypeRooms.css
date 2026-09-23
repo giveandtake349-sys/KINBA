@@ -1,0 +1,367 @@
+/* JHILIK Hype Room lobby — mobile-first, reuses index.css design tokens. */
+
+.hype-rooms-shell {
+  min-height: 100dvh;
+}
+
+.hype-rooms-page {
+  display: grid;
+  gap: 1.1rem;
+  margin: 0 auto;
+  max-width: 1080px;
+  padding: 28px clamp(14px, 4vw, 48px) 110px;
+}
+
+.hype-rooms-back {
+  align-items: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 7px;
+  justify-self: start;
+  padding: 9px 14px;
+  width: fit-content;
+}
+
+.hype-rooms-back:hover {
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.hype-rooms-header h1 {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(1.7rem, 4vw, 2.35rem);
+  letter-spacing: -0.04em;
+  margin: 0.15rem 0 0.35rem;
+}
+
+.hype-rooms-header .eyebrow {
+  align-items: center;
+  display: inline-flex;
+  gap: 7px;
+}
+
+.hype-rooms-lede {
+  color: var(--muted);
+  font-size: 0.92rem;
+  margin: 0;
+  max-width: 36rem;
+}
+
+.hype-room-filters {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  display: inline-flex;
+  gap: 4px;
+  padding: 5px;
+  position: sticky;
+  top: 12px;
+  width: fit-content;
+  z-index: 5;
+}
+
+.hype-room-filters button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 6px;
+  letter-spacing: 0.04em;
+  padding: 10px 16px;
+  text-transform: uppercase;
+  transition:
+    background 0.16s var(--line),
+    color 0.16s var(--line);
+}
+
+.hype-room-filters button:hover {
+  color: var(--text);
+}
+
+.hype-room-filters button.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+
+.hype-room-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+}
+
+.hype-room-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hype-room-card-cover {
+  aspect-ratio: 16 / 9;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(37, 216, 232, 0.18), transparent 42%),
+    radial-gradient(circle at 82% 12%, rgba(255, 94, 86, 0.16), transparent 40%),
+    linear-gradient(145deg, #121825 0%, #0b0f17 100%);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.hype-room-card-cover img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.hype-room-card-cover--placeholder {
+  color: var(--teal);
+}
+
+.hype-room-card-body {
+  display: grid;
+  gap: 8px;
+  padding: 15px 16px 17px;
+}
+
+.hype-room-card-top {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.hype-room-card-body h3 {
+  font-size: 1.05rem;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.hype-room-topic {
+  color: var(--teal);
+  font-family: "DM Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.hype-room-desc {
+  color: var(--muted);
+  display: -webkit-box;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.hype-room-chip {
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.7rem;
+  font-weight: 800;
+  gap: 6px;
+  letter-spacing: 0.06em;
+  padding: 0.34rem 0.62rem;
+  text-transform: uppercase;
+}
+
+.hype-room-chip-dot {
+  background: currentColor;
+  border-radius: 50%;
+  height: 7px;
+  width: 7px;
+}
+
+.hype-room-chip--live {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.hype-room-chip--live .hype-room-chip-dot {
+  box-shadow: 0 0 0 0 rgba(255, 94, 86, 0.55);
+  animation: hype-room-pulse 1.6s ease-out infinite;
+}
+
+.hype-room-chip--scheduled {
+  background: var(--teal-soft);
+  border-color: color-mix(in srgb, var(--teal) 45%, transparent);
+  color: var(--teal);
+}
+
+.hype-room-chip--expired,
+.hype-room-chip--archived {
+  opacity: 0.78;
+}
+
+.hype-room-host-badge {
+  background: var(--teal-soft);
+  border: 1px solid color-mix(in srgb, var(--teal) 40%, transparent);
+  border-radius: 999px;
+  color: var(--teal);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 0.3rem 0.55rem;
+  text-transform: uppercase;
+}
+
+.hype-room-meta {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  margin: 4px 0 0;
+}
+
+.hype-room-meta > div {
+  align-items: center;
+  background: color-mix(in srgb, var(--page-bg) 70%, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 10px;
+}
+
+.hype-room-meta dt {
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+  margin: 0;
+}
+
+.hype-room-meta dd {
+  color: var(--muted);
+  font-size: 0.74rem;
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hype-room-state {
+  align-items: center;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+  min-height: 240px;
+  padding: 32px 20px;
+  text-align: center;
+}
+
+.hype-room-state-icon {
+  align-items: center;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-radius: 50%;
+  color: var(--accent);
+  display: grid;
+  height: 52px;
+  place-items: center;
+  width: 52px;
+}
+
+.hype-room-state h3 {
+  font-size: 1.05rem;
+  margin: 4px 0 0;
+}
+
+.hype-room-state p {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin: 0;
+  max-width: 28rem;
+}
+
+.hype-room-state-action {
+  margin-top: 8px;
+}
+
+.hype-room-card--skeleton .hype-room-card-body {
+  gap: 10px;
+}
+
+.hype-room-skeleton-cover {
+  aspect-ratio: 16 / 9;
+  border-radius: 0;
+  height: auto;
+  width: 100%;
+}
+
+.hype-room-skeleton-line {
+  height: 12px;
+  width: 100%;
+}
+
+@keyframes hype-room-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 94, 86, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(255, 94, 86, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 94, 86, 0);
+  }
+}
+
+@media (min-width: 720px) {
+  .hype-room-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  .hype-room-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .hype-rooms-page {
+    padding-top: 18px;
+  }
+
+  .hype-room-filters {
+    display: flex;
+    width: 100%;
+  }
+
+  .hype-room-filters button {
+    flex: 1;
+    justify-content: center;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hype-room-chip--live .hype-room-chip-dot {
+    animation: none;
+  }
+}

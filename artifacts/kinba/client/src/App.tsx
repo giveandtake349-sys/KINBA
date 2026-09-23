@@ -6,6 +6,7 @@ import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { SupabaseAuthProvider } from "./contexts/SupabaseAuthContext";
 import Home from "./pages/Home";
 import Admin from "./pages/Admin";
+import HypeRooms from "./pages/HypeRooms";
 import NotFound from "./pages/NotFound";
 
 function ThemedToaster() {
@@ -22,6 +23,7 @@ export default function App() {
             <ThemedToaster />
             <Switch>
               <Route path="/admin" component={Admin} />
+              <Route path="/rooms" component={HypeRooms} />
               <Route path="/login" component={Home} />
               <Route path="/" component={Home} />
               <Route path="/profile" component={Home} />
