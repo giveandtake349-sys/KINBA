@@ -24,6 +24,18 @@ export const DROP_STATUSES = [
 ] as const;
 export type DropStatus = (typeof DROP_STATUSES)[number];
 
+/**
+ * drop_claim_status enum (matches drizzle/schema.ts).
+ * M5 adds seller fulfil/cancel only; `released` is admin/deferred (no path yet).
+ */
+export const DROP_CLAIM_STATUSES = [
+  "claimed",
+  "released",
+  "fulfilled",
+  "cancelled",
+] as const;
+export type DropClaimStatus = (typeof DROP_CLAIM_STATUSES)[number];
+
 export const REWARD_ENTRY_STATUSES = [
   "pending",
   "approved",
@@ -77,6 +89,19 @@ export const DROP_TRANSITIONS: TransitionMap<DropStatus> = {
   sold_out: ["ended", "archived"],
   ended: ["archived"],
   archived: [],
+};
+
+/**
+ * Claim lifecycle (spec §9/§19/§26).
+ * M5: seller fulfil/cancel from `claimed` only.
+ * `claimed → released` is intentionally NOT allowed here (admin path deferred).
+ * Terminal states have no outbound transitions.
+ */
+export const DROP_CLAIM_TRANSITIONS: TransitionMap<DropClaimStatus> = {
+  claimed: ["fulfilled", "cancelled"],
+  released: [],
+  fulfilled: [],
+  cancelled: [],
 };
 
 export const REWARD_ENTRY_TRANSITIONS: TransitionMap<RewardEntryStatus> = {

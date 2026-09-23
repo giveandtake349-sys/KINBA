@@ -12,8 +12,10 @@ import { dropClaims, drops, profiles, type DropRow } from "../drizzle/schema";
 import {
   assertTransition,
   canTransition,
+  DROP_CLAIM_TRANSITIONS,
   DROP_TRANSITIONS,
   resolveDropStatus,
+  type DropClaimStatus,
   type DropStatus,
 } from "@shared/stateMachines";
 import { getDb } from "./db";
@@ -154,6 +156,27 @@ export function resolveDropLifecycle(
 export function assertDropTransition(from: DropStatus, to: DropStatus): void {
   if (!canTransition(DROP_TRANSITIONS, from, to)) {
     assertTransition(DROP_TRANSITIONS, from, to, "drop");
+  }
+}
+
+/** Seller-facing claim targets available in M5 (no `released` path). */
+export type DropClaimFulfilTarget = "fulfilled" | "cancelled";
+
+/** Pure claim transition check against DROP_CLAIM_TRANSITIONS. */
+export function canClaimTransition(
+  from: DropClaimStatus,
+  to: DropClaimStatus
+): boolean {
+  return canTransition(DROP_CLAIM_TRANSITIONS, from, to);
+}
+
+/** Reject illegal claim transitions (terminal / released → *, claimed → released). */
+export function assertClaimTransition(
+  from: DropClaimStatus,
+  to: DropClaimStatus
+): void {
+  if (!canTransition(DROP_CLAIM_TRANSITIONS, from, to)) {
+    assertTransition(DROP_CLAIM_TRANSITIONS, from, to, "claim");
   }
 }
 
@@ -628,4 +651,78 @@ export async function listDropClaims(dropId: number): Promise<DropClaimRow[]> {
     .from(dropClaims)
     .where(eq(dropClaims.dropId, dropId))
     .orderBy(asc(dropClaims.claimedAt), asc(dropClaims.id));
+}
+
+export type DropClaimTransitionInput = {
+  dropId: number;
+  claimId: number;
+  notes?: string | null;
+};
+
+/**
+ * Seller claim status transition (M5): claimed → fulfilled | cancelled.
+ * - Owner of drop only; claim must belong to that drop.
+ * - Optimistic WHERE status='claimed' (lost race → controlled error).
+ * - Terminal claims are never rewritten.
+ * - No stock change (claim already decremented at claim time).
+ */
+async function transitionClaimForSeller(
+  sellerId: number,
+  input: DropClaimTransitionInput,
+  target: DropClaimFulfilTarget
+): Promise<DropClaimRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const drop = await getDropOrThrow(db, input.dropId);
+  await assertOwner(drop, sellerId);
+
+  const [claim] = await db
+    .select()
+    .from(dropClaims)
+    .where(
+      and(eq(dropClaims.id, input.claimId), eq(dropClaims.dropId, input.dropId))
+    )
+    .limit(1);
+  if (!claim) {
+    throw new Error("Claim not found.");
+  }
+  assertClaimTransition(claim.status, target);
+  if (claim.status !== "claimed") {
+    throw new Error("Claim is not in claimed state.");
+  }
+
+  const now = new Date();
+  const patch: Partial<typeof dropClaims.$inferInsert> = {
+    status: target,
+    updatedAt: now,
+  };
+  if (target === "fulfilled") patch.fulfilledAt = now;
+  if (target === "cancelled") patch.cancelledAt = now;
+  if (input.notes !== undefined) patch.notes = input.notes;
+
+  const [updated] = await db
+    .update(dropClaims)
+    .set(patch)
+    .where(and(eq(dropClaims.id, claim.id), eq(dropClaims.status, "claimed")))
+    .returning();
+  if (!updated) {
+    throw new Error("Claim is no longer in claimed state.");
+  }
+  return updated;
+}
+
+/** Seller fulfil: claimed → fulfilled (sets fulfilledAt). Spec §9.5/§26. */
+export async function fulfillClaim(
+  sellerId: number,
+  input: DropClaimTransitionInput
+): Promise<DropClaimRow> {
+  return transitionClaimForSeller(sellerId, input, "fulfilled");
+}
+
+/** Seller cancel: claimed → cancelled (sets cancelledAt). Spec §9.5. */
+export async function cancelClaim(
+  sellerId: number,
+  input: DropClaimTransitionInput
+): Promise<DropClaimRow> {
+  return transitionClaimForSeller(sellerId, input, "cancelled");
 }

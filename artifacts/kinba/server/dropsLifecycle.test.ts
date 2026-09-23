@@ -4,14 +4,18 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  DROP_CLAIM_STATUSES,
+  DROP_CLAIM_TRANSITIONS,
   DROP_STATUSES,
   DROP_TRANSITIONS,
   canTransition,
   resolveDropStatus,
 } from "@shared/stateMachines";
 import {
+  assertClaimTransition,
   assertDropTransition,
   buildClaimIdempotencyKey,
+  canClaimTransition,
   isEligibleSeller,
   normalizeClaimIdempotencyKey,
   resolveDropLifecycle,
@@ -46,6 +50,77 @@ describe("drop status set matches schema/enum", () => {
       "ended",
       "archived",
     ]);
+  });
+});
+
+describe("drop claim status set matches schema/enum", () => {
+  it("exposes claimed, released, fulfilled, cancelled", () => {
+    expect([...DROP_CLAIM_STATUSES]).toEqual([
+      "claimed",
+      "released",
+      "fulfilled",
+      "cancelled",
+    ]);
+  });
+});
+
+describe("DROP_CLAIM_TRANSITIONS — M5 fulfil/cancel only", () => {
+  it("maps claimed → fulfilled and claimed → cancelled", () => {
+    expect(canTransition(DROP_CLAIM_TRANSITIONS, "claimed", "fulfilled")).toBe(
+      true
+    );
+    expect(canTransition(DROP_CLAIM_TRANSITIONS, "claimed", "cancelled")).toBe(
+      true
+    );
+    expect(() => assertClaimTransition("claimed", "fulfilled")).not.toThrow();
+    expect(() => assertClaimTransition("claimed", "cancelled")).not.toThrow();
+    expect(canClaimTransition("claimed", "fulfilled")).toBe(true);
+    expect(canClaimTransition("claimed", "cancelled")).toBe(true);
+  });
+
+  it("does not allow claimed → released in M5", () => {
+    expect(canTransition(DROP_CLAIM_TRANSITIONS, "claimed", "released")).toBe(
+      false
+    );
+    expect(canClaimTransition("claimed", "released")).toBe(false);
+    expect(() => assertClaimTransition("claimed", "released")).toThrow(
+      /claim/i
+    );
+  });
+
+  it("keeps terminal fulfilled/cancelled/released without outbound edges", () => {
+    for (const from of ["fulfilled", "cancelled", "released"] as const) {
+      expect(DROP_CLAIM_TRANSITIONS[from]).toEqual([]);
+      for (const to of DROP_CLAIM_STATUSES) {
+        expect(canClaimTransition(from, to)).toBe(false);
+        expect(() => assertClaimTransition(from, to)).toThrow(/claim/i);
+      }
+    }
+  });
+
+  it("rejects illegal moves including self-transition on terminal", () => {
+    for (const [from, to] of [
+      ["fulfilled", "fulfilled"],
+      ["fulfilled", "cancelled"],
+      ["cancelled", "fulfilled"],
+      ["released", "fulfilled"],
+      ["released", "cancelled"],
+      ["fulfilled", "claimed"],
+      ["cancelled", "claimed"],
+    ] as const) {
+      expect(canClaimTransition(from, to)).toBe(false);
+      expect(() => assertClaimTransition(from, to)).toThrow(/transition/i);
+    }
+  });
+
+  it("documents optimistic status-guard contract (WHERE status='claimed')", () => {
+    // Concurrent second writer loses the race only if status left `claimed`.
+    const raceLost = (current: (typeof DROP_CLAIM_STATUSES)[number]) =>
+      current !== "claimed";
+    expect(raceLost("claimed")).toBe(false);
+    expect(raceLost("fulfilled")).toBe(true);
+    expect(raceLost("cancelled")).toBe(true);
+    expect(raceLost("released")).toBe(true);
   });
 });
 

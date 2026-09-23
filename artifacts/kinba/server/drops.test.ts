@@ -69,9 +69,13 @@ const dropsMocks = vi.hoisted(() => ({
   endDrop: vi.fn(),
   assertDropOwner: vi.fn(),
   listDropClaims: vi.fn(),
+  fulfillClaim: vi.fn(),
+  cancelClaim: vi.fn(),
   validateDropOffer: vi.fn(),
   resolveDropLifecycle: vi.fn(),
   assertDropTransition: vi.fn(),
+  assertClaimTransition: vi.fn(),
+  canClaimTransition: vi.fn(),
   isEligibleSeller: vi.fn(),
   buildClaimIdempotencyKey: vi.fn(),
   normalizeClaimIdempotencyKey: vi.fn(),
@@ -213,6 +217,51 @@ describe("drops procedures — feature flag fail-closed", () => {
       appRouter.createCaller(context()).drops.claims({ dropId: 3 })
     ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
     expect(dropsMocks.assertDropOwner).not.toHaveBeenCalled();
+  });
+
+  it("rejects fulfillClaim when the flag is disabled", async () => {
+    await expect(
+      appRouter.createCaller(context()).drops.fulfillClaim({
+        dropId: 3,
+        claimId: 9,
+      })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(dropsMocks.fulfillClaim).not.toHaveBeenCalled();
+    expect(featureFlagMocks.isFeatureFlagEnabled).toHaveBeenCalledWith(
+      "jhilik_drops"
+    );
+  });
+
+  it("rejects cancelClaim when the flag is disabled", async () => {
+    await expect(
+      appRouter.createCaller(context()).drops.cancelClaim({
+        dropId: 3,
+        claimId: 9,
+      })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(dropsMocks.cancelClaim).not.toHaveBeenCalled();
+  });
+
+  it("rejects unauthenticated fulfillClaim even if flag checks were skipped", async () => {
+    featureFlagMocks.isFeatureFlagEnabled.mockResolvedValue(true);
+    await expect(
+      appRouter.createCaller(context(null)).drops.fulfillClaim({
+        dropId: 3,
+        claimId: 9,
+      })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(dropsMocks.fulfillClaim).not.toHaveBeenCalled();
+  });
+
+  it("rejects unauthenticated cancelClaim even if flag checks were skipped", async () => {
+    featureFlagMocks.isFeatureFlagEnabled.mockResolvedValue(true);
+    await expect(
+      appRouter.createCaller(context(null)).drops.cancelClaim({
+        dropId: 3,
+        claimId: 9,
+      })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(dropsMocks.cancelClaim).not.toHaveBeenCalled();
   });
 
   it("rejects unauthenticated claim even if flag checks were skipped", async () => {
@@ -442,6 +491,132 @@ describe("drops procedures — enabled flag wiring", () => {
       appRouter.createCaller(context()).drops.claims({ dropId: 3 })
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(dropsMocks.listDropClaims).not.toHaveBeenCalled();
+  });
+
+  it("fulfills a claimed claim as the drop owner", async () => {
+    const claim = {
+      id: 9,
+      dropId: 3,
+      userId: 7,
+      status: "fulfilled" as const,
+      fulfilledAt: new Date(),
+      notes: "Handed off",
+    };
+    dropsMocks.fulfillClaim.mockResolvedValue(claim);
+    await expect(
+      appRouter.createCaller(context()).drops.fulfillClaim({
+        dropId: 3,
+        claimId: 9,
+        notes: "Handed off",
+      })
+    ).resolves.toEqual(claim);
+    expect(dropsMocks.fulfillClaim).toHaveBeenCalledWith(user.id, {
+      dropId: 3,
+      claimId: 9,
+      notes: "Handed off",
+    });
+    expect(databaseMocks.ensureProfile).toHaveBeenCalledWith(user.id);
+  });
+
+  it("cancels a claimed claim as the drop owner", async () => {
+    const claim = {
+      id: 9,
+      dropId: 3,
+      userId: 7,
+      status: "cancelled" as const,
+      cancelledAt: new Date(),
+      notes: null,
+    };
+    dropsMocks.cancelClaim.mockResolvedValue(claim);
+    await expect(
+      appRouter.createCaller(context()).drops.cancelClaim({
+        dropId: 3,
+        claimId: 9,
+      })
+    ).resolves.toEqual(claim);
+    expect(dropsMocks.cancelClaim).toHaveBeenCalledWith(user.id, {
+      dropId: 3,
+      claimId: 9,
+    });
+  });
+
+  it("maps fulfillClaim non-owner to FORBIDDEN", async () => {
+    dropsMocks.fulfillClaim.mockRejectedValue(
+      new Error("You do not own this drop.")
+    );
+    await expect(
+      appRouter.createCaller(context()).drops.fulfillClaim({
+        dropId: 3,
+        claimId: 9,
+      })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("maps cancelClaim non-owner to FORBIDDEN", async () => {
+    dropsMocks.cancelClaim.mockRejectedValue(
+      new Error("You do not own this drop.")
+    );
+    await expect(
+      appRouter.createCaller(context()).drops.cancelClaim({
+        dropId: 3,
+        claimId: 9,
+      })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("maps fulfillClaim missing claim to NOT_FOUND", async () => {
+    dropsMocks.fulfillClaim.mockRejectedValue(new Error("Claim not found."));
+    await expect(
+      appRouter.createCaller(context()).drops.fulfillClaim({
+        dropId: 3,
+        claimId: 99,
+      })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("maps fulfillClaim terminal claim to CONFLICT", async () => {
+    dropsMocks.fulfillClaim.mockRejectedValue(
+      new Error("Invalid claim transition: fulfilled → fulfilled")
+    );
+    await expect(
+      appRouter.createCaller(context()).drops.fulfillClaim({
+        dropId: 3,
+        claimId: 9,
+      })
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("maps cancelClaim lost optimistic guard to CONFLICT", async () => {
+    dropsMocks.cancelClaim.mockRejectedValue(
+      new Error("Claim is no longer in claimed state.")
+    );
+    await expect(
+      appRouter.createCaller(context()).drops.cancelClaim({
+        dropId: 3,
+        claimId: 9,
+      })
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("rejects non-positive claimId on fulfillClaim before the service", async () => {
+    await expect(
+      appRouter.createCaller(context()).drops.fulfillClaim({
+        dropId: 3,
+        claimId: 0,
+      })
+    ).rejects.toThrow();
+    expect(dropsMocks.fulfillClaim).not.toHaveBeenCalled();
+  });
+
+  it("rejects overlong notes on cancelClaim before the service", async () => {
+    await expect(
+      appRouter.createCaller(context()).drops.cancelClaim({
+        dropId: 3,
+        claimId: 9,
+        notes: "x".repeat(2001),
+      })
+    ).rejects.toThrow();
+    expect(dropsMocks.cancelClaim).not.toHaveBeenCalled();
   });
 
   it("does not require room membership input on claim", async () => {

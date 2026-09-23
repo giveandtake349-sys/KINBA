@@ -88,8 +88,10 @@ import {
 } from "./hypeRooms";
 import {
   assertDropOwner,
+  cancelClaim,
   claimDrop,
   endDrop,
+  fulfillClaim,
   getDrop,
   getMyClaim,
   listDrops,
@@ -182,7 +184,7 @@ function mapHypeRoomMemberError(error: unknown, _op: string): TRPCError {
 function mapDropError(error: unknown, _op: string): TRPCError {
   if (error instanceof TRPCError) return error;
   const message = error instanceof Error ? error.message : "";
-  if (message === "Drop not found.") {
+  if (message === "Drop not found." || message === "Claim not found.") {
     return new TRPCError({ code: "NOT_FOUND", message });
   }
   if (
@@ -190,6 +192,9 @@ function mapDropError(error: unknown, _op: string): TRPCError {
     message === "This drop is no longer available." ||
     message.includes("already claimed") ||
     message.includes("Invalid drop transition") ||
+    message.includes("Invalid claim transition") ||
+    message.includes("Claim is not in claimed state") ||
+    message.includes("Claim is no longer in claimed state") ||
     message.includes("Only draft drops") ||
     message.includes("cannot be ended") ||
     message.includes("Failed to")
@@ -338,6 +343,12 @@ const dropWindowInput = z.object({
 const dropClaimInput = z.object({
   dropId: z.number().int().positive(),
   idempotencyKey: z.string().trim().min(1).max(160).optional(),
+});
+
+const dropClaimTransitionInput = z.object({
+  dropId: z.number().int().positive(),
+  claimId: z.number().int().positive(),
+  notes: z.string().trim().max(2000).nullable().optional(),
 });
 
 const dropListInput = z
@@ -859,6 +870,29 @@ export const appRouter = router({
         throw mapDropError(error, "claims");
       }
     }),
+    // M5 — claim fulfilment (seller): claimed → fulfilled | cancelled only.
+    fulfillClaim: protectedProcedure
+      .input(dropClaimTransitionInput)
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("jhilik_drops");
+        await ensureProfile(ctx.user.id);
+        try {
+          return await fulfillClaim(ctx.user.id, input);
+        } catch (error) {
+          throw mapDropError(error, "fulfillClaim");
+        }
+      }),
+    cancelClaim: protectedProcedure
+      .input(dropClaimTransitionInput)
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("jhilik_drops");
+        await ensureProfile(ctx.user.id);
+        try {
+          return await cancelClaim(ctx.user.id, input);
+        } catch (error) {
+          throw mapDropError(error, "cancelClaim");
+        }
+      }),
   }),
   community: router({
     list: publicProcedure.query(() => listCommunityAnnouncements()),
