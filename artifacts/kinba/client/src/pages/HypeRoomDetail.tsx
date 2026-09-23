@@ -9,6 +9,7 @@ import {
   CalendarClock,
   Clock3,
   Eye,
+  Flag,
   Lock,
   Pin,
   PinOff,
@@ -23,6 +24,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { SupabaseAuthDialog } from "@/components/SupabaseAuthDialog";
+import { ReportDialog } from "@/components/ReportDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   formatRoomTime,
@@ -151,6 +153,12 @@ export default function HypeRoomDetail({
   const nowMs = useNow(1000);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportTargetId, setReportTargetId] = useState<number | null>(null);
+  const [reportTargetType, setReportTargetType] = useState<
+    "hype_room" | "hype_room_message"
+  >("hype_room");
+  const [reportTitle, setReportTitle] = useState<string | undefined>(undefined);
 
   const rawId = Number(params?.id);
   const roomId = Number.isInteger(rawId) && rawId > 0 ? rawId : null;
@@ -363,6 +371,23 @@ export default function HypeRoomDetail({
 
   const backToLobby = () => navigate("/rooms");
 
+  const openRoomReport = () => {
+    if (roomId == null) return;
+    if (!requireAuth()) return;
+    setReportTargetId(roomId);
+    setReportTargetType("hype_room");
+    setReportTitle("Report room");
+    setReportOpen(true);
+  };
+
+  const openMessageReport = (messageId: number) => {
+    if (!requireAuth()) return;
+    setReportTargetId(messageId);
+    setReportTargetType("hype_room_message");
+    setReportTitle("Report message");
+    setReportOpen(true);
+  };
+
   const actionBusy =
     joinMut.isPending ||
     leaveMut.isPending ||
@@ -540,6 +565,16 @@ export default function HypeRoomDetail({
                   >
                     <Lock size={14} aria-hidden="true" />
                     Sign in to join
+                  </button>
+                ) : null}
+                {!isHost && roomId != null ? (
+                  <button
+                    type="button"
+                    className="muted-btn report-action-btn"
+                    onClick={openRoomReport}
+                  >
+                    <Flag size={13} aria-hidden="true" />
+                    Report
                   </button>
                 ) : null}
               </div>
@@ -740,6 +775,21 @@ export default function HypeRoomDetail({
                                 </button>
                               )
                             ) : null}
+                            {row.message.userId != null &&
+                            userId != null &&
+                            row.message.userId !== userId ? (
+                              <button
+                                type="button"
+                                className="hype-room-icon-btn"
+                                aria-label="Report message"
+                                title="Report message"
+                                onClick={() =>
+                                  openMessageReport(row.message.id)
+                                }
+                              >
+                                <Flag size={13} />
+                              </button>
+                            ) : null}
                           </div>
                           <p className="hype-room-message-body">
                             {row.message.body}
@@ -790,6 +840,18 @@ export default function HypeRoomDetail({
           onOpenChange={open => (open ? auth.openAuth() : auth.closeAuth())}
         />
       ) : null}
+      <ReportDialog
+        open={reportOpen}
+        onClose={() => {
+          setReportOpen(false);
+          setReportTargetId(null);
+          setReportTargetType("hype_room");
+          setReportTitle(undefined);
+        }}
+        targetType={reportTargetType}
+        targetId={reportTargetId}
+        title={reportTitle}
+      />
     </div>
   );
 }

@@ -1,11 +1,42 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { ArrowLeft, Clock3, ExternalLink, ShieldCheck, WalletCards } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock3,
+  ExternalLink,
+  Flag,
+  EyeOff,
+  ShieldCheck,
+  WalletCards,
+} from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { getTrpcCode } from "@/pages/HypeRooms";
+
+type ReportStatusFilter = "all" | "open" | "resolved";
+type ReportTargetFilter =
+  | "all"
+  | "hype_room"
+  | "hype_room_message"
+  | "drop"
+  | "user";
 
 const formatDate = (value: Date | string | null | undefined) =>
   value ? new Date(value).toLocaleString() : "—";
+
+const TARGET_LABELS: Record<Exclude<ReportTargetFilter, "all">, string> = {
+  hype_room: "Hype Room",
+  hype_room_message: "Hype Room Message",
+  drop: "Drop",
+  user: "User",
+};
+
+function moderationErrorMessage(error: unknown): string {
+  if (getTrpcCode(error) === "PRECONDITION_FAILED") {
+    return "Reporting is currently unavailable.";
+  }
+  return error instanceof Error ? error.message : "Request failed.";
+}
 
 export default function Admin() {
   const auth = useAuth();
@@ -24,6 +55,33 @@ export default function Admin() {
   const [startsAt, setStartsAt] = useState("");
   const [notice, setNotice] = useState("");
   const [pendingSponsor, setPendingSponsor] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<ReportStatusFilter>("open");
+  const [targetFilter, setTargetFilter] = useState<ReportTargetFilter>("all");
+  const [resolveReportId, setResolveReportId] = useState<number | null>(null);
+  const [resolveReason, setResolveReason] = useState("");
+  const [hideMessageId, setHideMessageId] = useState<number | null>(null);
+  const [hideReason, setHideReason] = useState("");
+
+  const reportsQuery = trpc.admin.reports.list.useQuery(
+    {
+      ...(statusFilter === "all"
+        ? {}
+        : { status: statusFilter }),
+      ...(targetFilter === "all" ? {} : { targetType: targetFilter }),
+      limit: 50,
+    },
+    {
+      enabled: !auth.loading && isAdmin,
+      refetchOnWindowFocus: false,
+      staleTime: 10_000,
+    }
+  );
+  const resolveReport = trpc.admin.reports.resolve.useMutation();
+  const hideMessage = trpc.admin.messages.hide.useMutation();
+
+  const refreshReports = async () => {
+    await utils.admin.reports.list.invalidate();
+  };
 
   useEffect(() => {
     if (!auth.loading && (!auth.user || !isAdmin)) navigate("/");
@@ -65,6 +123,36 @@ export default function Admin() {
       setNotice(error instanceof Error ? error.message : "Sponsor status could not be updated.");
     } finally {
       setPendingSponsor(null);
+    }
+  };
+
+  const handleResolve = async (reportId: number) => {
+    const reason = resolveReason.trim();
+    if (!reason || reason.length > 500) return;
+    setNotice("");
+    try {
+      await resolveReport.mutateAsync({ reportId, reason });
+      setResolveReportId(null);
+      setResolveReason("");
+      setNotice("Report resolved.");
+      await refreshReports();
+    } catch (error) {
+      setNotice(moderationErrorMessage(error));
+    }
+  };
+
+  const handleHideMessage = async (messageId: number) => {
+    const reason = hideReason.trim();
+    if (!reason || reason.length > 500) return;
+    setNotice("");
+    try {
+      await hideMessage.mutateAsync({ messageId, reason });
+      setHideMessageId(null);
+      setHideReason("");
+      setNotice("Message hidden.");
+      await refreshReports();
+    } catch (error) {
+      setNotice(moderationErrorMessage(error));
     }
   };
 
@@ -140,6 +228,200 @@ export default function Admin() {
             <div className="admin-sponsor-actions"><span className={`status-chip status-chip--${row.sponsor.status}`}>{row.sponsor.status}</span>{row.sponsor.status === "pending" && <><button className="muted-btn" type="button" onClick={() => updateSponsor(row.sponsor.id, "approved")} disabled={pendingSponsor === row.sponsor.id}>Approve</button><button className="danger-btn" type="button" onClick={() => updateSponsor(row.sponsor.id, "rejected")} disabled={pendingSponsor === row.sponsor.id}>Reject</button></>}</div>
           </article>)}
         </div>
+      </section>
+
+      <section className="admin-card admin-reports-section" aria-label="Reports">
+        <div className="admin-section-heading">
+          <div>
+            <p className="eyebrow">Content reports</p>
+            <h2>Reports</h2>
+          </div>
+          <Flag size={22} />
+        </div>
+        <p className="admin-help">
+          Raw report rows only — targetId is the backend target ID for the reported content.
+        </p>
+        <div className="admin-reports-filters">
+          <label>
+            Status
+            <select
+              value={statusFilter}
+              onChange={event => {
+                setStatusFilter(event.target.value as ReportStatusFilter);
+                setResolveReportId(null);
+              }}
+            >
+              <option value="all">All</option>
+              <option value="open">Open</option>
+              <option value="resolved">Resolved</option>
+            </select>
+          </label>
+          <label>
+            Target type
+            <select
+              value={targetFilter}
+              onChange={event => {
+                setTargetFilter(event.target.value as ReportTargetFilter);
+                setResolveReportId(null);
+                setHideMessageId(null);
+              }}
+            >
+              <option value="all">All</option>
+              <option value="hype_room">Hype Room</option>
+              <option value="hype_room_message">Hype Room Message</option>
+              <option value="drop">Drop</option>
+              <option value="user">User</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            className="muted-btn"
+            onClick={() => void refreshReports()}
+            disabled={reportsQuery.isFetching}
+          >
+            {reportsQuery.isFetching ? "Refreshing…" : "Refresh"}
+          </button>
+        </div>
+        {reportsQuery.isPending ? (
+          <p className="admin-reports-empty">Loading reports…</p>
+        ) : reportsQuery.isError ? (
+          <div className="admin-reports-empty">
+            <p>{moderationErrorMessage(reportsQuery.error)}</p>
+            <button
+              type="button"
+              className="muted-btn"
+              onClick={() => void reportsQuery.refetch()}
+            >
+              Retry
+            </button>
+          </div>
+        ) : (reportsQuery.data?.reports ?? []).length === 0 ? (
+          <p className="admin-reports-empty">No reports match these filters.</p>
+        ) : (
+          <div className="admin-reports-list">
+            {(reportsQuery.data?.reports ?? []).map(report => (
+              <article className="admin-report-row" key={report.id}>
+                <div className="admin-report-meta">
+                  <span className={`status-chip status-chip--${report.status}`}>
+                    {report.status}
+                  </span>
+                  <span className="admin-report-id">Report #{report.id}</span>
+                  <span className="admin-report-target">
+                    {TARGET_LABELS[report.targetType as Exclude<ReportTargetFilter, "all">] ?? report.targetType}
+                    {" · targetId "}
+                    <strong>{report.targetId}</strong>
+                  </span>
+                  <span className="admin-report-time">{formatDate(report.createdAt)}</span>
+                </div>
+                <div className="admin-report-body">
+                  <p className="admin-report-reason">{report.reason}</p>
+                  {report.details ? (
+                    <p className="admin-report-details">{report.details}</p>
+                  ) : null}
+                  <p className="admin-report-ids">
+                    reporterId {report.reporterId}
+                    {report.resolvedAt
+                      ? ` · resolved ${formatDate(report.resolvedAt)}${report.resolvedBy != null ? ` by ${report.resolvedBy}` : ""}`
+                      : ""}
+                  </p>
+                </div>
+                <div className="admin-report-actions">
+                  {report.status === "open" ? (
+                    resolveReportId === report.id ? (
+                      <div className="admin-report-inline-form">
+                        <input
+                          value={resolveReason}
+                          onChange={event => setResolveReason(event.target.value)}
+                          maxLength={500}
+                          placeholder="Resolution reason (1–500)"
+                          aria-label="Resolution reason"
+                        />
+                        <button
+                          type="button"
+                          className="primary-btn"
+                          disabled={
+                            resolveReport.isPending ||
+                            resolveReason.trim().length < 1
+                          }
+                          onClick={() => void handleResolve(report.id)}
+                        >
+                          {resolveReport.isPending ? "Saving…" : "Confirm resolve"}
+                        </button>
+                        <button
+                          type="button"
+                          className="muted-btn"
+                          onClick={() => {
+                            setResolveReportId(null);
+                            setResolveReason("");
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="muted-btn"
+                        onClick={() => {
+                          setResolveReportId(report.id);
+                          setResolveReason("");
+                          setHideMessageId(null);
+                        }}
+                      >
+                        Resolve
+                      </button>
+                    )
+                  ) : null}
+                  {report.targetType === "hype_room_message" ? (
+                    hideMessageId === report.targetId ? (
+                      <div className="admin-report-inline-form">
+                        <input
+                          value={hideReason}
+                          onChange={event => setHideReason(event.target.value)}
+                          maxLength={500}
+                          placeholder="Hide reason (1–500)"
+                          aria-label="Hide reason"
+                        />
+                        <button
+                          type="button"
+                          className="danger-btn"
+                          disabled={
+                            hideMessage.isPending || hideReason.trim().length < 1
+                          }
+                          onClick={() => void handleHideMessage(report.targetId)}
+                        >
+                          {hideMessage.isPending ? "Hiding…" : "Confirm hide"}
+                        </button>
+                        <button
+                          type="button"
+                          className="muted-btn"
+                          onClick={() => {
+                            setHideMessageId(null);
+                            setHideReason("");
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="muted-btn"
+                        onClick={() => {
+                          setHideMessageId(report.targetId);
+                          setHideReason("");
+                          setResolveReportId(null);
+                        }}
+                      >
+                        <EyeOff size={13} aria-hidden="true" /> Hide message
+                      </button>
+                    )
+                  ) : null}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );

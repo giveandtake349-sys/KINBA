@@ -1575,6 +1575,134 @@ h3 {
   border-color: rgba(255, 141, 141, 0.4);
   background: rgba(255, 141, 141, 0.1);
 }
+/* Gate 6 — Admin Reports section */
+.admin-reports-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.admin-reports-filters label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.admin-reports-filters select {
+  min-height: 38px;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  background: var(--page-bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+.admin-reports-empty {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+.admin-reports-list {
+  display: grid;
+  gap: 0.75rem;
+}
+.admin-report-row {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--page-bg);
+}
+.admin-report-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.admin-report-id {
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+.admin-report-target,
+.admin-report-time {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.admin-report-body {
+  display: grid;
+  gap: 0.3rem;
+}
+.admin-report-reason {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.admin-report-details {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+}
+.admin-report-ids {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.admin-report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.admin-report-actions .muted-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.72rem;
+}
+.admin-report-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+}
+.admin-report-inline-form input {
+  flex: 1 1 180px;
+  min-height: 36px;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+.admin-report-inline-form .primary-btn,
+.admin-report-inline-form .danger-btn,
+.admin-report-inline-form .muted-btn {
+  min-height: 36px;
+  white-space: nowrap;
+}
+.status-chip--open {
+  color: var(--accent);
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+}
+.status-chip--resolved {
+  color: #43c984;
+  border-color: rgba(67, 201, 132, 0.4);
+  background: rgba(67, 201, 132, 0.1);
+}
 .danger-btn {
   border: 1px solid rgba(255, 141, 141, 0.4);
   border-radius: 999px;

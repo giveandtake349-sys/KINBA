@@ -4,6 +4,7 @@ import {
   CalendarClock,
   CheckCircle2,
   Clock3,
+  Flag,
   Lock,
   Package,
   RefreshCw,
@@ -14,6 +15,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { SupabaseAuthDialog } from "@/components/SupabaseAuthDialog";
+import { ReportDialog } from "@/components/ReportDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropStatusChip,
@@ -111,6 +113,7 @@ export default function DropDetail({
   const auth = useAuth();
   const nowMs = useNow(1000);
   const [claiming, setClaiming] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const rawId = Number(params?.id);
   const dropId = Number.isInteger(rawId) && rawId > 0 ? rawId : null;
@@ -174,6 +177,12 @@ export default function DropDetail({
     if (auth.isAuthenticated) return true;
     auth.openAuth();
     return false;
+  };
+
+  const openReport = () => {
+    if (dropId == null) return;
+    if (!requireAuth()) return;
+    setReportOpen(true);
   };
 
   const handleClaim = async () => {
@@ -370,6 +379,16 @@ export default function DropDetail({
                     This drop is not live yet.
                   </p>
                 ) : null}
+                {!isSeller && dropId != null ? (
+                  <button
+                    type="button"
+                    className="muted-btn report-action-btn"
+                    onClick={openReport}
+                  >
+                    <Flag size={13} aria-hidden="true" />
+                    Report
+                  </button>
+                ) : null}
               </div>
             </header>
 
@@ -396,6 +415,13 @@ export default function DropDetail({
           onOpenChange={open => (open ? auth.openAuth() : auth.closeAuth())}
         />
       ) : null}
+      <ReportDialog
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="drop"
+        targetId={dropId}
+        title="Report drop"
+      />
     </div>
   );
 }

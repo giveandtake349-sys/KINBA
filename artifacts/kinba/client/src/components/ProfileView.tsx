@@ -10,6 +10,7 @@ import {
 import {
   BadgeCheck,
   ArrowLeft,
+  Flag,
   MoreHorizontal,
   Share2,
   UserRound,
@@ -29,6 +30,7 @@ import { trpc } from "@/lib/trpc";
 import { uploadImage } from "@/lib/mediaUpload";
 import { resolveMediaUrl } from "@/lib/runtimeConfig";
 import AvatarCropModal from "./AvatarCropModal";
+import { ReportDialog } from "./ReportDialog";
 import "./profileRedesign.css";
 
 type ProfileSnapshot = {
@@ -295,6 +297,7 @@ export default function ProfileView({
   const [activeTab, setActiveTab] = useState<ProfileTab>("posts");
   const [editOpen, setEditOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -578,6 +581,20 @@ export default function ProfileView({
                   <LinkIcon size={15} />
                   Copy Link
                 </button>
+                {!isOwner && isAuthenticated && userId ? (
+                  <button
+                    type="button"
+                    className="pr-dropdown-item"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setReportOpen(true);
+                    }}
+                  >
+                    <Flag size={15} />
+                    Report User
+                  </button>
+                ) : null}
               </div>
             )}
           </div>
@@ -737,6 +754,13 @@ export default function ProfileView({
         profile={profile}
         open={editOpen}
         onClose={() => setEditOpen(false)}
+      />
+      <ReportDialog
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        targetType="user"
+        targetId={userId ?? null}
+        title="Report user"
       />
     </main>
   );

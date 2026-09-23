@@ -1040,6 +1040,56 @@ body {
   box-shadow: 0 0 0 3px var(--kinba-cyan-soft);
 }
 
+/* Gate 6 — ReportDialog (scoped; reuses action-modal + modal-form tokens). */
+.report-dialog {
+  width: min(100%, 440px);
+}
+.report-dialog .action-modal-head h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.report-dialog .action-modal-head h2 svg {
+  color: var(--kinba-cyan, #25d8e8);
+}
+.report-dialog-hint {
+  margin: 0;
+  color: var(--kinba-muted-modern, rgba(255, 255, 255, 0.62));
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+.report-dialog-req {
+  color: var(--kinba-cyan, #25d8e8);
+  font-weight: 600;
+}
+.report-dialog-optional {
+  opacity: 0.7;
+  font-weight: 500;
+}
+.report-dialog-count {
+  color: var(--kinba-muted-modern, rgba(255, 255, 255, 0.45));
+  font-size: 0.72rem;
+  font-weight: 500;
+  justify-self: end;
+}
+.report-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 2px;
+}
+.report-dialog-actions .muted-btn {
+  padding: 10px 12px;
+  font-size: 12px;
+}
+.report-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
 .modal-kind-switch {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
