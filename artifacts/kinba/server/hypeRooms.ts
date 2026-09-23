@@ -1105,3 +1105,189 @@ export async function removeHypeRoomMember(
     return removed;
   });
 }
+
+/**
+ * M8 — admin room list: all statuses (optional status filter), lazy lifecycle
+ * resolution preserved from listActiveHypeRooms / getHypeRoom.
+ */
+export async function listAdminHypeRooms(
+  opts: { status?: HypeRoomStatus } = {}
+): Promise<HypeRoomRow[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const now = new Date();
+  const rows = opts.status
+    ? await db
+        .select()
+        .from(hypeRooms)
+        .where(eq(hypeRooms.status, opts.status))
+        .orderBy(asc(hypeRooms.startsAt), asc(hypeRooms.id))
+    : await db
+        .select()
+        .from(hypeRooms)
+        .orderBy(asc(hypeRooms.startsAt), asc(hypeRooms.id));
+
+  const matched: HypeRoomRow[] = [];
+  for (const row of rows) {
+    matched.push(await persistResolvedRoom(db, row, now));
+  }
+  return matched;
+}
+
+/**
+ * M8 — admin force end: ONLY live → expired (optimistic WHERE status='live').
+ * Bypasses host ownership; reuses notifyRoomExpired (no new notification type).
+ */
+export async function adminForceEndHypeRoom(
+  roomId: number
+): Promise<HypeRoomRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const [roomRow] = await db
+    .select()
+    .from(hypeRooms)
+    .where(eq(hypeRooms.id, roomId))
+    .limit(1);
+  if (!roomRow) throw new Error("Room not found.");
+  const room = await persistResolvedRoom(db, roomRow, new Date());
+
+  if (room.status === "expired") {
+    throw new Error("The room has already ended.");
+  }
+  if (room.status === "archived") {
+    throw new Error("The room is already archived.");
+  }
+  if (room.status !== "live") {
+    throw new Error("Only a live room can be force-ended.");
+  }
+  assertRoomTransition(room.status, "expired");
+
+  const now = new Date();
+  const [updated] = await db
+    .update(hypeRooms)
+    .set({
+      status: "expired",
+      expiredAt: room.expiredAt ?? now,
+      updatedAt: now,
+    })
+    .where(and(eq(hypeRooms.id, roomId), eq(hypeRooms.status, "live")))
+    .returning();
+  if (!updated) {
+    throw new Error("Only a live room can be force-ended.");
+  }
+  await notifyRoomExpired(
+    { id: updated.id, title: updated.title, hostId: updated.hostId },
+    db
+  );
+  return updated;
+}
+
+/**
+ * M8 — admin archive: scheduled → archived | expired → archived only.
+ * Optional cancelReason matches host-cancel validation (≤500). Transcript kept.
+ */
+export async function adminArchiveHypeRoom(
+  roomId: number,
+  cancelReason?: string | null
+): Promise<HypeRoomRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const [roomRow] = await db
+    .select()
+    .from(hypeRooms)
+    .where(eq(hypeRooms.id, roomId))
+    .limit(1);
+  if (!roomRow) throw new Error("Room not found.");
+  const room = await persistResolvedRoom(db, roomRow, new Date());
+
+  if (room.status === "archived") {
+    throw new Error("The room is already archived.");
+  }
+  if (room.status === "live") {
+    throw new Error("A live room cannot be archived.");
+  }
+  if (room.status !== "scheduled" && room.status !== "expired") {
+    throw new Error("Only scheduled or expired rooms can be archived.");
+  }
+  assertRoomTransition(room.status, "archived");
+
+  const now = new Date();
+  const reason =
+    cancelReason == null ? null : cancelReason.trim().slice(0, 500) || null;
+  const [updated] = await db
+    .update(hypeRooms)
+    .set({
+      status: "archived",
+      archivedAt: room.archivedAt ?? now,
+      updatedAt: now,
+      ...(room.status === "scheduled" ? { cancelReason: reason } : {}),
+    })
+    .where(and(eq(hypeRooms.id, roomId), eq(hypeRooms.status, room.status)))
+    .returning();
+  if (!updated) {
+    throw new Error("Room is no longer in expected state.");
+  }
+  return updated;
+}
+
+/**
+ * M8 — room-scoped membership ban (not a global account ban).
+ * Pre-join bans supported: insert membership with bannedAt when no row exists.
+ * Existing join/send already reject when bannedAt is set.
+ */
+export async function adminBanHypeRoomMember(
+  roomId: number,
+  targetUserId: number
+): Promise<HypeRoomMemberRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const [room] = await db
+    .select()
+    .from(hypeRooms)
+    .where(eq(hypeRooms.id, roomId))
+    .limit(1);
+  if (!room) throw new Error("Room not found.");
+  if (room.status === "archived") {
+    throw new Error("Cannot ban members in an archived room.");
+  }
+
+  const now = new Date();
+  const [existing] = await db
+    .select()
+    .from(hypeRoomMembers)
+    .where(
+      and(
+        eq(hypeRoomMembers.roomId, roomId),
+        eq(hypeRoomMembers.userId, targetUserId)
+      )
+    )
+    .limit(1);
+
+  if (existing) {
+    const [updated] = await db
+      .update(hypeRoomMembers)
+      .set({ bannedAt: existing.bannedAt ?? now, leftAt: now })
+      .where(eq(hypeRoomMembers.id, existing.id))
+      .returning();
+    if (!updated) throw new Error("Failed to ban member.");
+    return updated;
+  }
+
+  const [created] = await db
+    .insert(hypeRoomMembers)
+    .values({
+      roomId,
+      userId: targetUserId,
+      role: resolveMemberRole(room.hostId, targetUserId),
+      bannedAt: now,
+      joinedAt: now,
+      leftAt: null,
+      removedBy: null,
+    })
+    .returning();
+  if (!created) throw new Error("Failed to ban member.");
+  return created;
+}

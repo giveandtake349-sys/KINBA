@@ -39,6 +39,11 @@ const hypeRoomsMocks = vi.hoisted(() => ({
   removeHypeRoomMember: vi.fn(),
   // M6
   cancelHypeRoom: vi.fn(),
+  // M8
+  listAdminHypeRooms: vi.fn(),
+  adminForceEndHypeRoom: vi.fn(),
+  adminArchiveHypeRoom: vi.fn(),
+  adminBanHypeRoomMember: vi.fn(),
   isValidDurationHours: vi.fn(),
   assertValidDurationHours: vi.fn(),
   computeEndsAt: vi.fn(),

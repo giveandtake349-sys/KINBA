@@ -75,6 +75,9 @@ import {
   markUserNotificationsRead,
 } from "./notifications";
 import {
+  adminArchiveHypeRoom,
+  adminBanHypeRoomMember,
+  adminForceEndHypeRoom,
   cancelHypeRoom,
   createHypeRoom,
   endHypeRoom,
@@ -82,6 +85,7 @@ import {
   joinHypeRoom,
   leaveHypeRoom,
   listActiveHypeRooms,
+  listAdminHypeRooms,
   listHypeRoomMembers,
   listRoomMessages,
   pinHypeRoomMessage,
@@ -93,6 +97,9 @@ import {
   ROOM_MESSAGE_MAX_LENGTH,
 } from "./hypeRooms";
 import {
+  adminFeatureDrop,
+  adminForceEndDrop,
+  adminTakedownDrop,
   assertDropOwner,
   cancelClaim,
   claimDrop,
@@ -100,6 +107,7 @@ import {
   fulfillClaim,
   getDrop,
   getMyClaim,
+  listAdminDrops,
   listDrops,
   listDropClaims,
   publishDrop,
@@ -185,6 +193,17 @@ function mapHypeRoomMemberError(error: unknown, _op: string): TRPCError {
   if (message.startsWith("Only verified company/creator")) {
     return new TRPCError({ code: "FORBIDDEN", message });
   }
+  // M8 — admin forceEnd / archive / banUser status guards.
+  if (
+    message === "Only a live room can be force-ended." ||
+    message === "A live room cannot be archived." ||
+    message === "Only scheduled or expired rooms can be archived." ||
+    message === "Room is no longer in expected state." ||
+    message === "Cannot ban members in an archived room." ||
+    message === "Failed to ban member."
+  ) {
+    return new TRPCError({ code: "CONFLICT", message });
+  }
   // Preserve original error for anything else (DB/driver/internal).
   if (error instanceof Error) {
     return new TRPCError({
@@ -245,9 +264,13 @@ function mapDropError(error: unknown, _op: string): TRPCError {
     message.includes("Media URL") ||
     message.includes("remaining quantity") ||
     message.includes("Date is invalid") ||
-    message.includes("Start or end")
+    message.includes("Start or end") ||
+    message.includes("Takedown reason")
   ) {
     return new TRPCError({ code: "BAD_REQUEST", message });
+  }
+  if (message === "Failed to update drop featured state.") {
+    return new TRPCError({ code: "CONFLICT", message });
   }
   if (error instanceof Error) {
     return new TRPCError({
@@ -684,6 +707,144 @@ export const appRouter = router({
       .mutation(({ input }) =>
         adminSetSponsorStatus(input.sponsorId, input.status)
       ),
+    // M8 — admin Hype Rooms (flag time_limited_communities; no host checks).
+    hypeRooms: router({
+      list: adminProcedure
+        .input(
+          z
+            .object({
+              status: z
+                .enum(["scheduled", "live", "expired", "archived"])
+                .optional(),
+            })
+            .optional()
+        )
+        .query(async ({ input }) => {
+          await requireFeatureFlag("time_limited_communities");
+          try {
+            return await listAdminHypeRooms({ status: input?.status });
+          } catch (error) {
+            throw mapHypeRoomMemberError(error, "admin.list");
+          }
+        }),
+      forceEnd: adminProcedure
+        .input(z.object({ roomId: z.number().int().positive() }))
+        .mutation(async ({ input }) => {
+          await requireFeatureFlag("time_limited_communities");
+          try {
+            return await adminForceEndHypeRoom(input.roomId);
+          } catch (error) {
+            throw mapHypeRoomMemberError(error, "admin.forceEnd");
+          }
+        }),
+      archive: adminProcedure
+        .input(
+          z.object({
+            roomId: z.number().int().positive(),
+            cancelReason: z.string().trim().max(500).nullable().optional(),
+          })
+        )
+        .mutation(async ({ input }) => {
+          await requireFeatureFlag("time_limited_communities");
+          try {
+            return await adminArchiveHypeRoom(
+              input.roomId,
+              input.cancelReason ?? null
+            );
+          } catch (error) {
+            throw mapHypeRoomMemberError(error, "admin.archive");
+          }
+        }),
+      banUser: adminProcedure
+        .input(
+          z.object({
+            roomId: z.number().int().positive(),
+            userId: z.number().int().positive(),
+          })
+        )
+        .mutation(async ({ input }) => {
+          await requireFeatureFlag("time_limited_communities");
+          try {
+            return await adminBanHypeRoomMember(input.roomId, input.userId);
+          } catch (error) {
+            throw mapHypeRoomMemberError(error, "admin.banUser");
+          }
+        }),
+    }),
+    // M8 — admin Drops (flag jhilik_drops; no seller ownership checks).
+    drops: router({
+      list: adminProcedure
+        .input(
+          z
+            .object({
+              status: z
+                .enum([
+                  "draft",
+                  "scheduled",
+                  "live",
+                  "sold_out",
+                  "ended",
+                  "archived",
+                ])
+                .optional(),
+              featured: z.boolean().optional(),
+              limit: z.number().int().min(1).max(100).optional(),
+            })
+            .optional()
+        )
+        .query(async ({ input }) => {
+          await requireFeatureFlag("jhilik_drops");
+          try {
+            return await listAdminDrops({
+              status: input?.status,
+              featured: input?.featured,
+              limit: input?.limit,
+            });
+          } catch (error) {
+            throw mapDropError(error, "admin.list");
+          }
+        }),
+      feature: adminProcedure
+        .input(
+          z.object({
+            dropId: z.number().int().positive(),
+            featured: z.boolean(),
+          })
+        )
+        .mutation(async ({ input }) => {
+          await requireFeatureFlag("jhilik_drops");
+          try {
+            return await adminFeatureDrop(input.dropId, input.featured);
+          } catch (error) {
+            throw mapDropError(error, "admin.feature");
+          }
+        }),
+      forceEnd: adminProcedure
+        .input(z.object({ dropId: z.number().int().positive() }))
+        .mutation(async ({ input }) => {
+          await requireFeatureFlag("jhilik_drops");
+          try {
+            return await adminForceEndDrop(input.dropId);
+          } catch (error) {
+            throw mapDropError(error, "admin.forceEnd");
+          }
+        }),
+      takedown: adminProcedure
+        .input(
+          z.object({
+            dropId: z.number().int().positive(),
+            reason: z.string().trim().max(500).optional(),
+          })
+        )
+        .mutation(async ({ input }) => {
+          await requireFeatureFlag("jhilik_drops");
+          try {
+            return await adminTakedownDrop(input.dropId, input.reason ?? null);
+          } catch (error) {
+            throw mapDropError(error, "admin.takedown");
+          }
+        }),
+    }),
   }),
   rewards: router({
     balance: protectedProcedure.query(async ({ ctx }) => {

@@ -746,3 +746,116 @@ export async function cancelClaim(
 ): Promise<DropClaimRow> {
   return transitionClaimForSeller(sellerId, input, "cancelled");
 }
+
+/** M8 — statuses admin forceEnd/takedown may move to `ended`. */
+const ADMIN_END_STATUSES = ["scheduled", "live", "sold_out"] as const;
+type AdminEndStatus = (typeof ADMIN_END_STATUSES)[number];
+
+function assertAdminEndStatus(status: DropStatus): asserts status is AdminEndStatus {
+  if (!(ADMIN_END_STATUSES as readonly string[]).includes(status)) {
+    throw new Error("Drop cannot be ended from its current status.");
+  }
+  // Shared map has live/sold_out → ended; scheduled → ended is M8 admin-only
+  // (binding scope) and is not in DROP_TRANSITIONS — skip assert for scheduled.
+  if (status !== "scheduled") {
+    assertDropTransition(status, "ended");
+  }
+}
+
+async function adminEndDropInternal(
+  db: DbClient,
+  dropId: number
+): Promise<DropRow> {
+  const existing = await getDropOrThrow(db, dropId);
+  const resolved = await persistResolvedDrop(db, existing, new Date());
+  assertAdminEndStatus(resolved.status);
+
+  const now = new Date();
+  const [updated] = await db
+    .update(drops)
+    .set({ status: "ended", endedAt: resolved.endedAt ?? now, updatedAt: now })
+    .where(and(eq(drops.id, dropId), eq(drops.status, resolved.status)))
+    .returning();
+  if (!updated) throw new Error("Failed to end drop.");
+  return updated;
+}
+
+/**
+ * M8 — admin list: optional status + featured filters; lazy lifecycle resolution
+ * preserved from listDrops. No new pagination framework.
+ */
+export async function listAdminDrops(
+  opts: {
+    status?: DropStatus;
+    featured?: boolean;
+    limit?: number;
+  } = {}
+): Promise<{ drops: DropRow[]; serverNow: Date }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const now = new Date();
+  const limit = Math.min(Math.max(opts.limit ?? 50, 1), 100);
+
+  const rows = await db
+    .select()
+    .from(drops)
+    .orderBy(desc(drops.featured), desc(drops.startsAt), desc(drops.id))
+    .limit(limit * 3);
+
+  const resolved: DropRow[] = [];
+  for (const row of rows) {
+    const r = await persistResolvedDrop(db, row, now);
+    if (opts.status != null && r.status !== opts.status) continue;
+    if (opts.featured != null && r.featured !== opts.featured) continue;
+    resolved.push(r);
+    if (resolved.length >= limit) break;
+  }
+  return { drops: resolved, serverNow: now };
+}
+
+/** M8 — feature/unfeature for Discover; does NOT change drop status. */
+export async function adminFeatureDrop(
+  dropId: number,
+  featured: boolean
+): Promise<DropRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const existing = await getDropOrThrow(db, dropId);
+
+  const now = new Date();
+  const [updated] = await db
+    .update(drops)
+    .set({
+      featured,
+      featuredAt: featured ? now : null,
+      updatedAt: now,
+    })
+    .where(eq(drops.id, existing.id))
+    .returning();
+  if (!updated) throw new Error("Failed to update drop featured state.");
+  return updated;
+}
+
+/** M8 — admin force end: scheduled/live/sold_out → ended (optimistic WHERE). */
+export async function adminForceEndDrop(dropId: number): Promise<DropRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return adminEndDropInternal(db, dropId);
+}
+
+/**
+ * M8 — admin takedown: same end transitions as forceEnd.
+ * Optional `reason` is accepted for API validation only — drops schema has
+ * no reason column; M9 owns durable moderation reason storage.
+ */
+export async function adminTakedownDrop(
+  dropId: number,
+  reason?: string | null
+): Promise<DropRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  if (reason != null && reason.trim().length > 500) {
+    throw new Error("Takedown reason must be at most 500 characters.");
+  }
+  return adminEndDropInternal(db, dropId);
+}
