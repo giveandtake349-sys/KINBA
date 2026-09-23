@@ -13,6 +13,7 @@ import {
 import {
   assertRoomTransition,
   assertValidDurationHours,
+  canHostCancelScheduled,
   canHostEndRoom,
   canJoinRoomStatus,
   canLeaveMembership,
@@ -20,8 +21,10 @@ import {
   computeEndsAt,
   decideJoinAction,
   decideRemoveMember,
+  isEligibleRoomHost,
   isRoomHost,
   isValidDurationHours,
+  matchesRoomListFilter,
   normalizeStartsAt,
   resolveMemberRole,
   resolveRoomLifecycle,
@@ -417,5 +420,164 @@ describe("M4 message pure helpers", () => {
     expect(
       decideRemoveMember(41, 41, { ...target, leftAt: new Date() })
     ).toBe("target_already_left");
+  });
+});
+
+describe("M6 — host scheduled cancel pure helpers", () => {
+  it("allows cancel only from scheduled (§8.4 / §19.1)", () => {
+    expect(canHostCancelScheduled("scheduled")).toBe(true);
+    expect(canHostCancelScheduled("live")).toBe(false);
+    expect(canHostCancelScheduled("expired")).toBe(false);
+    expect(canHostCancelScheduled("archived")).toBe(false);
+  });
+
+  it("scheduled → archived is a legal map transition", () => {
+    expect(canTransition(HYPE_ROOM_TRANSITIONS, "scheduled", "archived")).toBe(
+      true
+    );
+    expect(() =>
+      assertRoomTransition("scheduled", "archived")
+    ).not.toThrow();
+  });
+
+  it("does not invent illegal cancel transitions", () => {
+    expect(canTransition(HYPE_ROOM_TRANSITIONS, "live", "archived")).toBe(
+      false
+    );
+    expect(canTransition(HYPE_ROOM_TRANSITIONS, "expired", "live")).toBe(
+      false
+    );
+    expect(canTransition(HYPE_ROOM_TRANSITIONS, "archived", "scheduled")).toBe(
+      false
+    );
+    expect(() => assertRoomTransition("live", "archived")).toThrow();
+  });
+
+  it("expired → archived remains legal for archive policy/admin path", () => {
+    expect(canTransition(HYPE_ROOM_TRANSITIONS, "expired", "archived")).toBe(
+      true
+    );
+    expect(() => assertRoomTransition("expired", "archived")).not.toThrow();
+  });
+});
+
+describe("M6 — list filters (§18.3)", () => {
+  const scheduled = { status: "scheduled" as const, hostId: 1 };
+  const live = { status: "live" as const, hostId: 1 };
+  const expired = { status: "expired" as const, hostId: 1 };
+  const archived = { status: "archived" as const, hostId: 1 };
+  const other = { status: "live" as const, hostId: 2 };
+
+  it("default (no filter) preserves M1 active scheduled+live set", () => {
+    expect(matchesRoomListFilter(scheduled, undefined, 1)).toBe(true);
+    expect(matchesRoomListFilter(live, undefined, 1)).toBe(true);
+    expect(matchesRoomListFilter(expired, undefined, 1)).toBe(false);
+    expect(matchesRoomListFilter(archived, undefined, 1)).toBe(false);
+  });
+
+  it("live filter keeps only live rooms", () => {
+    expect(matchesRoomListFilter(live, "live", 1)).toBe(true);
+    expect(matchesRoomListFilter(scheduled, "live", 1)).toBe(false);
+    expect(matchesRoomListFilter(expired, "live", 1)).toBe(false);
+  });
+
+  it("upcoming filter keeps only scheduled rooms", () => {
+    expect(matchesRoomListFilter(scheduled, "upcoming", 1)).toBe(true);
+    expect(matchesRoomListFilter(live, "upcoming", 1)).toBe(false);
+    expect(matchesRoomListFilter(expired, "upcoming", 1)).toBe(false);
+  });
+
+  it("mine filter is host ownership only (parallel to drops mine)", () => {
+    expect(matchesRoomListFilter(scheduled, "mine", 1)).toBe(true);
+    expect(matchesRoomListFilter(live, "mine", 1)).toBe(true);
+    expect(matchesRoomListFilter(expired, "mine", 1)).toBe(true);
+    expect(matchesRoomListFilter(other, "mine", 1)).toBe(false);
+    expect(matchesRoomListFilter(scheduled, "mine", 2)).toBe(false);
+    expect(matchesRoomListFilter(scheduled, "mine", null)).toBe(false);
+    expect(matchesRoomListFilter(scheduled, "mine", undefined)).toBe(false);
+  });
+});
+
+describe("M6 — host/create eligibility (§16 default verified company/creator)", () => {
+  const matrix: Array<{
+    profile: { accountType: string; verificationStatus: string } | null;
+    expected: boolean;
+    label: string;
+  }> = [
+    { profile: null, expected: false, label: "missing profile" },
+    {
+      profile: { accountType: "member", verificationStatus: "none" },
+      expected: false,
+      label: "member",
+    },
+    {
+      profile: { accountType: "member", verificationStatus: "business_verified" },
+      expected: false,
+      label: "member business_verified",
+    },
+    {
+      profile: { accountType: "creator", verificationStatus: "none" },
+      expected: false,
+      label: "creator none",
+    },
+    {
+      profile: { accountType: "creator", verificationStatus: "pending" },
+      expected: false,
+      label: "creator pending",
+    },
+    {
+      profile: { accountType: "creator", verificationStatus: "eligible" },
+      expected: false,
+      label: "creator eligible",
+    },
+    {
+      profile: { accountType: "creator", verificationStatus: "verified" },
+      expected: true,
+      label: "creator verified",
+    },
+    {
+      profile: { accountType: "creator", verificationStatus: "business_verified" },
+      expected: true,
+      label: "creator business_verified",
+    },
+    {
+      profile: { accountType: "creator", verificationStatus: "official" },
+      expected: true,
+      label: "creator official",
+    },
+    {
+      profile: { accountType: "company", verificationStatus: "none" },
+      expected: false,
+      label: "company none",
+    },
+    {
+      profile: { accountType: "company", verificationStatus: "pending" },
+      expected: false,
+      label: "company pending",
+    },
+    {
+      profile: { accountType: "company", verificationStatus: "verified" },
+      expected: false,
+      label: "company verified (legacy not business/official)",
+    },
+    {
+      profile: { accountType: "company", verificationStatus: "business_verified" },
+      expected: true,
+      label: "company business_verified",
+    },
+    {
+      profile: { accountType: "company", verificationStatus: "official" },
+      expected: true,
+      label: "company official",
+    },
+  ];
+
+  it("matches the §16 eligibility matrix", () => {
+    for (const row of matrix) {
+      expect(
+        isEligibleRoomHost(row.profile),
+        `${row.label} → ${row.expected}`
+      ).toBe(row.expected);
+    }
   });
 });

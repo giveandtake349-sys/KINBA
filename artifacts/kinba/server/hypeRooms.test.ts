@@ -37,6 +37,8 @@ const hypeRoomsMocks = vi.hoisted(() => ({
   pinHypeRoomMessage: vi.fn(),
   unpinHypeRoomMessage: vi.fn(),
   removeHypeRoomMember: vi.fn(),
+  // M6
+  cancelHypeRoom: vi.fn(),
   isValidDurationHours: vi.fn(),
   assertValidDurationHours: vi.fn(),
   computeEndsAt: vi.fn(),
@@ -51,6 +53,9 @@ const hypeRoomsMocks = vi.hoisted(() => ({
   canSendRoomMessage: vi.fn(),
   isRoomHost: vi.fn(),
   canHostEndRoom: vi.fn(),
+  canHostCancelScheduled: vi.fn(),
+  matchesRoomListFilter: vi.fn(),
+  isEligibleRoomHost: vi.fn(),
   decideRemoveMember: vi.fn(),
   ROOM_DURATION_HOURS: [4, 6, 12, 24],
   ROOM_MAX_LEAD_MS: 7 * 24 * 60 * 60 * 1000,
@@ -152,6 +157,16 @@ describe("hypeRooms procedures — feature flag fail-closed", () => {
       appRouter.createCaller(context()).hypeRooms.list()
     ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
     expect(hypeRoomsMocks.listActiveHypeRooms).not.toHaveBeenCalled();
+  });
+
+  it("rejects cancel when the flag is disabled", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.cancel({
+        roomId: 1,
+        cancelReason: "changed mind",
+      })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(hypeRoomsMocks.cancelHypeRoom).not.toHaveBeenCalled();
   });
 
   it("rejects resolve when the flag is disabled", async () => {
@@ -292,6 +307,16 @@ describe("hypeRooms procedures — feature flag fail-closed", () => {
     expect(hypeRoomsMocks.joinHypeRoom).not.toHaveBeenCalled();
   });
 
+  it("rejects unauthenticated cancel even if flag checks were skipped", async () => {
+    featureFlagMocks.isFeatureFlagEnabled.mockResolvedValue(true);
+    await expect(
+      appRouter.createCaller(context(null)).hypeRooms.cancel({
+        roomId: 1,
+      })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(hypeRoomsMocks.cancelHypeRoom).not.toHaveBeenCalled();
+  });
+
   it("rejects unauthenticated leave even if flag checks were skipped", async () => {
     featureFlagMocks.isFeatureFlagEnabled.mockResolvedValue(true);
     await expect(
@@ -353,7 +378,7 @@ describe("hypeRooms procedures — enabled flag wiring", () => {
     expect(hypeRoomsMocks.getHypeRoom).toHaveBeenCalledWith(3);
   });
 
-  it("lists active rooms after flag check", async () => {
+  it("lists active rooms after flag check (legacy default)", async () => {
     const rooms = [
       { id: 1, status: "live" as const },
       { id: 2, status: "scheduled" as const },
@@ -362,7 +387,60 @@ describe("hypeRooms procedures — enabled flag wiring", () => {
     await expect(
       appRouter.createCaller(context()).hypeRooms.list()
     ).resolves.toEqual(rooms);
-    expect(hypeRoomsMocks.listActiveHypeRooms).toHaveBeenCalled();
+    expect(hypeRoomsMocks.listActiveHypeRooms).toHaveBeenCalledWith({
+      filter: undefined,
+      userId: user.id,
+    });
+  });
+
+  it("forwards live/upcoming/mine list filters (M6)", async () => {
+    hypeRoomsMocks.listActiveHypeRooms.mockResolvedValue([]);
+    await appRouter.createCaller(context()).hypeRooms.list({ filter: "live" });
+    expect(hypeRoomsMocks.listActiveHypeRooms).toHaveBeenLastCalledWith({
+      filter: "live",
+      userId: user.id,
+    });
+    await appRouter
+      .createCaller(context())
+      .hypeRooms.list({ filter: "upcoming" });
+    expect(hypeRoomsMocks.listActiveHypeRooms).toHaveBeenLastCalledWith({
+      filter: "upcoming",
+      userId: user.id,
+    });
+    await appRouter.createCaller(context()).hypeRooms.list({ filter: "mine" });
+    expect(hypeRoomsMocks.listActiveHypeRooms).toHaveBeenLastCalledWith({
+      filter: "mine",
+      userId: user.id,
+    });
+  });
+
+  it("rejects mine list filter without authentication", async () => {
+    await expect(
+      appRouter.createCaller(context(null)).hypeRooms.list({
+        filter: "mine",
+      })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(hypeRoomsMocks.listActiveHypeRooms).not.toHaveBeenCalled();
+  });
+
+  it("allows live/upcoming list filters without authentication", async () => {
+    hypeRoomsMocks.listActiveHypeRooms.mockResolvedValue([]);
+    await appRouter
+      .createCaller(context(null))
+      .hypeRooms.list({ filter: "live" });
+    expect(hypeRoomsMocks.listActiveHypeRooms).toHaveBeenCalledWith({
+      filter: "live",
+      userId: null,
+    });
+  });
+
+  it("rejects unknown list filters at the API boundary", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.list({
+        filter: "all" as "live",
+      })
+    ).rejects.toThrow();
+    expect(hypeRoomsMocks.listActiveHypeRooms).not.toHaveBeenCalled();
   });
 
   it("resolves expiry idempotently for a known room", async () => {
@@ -753,6 +831,109 @@ describe("hypeRooms procedures — M4 messages and host controls", () => {
         userId: 99,
       })
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
+describe("hypeRooms procedures — M6 lifecycle", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    databaseMocks.ensureProfile.mockResolvedValue(undefined);
+    featureFlagMocks.isFeatureFlagEnabled.mockResolvedValue(true);
+  });
+
+  it("cancels a scheduled room as host with reason", async () => {
+    const archived = {
+      id: 11,
+      hostId: user.id,
+      status: "archived" as const,
+      cancelReason: "conflict",
+      archivedAt: new Date(),
+    };
+    hypeRoomsMocks.cancelHypeRoom.mockResolvedValue(archived);
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.cancel({
+        roomId: 11,
+        cancelReason: "conflict",
+      })
+    ).resolves.toEqual(archived);
+    expect(hypeRoomsMocks.cancelHypeRoom).toHaveBeenCalledWith(
+      11,
+      user.id,
+      "conflict"
+    );
+  });
+
+  it("maps non-host cancel to FORBIDDEN", async () => {
+    hypeRoomsMocks.cancelHypeRoom.mockRejectedValue(
+      new Error("Only the host can cancel the room.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.cancel({ roomId: 11 })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("maps cancel of non-scheduled room to CONFLICT", async () => {
+    hypeRoomsMocks.cancelHypeRoom.mockRejectedValue(
+      new Error("Only a scheduled room can be cancelled.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.cancel({ roomId: 11 })
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("maps concurrent cancel race to CONFLICT", async () => {
+    hypeRoomsMocks.cancelHypeRoom.mockRejectedValue(
+      new Error("Room is no longer in scheduled state.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.cancel({ roomId: 11 })
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("maps live-room cancel to CONFLICT", async () => {
+    hypeRoomsMocks.cancelHypeRoom.mockRejectedValue(
+      new Error("A live room cannot be cancelled; end it instead.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.cancel({ roomId: 11 })
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("maps expired cancel to PRECONDITION_FAILED", async () => {
+    hypeRoomsMocks.cancelHypeRoom.mockRejectedValue(
+      new Error("The room has already ended.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.cancel({ roomId: 11 })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+  });
+
+  it("maps missing room cancel to NOT_FOUND", async () => {
+    hypeRoomsMocks.cancelHypeRoom.mockRejectedValue(
+      new Error("Room not found.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.cancel({ roomId: 11 })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("maps create eligibility rejection to FORBIDDEN", async () => {
+    hypeRoomsMocks.createHypeRoom.mockRejectedValue(
+      new Error("Only verified company/creator accounts can create rooms.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.create(createInput)
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("rejects cancelReason over 500 chars at the API boundary", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.cancel({
+        roomId: 1,
+        cancelReason: "x".repeat(501),
+      })
+    ).rejects.toThrow();
+    expect(hypeRoomsMocks.cancelHypeRoom).not.toHaveBeenCalled();
   });
 });
 

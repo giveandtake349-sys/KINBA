@@ -1,12 +1,14 @@
 /**
- * JHILIK temporary Hype/Community rooms (Phase 2 Milestones 1–4).
+ * JHILIK temporary Hype/Community rooms (Phase 2 Milestones 1–4, M6 lifecycle).
  *
  * M1: create / get / list active / resolve expiry.
  * M2: join / leave / list members (hype_room_members).
  * M4: messages list/send, host end (live→expired), pin/unpin, removeMember.
+ * M6: list filters (live/upcoming/mine), host scheduled-cancel (→archived),
+ *     host/create eligibility (default verified company/creator, §16).
  * Lifecycle is server-authoritative from persisted startsAt/endsAt.
  * Flag: time_limited_communities (fail-closed via router gate).
- * No drops, claims, rewards, notifications, or scheduled-cancel in this module.
+ * No drops, claims, rewards, or notifications in this module.
  */
 import { and, asc, eq, inArray, isNull, isNotNull } from "drizzle-orm";
 import {
@@ -172,6 +174,76 @@ export function assertRoomTransition(
   }
 }
 
+/**
+ * Host/create eligibility (spec §16: “default verified company/creator”).
+ * Mirrors the verified company/creator matrix used for sellers (§9.6);
+ * does not invent new roles, verification classes, or payment gates.
+ */
+export function isEligibleRoomHost(
+  profile:
+    | { accountType: string; verificationStatus: string }
+    | null
+    | undefined
+): boolean {
+  if (!profile) return false;
+  if (
+    profile.accountType !== "company" &&
+    profile.accountType !== "creator"
+  ) {
+    return false;
+  }
+  const v = profile.verificationStatus;
+  if (v === "business_verified" || v === "official") return true;
+  // Paid-verified creators currently map to `verified` and remain eligible.
+  if (profile.accountType === "creator" && v === "verified") return true;
+  return false;
+}
+
+/** Load profile and enforce host eligibility (admin bypass handled by caller). */
+async function assertProfileEligibleRoomHost(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  userId: number
+): Promise<void> {
+  const [profile] = await db
+    .select({
+      accountType: profiles.accountType,
+      verificationStatus: profiles.verificationStatus,
+    })
+    .from(profiles)
+    .where(eq(profiles.userId, userId))
+    .limit(1);
+  if (!isEligibleRoomHost(profile)) {
+    throw new Error(
+      "Only verified company/creator accounts can create rooms."
+    );
+  }
+}
+
+/** Host cancel eligibility: only scheduled rooms (§8.4 / §19.1). */
+export function canHostCancelScheduled(status: HypeRoomStatus): boolean {
+  return status === "scheduled";
+}
+
+/** Approved list filters only (spec §18.3). Default = legacy active list. */
+export type HypeRoomListFilter = "live" | "upcoming" | "mine";
+
+/** Pure post-resolve membership in a list bucket. */
+export function matchesRoomListFilter(
+  room: Pick<HypeRoomRow, "status" | "hostId">,
+  filter: HypeRoomListFilter | undefined,
+  userId: number | null | undefined
+): boolean {
+  if (filter == null) {
+    // Legacy default: active scheduled/live set (M1 behavior).
+    return room.status === "scheduled" || room.status === "live";
+  }
+  if (filter === "live") return room.status === "live";
+  if (filter === "upcoming") return room.status === "scheduled";
+  // mine — parallel to drops.list mine: rooms this user hosts.
+  if (userId == null) return false;
+  return room.hostId === userId;
+}
+
 async function persistResolvedRoom(
   db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
   room: HypeRoomRow,
@@ -205,10 +277,12 @@ async function persistResolvedRoom(
 /**
  * Create a temporary room. Ends are always computed server-side:
  * endsAt = startsAt + durationHours.
+ * Host must be verified company/creator (§16) unless callers pre-check admin.
  */
 export async function createHypeRoom(
   hostId: number,
-  input: CreateHypeRoomInput
+  input: CreateHypeRoomInput,
+  opts: { skipEligibility?: boolean } = {}
 ): Promise<HypeRoomRow> {
   const durationHours = assertValidDurationHours(input.durationHours);
   const now = new Date();
@@ -221,6 +295,18 @@ export async function createHypeRoom(
 
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
+
+  if (!opts.skipEligibility) {
+    const [actor] = await db
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.id, hostId))
+      .limit(1);
+    // §16: Admin may always create; otherwise default verified company/creator.
+    if (actor?.role !== "admin") {
+      await assertProfileEligibleRoomHost(db, hostId);
+    }
+  }
 
   const [created] = await db
     .insert(hypeRooms)
@@ -262,27 +348,45 @@ export async function getHypeRoom(
 }
 
 /**
- * List active (scheduled/live) rooms after resolving due expiry.
- * Expired/archived rooms are excluded from this listing.
+ * List rooms after resolving due expiry.
+ * - no filter (legacy default): scheduled + live (M1 active set)
+ * - live: currently live
+ * - upcoming: scheduled, not yet live
+ * - mine: rooms hosted by userId (parallel to drops.list mine)
+ * Order: startsAt, id (unchanged from M1).
  */
-export async function listActiveHypeRooms(): Promise<HypeRoomRow[]> {
+export async function listActiveHypeRooms(
+  opts: {
+    filter?: HypeRoomListFilter;
+    userId?: number | null;
+  } = {}
+): Promise<HypeRoomRow[]> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const now = new Date();
+  const filter = opts.filter;
+  const userId = opts.userId ?? null;
+
+  // mine may include expired hosted rooms; other filters stay on active set.
+  const baseStatuses =
+    filter === "mine"
+      ? (["scheduled", "live", "expired", "archived"] as const)
+      : (["scheduled", "live"] as const);
+
   const rows = await db
     .select()
     .from(hypeRooms)
-    .where(inArray(hypeRooms.status, ["scheduled", "live"]))
+    .where(inArray(hypeRooms.status, [...baseStatuses]))
     .orderBy(asc(hypeRooms.startsAt), asc(hypeRooms.id));
 
-  const active: HypeRoomRow[] = [];
+  const matched: HypeRoomRow[] = [];
   for (const row of rows) {
     const resolved = await persistResolvedRoom(db, row, now);
-    if (resolved.status === "scheduled" || resolved.status === "live") {
-      active.push(resolved);
+    if (matchesRoomListFilter(resolved, filter, userId)) {
+      matched.push(resolved);
     }
   }
-  return active;
+  return matched;
 }
 
 /**
@@ -555,9 +659,68 @@ export function isRoomHost(roomHostId: number, userId: number): boolean {
   return roomHostId === userId;
 }
 
-/** Host end (A3): only live → expired. No scheduled cancel in M4. */
+/** Host end (A3): only live → expired. */
 export function canHostEndRoom(status: HypeRoomStatus): boolean {
   return status === "live";
+}
+
+/**
+ * Host cancel before start (spec §8.4 / §19.1): scheduled → archived + reason.
+ * Concurrency-safe via optimistic WHERE status='scheduled'.
+ * Live/expired/archived rooms are rejected (cannot cancel).
+ */
+export async function cancelHypeRoom(
+  roomId: number,
+  userId: number,
+  cancelReason?: string | null
+): Promise<HypeRoomRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const [roomRow] = await db
+    .select()
+    .from(hypeRooms)
+    .where(eq(hypeRooms.id, roomId))
+    .limit(1);
+  if (!roomRow) throw new Error("Room not found.");
+
+  // Resolve first: a due scheduled→live/expired room is no longer cancellable.
+  const room = await persistResolvedRoom(db, roomRow, new Date());
+
+  if (!isRoomHost(room.hostId, userId)) {
+    throw new Error("Only the host can cancel the room.");
+  }
+  if (room.status === "live") {
+    throw new Error("A live room cannot be cancelled; end it instead.");
+  }
+  if (room.status === "expired") {
+    throw new Error("The room has already ended.");
+  }
+  if (room.status === "archived") {
+    throw new Error("The room is already archived.");
+  }
+  if (!canHostCancelScheduled(room.status)) {
+    throw new Error("Only a scheduled room can be cancelled.");
+  }
+  assertRoomTransition(room.status, "archived");
+
+  const now = new Date();
+  const reason =
+    cancelReason == null ? null : cancelReason.trim().slice(0, 500) || null;
+  const [updated] = await db
+    .update(hypeRooms)
+    .set({
+      status: "archived",
+      cancelReason: reason,
+      archivedAt: room.archivedAt ?? now,
+      updatedAt: now,
+    })
+    .where(and(eq(hypeRooms.id, roomId), eq(hypeRooms.status, "scheduled")))
+    .returning();
+  if (!updated) {
+    throw new Error("Room is no longer in scheduled state.");
+  }
+  return updated;
 }
 
 export type RemoveMemberDecision =
@@ -702,7 +865,7 @@ export async function sendHypeRoomMessage(
 
 /**
  * Host end early: live → expired only (product decision A3).
- * Owner is room.hostId. No scheduled-room cancellation in M4.
+ * Owner is room.hostId. Scheduled cancel is cancelHypeRoom (M6).
  */
 export async function endHypeRoom(
   roomId: number,

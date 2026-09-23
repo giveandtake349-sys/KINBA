@@ -70,6 +70,7 @@ import {
 } from "./featureFlags";
 import { getCoinBalance, listRewardHistory } from "./rewardLedger";
 import {
+  cancelHypeRoom,
   createHypeRoom,
   endHypeRoom,
   getHypeRoom,
@@ -149,7 +150,8 @@ function mapHypeRoomMemberError(error: unknown, _op: string): TRPCError {
     message === "Only the host can end the room." ||
     message === "Only the host can pin messages." ||
     message === "Only the host can remove members." ||
-    message === "The host cannot be removed from the room."
+    message === "The host cannot be removed from the room." ||
+    message === "Only the host can cancel the room."
   ) {
     return new TRPCError({ code: "FORBIDDEN", message });
   }
@@ -165,6 +167,18 @@ function mapHypeRoomMemberError(error: unknown, _op: string): TRPCError {
     message.startsWith("Message body must be at most")
   ) {
     return new TRPCError({ code: "BAD_REQUEST", message });
+  }
+  // M6 — host scheduled-cancel + create eligibility.
+  if (
+    message === "Only a scheduled room can be cancelled." ||
+    message === "A live room cannot be cancelled; end it instead." ||
+    message === "Room is no longer in scheduled state." ||
+    message === "The room is already archived."
+  ) {
+    return new TRPCError({ code: "CONFLICT", message });
+  }
+  if (message.startsWith("Only verified company/creator")) {
+    return new TRPCError({ code: "FORBIDDEN", message });
   }
   // Preserve original error for anything else (DB/driver/internal).
   if (error instanceof Error) {
@@ -355,6 +369,13 @@ const dropListInput = z
   .object({
     filter: z.enum(["live", "upcoming", "mine", "all"]).default("live"),
     limit: z.number().int().min(1).max(100).optional(),
+  })
+  .optional();
+
+// M6 — lobby filters only (spec §18.3). Default preserves M1 active list.
+const hypeRoomListInput = z
+  .object({
+    filter: z.enum(["live", "upcoming", "mine"]).optional(),
   })
   .optional();
 
@@ -646,14 +667,18 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await requireFeatureFlag("time_limited_communities");
         await ensureProfile(ctx.user.id);
-        return createHypeRoom(ctx.user.id, {
-          title: input.title,
-          topic: input.topic ?? null,
-          description: input.description ?? null,
-          durationHours: input.durationHours,
-          visibility: input.visibility,
-          startsAt: input.startsAt ?? null,
-        });
+        try {
+          return await createHypeRoom(ctx.user.id, {
+            title: input.title,
+            topic: input.topic ?? null,
+            description: input.description ?? null,
+            durationHours: input.durationHours,
+            visibility: input.visibility,
+            startsAt: input.startsAt ?? null,
+          });
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "create");
+        }
       }),
     byId: publicProcedure
       .input(z.object({ roomId: z.number().int().positive() }))
@@ -661,10 +686,37 @@ export const appRouter = router({
         await requireFeatureFlag("time_limited_communities");
         return getHypeRoom(input.roomId);
       }),
-    list: publicProcedure.query(async () => {
+    list: publicProcedure.input(hypeRoomListInput).query(async ({ input, ctx }) => {
       await requireFeatureFlag("time_limited_communities");
-      return listActiveHypeRooms();
+      const filter = input?.filter;
+      if (filter === "mine" && !ctx.user) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+      return listActiveHypeRooms({
+        filter,
+        userId: ctx.user?.id ?? null,
+      });
     }),
+    // M6 — host scheduled cancel (§8.4 / §19.1): scheduled → archived + reason.
+    cancel: protectedProcedure
+      .input(
+        z.object({
+          roomId: z.number().int().positive(),
+          cancelReason: z.string().trim().max(500).nullable().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await cancelHypeRoom(
+            input.roomId,
+            ctx.user.id,
+            input.cancelReason ?? null
+          );
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "cancel");
+        }
+      }),
     resolve: publicProcedure
       .input(z.object({ roomId: z.number().int().positive() }))
       .mutation(async ({ input }) => {
