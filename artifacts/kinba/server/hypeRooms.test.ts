@@ -27,12 +27,19 @@ const hypeRoomsMocks = vi.hoisted(() => ({
   getHypeRoom: vi.fn(),
   listActiveHypeRooms: vi.fn(),
   resolveHypeRoomExpiry: vi.fn(),
+  joinHypeRoom: vi.fn(),
+  leaveHypeRoom: vi.fn(),
+  listHypeRoomMembers: vi.fn(),
   isValidDurationHours: vi.fn(),
   assertValidDurationHours: vi.fn(),
   computeEndsAt: vi.fn(),
   normalizeStartsAt: vi.fn(),
   resolveRoomLifecycle: vi.fn(),
   assertRoomTransition: vi.fn(),
+  canJoinRoomStatus: vi.fn(),
+  resolveMemberRole: vi.fn(),
+  decideJoinAction: vi.fn(),
+  canLeaveMembership: vi.fn(),
   ROOM_DURATION_HOURS: [4, 6, 12, 24],
   ROOM_MAX_LEAD_MS: 7 * 24 * 60 * 60 * 1000,
 }));
@@ -147,6 +154,43 @@ describe("hypeRooms procedures — feature flag fail-closed", () => {
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(hypeRoomsMocks.createHypeRoom).not.toHaveBeenCalled();
   });
+
+  it("rejects join when the flag is disabled", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.join({ roomId: 1 })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(hypeRoomsMocks.joinHypeRoom).not.toHaveBeenCalled();
+  });
+
+  it("rejects leave when the flag is disabled", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.leave({ roomId: 1 })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(hypeRoomsMocks.leaveHypeRoom).not.toHaveBeenCalled();
+  });
+
+  it("rejects members when the flag is disabled", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.members({ roomId: 1 })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(hypeRoomsMocks.listHypeRoomMembers).not.toHaveBeenCalled();
+  });
+
+  it("rejects unauthenticated join even if flag checks were skipped", async () => {
+    featureFlagMocks.isFeatureFlagEnabled.mockResolvedValue(true);
+    await expect(
+      appRouter.createCaller(context(null)).hypeRooms.join({ roomId: 1 })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(hypeRoomsMocks.joinHypeRoom).not.toHaveBeenCalled();
+  });
+
+  it("rejects unauthenticated leave even if flag checks were skipped", async () => {
+    featureFlagMocks.isFeatureFlagEnabled.mockResolvedValue(true);
+    await expect(
+      appRouter.createCaller(context(null)).hypeRooms.leave({ roomId: 1 })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(hypeRoomsMocks.leaveHypeRoom).not.toHaveBeenCalled();
+  });
 });
 
 describe("hypeRooms procedures — enabled flag wiring", () => {
@@ -227,5 +271,138 @@ describe("hypeRooms procedures — enabled flag wiring", () => {
       appRouter.createCaller(context()).hypeRooms.byId({ roomId: 0 })
     ).rejects.toThrow();
     expect(hypeRoomsMocks.getHypeRoom).not.toHaveBeenCalled();
+  });
+});
+
+describe("hypeRooms procedures — M2 members", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    databaseMocks.ensureProfile.mockResolvedValue(undefined);
+    featureFlagMocks.isFeatureFlagEnabled.mockResolvedValue(true);
+  });
+
+  it("joins a room for the authenticated user when the flag is on", async () => {
+    const membership = {
+      id: 5,
+      roomId: 11,
+      userId: user.id,
+      role: "member" as const,
+      leftAt: null,
+      bannedAt: null,
+    };
+    hypeRoomsMocks.joinHypeRoom.mockResolvedValue(membership);
+
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.join({ roomId: 11 })
+    ).resolves.toEqual(membership);
+    expect(hypeRoomsMocks.joinHypeRoom).toHaveBeenCalledWith(11, user.id);
+    expect(databaseMocks.ensureProfile).toHaveBeenCalledWith(user.id);
+  });
+
+  it("maps duplicate join to CONFLICT", async () => {
+    hypeRoomsMocks.joinHypeRoom.mockRejectedValue(
+      new Error("You are already a member of this room.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.join({ roomId: 11 })
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("maps banned join to FORBIDDEN", async () => {
+    hypeRoomsMocks.joinHypeRoom.mockRejectedValue(
+      new Error("You are banned from this room.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.join({ roomId: 11 })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("maps expired/archived join to PRECONDITION_FAILED", async () => {
+    hypeRoomsMocks.joinHypeRoom.mockRejectedValue(
+      new Error("This room is no longer accepting new members.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.join({ roomId: 11 })
+    ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+  });
+
+  it("maps nonexistent room on join to NOT_FOUND", async () => {
+    hypeRoomsMocks.joinHypeRoom.mockRejectedValue(new Error("Room not found."));
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.join({ roomId: 999 })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("leaves a room for the authenticated user", async () => {
+    const membership = {
+      id: 5,
+      roomId: 11,
+      userId: user.id,
+      role: "member" as const,
+      leftAt: new Date(),
+      bannedAt: null,
+    };
+    hypeRoomsMocks.leaveHypeRoom.mockResolvedValue(membership);
+
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.leave({ roomId: 11 })
+    ).resolves.toEqual(membership);
+    expect(hypeRoomsMocks.leaveHypeRoom).toHaveBeenCalledWith(11, user.id);
+  });
+
+  it("maps host leave attempt to CONFLICT", async () => {
+    hypeRoomsMocks.leaveHypeRoom.mockRejectedValue(
+      new Error("The host cannot leave the room.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.leave({ roomId: 11 })
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("maps leave when not a member to CONFLICT", async () => {
+    hypeRoomsMocks.leaveHypeRoom.mockRejectedValue(
+      new Error("You are not a member of this room.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.leave({ roomId: 11 })
+    ).rejects.toMatchObject({ code: "CONFLICT" });
+  });
+
+  it("maps leave on nonexistent room to NOT_FOUND", async () => {
+    hypeRoomsMocks.leaveHypeRoom.mockRejectedValue(new Error("Room not found."));
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.leave({ roomId: 999 })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("lists members publicly after flag check", async () => {
+    const members = [
+      {
+        membership: { id: 1, roomId: 11, userId: 41, role: "host" as const },
+        user: { id: 41, name: "Host", openId: "o1", photoUrl: null, username: null },
+      },
+    ];
+    hypeRoomsMocks.listHypeRoomMembers.mockResolvedValue(members);
+
+    await expect(
+      appRouter.createCaller(context(null)).hypeRooms.members({ roomId: 11 })
+    ).resolves.toEqual(members);
+    expect(hypeRoomsMocks.listHypeRoomMembers).toHaveBeenCalledWith(11);
+  });
+
+  it("maps members on nonexistent room to NOT_FOUND", async () => {
+    hypeRoomsMocks.listHypeRoomMembers.mockRejectedValue(
+      new Error("Room not found.")
+    );
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.members({ roomId: 999 })
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("rejects non-positive room ids on join before the service", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.join({ roomId: 0 })
+    ).rejects.toThrow();
+    expect(hypeRoomsMocks.joinHypeRoom).not.toHaveBeenCalled();
   });
 });

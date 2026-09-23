@@ -72,7 +72,10 @@ import { getCoinBalance, listRewardHistory } from "./rewardLedger";
 import {
   createHypeRoom,
   getHypeRoom,
+  joinHypeRoom,
+  leaveHypeRoom,
   listActiveHypeRooms,
+  listHypeRoomMembers,
   resolveHypeRoomExpiry,
   ROOM_DURATION_HOURS,
 } from "./hypeRooms";
@@ -85,6 +88,44 @@ async function requireFeatureFlag(key: (typeof FEATURE_FLAG_KEYS)[number]) {
       message: "This feature is currently disabled.",
     });
   }
+}
+
+/**
+ * Map service member errors to controlled tRPC codes.
+ * Unknown errors are rethrown unchanged (preserves M1 behavior).
+ */
+function mapHypeRoomMemberError(error: unknown, _op: string): TRPCError {
+  if (error instanceof TRPCError) return error;
+  const message = error instanceof Error ? error.message : "";
+  if (message === "Room not found.") {
+    return new TRPCError({ code: "NOT_FOUND", message });
+  }
+  if (message === "You are banned from this room.") {
+    return new TRPCError({ code: "FORBIDDEN", message });
+  }
+  if (
+    message === "You are already a member of this room." ||
+    message === "You are not an active member of this room." ||
+    message === "You are not a member of this room." ||
+    message === "The host cannot leave the room."
+  ) {
+    return new TRPCError({ code: "CONFLICT", message });
+  }
+  if (message === "This room is no longer accepting new members.") {
+    return new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message,
+    });
+  }
+  // Preserve original error for anything else (DB/driver/internal).
+  if (error instanceof Error) {
+    return new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: error.message,
+      cause: error,
+    });
+  }
+  return new TRPCError({ code: "INTERNAL_SERVER_ERROR", cause: error });
 }
 
 const videoIdInput = z.object({ videoId: z.number().int().positive() });
@@ -463,6 +504,38 @@ export const appRouter = router({
       .mutation(async ({ input }) => {
         await requireFeatureFlag("time_limited_communities");
         return resolveHypeRoomExpiry(input.roomId);
+      }),
+    // M2 — members: join / leave / list (all behind the same fail-closed flag).
+    join: protectedProcedure
+      .input(z.object({ roomId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        await ensureProfile(ctx.user.id);
+        try {
+          return await joinHypeRoom(input.roomId, ctx.user.id);
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "join");
+        }
+      }),
+    leave: protectedProcedure
+      .input(z.object({ roomId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await leaveHypeRoom(input.roomId, ctx.user.id);
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "leave");
+        }
+      }),
+    members: publicProcedure
+      .input(z.object({ roomId: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await listHypeRoomMembers(input.roomId);
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "members");
+        }
       }),
   }),
   community: router({

@@ -1,14 +1,18 @@
 /**
- * JHILIK temporary Hype/Community rooms (Phase 2 Milestone 1).
+ * JHILIK temporary Hype/Community rooms (Phase 2 Milestones 1–2).
  *
- * Domain foundation only: create / get / list active / resolve expiry.
+ * M1: create / get / list active / resolve expiry.
+ * M2: join / leave / list members (hype_room_members).
  * Lifecycle is server-authoritative from persisted startsAt/endsAt.
  * Flag: time_limited_communities (fail-closed via router gate).
- * No drops, claims, rewards, members, or chat wiring this milestone.
+ * No drops, claims, rewards, or chat wiring yet.
  */
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import {
+  hypeRoomMembers,
   hypeRooms,
+  profiles,
+  users,
   type HypeRoomRow,
 } from "../drizzle/schema";
 import {
@@ -19,6 +23,21 @@ import {
   type HypeRoomStatus,
 } from "@shared/stateMachines";
 import { getDb } from "./db";
+
+/** Membership row from hype_room_members. */
+export type HypeRoomMemberRow = typeof hypeRoomMembers.$inferSelect;
+
+/** Membership row joined with basic user display fields. */
+export type HypeRoomMemberWithUser = {
+  membership: HypeRoomMemberRow;
+  user: {
+    id: number;
+    name: string | null;
+    openId: string;
+    photoUrl: string | null;
+    username: string | null;
+  };
+};
 
 /** Allowed temporary room durations (matches DB CHECK + product spec §8.3). */
 export const ROOM_DURATION_HOURS = [4, 6, 12, 24] as const;
@@ -265,4 +284,210 @@ export async function resolveHypeRoomExpiry(
     .limit(1);
   if (!room) return null;
   return persistResolvedRoom(db, room, new Date());
+}
+
+// ---------------------------------------------------------------------------
+// M2 — Members (hype_room_members)
+// ---------------------------------------------------------------------------
+
+/** Join is allowed only while the room is scheduled or live (spec §8.2). */
+export function canJoinRoomStatus(status: HypeRoomStatus): boolean {
+  return status === "scheduled" || status === "live";
+}
+
+/** Host membership uses role "host"; everyone else is "member". */
+export function resolveMemberRole(
+  roomHostId: number,
+  userId: number
+): "host" | "member" {
+  return roomHostId === userId ? "host" : "member";
+}
+
+/** Existing row + room state → controlled join decision (pure). */
+export type JoinAction =
+  | "insert"
+  | "rejoin"
+  | "reject_duplicate"
+  | "reject_banned"
+  | "reject_closed";
+
+export function decideJoinAction(
+  membership: Pick<HypeRoomMemberRow, "leftAt" | "bannedAt"> | null | undefined,
+  roomStatus: HypeRoomStatus
+): JoinAction {
+  if (!canJoinRoomStatus(roomStatus)) return "reject_closed";
+  if (membership?.bannedAt) return "reject_banned";
+  if (membership && membership.leftAt == null) return "reject_duplicate";
+  return membership ? "rejoin" : "insert";
+}
+
+/** Pure leave eligibility (spec §18.4 leave row). */
+export function canLeaveMembership(
+  membership: Pick<HypeRoomMemberRow, "role" | "leftAt" | "userId"> | null | undefined,
+  roomHostId: number
+): boolean {
+  if (!membership || membership.leftAt != null) return false;
+  if (membership.role === "host" || membership.userId === roomHostId) return false;
+  return true;
+}
+
+/**
+ * Join a room (pre-join while scheduled, or while live).
+ * Reuses UNIQUE(roomId,userId); soft rejoin clears leftAt.
+ */
+export async function joinHypeRoom(
+  roomId: number,
+  userId: number
+): Promise<HypeRoomMemberRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  return db.transaction(async tx => {
+    const [room] = await tx
+      .select()
+      .from(hypeRooms)
+      .where(eq(hypeRooms.id, roomId))
+      .limit(1);
+    if (!room) throw new Error("Room not found.");
+    const resolved = await persistResolvedRoom(tx as never, room, new Date());
+    if (!canJoinRoomStatus(resolved.status)) {
+      throw new Error("This room is no longer accepting new members.");
+    }
+
+    const [existing] = await tx
+      .select()
+      .from(hypeRoomMembers)
+      .where(
+        and(
+          eq(hypeRoomMembers.roomId, roomId),
+          eq(hypeRoomMembers.userId, userId)
+        )
+      )
+      .limit(1);
+
+    if (existing?.bannedAt) {
+      throw new Error("You are banned from this room.");
+    }
+    if (existing && existing.leftAt == null) {
+      throw new Error("You are already a member of this room.");
+    }
+
+    if (existing) {
+      const [rejoined] = await tx
+        .update(hypeRoomMembers)
+        .set({ leftAt: null, removedBy: null })
+        .where(eq(hypeRoomMembers.id, existing.id))
+        .returning();
+      if (!rejoined) throw new Error("Failed to rejoin room.");
+      return rejoined;
+    }
+
+    const role = resolveMemberRole(resolved.hostId, userId);
+    const [inserted] = await tx
+      .insert(hypeRoomMembers)
+      .values({ roomId, userId, role })
+      .onConflictDoNothing({
+        target: [hypeRoomMembers.roomId, hypeRoomMembers.userId],
+      })
+      .returning();
+    if (inserted) return inserted;
+
+    // Race: concurrent insert won — treat as controlled duplicate.
+    throw new Error("You are already a member of this room.");
+  });
+}
+
+/** Soft-leave a room (sets leftAt). Host cannot leave. */
+export async function leaveHypeRoom(
+  roomId: number,
+  userId: number
+): Promise<HypeRoomMemberRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  return db.transaction(async tx => {
+    const [room] = await tx
+      .select()
+      .from(hypeRooms)
+      .where(eq(hypeRooms.id, roomId))
+      .limit(1);
+    if (!room) throw new Error("Room not found.");
+
+    const [membership] = await tx
+      .select()
+      .from(hypeRoomMembers)
+      .where(
+        and(
+          eq(hypeRoomMembers.roomId, roomId),
+          eq(hypeRoomMembers.userId, userId)
+        )
+      )
+      .limit(1);
+
+    if (!canLeaveMembership(membership, room.hostId)) {
+      if (membership?.role === "host" || membership?.userId === room.hostId) {
+        throw new Error("The host cannot leave the room.");
+      }
+      if (membership?.leftAt != null) {
+        throw new Error("You are not an active member of this room.");
+      }
+      throw new Error("You are not a member of this room.");
+    }
+
+    const [left] = await tx
+      .update(hypeRoomMembers)
+      .set({ leftAt: new Date() })
+      .where(
+        and(
+          eq(hypeRoomMembers.id, membership!.id),
+          isNull(hypeRoomMembers.leftAt)
+        )
+      )
+      .returning();
+    if (!left) throw new Error("You are not an active member of this room.");
+    return left;
+  });
+}
+
+/**
+ * List active (not left, not banned) members for a room (spec §18.4 members).
+ * Public read once the flag gate passes; room must exist.
+ */
+export async function listHypeRoomMembers(
+  roomId: number
+): Promise<HypeRoomMemberWithUser[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const [room] = await db
+    .select({ id: hypeRooms.id })
+    .from(hypeRooms)
+    .where(eq(hypeRooms.id, roomId))
+    .limit(1);
+  if (!room) throw new Error("Room not found.");
+
+  const rows = await db
+    .select({
+      membership: hypeRoomMembers,
+      user: {
+        id: users.id,
+        name: users.name,
+        openId: users.openId,
+        photoUrl: profiles.photoUrl,
+        username: profiles.username,
+      },
+    })
+    .from(hypeRoomMembers)
+    .innerJoin(users, eq(hypeRoomMembers.userId, users.id))
+    .leftJoin(profiles, eq(profiles.userId, users.id))
+    .where(
+      and(
+        eq(hypeRoomMembers.roomId, roomId),
+        isNull(hypeRoomMembers.leftAt),
+        isNull(hypeRoomMembers.bannedAt)
+      )
+    )
+    .orderBy(asc(hypeRoomMembers.joinedAt), asc(hypeRoomMembers.id));
+
+  return rows;
 }

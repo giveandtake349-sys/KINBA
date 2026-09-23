@@ -13,9 +13,13 @@ import {
 import {
   assertRoomTransition,
   assertValidDurationHours,
+  canJoinRoomStatus,
+  canLeaveMembership,
   computeEndsAt,
+  decideJoinAction,
   isValidDurationHours,
   normalizeStartsAt,
+  resolveMemberRole,
   resolveRoomLifecycle,
   ROOM_DURATION_HOURS,
   ROOM_MAX_LEAD_MS,
@@ -276,5 +280,57 @@ describe("invalid transition rejection", () => {
       "expired",
       "archived",
     ]);
+  });
+});
+
+describe("M2 member pure helpers", () => {
+  it("allows join only for scheduled/live rooms", () => {
+    expect(canJoinRoomStatus("scheduled")).toBe(true);
+    expect(canJoinRoomStatus("live")).toBe(true);
+    expect(canJoinRoomStatus("expired")).toBe(false);
+    expect(canJoinRoomStatus("archived")).toBe(false);
+  });
+
+  it("resolves host vs member role from room hostId", () => {
+    expect(resolveMemberRole(41, 41)).toBe("host");
+    expect(resolveMemberRole(41, 99)).toBe("member");
+  });
+
+  it("decides join actions from membership + status", () => {
+    const active = { leftAt: null, bannedAt: null };
+    const left = { leftAt: new Date(), bannedAt: null };
+    const banned = { leftAt: null, bannedAt: new Date() };
+
+    expect(decideJoinAction(null, "live")).toBe("insert");
+    expect(decideJoinAction(null, "scheduled")).toBe("insert");
+    expect(decideJoinAction(active, "live")).toBe("reject_duplicate");
+    expect(decideJoinAction(left, "live")).toBe("rejoin");
+    expect(decideJoinAction(banned, "live")).toBe("reject_banned");
+    expect(decideJoinAction(null, "expired")).toBe("reject_closed");
+    expect(decideJoinAction(null, "archived")).toBe("reject_closed");
+    expect(decideJoinAction(active, "expired")).toBe("reject_closed");
+  });
+
+  it("allows only non-host active members to leave", () => {
+    const member = {
+      id: 1,
+      userId: 99,
+      roomId: 7,
+      role: "member" as const,
+      joinedAt: new Date(),
+      leftAt: null,
+      bannedAt: null,
+      removedBy: null,
+    };
+    const host = { ...member, userId: 41, role: "host" as const };
+    const left = { ...member, leftAt: new Date() };
+
+    expect(canLeaveMembership(member, 41)).toBe(true);
+    expect(canLeaveMembership(host, 41)).toBe(false);
+    expect(canLeaveMembership({ ...member, userId: 41, role: "member" as const }, 41)).toBe(
+      false
+    );
+    expect(canLeaveMembership(left, 41)).toBe(false);
+    expect(canLeaveMembership(null, 41)).toBe(false);
   });
 });
