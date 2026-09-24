@@ -976,14 +976,23 @@ export async function listRoomMessages(
   });
 }
 
-/** Explicit small reaction set — arbitrary strings are rejected. */
-export const HYPE_ROOM_REACTIONS = ["like", "love", "fire", "clap"] as const;
-export type HypeRoomReaction = (typeof HYPE_ROOM_REACTIONS)[number];
+import {
+  REACTION_TYPES,
+  isValidReaction,
+  type ReactionType,
+} from "@shared/reactions";
+
+/**
+ * Explicit small reaction set — arbitrary strings are rejected.
+ * Single source: shared/reactions (re-exported so existing imports keep working).
+ */
+export { REACTION_TYPES as HYPE_ROOM_REACTIONS };
+export type HypeRoomReaction = ReactionType;
 
 export function isValidHypeRoomReaction(
   value: string
 ): value is HypeRoomReaction {
-  return (HYPE_ROOM_REACTIONS as readonly string[]).includes(value);
+  return isValidReaction(value);
 }
 
 /** One-level reply: parent must be a visible top-level message in the same room. */

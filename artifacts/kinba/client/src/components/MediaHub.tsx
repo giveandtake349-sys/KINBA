@@ -20,6 +20,9 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CornerUpLeft,
+  Copy,
+  Flag,
   Heart,
   Image,
   Loader2,
@@ -59,12 +62,23 @@ import {
   type VideoMetadata,
 } from "@/lib/mediaUpload";
 import ErrorBoundary from "./ErrorBoundary";
+import {
+  ActionMenu,
+  MentionPicker,
+  ReactionBar,
+  ReplyBanner,
+  replyCountLabel,
+  type ConversationAction,
+  type ConversationReactionEntry,
+  type ConversationReactionId,
+} from "./conversation";
 import { isAbsoluteHttpUrl, resolveMediaUrl } from "@/lib/runtimeConfig";
 import "./mediaHub.css";
 import "./kinbaModern.css";
 import "./feedUi.css";
 import "./modernFeed.css";
 import "./shorts-stage.css";
+import "./conversation/conversation.css";
 
 type HomeTab = "videos" | "trendy" | "following" | "icons" | "spotlight";
 type VideoKind = "LONG" | "SHORT" | "WHEEL";
@@ -1637,20 +1651,31 @@ function CommentDrawer({
     id: number;
     username: string;
   } | null>(null);
-  const [likingId, setLikingId] = useState<number | null>(null);
+  const [reactingId, setReactingId] = useState<number | null>(null);
+  const [mentionPickerOpen, setMentionPickerOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const commentsQuery = trpc.videos.comments.list.useQuery(
     { videoId: postId },
     { enabled: open, refetchOnWindowFocus: false }
   );
   const createComment = trpc.videos.comments.create.useMutation();
-  const likeComment = trpc.videos.comments.like.useMutation();
+  const reactComment = trpc.videos.comments.react.useMutation();
   const deleteComment = trpc.videos.comments.delete.useMutation();
   const comments = commentsQuery.data ?? [];
 
   useEffect(() => {
     if (replyTo) inputRef.current?.focus();
   }, [replyTo]);
+
+  const replyCounts = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const row of comments) {
+      if (row.parentId != null) {
+        map.set(row.parentId, (map.get(row.parentId) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [comments]);
 
   const submitComment = async (
     audioUrl: string | null,
@@ -1666,20 +1691,24 @@ function CommentDrawer({
     });
     setBody("");
     setReplyTo(null);
+    setMentionPickerOpen(false);
     await commentsQuery.refetch();
   };
 
-  const toggleLike = async (commentId: number) => {
+  const reactToComment = async (
+    commentId: number,
+    reaction: ConversationReactionId
+  ) => {
     if (!auth.isAuthenticated) return auth.openAuth();
-    if (likingId !== null) return;
-    setLikingId(commentId);
+    if (reactingId !== null) return;
+    setReactingId(commentId);
     try {
-      await likeComment.mutateAsync({ commentId });
+      await reactComment.mutateAsync({ commentId, reaction });
       await commentsQuery.refetch();
     } catch (error) {
       notifyError(error);
     } finally {
-      setLikingId(null);
+      setReactingId(null);
     }
   };
 
@@ -1694,90 +1723,172 @@ function CommentDrawer({
     }
   };
 
+  const insertMention = (user: {
+    id: number;
+    name: string | null;
+    username: string | null;
+  }) => {
+    const handle = user.username?.trim() || user.name?.trim() || "";
+    if (!handle) return;
+    const token = handle.startsWith("@") ? handle : `@${handle}`;
+    setBody(prev => {
+      const next = prev.endsWith(" ") || prev.length === 0
+        ? `${prev}${token} `
+        : `${prev} ${token} `;
+      return next.slice(0, 500);
+    });
+    setMentionPickerOpen(false);
+    inputRef.current?.focus();
+  };
+
   const renderComment = (
     comment: (typeof comments)[number],
     depth = 0
   ): ReactNode => {
     const username = comment.author.username?.trim() || "member";
+    const displayNameValue = displayName(comment.author.name, comment.author.username);
     const canDelete =
       auth.user?.id === comment.author.id || auth.user?.id === postOwnerId;
+    const isOwn = auth.user?.id === comment.author.id;
     const replies = comments.filter(reply => reply.parentId === comment.id);
+    const replyCount = replyCounts.get(comment.id) ?? 0;
+    const authorLabel = `@${username}`;
+
+    // Shared conversation reaction surface: backend returns merged
+    // multi-reaction entries (comment_reactions ∪ legacy comment_likes "like").
+    const reactionEntries: ConversationReactionEntry[] =
+      comment.reactions && comment.reactions.length
+        ? comment.reactions.map(row => ({
+            reaction: row.reaction,
+            count: row.count,
+            reactedByMe: row.reactedByMe,
+          }))
+        : [
+            {
+              reaction: "like",
+              count: comment.likeCount ?? 0,
+              reactedByMe: Boolean(comment.viewerLiked),
+            },
+          ];
+
+    const activeReaction =
+      reactionEntries.find(row => row.reactedByMe)?.reaction ?? null;
+
+    const menuActions: ConversationAction[] = [
+      {
+        id: "reply",
+        label: "Reply",
+        icon: <CornerUpLeft size={14} />,
+        run: () => setReplyTo({ id: comment.id, username }),
+      },
+      {
+        id: "react",
+        label: activeReaction ? "Remove reaction" : "React",
+        icon: <span aria-hidden="true">👍</span>,
+        run: () => void reactToComment(comment.id, activeReaction ?? "like"),
+      },
+      {
+        id: "copy",
+        label: "Copy text",
+        icon: <Copy size={14} />,
+        run: () => {
+          if (comment.body) {
+            void navigator.clipboard?.writeText(comment.body).catch(() => {});
+          }
+        },
+      },
+    ];
+    if (canDelete) {
+      menuActions.push({
+        id: "delete",
+        label: "Delete",
+        icon: <Trash2 size={14} />,
+        run: () => void removeComment(comment.id),
+        danger: true,
+      });
+    }
+    if (!isOwn) {
+      menuActions.push({
+        id: "report",
+        label: "Report author",
+        icon: <Flag size={14} />,
+        run: () => {
+          // Reports target supported types only — user is valid.
+          window.dispatchEvent(
+            new CustomEvent("kinba:report-user", {
+              detail: { userId: comment.author.id, name: displayNameValue },
+            })
+          );
+        },
+        danger: true,
+      });
+    }
+
     return (
       <div
         className={
           depth
-            ? "video-comment-thread video-comment-thread--reply"
-            : "video-comment-thread"
+            ? "conv-comment-thread conv-comment-thread--reply"
+            : "conv-comment-thread"
         }
         key={comment.id}
       >
-        <div className="video-comment">
-          <div className="video-comment-heading">
+        <article className="conv-comment" data-comment-id={comment.id}>
+          <div className="conv-comment-head">
             <a
-              className="profile-link"
+              className="conv-comment-author"
               href={`/profile/${comment.author.id}`}
-              onClick={event => event.stopPropagation()}
-              aria-label={`Open ${displayName(comment.author.name, comment.author.username)} profile`}
+              onClick={event => {
+                event.preventDefault();
+                event.stopPropagation();
+                navigateToProfile(event, comment.author.id);
+              }}
+              aria-label={`Open ${displayNameValue} profile`}
             >
-              <strong>
-                {displayName(comment.author.name, comment.author.username)}
-              </strong>
+              {displayNameValue}
             </a>
-            <span className="video-comment-actions">
-              <button
-                type="button"
-                className="video-comment-action"
-                onClick={() => setReplyTo({ id: comment.id, username })}
-                aria-label={`Reply to @${username}`}
-              >
-                Reply
-              </button>
-              {canDelete && (
-                <button
-                  type="button"
-                  className="video-comment-action video-comment-action--danger"
-                  onClick={() => void removeComment(comment.id)}
-                  disabled={deleteComment.isPending}
-                  aria-label="Delete comment"
-                >
-                  <Trash2 size={13} />
-                </button>
-              )}
+            <span className="conv-comment-time">
+              {relativeTime(comment.createdAt)}
             </span>
+            <ActionMenu actions={menuActions} ariaLabel="Comment actions" />
           </div>
-          {comment.body && <span>{comment.body}</span>}
-          {comment.audioUrl && (
+          {comment.body ? (
+            <p className="conv-comment-body">{comment.body}</p>
+          ) : null}
+          {comment.audioUrl ? (
             <CommentAudioPlayer
               src={comment.audioUrl}
               duration={comment.audioDuration}
             />
-          )}
-          <div className="video-comment-footer">
+          ) : null}
+          <div className="conv-comment-foot">
+            <ReactionBar
+              reactions={reactionEntries}
+              onReact={reaction => void reactToComment(comment.id, reaction)}
+              disabled={reactingId !== null}
+              busy={reactingId === comment.id}
+              ariaLabel="Comment reactions"
+            />
             <button
               type="button"
-              className={`video-comment-like${comment.viewerLiked ? " is-active" : ""}`}
-              onClick={() => void toggleLike(comment.id)}
-              disabled={likingId !== null}
-              aria-pressed={comment.viewerLiked}
-              aria-label={
-                comment.viewerLiked
-                  ? "Remove Pookie from comment"
-                  : "Pookie this comment"
-              }
+              className="conv-comment-reply-count"
+              onClick={() => setReplyTo({ id: comment.id, username })}
+              aria-label={`Reply to ${authorLabel}`}
             >
-              <Heart
-                size={14}
-                fill={comment.viewerLiked ? "currentColor" : "none"}
-              />
-              <span>{comment.likeCount}</span>
+              Reply
             </button>
-            {replyTo?.id === comment.id && (
-              <span className="video-comment-replying">
-                Replying to @{username}
+            {replyCount > 0 ? (
+              <span className="conv-comment-reply-count" aria-label={`${replyCount} replies`}>
+                ↳ {replyCountLabel(replyCount)}
               </span>
-            )}
+            ) : null}
+            {replyTo?.id === comment.id ? (
+              <span className="video-comment-replying">
+                Replying to {authorLabel}
+              </span>
+            ) : null}
           </div>
-        </div>
+        </article>
         {replies.map(reply => renderComment(reply, depth + 1))}
       </div>
     );
@@ -1850,33 +1961,58 @@ function CommentDrawer({
             </div>
           )}
         </div>
-        {replyTo && (
-          <div className="comment-replying-banner">
-            Replying to @{replyTo.username}
-            <button
-              type="button"
-              onClick={() => setReplyTo(null)}
-              aria-label="Cancel reply"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        )}
-        <VoiceCommentComposer
-          body={body}
-          onBodyChange={setBody}
-          onSend={submitComment}
-          disabled={createComment.isPending}
-          inputRef={inputRef}
-          placeholder={
-            auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"
-          }
-        />
+        {replyTo ? (
+          <ReplyBanner
+            label={`@${replyTo.username}`}
+            onCancel={() => setReplyTo(null)}
+          />
+        ) : null}
+        {mentionPickerOpen && auth.isAuthenticated ? (
+          <MentionPicker
+            viewerId={auth.user?.id ?? null}
+            onPick={insertMention}
+          />
+        ) : null}
+        <div className="conv-composer-row">
+          <button
+            type="button"
+            className={
+              mentionPickerOpen
+                ? "conv-mention-toggle conv-mention-toggle--on"
+                : "conv-mention-toggle"
+            }
+            aria-label="Mention someone"
+            aria-pressed={mentionPickerOpen}
+            title="Mention"
+            disabled={!auth.isAuthenticated}
+            onClick={() => {
+              if (!auth.isAuthenticated) return auth.openAuth();
+              setMentionPickerOpen(value => !value);
+            }}
+          >
+            @
+          </button>
+          <VoiceCommentComposer
+            body={body}
+            onBodyChange={setBody}
+            onSend={submitComment}
+            disabled={createComment.isPending}
+            inputRef={inputRef}
+            placeholder={
+              auth.isAuthenticated
+                ? replyTo
+                  ? "Write a reply…"
+                  : "Write a comment…"
+                : "Sign in to comment"
+            }
+          />
+        </div>
       </section>
     </div>,
     document.body
   );
 }
+
 
 function getRawPulseVoterKey() {
   if (typeof window === "undefined") return "server-render-voter-key";

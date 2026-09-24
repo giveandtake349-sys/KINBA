@@ -16,6 +16,7 @@ const databaseMocks = vi.hoisted(() => ({
   adminCreateSponsorBidsSession: vi.fn(),
   adminStartSponsorBidsSession: vi.fn(),
   adminSetSponsorStatus: vi.fn(),
+  toggleCommentReaction: vi.fn(),
 }));
 const hlsMocks = vi.hoisted(() => ({
   queueVideoTranscode: vi.fn(),
@@ -217,6 +218,33 @@ describe("KINBA protected procedures", () => {
       user.id,
       "Great video"
     );
+  });
+
+  it("toggles a comment reaction through the react procedure", async () => {
+    const result = { commentId: 701, reaction: "fire" as const, active: true };
+    databaseMocks.toggleCommentReaction.mockResolvedValue(result);
+
+    await expect(
+      appRouter.createCaller(context()).videos.comments.react({
+        commentId: 701,
+        reaction: "fire",
+      })
+    ).resolves.toEqual(result);
+    expect(databaseMocks.toggleCommentReaction).toHaveBeenCalledWith(
+      701,
+      user.id,
+      "fire"
+    );
+  });
+
+  it("rejects an unknown comment reaction before reaching the database", async () => {
+    await expect(
+      appRouter.createCaller(context()).videos.comments.react({
+        commentId: 701,
+        reaction: "thumb",
+      })
+    ).rejects.toThrow();
+    expect(databaseMocks.toggleCommentReaction).not.toHaveBeenCalled();
   });
 
   it("creates a protected community post comment", async () => {

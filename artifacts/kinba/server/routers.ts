@@ -18,6 +18,7 @@ import {
   createVideoComment,
   deleteComment,
   toggleCommentLike,
+  toggleCommentReaction,
   ensureProfile,
   getOwnProfile,
   getPublicProfile,
@@ -61,6 +62,7 @@ import {
   createTextPost,
 } from "./db";
 import { communityAnnouncementInput, textPostInput, videoInput } from "./mediaValidation";
+import { REACTION_TYPES } from "@shared/reactions";
 import {
   FEATURE_FLAG_KEYS,
   getActiveFeatureFlags,
@@ -689,6 +691,16 @@ export const appRouter = router({
       like: protectedProcedure
         .input(z.object({ commentId: z.number().int().positive() }))
         .mutation(({ ctx, input }) => toggleCommentLike(input.commentId, ctx.user.id)),
+      react: protectedProcedure
+        .input(
+          z.object({
+            commentId: z.number().int().positive(),
+            reaction: z.enum(REACTION_TYPES),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          toggleCommentReaction(input.commentId, ctx.user.id, input.reaction)
+        ),
     }),
   }),
   payments: router({

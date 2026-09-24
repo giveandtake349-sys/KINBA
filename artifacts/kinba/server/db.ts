@@ -21,6 +21,7 @@ import {
   videoBookmarks,
   videoComments,
   commentLikes,
+  commentReactions,
   videoReactions,
   videoShares,
   videoSources,
@@ -30,6 +31,11 @@ import {
   rawPulseOptions,
   rawPulseVotes,
 } from "../drizzle/schema";
+import {
+  REACTION_TYPES,
+  isValidReaction,
+  type ReactionType,
+} from "@shared/reactions";
 import { ENV } from "./_core/env";
 import { resolvePostgresDatabaseUrl } from "./databaseConfig";
 import { selectNomineeIds, selectSecondaryWinnerId } from "./sponsorBidsDraw";
@@ -1303,6 +1309,7 @@ export async function deleteComment(commentId: number, userId: number) {
 export async function listVideoComments(videoId: number, viewerId?: number) {
   const db = await getDb();
   if (!db) return [];
+  // Legacy fields keep their exact comment_likes semantics (read-only compat).
   const likeCount = sql<number>`(
     select count(*) from comment_likes
     where comment_likes."commentId" = ${videoComments.id}
@@ -1328,23 +1335,93 @@ export async function listVideoComments(videoId: number, viewerId?: number) {
     .where(eq(videoComments.videoId, videoId))
     .orderBy(desc(videoComments.createdAt))
     .limit(100);
-  return rows.map(row => ({
-    ...row.comment,
-    body: typeof row.comment.body === "string" ? row.comment.body : "",
-    audioUrl: typeof row.comment.audioUrl === "string" && row.comment.audioUrl.trim()
-      ? row.comment.audioUrl
-      : null,
-    audioDuration: Number.isFinite(Number(row.comment.audioDuration))
-      ? Math.max(1, Math.min(60, Math.round(Number(row.comment.audioDuration))))
-      : null,
-    likeCount: Number(row.likeCount ?? 0),
-    viewerLiked: Boolean(row.viewerLiked),
-    author: {
-      id: row.user.id,
-      name: row.user.name,
-      username: row.profile?.username ?? null,
-    },
-  }));
+
+  // Merged multi-reaction view: comment_reactions ∪ legacy comment_likes for "like".
+  // Read-only — no legacy rows are rewritten here.
+  const commentIds = rows.map(row => row.comment.id);
+  const [reactionRows, legacyLikeRows] = commentIds.length
+    ? await Promise.all([
+        db
+          .select({
+            commentId: commentReactions.commentId,
+            userId: commentReactions.userId,
+            reaction: commentReactions.reaction,
+          })
+          .from(commentReactions)
+          .where(inArray(commentReactions.commentId, commentIds)),
+        db
+          .select({
+            commentId: commentLikes.commentId,
+            userId: commentLikes.userId,
+          })
+          .from(commentLikes)
+          .where(inArray(commentLikes.commentId, commentIds)),
+      ])
+    : [[], []] as const;
+
+  const typedByComment = new Map<number, Map<string, Set<number>>>();
+  for (const row of reactionRows) {
+    let byType = typedByComment.get(row.commentId);
+    if (!byType) {
+      byType = new Map();
+      typedByComment.set(row.commentId, byType);
+    }
+    let userIds = byType.get(row.reaction);
+    if (!userIds) {
+      userIds = new Set();
+      byType.set(row.reaction, userIds);
+    }
+    userIds.add(row.userId);
+  }
+  const legacyLikersByComment = new Map<number, Set<number>>();
+  for (const row of legacyLikeRows) {
+    let userIds = legacyLikersByComment.get(row.commentId);
+    if (!userIds) {
+      userIds = new Set();
+      legacyLikersByComment.set(row.commentId, userIds);
+    }
+    userIds.add(row.userId);
+  }
+
+  return rows.map(row => {
+    const typed = typedByComment.get(row.comment.id);
+    const legacyLikers = legacyLikersByComment.get(row.comment.id);
+    const reactions: Array<{
+      reaction: ReactionType;
+      count: number;
+      reactedByMe: boolean;
+    }> = [];
+    for (const type of REACTION_TYPES) {
+      const userIds = new Set(typed?.get(type));
+      if (type === "like" && legacyLikers) {
+        for (const id of legacyLikers) userIds.add(id);
+      }
+      if (userIds.size === 0) continue;
+      reactions.push({
+        reaction: type,
+        count: userIds.size,
+        reactedByMe: viewerId != null && userIds.has(viewerId),
+      });
+    }
+    return {
+      ...row.comment,
+      body: typeof row.comment.body === "string" ? row.comment.body : "",
+      audioUrl: typeof row.comment.audioUrl === "string" && row.comment.audioUrl.trim()
+        ? row.comment.audioUrl
+        : null,
+      audioDuration: Number.isFinite(Number(row.comment.audioDuration))
+        ? Math.max(1, Math.min(60, Math.round(Number(row.comment.audioDuration))))
+        : null,
+      likeCount: Number(row.likeCount ?? 0),
+      viewerLiked: Boolean(row.viewerLiked),
+      reactions,
+      author: {
+        id: row.user.id,
+        name: row.user.name,
+        username: row.profile?.username ?? null,
+      },
+    };
+  });
 }
 
 export async function createVideoComment(
@@ -1414,6 +1491,106 @@ export async function toggleCommentLike(commentId: number, userId: number) {
     likeCount: Number(count ?? 0),
     viewerLiked: !existing,
   };
+}
+
+export type CommentReactionToggleResult = {
+  commentId: number;
+  reaction: ReactionType;
+  active: boolean;
+};
+
+/**
+ * Toggle a multi-reaction on a video comment (replies included).
+ * Legacy comment_likes is only read as part of the "like" active-state check —
+ * a user with a legacy like never gets a duplicate comment_reactions like row;
+ * unliking removes whichever source(s) hold the like. Other reaction types
+ * live exclusively in comment_reactions.
+ */
+export async function toggleCommentReaction(
+  commentId: number,
+  userId: number,
+  reaction: string
+): Promise<CommentReactionToggleResult> {
+  if (!isValidReaction(reaction)) {
+    throw new Error("Invalid reaction type.");
+  }
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  return db.transaction(async tx => {
+    const [comment] = await tx
+      .select({ id: videoComments.id })
+      .from(videoComments)
+      .where(eq(videoComments.id, commentId))
+      .limit(1);
+    if (!comment) throw new Error("Comment not found.");
+
+    const [existing] = await tx
+      .select({ id: commentReactions.id })
+      .from(commentReactions)
+      .where(
+        and(
+          eq(commentReactions.commentId, commentId),
+          eq(commentReactions.userId, userId),
+          eq(commentReactions.reaction, reaction)
+        )
+      )
+      .limit(1);
+
+    let activeExisting = Boolean(existing);
+    let legacyLike: { id: number } | undefined;
+    if (reaction === "like") {
+      [legacyLike] = await tx
+        .select({ id: commentLikes.id })
+        .from(commentLikes)
+        .where(
+          and(
+            eq(commentLikes.commentId, commentId),
+            eq(commentLikes.userId, userId)
+          )
+        )
+        .limit(1);
+      activeExisting = activeExisting || Boolean(legacyLike);
+    }
+
+    if (activeExisting) {
+      if (existing) {
+        await tx
+          .delete(commentReactions)
+          .where(eq(commentReactions.id, existing.id));
+      }
+      if (legacyLike) {
+        await tx.delete(commentLikes).where(eq(commentLikes.id, legacyLike.id));
+      }
+      return { commentId, reaction: reaction as ReactionType, active: false };
+    }
+
+    const [inserted] = await tx
+      .insert(commentReactions)
+      .values({ commentId, userId, reaction })
+      .onConflictDoNothing()
+      .returning();
+    if (inserted) {
+      return { commentId, reaction: reaction as ReactionType, active: true };
+    }
+
+    // Concurrent identical activation won the unique race — reaction is active.
+    const [confirmed] = await tx
+      .select({ id: commentReactions.id })
+      .from(commentReactions)
+      .where(
+        and(
+          eq(commentReactions.commentId, commentId),
+          eq(commentReactions.userId, userId),
+          eq(commentReactions.reaction, reaction)
+        )
+      )
+      .limit(1);
+    if (confirmed) {
+      return { commentId, reaction: reaction as ReactionType, active: true };
+    }
+    throw new Error("Failed to toggle reaction.");
+  });
 }
 
 export async function toggleVideoReaction(videoId: number, userId: number) {

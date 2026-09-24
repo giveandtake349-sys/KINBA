@@ -576,6 +576,29 @@ export const commentLikes = pgTable(
     index("comment_likes_user_idx").on(table.userId),
   ]
 );
+export const commentReactions = pgTable(
+  "comment_reactions",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    commentId: integer("commentId")
+      .notNull()
+      .references(() => videoComments.id, { onDelete: "cascade" }),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    reaction: varchar("reaction", { length: 32 }).notNull(),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("comment_reactions_unique").on(
+      table.commentId,
+      table.userId,
+      table.reaction
+    ),
+    index("comment_reactions_comment_idx").on(table.commentId),
+    index("comment_reactions_user_idx").on(table.userId),
+  ]
+);
 export const communityAnnouncements = pgTable(
   "community_announcements",
   {

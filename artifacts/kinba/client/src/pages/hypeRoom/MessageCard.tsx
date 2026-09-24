@@ -17,18 +17,15 @@ import {
   type MessageRow,
 } from "./shared";
 
-export type HypeReactionId = "like" | "love" | "fire" | "clap";
+import { REACTION_OPTIONS, type ReactionType } from "@shared/reactions";
+
+export type HypeReactionId = ReactionType;
 
 export const HYPE_REACTIONS: ReadonlyArray<{
   id: HypeReactionId;
   label: string;
   glyph: string;
-}> = [
-  { id: "like", label: "Like", glyph: "👍" },
-  { id: "love", label: "Love", glyph: "❤️" },
-  { id: "fire", label: "Fire", glyph: "🔥" },
-  { id: "clap", label: "Clap", glyph: "👏" },
-];
+}> = REACTION_OPTIONS;
 
 function initialsOf(name: string): string {
   return (

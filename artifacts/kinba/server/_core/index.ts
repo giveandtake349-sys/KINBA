@@ -105,6 +105,7 @@ async function startServer() {
   // Reactions/likes: 30 req/min — fast toggling is normal
   app.use("/api/trpc/videos.react", rateLimit({ windowMs: 60_000, max: 30, keyPrefix: "react" }));
   app.use("/api/trpc/videos.comments.like", rateLimit({ windowMs: 60_000, max: 30, keyPrefix: "react" }));
+  app.use("/api/trpc/videos.comments.react", rateLimit({ windowMs: 60_000, max: 30, keyPrefix: "react" }));
   app.use("/api/trpc/community.react", rateLimit({ windowMs: 60_000, max: 30, keyPrefix: "react" }));
 
   // Shares/bookmarks/follows: 20 req/min
