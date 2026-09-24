@@ -5,32 +5,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import {
-  ArrowLeft,
-  AtSign,
-  CalendarClock,
-  Check,
-  Clock3,
-  CornerUpLeft,
-  Eye,
-  Flag,
-  Flame,
-  Hand,
-  Heart,
-  Lock,
-  Mail,
-  Pin,
-  PinOff,
-  Radio,
-  RefreshCw,
-  Send,
-  Settings,
-  ThumbsUp,
-  Trash2,
-  UserPlus,
-  Users,
-  X,
-} from "lucide-react";
+import { Flag, Radio, RefreshCw, ArrowLeft } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -38,94 +13,29 @@ import { trpc } from "@/lib/trpc";
 import { SupabaseAuthDialog } from "@/components/SupabaseAuthDialog";
 import { ReportDialog } from "@/components/ReportDialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getTrpcCode, useNow } from "./HypeRooms";
+import { RoomHeader } from "./hypeRoom/RoomHeader";
+import { ActivityBar, PinnedHostNote } from "./hypeRoom/ActivityBar";
+import { MessageCard, type HypeReactionId } from "./hypeRoom/MessageCard";
+import { ThreadSheet } from "./hypeRoom/ThreadSheet";
+import { MembersPanel } from "./hypeRoom/MembersPanel";
+import { DropPanel } from "./hypeRoom/DropPanel";
+import { EmptyRoom } from "./hypeRoom/EmptyRoom";
+import { SettingsModal } from "./hypeRoom/SettingsModal";
+import { InviteModal } from "./hypeRoom/InviteModal";
+import { LifecycleBanner } from "./hypeRoom/LifecycleBanner";
+import { Composer } from "./hypeRoom/Composer";
 import {
-  formatRoomTime,
-  getTrpcCode,
-  StatusChip,
-  useNow,
-  formatCountdown,
-  type RoomCard,
-} from "./HypeRooms";
+  displayMemberName,
+  displayMessageName,
+  type InviteRow,
+  type InviteTarget,
+  type MemberRow,
+  type MessageRow,
+} from "./hypeRoom/shared";
 import "./hypeRooms.css";
 
-type MemberRow = {
-  membership: {
-    id: number;
-    roomId: number;
-    userId: number;
-    role: string;
-    joinedAt: Date | string;
-    leftAt: Date | string | null;
-    bannedAt: Date | string | null;
-    removedBy: number | null;
-  };
-  user: {
-    id: number;
-    name: string | null;
-    openId: string;
-    photoUrl: string | null;
-    username: string | null;
-  };
-};
-
-type MessageRow = {
-  message: {
-    id: number;
-    roomId: number;
-    userId: number | null;
-    body: string;
-    parentId: number | null;
-    pinned: boolean;
-    createdAt: Date | string;
-  };
-  user: {
-    id: number | null;
-    name: string | null;
-    openId: string | null;
-    photoUrl: string | null;
-    username: string | null;
-  };
-  parent?: {
-    id: number;
-    body: string | null;
-    userId: number | null;
-  } | null;
-  reactions?: Array<{
-    reaction: string;
-    count: number;
-    reactedByMe: boolean;
-  }>;
-  mentionUserIds?: number[];
-};
-
-type InviteRow = {
-  id: number;
-  roomId: number;
-  invitedUserId: number;
-  createdBy: number;
-  status: string;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  consumedAt: Date | string | null;
-};
-
-type InviteTarget = {
-  id: number;
-  name: string | null;
-  username: string | null;
-  photoUrl: string | null;
-};
-
-const ROOM_MESSAGE_MAX = 5000;
-
-const HYPE_REACTIONS = [
-  { id: "like", label: "Like", Icon: ThumbsUp },
-  { id: "love", label: "Love", Icon: Heart },
-  { id: "fire", label: "Fire", Icon: Flame },
-  { id: "clap", label: "Clap", Icon: Hand },
-] as const;
-
-type HypeReactionId = (typeof HYPE_REACTIONS)[number]["id"];
+type HypeReaction = HypeReactionId;
 
 function DetailState({
   icon,
@@ -150,66 +60,10 @@ function DetailState({
   );
 }
 
-function displayMemberName(member: MemberRow): string {
-  return (
-    member.user.username ||
-    member.user.name ||
-    `Member #${member.user.id}`
-  );
-}
-
-function displayMessageName(row: MessageRow): string {
-  return (
-    row.user.username ||
-    row.user.name ||
-    (row.user.id != null ? `User #${row.user.id}` : "Removed user")
-  );
-}
-
-function displayInviteName(id: number, members: MemberRow[]): string {
-  const match = members.find(member => member.user.id === id);
-  return match ? displayMemberName(match) : `User #${id}`;
-}
-
-function roleLabel(role: string): string {
-  if (role === "host") return "Host";
-  if (role === "speaker") return "Speaker";
-  if (role === "audience") return "Audience";
-  return "Member";
-}
-
-function formatMessageTime(value: Date | string): string {
-  return new Date(value).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-function countdownFor(
-  room: Pick<RoomCard, "status" | "startsAt" | "endsAt">,
-  nowMs: number
-): { label: string; remaining: string } | null {
-  if (room.status === "scheduled") {
-    const target = new Date(room.startsAt).getTime();
-    const remainingMs = target - nowMs;
-    if (remainingMs <= 0) return null;
-    return { label: "Starts in", remaining: formatCountdown(remainingMs) };
-  }
-  if (room.status === "live") {
-    const target = new Date(room.endsAt).getTime();
-    const remainingMs = target - nowMs;
-    if (remainingMs <= 0) return null;
-    return { label: "Ends in", remaining: formatCountdown(remainingMs) };
-  }
-  return null;
-}
-
 function applyReactionOptimistic(
   rows: MessageRow[],
   messageId: number,
-  reaction: HypeReactionId
+  reaction: HypeReaction
 ): MessageRow[] {
   return rows.map(row => {
     if (row.message.id !== messageId) return row;
@@ -247,6 +101,8 @@ export default function HypeRoomDetail({
   const [replyTarget, setReplyTarget] = useState<MessageRow | null>(null);
   const [mentionedIds, setMentionedIds] = useState<number[]>([]);
   const [mentionPickerOpen, setMentionPickerOpen] = useState(false);
+  const [selectedMessageId, setSelectedMessageId] = useState<number | null>(null);
+  const [threadRootId, setThreadRootId] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsTitle, setSettingsTitle] = useState("");
   const [settingsTopic, setSettingsTopic] = useState("");
@@ -298,6 +154,28 @@ export default function HypeRoomDetail({
     }
   );
 
+  const hostMember = useMemo(() => {
+    if (room == null) return undefined;
+    const rows = (membersQuery.data ?? []) as MemberRow[];
+    return rows.find(member => member.user.id === room.hostId);
+  }, [membersQuery.data, room]);
+
+  // Only fetch host identity when the host is not already in the member list.
+  const hostProfileQuery = trpc.profile.byId.useQuery(
+    { userId: room?.hostId ?? -1 },
+    {
+      enabled:
+        roomReady &&
+        room != null &&
+        !unavailable &&
+        ((membersQuery.isSuccess && hostMember == null) ||
+          membersQuery.isError),
+      retry: false,
+      refetchOnWindowFocus: false,
+      staleTime: 60_000,
+    }
+  );
+
   const messagesQuery = trpc.hypeRooms.messages.useQuery(
     { roomId: roomId ?? -1 },
     {
@@ -306,6 +184,17 @@ export default function HypeRoomDetail({
       refetchOnWindowFocus: false,
       staleTime: 5_000,
       refetchInterval: room?.status === "live" ? 5_000 : false,
+    }
+  );
+
+  const dropId = room?.dropId ?? null;
+  const dropQuery = trpc.drops.byId.useQuery(
+    { dropId: dropId ?? -1 },
+    {
+      enabled: dropId != null && roomReady && room != null,
+      retry: false,
+      refetchOnWindowFocus: false,
+      staleTime: 30_000,
     }
   );
 
@@ -381,6 +270,27 @@ export default function HypeRoomDetail({
     [invitesQuery.data]
   );
 
+  const replyCounts = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const row of messages) {
+      const parentId = row.message.parentId;
+      if (parentId != null) {
+        map.set(parentId, (map.get(parentId) ?? 0) + 1);
+      }
+    }
+    return map;
+  }, [messages]);
+
+  const topLevelMessages = useMemo(
+    () => messages,
+    [messages]
+  );
+
+  const threadRoot = useMemo(() => {
+    if (threadRootId == null) return null;
+    return messages.find(row => row.message.id === threadRootId) ?? null;
+  }, [threadRootId, messages]);
+
   const userId = auth.user?.id ?? null;
   const isHost = room != null && userId != null && room.hostId === userId;
   const myMembership =
@@ -388,6 +298,20 @@ export default function HypeRoomDetail({
       ? members.find(member => member.user.id === userId)
       : undefined;
   const isActiveMember = Boolean(myMembership);
+
+  const hostProfile = hostProfileQuery.data ?? null;
+  const hostFallbackName =
+    isHost && userId != null ? auth.user?.name || `User #${userId}` : null;
+  const hostName = hostMember
+    ? displayMemberName(hostMember)
+    : hostProfile
+      ? hostProfile.profile?.username ||
+        hostProfile.user?.name ||
+        `User #${room?.hostId ?? ""}`
+      : hostFallbackName;
+  const hostPhoto = hostMember
+    ? hostMember.user.photoUrl
+    : hostProfile?.profile?.photoUrl ?? null;
 
   const canJoinWindow =
     room != null && (room.status === "scheduled" || room.status === "live");
@@ -397,8 +321,8 @@ export default function HypeRoomDetail({
     room?.status === "live" && isActiveMember && !auth.loading;
   const canEnd = isHost && room?.status === "live";
   const canCancel = isHost && room?.status === "scheduled";
+  const showSignIn = !auth.isAuthenticated && !auth.loading && canJoinWindow;
 
-  const countdown = room ? countdownFor(room, nowMs) : null;
   const pinnedMessageId = room?.pinnedMessageId ?? null;
 
   const requireAuth = () => {
@@ -531,7 +455,7 @@ export default function HypeRoomDetail({
     }
   };
 
-  const handleReaction = async (messageId: number, reaction: HypeReactionId) => {
+  const handleReaction = async (messageId: number, reaction: HypeReaction) => {
     if (!requireAuth() || roomId == null) return;
     const queryKey = { roomId };
     const prev = utils.hypeRooms.messages.getData(queryKey) as
@@ -586,23 +510,24 @@ export default function HypeRoomDetail({
     setSettingsOpen(true);
   };
 
-  const handleSettingsSubmit = async (event: FormEvent) => {
-    event.preventDefault();
+  const handleSettingsSubmit = async (values: {
+    title: string;
+    topic: string;
+    description: string;
+    visibility: "public" | "link_only";
+  }) => {
     if (!requireAuth() || roomId == null) return;
-    const title = settingsTitle.trim();
-    if (title.length < 3) {
+    if (values.title.length < 3) {
       toast.error("Room title must be 3–180 characters.");
       return;
     }
     try {
       await updateSettingsMut.mutateAsync({
         roomId,
-        title,
-        topic: settingsTopic.trim() ? settingsTopic.trim() : null,
-        description: settingsDescription.trim()
-          ? settingsDescription.trim()
-          : null,
-        visibility: settingsVisibility,
+        title: values.title,
+        topic: values.topic ? values.topic : null,
+        description: values.description ? values.description : null,
+        visibility: values.visibility,
       });
       setSettingsOpen(false);
       await invalidateRoom();
@@ -665,6 +590,15 @@ export default function HypeRoomDetail({
     if (row.message.parentId != null) return;
     setReplyTarget(row);
     setMentionPickerOpen(false);
+    setThreadRootId(null);
+  };
+
+  const openThread = (row: MessageRow) => {
+    if (row.message.parentId != null) return;
+    setThreadRootId(row.message.id);
+    if (requireAuth()) {
+      setReplyTarget(row);
+    }
   };
 
   const toggleMention = (memberUserId: number) => {
@@ -675,11 +609,6 @@ export default function HypeRoomDetail({
         : [...prev, memberUserId]
     );
   };
-
-  const mentionableMembers = useMemo(
-    () => members.filter(member => member.user.id !== userId),
-    [members, userId]
-  );
 
   const backToLobby = () => navigate("/rooms");
 
@@ -713,6 +642,13 @@ export default function HypeRoomDetail({
     setRoleMut.isPending ||
     updateSettingsMut.isPending ||
     createInviteMut.isPending;
+
+  const pinnedMessage = useMemo(() => {
+    if (pinnedMessageId == null) return null;
+    return messages.find(row => row.message.id === pinnedMessageId) ?? null;
+  }, [pinnedMessageId, messages]);
+
+  const dropData = dropQuery.data?.drop ?? null;
 
   return (
     <div className="kinba-app hype-rooms-shell">
@@ -775,302 +711,104 @@ export default function HypeRoomDetail({
           />
         ) : (
           <>
-            <header className="hype-room-detail-header">
-              <div className="hype-room-detail-heading">
-                <div className="hype-room-card-top">
-                  <StatusChip status={room.status} />
-                  {isHost ? (
-                    <span className="hype-room-host-badge">Host</span>
-                  ) : null}
-                </div>
-                <h1>{room.title}</h1>
-                {room.topic ? (
-                  <p className="hype-room-topic">{room.topic}</p>
-                ) : null}
-                {room.description ? (
-                  <p className="hype-room-desc hype-room-detail-desc">
-                    {room.description}
-                  </p>
-                ) : null}
-                {countdown ? (
-                  <p className="hype-room-countdown" aria-live="polite">
-                    <Clock3 size={14} aria-hidden="true" />
-                    {countdown.label} {countdown.remaining}
-                  </p>
-                ) : null}
-                <dl className="hype-room-meta">
-                  <div>
-                    <dt>
-                      <Clock3 size={13} aria-hidden="true" />
-                      <span className="sr-only">Duration</span>
-                    </dt>
-                    <dd>{room.durationHours}h window</dd>
-                  </div>
-                  <div>
-                    <dt>
-                      <CalendarClock size={13} aria-hidden="true" />
-                      <span className="sr-only">Starts</span>
-                    </dt>
-                    <dd>Starts {formatRoomTime(room.startsAt)}</dd>
-                  </div>
-                  <div>
-                    <dt>
-                      <CalendarClock size={13} aria-hidden="true" />
-                      <span className="sr-only">Ends</span>
-                    </dt>
-                    <dd>Ends {formatRoomTime(room.endsAt)}</dd>
-                  </div>
-                  <div>
-                    <dt>
-                      <Eye size={13} aria-hidden="true" />
-                      <span className="sr-only">Visibility</span>
-                    </dt>
-                    <dd>
-                      {room.visibility === "public" ? "Public" : "Link only"}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
+            <RoomHeader
+              room={room}
+              nowMs={nowMs}
+              isHost={isHost}
+              isActiveMember={isActiveMember}
+              showJoin={showJoin}
+              showLeave={showLeave}
+              canEnd={canEnd}
+              canCancel={canCancel}
+              canEditSettings={canEditSettings}
+              showSignIn={showSignIn}
+              participantCount={
+                membersQuery.data ? members.length : null
+              }
+              hostName={hostName}
+              hostPhoto={hostPhoto}
+              actionBusy={actionBusy}
+              joinPending={joinMut.isPending}
+              leavePending={leaveMut.isPending}
+              endPending={endMut.isPending}
+              cancelPending={cancelMut.isPending}
+              onJoin={() => void handleJoin()}
+              onLeave={() => void handleLeave()}
+              onEnd={() => void handleEnd()}
+              onCancel={() => void handleCancel()}
+              onOpenSettings={openSettings}
+              onOpenInvite={openInvite}
+              onOpenReport={openRoomReport}
+              onSignIn={() => auth.openAuth()}
+            />
 
-              <div className="hype-room-detail-actions">
-                {showJoin ? (
-                  <button
-                    type="button"
-                    className="primary-btn"
-                    disabled={actionBusy}
-                    onClick={() => void handleJoin()}
-                  >
-                    {joinMut.isPending ? "Joining…" : "Join room"}
-                  </button>
-                ) : null}
-                {showLeave ? (
-                  <button
-                    type="button"
-                    className="muted-btn"
-                    disabled={actionBusy}
-                    onClick={() => void handleLeave()}
-                  >
-                    {leaveMut.isPending ? "Leaving…" : "Leave room"}
-                  </button>
-                ) : null}
-                {canEnd ? (
-                  <button
-                    type="button"
-                    className="danger-btn"
-                    disabled={actionBusy}
-                    onClick={() => void handleEnd()}
-                  >
-                    {endMut.isPending ? "Ending…" : "End room"}
-                  </button>
-                ) : null}
-                {canCancel ? (
-                  <button
-                    type="button"
-                    className="danger-btn"
-                    disabled={actionBusy}
-                    onClick={() => void handleCancel()}
-                  >
-                    {cancelMut.isPending ? "Cancelling…" : "Cancel room"}
-                  </button>
-                ) : null}
-                {canEditSettings ? (
-                  <button
-                    type="button"
-                    className="muted-btn"
-                    onClick={openSettings}
-                  >
-                    <Settings size={14} aria-hidden="true" />
-                    Settings
-                  </button>
-                ) : null}
-                {canEditSettings ? (
-                  <button
-                    type="button"
-                    className="muted-btn"
-                    onClick={openInvite}
-                  >
-                    <UserPlus size={14} aria-hidden="true" />
-                    Invite
-                  </button>
-                ) : null}
-                {!auth.isAuthenticated && canJoinWindow ? (
-                  <button
-                    type="button"
-                    className="muted-btn"
-                    onClick={() => auth.openAuth()}
-                  >
-                    <Lock size={14} aria-hidden="true" />
-                    Sign in to join
-                  </button>
-                ) : null}
-                {!isHost && roomId != null ? (
-                  <button
-                    type="button"
-                    className="muted-btn report-action-btn"
-                    onClick={openRoomReport}
-                  >
-                    <Flag size={13} aria-hidden="true" />
-                    Report
-                  </button>
-                ) : null}
-              </div>
-            </header>
+            <LifecycleBanner room={room} nowMs={nowMs} />
 
-            {room.status === "expired" ? (
-              <DetailState
-                icon={<Clock3 size={22} />}
-                title="This room has ended."
-                body="The live window is closed. Chat history remains available below."
-              />
-            ) : room.status === "archived" ? (
-              <DetailState
-                icon={<Lock size={22} />}
-                title="This room is archived."
-                body={
-                  room.cancelReason
-                    ? `Cancelled: ${room.cancelReason}`
-                    : "This room is no longer active."
-                }
+            <ActivityBar
+              participantCount={membersQuery.data ? members.length : null}
+              messageCount={
+                messagesQuery.data != null ? messages.length : null
+              }
+              hasDrop={dropId != null}
+              dropLabel={
+                dropData
+                  ? `${Math.max(0, dropData.remainingQuantity)} left`
+                  : dropId != null
+                    ? "linked"
+                    : undefined
+              }
+            />
+
+            {pinnedMessage ? (
+              <PinnedHostNote
+                authorName={displayMessageName(pinnedMessage)}
+                body={pinnedMessage.message.body}
+                canUnpin={isHost}
+                busy={actionBusy}
+                onUnpin={() => void handleUnpin()}
               />
             ) : null}
 
             <div className="hype-room-detail-grid">
-              <section
-                className="hype-room-panel"
-                aria-label="Room members"
-                aria-busy={membersQuery.isPending || undefined}
-              >
-                <div className="hype-room-panel-header">
-                  <h2>
-                    <Users size={15} aria-hidden="true" /> Members
-                    {membersQuery.data ? (
-                      <span className="hype-room-panel-count">
-                        {members.length}
-                      </span>
-                    ) : null}
-                  </h2>
-                </div>
-                {membersQuery.isPending ? (
-                  <div className="hype-room-panel-body">
-                    <Skeleton className="hype-room-skeleton-line w-full" />
-                    <Skeleton className="hype-room-skeleton-line w-2/3" />
-                  </div>
-                ) : membersQuery.isError ? (
-                  <div className="hype-room-panel-body">
-                    <p className="hype-room-panel-error">
-                      Could not load members.
-                    </p>
-                    <button
-                      type="button"
-                      className="muted-btn"
-                      onClick={() => void membersQuery.refetch()}
-                    >
-                      Retry
-                    </button>
-                  </div>
-                ) : members.length === 0 ? (
-                  <div className="hype-room-panel-body">
-                    <p className="hype-room-panel-empty">
-                      No members yet. Join to get started.
-                    </p>
-                  </div>
-                ) : (
-                  <ul className="hype-room-member-list">
-                    {members.map(member => {
-                      const memberIsHost =
-                        member.membership.role === "host" ||
-                        member.user.id === room.hostId;
-                      const isSelf = member.user.id === userId;
-                      const currentRole = memberIsHost
-                        ? "host"
-                        : member.membership.role;
-                      return (
-                        <li key={member.membership.id}>
-                          <span className="hype-room-member-name">
-                            {displayMemberName(member)}
-                          </span>
-                          <span
-                            className={`hype-room-role-badge hype-room-role--${currentRole}`}
-                          >
-                            {roleLabel(currentRole)}
-                          </span>
-                          {isHost && !memberIsHost && !isSelf ? (
-                            currentRole === "speaker" ? (
-                              <button
-                                type="button"
-                                className="hype-room-icon-btn"
-                                aria-label={`Move ${displayMemberName(member)} to audience`}
-                                title="Move to audience"
-                                disabled={actionBusy}
-                                onClick={() =>
-                                  void handleSetRole(member.user.id, "audience")
-                                }
-                              >
-                                <Users size={14} />
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                className="hype-room-icon-btn"
-                                aria-label={`Promote ${displayMemberName(member)} to speaker`}
-                                title="Promote to speaker"
-                                disabled={actionBusy}
-                                onClick={() =>
-                                  void handleSetRole(member.user.id, "speaker")
-                                }
-                              >
-                                <Send size={14} />
-                              </button>
-                            )
-                          ) : null}
-                          {isHost && !memberIsHost && !isSelf ? (
-                            <button
-                              type="button"
-                              className="hype-room-icon-btn"
-                              aria-label={`Remove ${displayMemberName(member)}`}
-                              title="Remove member"
-                              disabled={actionBusy}
-                              onClick={() =>
-                                void handleRemoveMember(member.user.id)
-                              }
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          ) : null}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-                {isHost && invitesQuery.data ? (
-                  <div className="hype-room-invites-inline">
-                    <h3>
-                      <Mail size={13} aria-hidden="true" /> Room invites (
-                      {invites.length})
-                    </h3>
-                    {invites.length === 0 ? (
-                      <p className="hype-room-panel-empty">
-                        No invites yet. Use Invite to search for people.
-                      </p>
-                    ) : (
-                      <ul className="hype-room-invite-list">
-                        {invites.map(invite => (
-                          <li key={invite.id}>
-                            <span>
-                              {displayInviteName(invite.invitedUserId, members)}
-                            </span>
-                            <span
-                              className={`hype-room-invite-status hype-room-invite-status--${invite.status}`}
-                            >
-                              {invite.status}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+              <div className="hype-room-side">
+                <MembersPanel
+                  members={members}
+                  invites={invites}
+                  hostId={room.hostId}
+                  isHostViewer={isHost}
+                  viewerId={userId}
+                  busy={actionBusy}
+                  loading={membersQuery.isPending}
+                  error={membersQuery.isError}
+                  invitesReady={Boolean(invitesQuery.data)}
+                  onRetry={() => void membersQuery.refetch()}
+                  onSetRole={(id, role) => void handleSetRole(id, role)}
+                  onRemove={id => void handleRemoveMember(id)}
+                />
+
+                {dropId != null ? (
+                  <DropPanel
+                    drop={
+                      dropData
+                        ? {
+                            id: dropData.id,
+                            title: dropData.title,
+                            status: dropData.status,
+                            discountedPrice: dropData.discountedPrice,
+                            originalPrice: dropData.originalPrice,
+                            currency: dropData.currency,
+                            remainingQuantity: dropData.remainingQuantity,
+                            startsAt: dropData.startsAt,
+                            endsAt: dropData.endsAt,
+                          }
+                        : null
+                    }
+                    loading={dropQuery.isPending}
+                    error={dropQuery.isError}
+                    onRetry={() => void dropQuery.refetch()}
+                  />
                 ) : null}
-              </section>
+              </div>
 
               <section
                 className="hype-room-panel hype-room-chat"
@@ -1079,39 +817,14 @@ export default function HypeRoomDetail({
               >
                 <div className="hype-room-panel-header">
                   <h2>
-                    <Send size={15} aria-hidden="true" /> Messages
+                    <Flag size={15} aria-hidden="true" /> Conversation
+                    {messagesQuery.data ? (
+                      <span className="hype-room-panel-count">
+                        {messages.length}
+                      </span>
+                    ) : null}
                   </h2>
-                  {isHost && pinnedMessageId != null ? (
-                    <button
-                      type="button"
-                      className="hype-room-icon-btn"
-                      aria-label="Unpin message"
-                      title="Unpin message"
-                      disabled={actionBusy}
-                      onClick={() => void handleUnpin()}
-                    >
-                      <PinOff size={14} />
-                    </button>
-                  ) : null}
                 </div>
-
-                {pinnedMessageId != null ? (
-                  (() => {
-                    const pinned = messages.find(
-                      row => row.message.id === pinnedMessageId
-                    );
-                    if (!pinned) return null;
-                    return (
-                      <div className="hype-room-pinned">
-                        <Pin size={12} aria-hidden="true" />
-                        <span>
-                          <strong>{displayMessageName(pinned)}:</strong>{" "}
-                          {pinned.message.body}
-                        </span>
-                      </div>
-                    );
-                  })()
-                ) : null}
 
                 <div className="hype-room-panel-body hype-room-messages">
                   {messagesQuery.isPending ? (
@@ -1134,290 +847,79 @@ export default function HypeRoomDetail({
                       </button>
                     </div>
                   ) : messages.length === 0 ? (
-                    <p className="hype-room-panel-empty">
-                      {room.status === "live"
-                        ? "No messages yet. Say hello when you join."
-                        : "Chat opens when the room is live."}
-                    </p>
+                    <EmptyRoom
+                      isLive={room.status === "live"}
+                      isHost={isHost}
+                      isActiveMember={isActiveMember}
+                      hostAction={
+                        canEditSettings
+                          ? { label: "Invite people", onClick: openInvite }
+                          : undefined
+                      }
+                      memberAction={
+                        showJoin
+                          ? { label: "Join room", onClick: () => void handleJoin() }
+                          : undefined
+                      }
+                    />
                   ) : (
                     <ul className="hype-room-message-list">
-                      {messages.map(row => {
-                        const isTopLevel = row.message.parentId == null;
-                        const hasParent =
-                          row.message.parentId != null ||
-                          (row.parent != null && row.parent.id != null);
-                        return (
-                          <li
-                            key={row.message.id}
-                            className={
-                              row.message.id === pinnedMessageId
-                                ? "hype-room-message--pinned"
-                                : undefined
-                            }
-                          >
-                            <div className="hype-room-message-meta">
-                              <span className="hype-room-message-author">
-                                {displayMessageName(row)}
-                              </span>
-                              <time dateTime={String(row.message.createdAt)}>
-                                {formatMessageTime(row.message.createdAt)}
-                              </time>
-                              {canSend && isTopLevel ? (
-                                <button
-                                  type="button"
-                                  className="hype-room-icon-btn"
-                                  aria-label="Reply to message"
-                                  title="Reply"
-                                  onClick={() => startReply(row)}
-                                >
-                                  <CornerUpLeft size={13} />
-                                </button>
-                              ) : null}
-                              {isHost ? (
-                                row.message.id === pinnedMessageId ? null : (
-                                  <button
-                                    type="button"
-                                    className="hype-room-icon-btn"
-                                    aria-label="Pin message"
-                                    title="Pin message"
-                                    disabled={actionBusy}
-                                    onClick={() =>
-                                      void handlePin(row.message.id)
-                                    }
-                                  >
-                                    <Pin size={13} />
-                                  </button>
-                                )
-                              ) : null}
-                              {row.message.userId != null &&
-                              userId != null &&
-                              row.message.userId !== userId ? (
-                                <button
-                                  type="button"
-                                  className="hype-room-icon-btn"
-                                  aria-label="Report message"
-                                  title="Report message"
-                                  onClick={() =>
-                                    openMessageReport(row.message.id)
-                                  }
-                                >
-                                  <Flag size={13} />
-                                </button>
-                              ) : null}
-                            </div>
-                            {hasParent ? (
-                              <div className="hype-room-message-parent">
-                                {row.parent ? (
-                                  <>
-                                    <span className="hype-room-message-parent-label">
-                                      Reply to{" "}
-                                      {row.parent.userId != null
-                                        ? displayInviteName(
-                                            row.parent.userId,
-                                            members
-                                          )
-                                        : "message"}
-                                    </span>
-                                    <span className="hype-room-message-parent-body">
-                                      {row.parent.body ?? ""}
-                                    </span>
-                                  </>
-                                ) : (
-                                  <span className="hype-room-message-parent-label">
-                                    Reply to a removed message
-                                  </span>
-                                )}
-                              </div>
-                            ) : null}
-                            <p className="hype-room-message-body">
-                              {row.message.body}
-                            </p>
-                            {row.mentionUserIds &&
-                            row.mentionUserIds.length > 0 ? (
-                              <p className="hype-room-message-mentions">
-                                Mentioned:{" "}
-                                {row.mentionUserIds
-                                  .map(id => displayInviteName(id, members))
-                                  .join(", ")}
-                              </p>
-                            ) : null}
-                            <div
-                              className="hype-room-reactions"
-                              role="group"
-                              aria-label="Message reactions"
-                            >
-                              {HYPE_REACTIONS.map(
-                                ({ id, label, Icon }) => {
-                                  const entry = (
-                                    row.reactions ?? []
-                                  ).find(r => r.reaction === id);
-                                  const count = entry?.count ?? 0;
-                                  const mine = entry?.reactedByMe ?? false;
-                                  const visible = count > 0 || mine;
-                                  return (
-                                    <button
-                                      key={id}
-                                      type="button"
-                                      className={
-                                        mine
-                                          ? "hype-room-reaction hype-room-reaction--on"
-                                          : "hype-room-reaction"
-                                      }
-                                      aria-label={
-                                        mine
-                                          ? `Remove ${label} reaction`
-                                          : `React with ${label}`
-                                      }
-                                      aria-pressed={mine}
-                                      title={label}
-                                      disabled={!isActiveMember}
-                                      onClick={() =>
-                                        void handleReaction(row.message.id, id)
-                                      }
-                                    >
-                                      <Icon size={13} aria-hidden="true" />
-                                      {visible ? (
-                                        <span className="hype-room-reaction-count">
-                                          {count}
-                                        </span>
-                                      ) : null}
-                                    </button>
-                                  );
-                                }
-                              )}
-                            </div>
-                          </li>
-                        );
-                      })}
+                      {topLevelMessages.map(row => (
+                        <MessageCard
+                          key={row.message.id}
+                          row={row}
+                          members={members}
+                          hostId={room.hostId}
+                          viewerId={userId}
+                          isHostViewer={isHost}
+                          isActiveMember={isActiveMember}
+                          canReply={canSend}
+                          isPinned={row.message.id === pinnedMessageId}
+                          replyCount={replyCounts.get(row.message.id) ?? 0}
+                          selected={selectedMessageId === row.message.id}
+                          busy={actionBusy}
+                          onSelect={() =>
+                            setSelectedMessageId(id =>
+                              id === row.message.id ? null : row.message.id
+                            )
+                          }
+                          onReply={() => startReply(row)}
+                          onReact={reaction =>
+                            void handleReaction(row.message.id, reaction)
+                          }
+                          onPin={
+                            isHost ? () => void handlePin(row.message.id) : undefined
+                          }
+                          onReport={
+                            row.user.id != null && row.user.id !== userId
+                              ? () => openMessageReport(row.message.id)
+                              : undefined
+                          }
+                          onOpenThread={() => openThread(row)}
+                        />
+                      ))}
                     </ul>
                   )}
                 </div>
 
                 {canSend ? (
-                  <form
-                    className="hype-room-composer"
+                  <Composer
+                    draft={draft}
+                    sending={sending}
+                    replyTarget={replyTarget}
+                    mentionedIds={mentionedIds}
+                    mentionPickerOpen={mentionPickerOpen}
+                    members={members}
+                    viewerId={userId}
+                    hostId={room.hostId}
+                    onDraftChange={setDraft}
+                    onToggleMentionPicker={() =>
+                      setMentionPickerOpen(open => !open)
+                    }
+                    onToggleMention={toggleMention}
+                    onCancelReply={() => setReplyTarget(null)}
                     onSubmit={event => void handleSend(event)}
-                  >
-                    {replyTarget ? (
-                      <div className="hype-room-reply-banner">
-                        <span>
-                          Replying to{" "}
-                          <strong>{displayMessageName(replyTarget)}</strong>
-                        </span>
-                        <button
-                          type="button"
-                          className="hype-room-icon-btn"
-                          aria-label="Cancel reply"
-                          title="Cancel reply"
-                          onClick={() => setReplyTarget(null)}
-                        >
-                          <X size={13} />
-                        </button>
-                      </div>
-                    ) : null}
-                    {mentionedIds.length > 0 ? (
-                      <div className="hype-room-mention-chips">
-                        {mentionedIds.map(id => {
-                          const member = members.find(
-                            row => row.user.id === id
-                          );
-                          return (
-                            <span
-                              key={id}
-                              className="hype-room-mention-chip"
-                            >
-                              @{member ? displayMemberName(member) : `user${id}`}
-                              <button
-                                type="button"
-                                aria-label={`Remove mention ${
-                                  member ? displayMemberName(member) : id
-                                }`}
-                                onClick={() => toggleMention(id)}
-                              >
-                                <X size={11} />
-                              </button>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                    {mentionPickerOpen ? (
-                      <div
-                        className="hype-room-mention-picker"
-                        role="listbox"
-                        aria-label="Mention a member"
-                      >
-                        {mentionableMembers.length === 0 ? (
-                          <p className="hype-room-panel-empty">
-                            No other members to mention.
-                          </p>
-                        ) : (
-                          mentionableMembers.map(member => {
-                            const selected = mentionedIds.includes(
-                              member.user.id
-                            );
-                            return (
-                              <button
-                                key={member.membership.id}
-                                type="button"
-                                role="option"
-                                aria-selected={selected}
-                                className={
-                                  selected
-                                    ? "hype-room-mention-option hype-room-mention-option--on"
-                                    : "hype-room-mention-option"
-                                }
-                                onClick={() => toggleMention(member.user.id)}
-                              >
-                                <span>{displayMemberName(member)}</span>
-                                {selected ? (
-                                  <Check size={13} aria-hidden="true" />
-                                ) : null}
-                              </button>
-                            );
-                          })
-                        )}
-                      </div>
-                    ) : null}
-                    <label className="sr-only" htmlFor="hype-room-message">
-                      Message
-                    </label>
-                    <textarea
-                      id="hype-room-message"
-                      value={draft}
-                      onChange={event => setDraft(event.target.value)}
-                      maxLength={ROOM_MESSAGE_MAX}
-                      rows={2}
-                      placeholder={
-                        replyTarget
-                          ? "Write a reply…"
-                          : "Send a message to the room…"
-                      }
-                    />
-                    <div className="hype-room-composer-actions">
-                      <button
-                        type="button"
-                        className={
-                          mentionPickerOpen
-                            ? "hype-room-icon-btn hype-room-icon-btn--on"
-                            : "hype-room-icon-btn"
-                        }
-                        aria-label="Mention members"
-                        aria-pressed={mentionPickerOpen}
-                        title="Mention"
-                        onClick={() => setMentionPickerOpen(open => !open)}
-                      >
-                        <AtSign size={14} />
-                      </button>
-                      <button
-                        type="submit"
-                        className="primary-btn"
-                        disabled={sending || draft.trim().length === 0}
-                      >
-                        {sending ? "Sending…" : "Send"}
-                      </button>
-                    </div>
-                  </form>
+                  />
                 ) : room.status === "live" && !isActiveMember ? (
                   <p className="hype-room-composer-hint">
                     Join the room to send messages.
@@ -1426,216 +928,69 @@ export default function HypeRoomDetail({
               </section>
             </div>
 
+            {threadRoot ? (
+              <ThreadSheet
+                root={threadRoot}
+                messages={messages}
+                members={members}
+                hostId={room.hostId}
+                viewerId={userId}
+                isHostViewer={isHost}
+                isActiveMember={isActiveMember}
+                canReply={canSend}
+                replyTarget={replyTarget}
+                draft={draft}
+                sending={sending}
+                busy={actionBusy}
+                replyCounts={replyCounts}
+                onDraftChange={setDraft}
+                onSend={() => {
+                  const event = {
+                    preventDefault: () => {},
+                  } as unknown as FormEvent;
+                  void handleSend(event);
+                }}
+                onCancelReply={() => setReplyTarget(null)}
+                onReact={(id, reaction) => void handleReaction(id, reaction)}
+                onPin={isHost ? id => void handlePin(id) : undefined}
+                onReport={id => openMessageReport(id)}
+                onClose={() => {
+                  setThreadRootId(null);
+                  setReplyTarget(null);
+                }}
+              />
+            ) : null}
+
             {settingsOpen ? (
-              <div className="action-modal-layer" role="presentation">
-                <button
-                  type="button"
-                  className="action-modal-backdrop"
-                  aria-label="Close room settings"
-                  onClick={() => setSettingsOpen(false)}
-                />
-                <section
-                  className="action-modal report-dialog"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label="Room settings"
-                >
-                  <div className="action-modal-head">
-                    <h2>
-                      <Settings size={18} aria-hidden="true" /> Room settings
-                    </h2>
-                    <button
-                      type="button"
-                      aria-label="Close room settings"
-                      onClick={() => setSettingsOpen(false)}
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
-                  <form
-                    className="modal-form report-dialog-form"
-                    onSubmit={handleSettingsSubmit}
-                  >
-                    <p className="report-dialog-hint">
-                      Title, topic, description, and visibility only. Lifecycle
-                      and host cannot change here.
-                    </p>
-                    <label htmlFor="hype-settings-title">
-                      Title <span className="report-dialog-req">(required)</span>
-                      <input
-                        id="hype-settings-title"
-                        value={settingsTitle}
-                        onChange={event => setSettingsTitle(event.target.value)}
-                        minLength={3}
-                        maxLength={180}
-                        required
-                        autoComplete="off"
-                        placeholder="Room title (3–180 characters)"
-                      />
-                    </label>
-                    <label htmlFor="hype-settings-topic">
-                      Topic{" "}
-                      <span className="report-dialog-optional">(optional)</span>
-                      <input
-                        id="hype-settings-topic"
-                        value={settingsTopic}
-                        onChange={event => setSettingsTopic(event.target.value)}
-                        maxLength={120}
-                        autoComplete="off"
-                        placeholder="Topic tag (max 120 characters)"
-                      />
-                    </label>
-                    <label htmlFor="hype-settings-description">
-                      Description{" "}
-                      <span className="report-dialog-optional">(optional)</span>
-                      <textarea
-                        id="hype-settings-description"
-                        value={settingsDescription}
-                        onChange={event =>
-                          setSettingsDescription(event.target.value)
-                        }
-                        maxLength={2000}
-                        rows={4}
-                        placeholder="Room description (max 2000 characters)"
-                      />
-                    </label>
-                    <label htmlFor="hype-settings-visibility">
-                      Visibility
-                      <select
-                        id="hype-settings-visibility"
-                        value={settingsVisibility}
-                        onChange={event =>
-                          setSettingsVisibility(
-                            event.target.value as "public" | "link_only"
-                          )
-                        }
-                      >
-                        <option value="public">Public</option>
-                        <option value="link_only">Link only</option>
-                      </select>
-                    </label>
-                    <div className="report-dialog-actions">
-                      <button
-                        type="button"
-                        className="muted-btn"
-                        onClick={() => setSettingsOpen(false)}
-                        disabled={updateSettingsMut.isPending}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="primary-btn"
-                        disabled={
-                          updateSettingsMut.isPending ||
-                          settingsTitle.trim().length < 3
-                        }
-                      >
-                        {updateSettingsMut.isPending
-                          ? "Saving…"
-                          : "Save settings"}
-                      </button>
-                    </div>
-                  </form>
-                </section>
-              </div>
+              <SettingsModal
+                initial={{
+                  title: settingsTitle,
+                  topic: settingsTopic,
+                  description: settingsDescription,
+                  visibility: settingsVisibility,
+                }}
+                saving={updateSettingsMut.isPending}
+                onClose={() => setSettingsOpen(false)}
+                onSubmit={handleSettingsSubmit}
+              />
             ) : null}
 
             {inviteOpen ? (
-              <div className="action-modal-layer" role="presentation">
-                <button
-                  type="button"
-                  className="action-modal-backdrop"
-                  aria-label="Close invite"
-                  onClick={() => setInviteOpen(false)}
-                />
-                <section
-                  className="action-modal report-dialog"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label="Invite to room"
-                >
-                  <div className="action-modal-head">
-                    <h2>
-                      <UserPlus size={18} aria-hidden="true" /> Invite to room
-                    </h2>
-                    <button
-                      type="button"
-                      aria-label="Close invite"
-                      onClick={() => setInviteOpen(false)}
-                    >
-                      <X size={20} />
-                    </button>
-                  </div>
-                  <div className="modal-form report-dialog-form">
-                    <p className="report-dialog-hint">
-                      Search people by name or username. Current members cannot
-                      be invited again.
-                    </p>
-                    <label htmlFor="hype-invite-search">
-                      Search
-                      <input
-                        id="hype-invite-search"
-                        value={inviteTerm}
-                        onChange={event => setInviteTerm(event.target.value)}
-                        maxLength={120}
-                        autoComplete="off"
-                        placeholder="Name or @username (min 2 characters)"
-                      />
-                    </label>
-                    <div
-                      className="hype-room-invite-results"
-                      aria-live="polite"
-                      aria-busy={inviteSearchQuery.isPending || undefined}
-                    >
-                      {inviteDebounced.trim().length < 2 ? (
-                        <p className="hype-room-panel-empty">
-                          Type at least 2 characters to search.
-                        </p>
-                      ) : inviteSearchQuery.isPending ? (
-                        <Skeleton className="hype-room-skeleton-line w-full" />
-                      ) : inviteSearchQuery.isError ? (
-                        <p className="hype-room-panel-error">
-                          Could not search right now.
-                        </p>
-                      ) : inviteSearchResults.length === 0 ? (
-                        <p className="hype-room-panel-empty">
-                          No people found (or they are already members).
-                        </p>
-                      ) : (
-                        <ul className="hype-room-invite-results-list">
-                          {inviteSearchResults.map(user => (
-                            <li key={user.id}>
-                              <span>
-                                {user.username || user.name || `User #${user.id}`}
-                              </span>
-                              <button
-                                type="button"
-                                className="muted-btn"
-                                disabled={createInviteMut.isPending}
-                                onClick={() =>
-                                  void handleCreateInvite(user.id)
-                                }
-                              >
-                                Invite
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                    <div className="report-dialog-actions">
-                      <button
-                        type="button"
-                        className="muted-btn"
-                        onClick={() => setInviteOpen(false)}
-                      >
-                        Close
-                      </button>
-                    </div>
-                  </div>
-                </section>
-              </div>
+              <InviteModal
+                roomTitle={room.title}
+                term={inviteTerm}
+                onTermChange={setInviteTerm}
+                search={inviteDebounced}
+                searchLoading={inviteSearchQuery.isPending}
+                searchError={inviteSearchQuery.isError}
+                results={inviteSearchResults}
+                invites={invites}
+                members={members}
+                inviting={createInviteMut.isPending}
+                canInvite={canEditSettings}
+                onClose={() => setInviteOpen(false)}
+                onInvite={id => void handleCreateInvite(id)}
+              />
             ) : null}
           </>
         )}
