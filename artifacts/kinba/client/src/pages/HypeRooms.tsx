@@ -2,14 +2,17 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowLeft,
   CalendarClock,
+  Check,
   Clock3,
   Eye,
   Lock,
+  Mail,
   Plus,
   Radio,
   RefreshCw,
   Users,
 } from "lucide-react";
+import { toast } from "sonner";
 import { TRPCClientError } from "@trpc/client";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -233,11 +236,23 @@ function LobbyState({
   );
 }
 
+type InviteRow = {
+  id: number;
+  roomId: number;
+  invitedUserId: number;
+  createdBy: number;
+  status: string;
+  createdAt: Date | string;
+  updatedAt: Date | string;
+  consumedAt: Date | string | null;
+};
+
 export default function HypeRooms() {
   const [, navigate] = useLocation();
   const auth = useAuth();
   const [filter, setFilter] = useState<LobbyFilter>("live");
   const nowMs = useNow(1000);
+  const utils = trpc.useUtils();
 
   const needsAuth = filter === "mine";
   const blockedByAuth =
@@ -252,6 +267,41 @@ export default function HypeRooms() {
       staleTime: 15_000,
     }
   );
+
+  const invitesQuery = trpc.hypeRooms.listMyInvites.useQuery(undefined, {
+    enabled: auth.isAuthenticated && !auth.loading,
+    retry: false,
+    refetchOnWindowFocus: false,
+    staleTime: 10_000,
+  });
+  const acceptInviteMut = trpc.hypeRooms.acceptInvite.useMutation();
+
+  const myInvites = useMemo(
+    () => ((invitesQuery.data ?? []) as InviteRow[] | undefined) ?? [],
+    [invitesQuery.data]
+  );
+
+  const handleAcceptInvite = async (inviteId: number) => {
+    if (!auth.isAuthenticated) {
+      auth.openAuth();
+      return;
+    }
+    try {
+      const result = await acceptInviteMut.mutateAsync({ inviteId });
+      await Promise.all([
+        utils.hypeRooms.listMyInvites.invalidate(),
+        utils.hypeRooms.byId.invalidate(),
+        utils.hypeRooms.members.invalidate(),
+        utils.hypeRooms.list.invalidate(),
+      ]);
+      toast.success("Invite accepted — you joined the room.");
+      navigate(`/rooms/${result.invite.roomId}`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not accept invite."
+      );
+    }
+  };
 
   const rooms = useMemo(
     () => ((query.data ?? []) as RoomCard[] | undefined) ?? [],
@@ -323,6 +373,43 @@ export default function HypeRooms() {
             );
           })}
         </nav>
+
+        {auth.isAuthenticated && myInvites.length > 0 ? (
+          <section
+            className="hype-room-invite-inbox"
+            aria-label="Your room invites"
+            aria-busy={invitesQuery.isPending || undefined}
+          >
+            <h2>
+              <Mail size={15} aria-hidden="true" /> Invites
+              <span className="hype-room-panel-count">{myInvites.length}</span>
+            </h2>
+            <ul className="hype-room-invite-list">
+              {myInvites.map(invite => (
+                <li key={invite.id}>
+                  <span>
+                    Room invite
+                    <span className="hype-room-invite-room">
+                      #{invite.roomId}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="primary-btn"
+                    disabled={acceptInviteMut.isPending}
+                    onClick={() => void handleAcceptInvite(invite.id)}
+                  >
+                    <Check size={14} aria-hidden="true" />
+                    {acceptInviteMut.isPending &&
+                    acceptInviteMut.variables?.inviteId === invite.id
+                      ? "Accepting…"
+                      : "Accept"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         <section
           className="hype-room-results"
