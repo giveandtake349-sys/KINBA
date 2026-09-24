@@ -11,9 +11,12 @@
  * No drops, claims, or rewards in this module.
  * M7: durable notifications fire only on actual status transitions (§22).
  */
-import { and, asc, eq, inArray, isNull, isNotNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, isNotNull, ne } from "drizzle-orm";
 import {
+  hypeRoomInvites,
   hypeRoomMembers,
+  hypeRoomMessageMentions,
+  hypeRoomMessageReactions,
   hypeRoomMessages,
   hypeRooms,
   profiles,
@@ -62,6 +65,20 @@ export type HypeRoomMessageWithUser = {
     photoUrl: string | null;
     username: string | null;
   };
+  /** M-A1 — one-level parent snapshot for threading (null for top-level). */
+  parent?: {
+    id: number;
+    body: string | null;
+    userId: number | null;
+  } | null;
+  /** M-A1 — aggregate reactions on this message. */
+  reactions?: Array<{
+    reaction: string;
+    count: number;
+    reactedByMe: boolean;
+  }>;
+  /** M-A1 — mentioned active-member user ids on this message. */
+  mentionUserIds?: number[];
 };
 
 /** Allowed temporary room durations (matches DB CHECK + product spec §8.3). */
@@ -363,6 +380,7 @@ export async function createHypeRoom(
       startsAt,
       endsAt,
       visibility: input.visibility ?? "public",
+      // dropId intentionally left null — no safe room↔drop mutation is wired yet.
       dropId: null,
       pinnedMessageId: null,
       createdAt: now,
@@ -499,6 +517,70 @@ export function canLeaveMembership(
  * Join a room (pre-join while scheduled, or while live).
  * Reuses UNIQUE(roomId,userId); soft rejoin clears leftAt.
  */
+/**
+ * Join rules inside an open transaction (shared by joinHypeRoom + invite accept).
+ * Caller owns the transaction — do not nest transactions here.
+ */
+async function joinHypeRoomInTx(
+  tx: Parameters<
+    Parameters<NonNullable<Awaited<ReturnType<typeof getDb>>>["transaction"]>[0]
+  >[0],
+  roomId: number,
+  userId: number
+): Promise<HypeRoomMemberRow> {
+  const [room] = await tx
+    .select()
+    .from(hypeRooms)
+    .where(eq(hypeRooms.id, roomId))
+    .limit(1);
+  if (!room) throw new Error("Room not found.");
+  const resolved = await persistResolvedRoom(tx as never, room, new Date());
+  if (!canJoinRoomStatus(resolved.status)) {
+    throw new Error("This room is no longer accepting new members.");
+  }
+
+  const [existing] = await tx
+    .select()
+    .from(hypeRoomMembers)
+    .where(
+      and(
+        eq(hypeRoomMembers.roomId, roomId),
+        eq(hypeRoomMembers.userId, userId)
+      )
+    )
+    .limit(1);
+
+  if (existing?.bannedAt) {
+    throw new Error("You are banned from this room.");
+  }
+  if (existing && existing.leftAt == null) {
+    throw new Error("You are already a member of this room.");
+  }
+
+  if (existing) {
+    const [rejoined] = await tx
+      .update(hypeRoomMembers)
+      .set({ leftAt: null, removedBy: null })
+      .where(eq(hypeRoomMembers.id, existing.id))
+      .returning();
+    if (!rejoined) throw new Error("Failed to rejoin room.");
+    return rejoined;
+  }
+
+  const role = resolveMemberRole(resolved.hostId, userId);
+  const [inserted] = await tx
+    .insert(hypeRoomMembers)
+    .values({ roomId, userId, role })
+    .onConflictDoNothing({
+      target: [hypeRoomMembers.roomId, hypeRoomMembers.userId],
+    })
+    .returning();
+  if (inserted) return inserted;
+
+  // Race: concurrent insert won — treat as controlled duplicate.
+  throw new Error("You are already a member of this room.");
+}
+
 export async function joinHypeRoom(
   roomId: number,
   userId: number
@@ -506,59 +588,7 @@ export async function joinHypeRoom(
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
-  return db.transaction(async tx => {
-    const [room] = await tx
-      .select()
-      .from(hypeRooms)
-      .where(eq(hypeRooms.id, roomId))
-      .limit(1);
-    if (!room) throw new Error("Room not found.");
-    const resolved = await persistResolvedRoom(tx as never, room, new Date());
-    if (!canJoinRoomStatus(resolved.status)) {
-      throw new Error("This room is no longer accepting new members.");
-    }
-
-    const [existing] = await tx
-      .select()
-      .from(hypeRoomMembers)
-      .where(
-        and(
-          eq(hypeRoomMembers.roomId, roomId),
-          eq(hypeRoomMembers.userId, userId)
-        )
-      )
-      .limit(1);
-
-    if (existing?.bannedAt) {
-      throw new Error("You are banned from this room.");
-    }
-    if (existing && existing.leftAt == null) {
-      throw new Error("You are already a member of this room.");
-    }
-
-    if (existing) {
-      const [rejoined] = await tx
-        .update(hypeRoomMembers)
-        .set({ leftAt: null, removedBy: null })
-        .where(eq(hypeRoomMembers.id, existing.id))
-        .returning();
-      if (!rejoined) throw new Error("Failed to rejoin room.");
-      return rejoined;
-    }
-
-    const role = resolveMemberRole(resolved.hostId, userId);
-    const [inserted] = await tx
-      .insert(hypeRoomMembers)
-      .values({ roomId, userId, role })
-      .onConflictDoNothing({
-        target: [hypeRoomMembers.roomId, hypeRoomMembers.userId],
-      })
-      .returning();
-    if (inserted) return inserted;
-
-    // Race: concurrent insert won — treat as controlled duplicate.
-    throw new Error("You are already a member of this room.");
-  });
+  return db.transaction(async tx => joinHypeRoomInTx(tx, roomId, userId));
 }
 
 /** Soft-leave a room (sets leftAt). Host cannot leave. */
@@ -818,9 +848,11 @@ async function loadActiveMembership(
  * Read room transcript (ordered by createdAt).
  * Works while scheduled/live and remains readable after expire (spec §18.4).
  * Hidden/moderated messages (hiddenAt set) are excluded.
+ * M-A1: optional viewerUserId enables reactedByMe; parent snapshot + mentions included.
  */
 export async function listRoomMessages(
-  roomId: number
+  roomId: number,
+  viewerUserId: number | null = null
 ): Promise<HypeRoomMessageWithUser[]> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -851,19 +883,162 @@ export async function listRoomMessages(
     )
     .orderBy(asc(hypeRoomMessages.createdAt), asc(hypeRoomMessages.id));
 
-  return rows;
+  const messageIds = rows.map(r => r.message.id);
+  if (messageIds.length === 0) return [];
+
+  const reactionRows = await db
+    .select({
+      messageId: hypeRoomMessageReactions.messageId,
+      userId: hypeRoomMessageReactions.userId,
+      reaction: hypeRoomMessageReactions.reaction,
+    })
+    .from(hypeRoomMessageReactions)
+    .where(inArray(hypeRoomMessageReactions.messageId, messageIds));
+
+  const mentionRows = await db
+    .select({
+      messageId: hypeRoomMessageMentions.messageId,
+      mentionedUserId: hypeRoomMessageMentions.mentionedUserId,
+    })
+    .from(hypeRoomMessageMentions)
+    .where(inArray(hypeRoomMessageMentions.messageId, messageIds));
+
+  const parentIds = [
+    ...new Set(
+      rows
+        .map(r => r.message.parentId)
+        .filter((id): id is number => typeof id === "number")
+    ),
+  ];
+  const parentRows =
+    parentIds.length > 0
+      ? await db
+          .select({
+            id: hypeRoomMessages.id,
+            body: hypeRoomMessages.body,
+            userId: hypeRoomMessages.userId,
+          })
+          .from(hypeRoomMessages)
+          .where(
+            and(
+              inArray(hypeRoomMessages.id, parentIds),
+              isNull(hypeRoomMessages.hiddenAt)
+            )
+          )
+      : [];
+  const parentById = new Map(parentRows.map(p => [p.id, p]));
+
+  const reactionsByMessage = new Map<
+    number,
+    Array<{ reaction: string; count: number; reactedByMe: boolean }>
+  >();
+  const reactionCount = new Map<string, number>();
+  for (const row of reactionRows) {
+    const key = `${row.messageId}:${row.reaction}`;
+    reactionCount.set(key, (reactionCount.get(key) ?? 0) + 1);
+  }
+  for (const [key, count] of reactionCount) {
+    const sep = key.indexOf(":");
+    const messageId = Number(key.slice(0, sep));
+    const reaction = key.slice(sep + 1);
+    const mine =
+      viewerUserId != null &&
+      reactionRows.some(
+        r =>
+          r.messageId === messageId &&
+          r.reaction === reaction &&
+          r.userId === viewerUserId
+      );
+    const list = reactionsByMessage.get(messageId) ?? [];
+    list.push({ reaction, count, reactedByMe: mine });
+    reactionsByMessage.set(messageId, list);
+  }
+
+  const mentionsByMessage = new Map<number, number[]>();
+  for (const row of mentionRows) {
+    const list = mentionsByMessage.get(row.messageId) ?? [];
+    if (!list.includes(row.mentionedUserId)) list.push(row.mentionedUserId);
+    mentionsByMessage.set(row.messageId, list);
+  }
+
+  return rows.map(row => {
+    const parentId = row.message.parentId;
+    const parent = parentId != null ? (parentById.get(parentId) ?? null) : null;
+    return {
+      message: row.message,
+      user: row.user,
+      parent: parent
+        ? { id: parent.id, body: parent.body, userId: parent.userId }
+        : null,
+      reactions: reactionsByMessage.get(row.message.id) ?? [],
+      mentionUserIds: mentionsByMessage.get(row.message.id) ?? [],
+    };
+  });
 }
+
+/** Explicit small reaction set — arbitrary strings are rejected. */
+export const HYPE_ROOM_REACTIONS = ["like", "love", "fire", "clap"] as const;
+export type HypeRoomReaction = (typeof HYPE_ROOM_REACTIONS)[number];
+
+export function isValidHypeRoomReaction(
+  value: string
+): value is HypeRoomReaction {
+  return (HYPE_ROOM_REACTIONS as readonly string[]).includes(value);
+}
+
+/** One-level reply: parent must be a visible top-level message in the same room. */
+export function validateReplyParent(
+  parentId: number | null | undefined,
+  parent:
+    | Pick<HypeRoomMessageRow, "id" | "roomId" | "parentId" | "hiddenAt">
+    | null,
+  roomId: number
+): number | null {
+  if (parentId == null) return null;
+  if (!parent) throw new Error("Message not found.");
+  if (parent.hiddenAt) throw new Error("Message not found.");
+  if (parent.roomId !== roomId) {
+    throw new Error("Reply target is not in this room.");
+  }
+  if (parent.id === parent.parentId) {
+    throw new Error("Cannot reply to itself.");
+  }
+  if (parent.parentId != null) {
+    throw new Error("You can only reply to top-level messages.");
+  }
+  return parent.id;
+}
+
+/** Dedupe mention ids while preserving order; reject non-integers. */
+export function normalizeMentionUserIds(ids: readonly number[]): number[] {
+  const out: number[] = [];
+  for (const id of ids) {
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new Error("Invalid mention target.");
+    }
+    if (!out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
+export type SendHypeRoomMessageOptions = {
+  parentId?: number | null;
+  mentionedUserIds?: number[];
+};
 
 /**
  * Insert a text message while the room is live.
  * Requires active membership (host included — no host bypass).
+ * M-A1: optional one-level parentId + mention records (no mention notifications).
  */
 export async function sendHypeRoomMessage(
   roomId: number,
   userId: number,
-  body: string
+  body: string,
+  options: SendHypeRoomMessageOptions = {}
 ): Promise<HypeRoomMessageRow> {
   const validated = validateRoomMessageBody(body);
+  const mentionIds = normalizeMentionUserIds(options.mentionedUserIds ?? []);
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
@@ -884,10 +1059,47 @@ export async function sendHypeRoomMessage(
       throw new Error("You are not an active member of this room.");
     }
     if (!canSendRoomMessage(room.status, membership)) {
-      if (room.status !== "live") {
-        throw new Error("Messages can only be sent while the room is live.");
-      }
       throw new Error("Messages can only be sent while the room is live.");
+    }
+
+    let parentId: number | null = null;
+    if (options.parentId != null) {
+      const [parent] = await tx
+        .select()
+        .from(hypeRoomMessages)
+        .where(eq(hypeRoomMessages.id, options.parentId))
+        .limit(1);
+      parentId = validateReplyParent(options.parentId, parent ?? null, roomId);
+    }
+
+    // Mentions: only active room members (not left, not banned) may be targeted.
+    if (mentionIds.length > 0) {
+      const activeMemberRows = await tx
+        .select({ userId: hypeRoomMembers.userId })
+        .from(hypeRoomMembers)
+        .where(
+          and(
+            eq(hypeRoomMembers.roomId, roomId),
+            isNull(hypeRoomMembers.leftAt),
+            isNull(hypeRoomMembers.bannedAt)
+          )
+        );
+      const activeIds = new Set(activeMemberRows.map(r => r.userId));
+      for (const id of mentionIds) {
+        if (!activeIds.has(id)) {
+          throw new Error(
+            "You can only mention active members of this room."
+          );
+        }
+      }
+      // Ensure mentioned users exist (FK will also enforce).
+      const userRows = await tx
+        .select({ id: users.id })
+        .from(users)
+        .where(inArray(users.id, mentionIds));
+      if (userRows.length !== mentionIds.length) {
+        throw new Error("Invalid mention target.");
+      }
     }
 
     const now = new Date();
@@ -897,13 +1109,504 @@ export async function sendHypeRoomMessage(
         roomId,
         userId,
         body: validated,
+        parentId,
         pinned: false,
         createdAt: now,
       })
       .returning();
     if (!inserted) throw new Error("Failed to send message.");
+
+    if (mentionIds.length > 0) {
+      await tx.insert(hypeRoomMessageMentions).values(
+        mentionIds.map(mentionedUserId => ({
+          roomId,
+          messageId: inserted.id,
+          mentionedUserId,
+          createdAt: now,
+        }))
+      );
+    }
     return inserted;
   });
+}
+
+export type ReactionToggleResult = {
+  messageId: number;
+  reaction: HypeRoomReaction;
+  active: boolean;
+};
+
+/**
+ * Toggle a reaction on a room message.
+ * Active members only; message must belong to roomId; unique(user, message, reaction).
+ */
+export async function toggleHypeRoomMessageReaction(
+  roomId: number,
+  userId: number,
+  messageId: number,
+  reaction: string
+): Promise<ReactionToggleResult> {
+  if (!isValidHypeRoomReaction(reaction)) {
+    throw new Error("Invalid reaction type.");
+  }
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  return db.transaction(async tx => {
+    const [room] = await tx
+      .select({ id: hypeRooms.id })
+      .from(hypeRooms)
+      .where(eq(hypeRooms.id, roomId))
+      .limit(1);
+    if (!room) throw new Error("Room not found.");
+
+    const membership = await loadActiveMembership(tx as never, roomId, userId);
+    if (membership?.bannedAt) {
+      throw new Error("You are banned from this room.");
+    }
+    if (!membership || membership.leftAt != null) {
+      throw new Error("You are not an active member of this room.");
+    }
+
+    const [message] = await tx
+      .select()
+      .from(hypeRoomMessages)
+      .where(eq(hypeRoomMessages.id, messageId))
+      .limit(1);
+    if (!message || message.hiddenAt) {
+      throw new Error("Message not found.");
+    }
+    if (message.roomId !== roomId) {
+      throw new Error("Message does not belong to this room.");
+    }
+
+    const [existing] = await tx
+      .select()
+      .from(hypeRoomMessageReactions)
+      .where(
+        and(
+          eq(hypeRoomMessageReactions.messageId, messageId),
+          eq(hypeRoomMessageReactions.userId, userId),
+          eq(hypeRoomMessageReactions.reaction, reaction)
+        )
+      )
+      .limit(1);
+
+    if (existing) {
+      await tx
+        .delete(hypeRoomMessageReactions)
+        .where(eq(hypeRoomMessageReactions.id, existing.id));
+      return { messageId, reaction: reaction as HypeRoomReaction, active: false };
+    }
+
+    const [inserted] = await tx
+      .insert(hypeRoomMessageReactions)
+      .values({
+        roomId,
+        messageId,
+        userId,
+        reaction,
+      })
+      .onConflictDoNothing()
+      .returning();
+    if (inserted) {
+      return { messageId, reaction: reaction as HypeRoomReaction, active: true };
+    }
+
+    // Concurrent identical activation won the unique race — reaction is active.
+    const [confirmed] = await tx
+      .select()
+      .from(hypeRoomMessageReactions)
+      .where(
+        and(
+          eq(hypeRoomMessageReactions.messageId, messageId),
+          eq(hypeRoomMessageReactions.userId, userId),
+          eq(hypeRoomMessageReactions.reaction, reaction)
+        )
+      )
+      .limit(1);
+    if (confirmed) {
+      return { messageId, reaction: reaction as HypeRoomReaction, active: true };
+    }
+    throw new Error("Failed to toggle reaction.");
+  });
+}
+
+export type HypeRoomAssignableRole = "speaker" | "audience";
+
+/**
+ * Host promotes/demotes speaker ↔ audience.
+ * Legacy "member" rows are treated as audience-equivalent for eligibility.
+ * Host identity is room.hostId — never demoted via this mutation.
+ */
+export async function setHypeRoomMemberRole(
+  roomId: number,
+  actorId: number,
+  targetUserId: number,
+  role: HypeRoomAssignableRole
+): Promise<HypeRoomMemberRow> {
+  if (role !== "speaker" && role !== "audience") {
+    throw new Error("Invalid room role.");
+  }
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  return db.transaction(async tx => {
+    const [room] = await tx
+      .select()
+      .from(hypeRooms)
+      .where(eq(hypeRooms.id, roomId))
+      .limit(1);
+    if (!room) throw new Error("Room not found.");
+
+    if (!isRoomHost(room.hostId, actorId)) {
+      throw new Error("Only the host can change member roles.");
+    }
+    if (targetUserId === room.hostId) {
+      throw new Error("The host role cannot be changed.");
+    }
+
+    const [target] = await tx
+      .select()
+      .from(hypeRoomMembers)
+      .where(
+        and(
+          eq(hypeRoomMembers.roomId, roomId),
+          eq(hypeRoomMembers.userId, targetUserId)
+        )
+      )
+      .limit(1);
+    if (!target) throw new Error("Member not found in this room.");
+    if (target.bannedAt) {
+      throw new Error("You are banned from this room.");
+    }
+    if (target.leftAt != null) {
+      throw new Error("You are not an active member of this room.");
+    }
+    if (target.role === "host") {
+      throw new Error("The host role cannot be changed.");
+    }
+
+    const current = target.role;
+    if (role === "speaker") {
+      if (current === "speaker") return target;
+      // audience-equivalent: legacy "member" or explicit "audience"
+      if (current !== "member" && current !== "audience") {
+        throw new Error("Invalid room role.");
+      }
+    } else {
+      // demote to audience — only speakers (or already-audience no-op)
+      if (current === "member" || current === "audience") {
+        if (current === "audience") return target;
+        // Keep legacy "member" as-is when already non-speaker audience-equivalent.
+        return target;
+      }
+      if (current !== "speaker") {
+        throw new Error("Invalid room role.");
+      }
+    }
+
+    const [updated] = await tx
+      .update(hypeRoomMembers)
+      .set({ role })
+      .where(
+        and(
+          eq(hypeRoomMembers.id, target.id),
+          isNull(hypeRoomMembers.leftAt),
+          isNull(hypeRoomMembers.bannedAt),
+          ne(hypeRoomMembers.role, "host")
+        )
+      )
+      .returning();
+    if (!updated) throw new Error("You are not an active member of this room.");
+    return updated;
+  });
+}
+
+export type UpdateHypeRoomSettingsInput = {
+  title?: string;
+  topic?: string | null;
+  description?: string | null;
+  visibility?: "public" | "link_only";
+};
+
+/** Settings editable only while the room is still active for the host. */
+export function canUpdateRoomSettings(status: HypeRoomStatus): boolean {
+  return status === "scheduled" || status === "live";
+}
+
+/**
+ * Host-only settings mutation. Allowed fields only: title, topic, description,
+ * visibility. Does not change host, lifecycle, startsAt/endsAt, or id.
+ */
+export async function updateHypeRoomSettings(
+  roomId: number,
+  userId: number,
+  input: UpdateHypeRoomSettingsInput
+): Promise<HypeRoomRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const [roomRow] = await db
+    .select()
+    .from(hypeRooms)
+    .where(eq(hypeRooms.id, roomId))
+    .limit(1);
+  if (!roomRow) throw new Error("Room not found.");
+  // Host check before lifecycle persist: hostId is immutable across resolve,
+  // so non-host callers never trigger status writes/notifications here.
+  if (!isRoomHost(roomRow.hostId, userId)) {
+    throw new Error("Only the host can update room settings.");
+  }
+  const room = await persistResolvedRoom(db, roomRow, new Date());
+  if (!canUpdateRoomSettings(room.status)) {
+    throw new Error("This room can no longer be edited.");
+  }
+
+  const patch: Partial<typeof hypeRooms.$inferInsert> = { updatedAt: new Date() };
+  let touched = false;
+
+  if (input.title !== undefined) {
+    const title = input.title.trim();
+    if (title.length < 3 || title.length > 180) {
+      throw new Error("Room title must be 3–180 characters.");
+    }
+    patch.title = title;
+    touched = true;
+  }
+  if (input.topic !== undefined) {
+    const topic = input.topic == null ? null : input.topic.trim();
+    if (topic != null && topic.length > 120) {
+      throw new Error("Room topic must be at most 120 characters.");
+    }
+    patch.topic = topic || null;
+    touched = true;
+  }
+  if (input.description !== undefined) {
+    const description =
+      input.description == null ? null : input.description.trim();
+    if (description != null && description.length > 2000) {
+      throw new Error("Room description must be at most 2000 characters.");
+    }
+    patch.description = description || null;
+    touched = true;
+  }
+  if (input.visibility !== undefined) {
+    if (input.visibility !== "public" && input.visibility !== "link_only") {
+      throw new Error("Invalid room visibility.");
+    }
+    patch.visibility = input.visibility;
+    touched = true;
+  }
+
+  if (!touched) {
+    throw new Error("No settings provided.");
+  }
+
+  const [updated] = await db
+    .update(hypeRooms)
+    .set(patch)
+    .where(eq(hypeRooms.id, roomId))
+    .returning();
+  if (!updated) throw new Error("Room not found.");
+  return updated;
+}
+
+export type HypeRoomInviteRow = typeof hypeRoomInvites.$inferSelect;
+
+/**
+ * Host creates (or re-opens) a user-targeted invite.
+ * Unique(roomId, invitedUserId). No public share tokens.
+ */
+export async function createHypeRoomInvite(
+  roomId: number,
+  hostId: number,
+  invitedUserId: number
+): Promise<HypeRoomInviteRow> {
+  if (!Number.isInteger(invitedUserId) || invitedUserId <= 0) {
+    throw new Error("Invalid invite target.");
+  }
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  return db.transaction(async tx => {
+    const [roomRow] = await tx
+      .select()
+      .from(hypeRooms)
+      .where(eq(hypeRooms.id, roomId))
+      .limit(1);
+    if (!roomRow) throw new Error("Room not found.");
+    // Host check before lifecycle persist (hostId immutable — no unauthorized write).
+    if (!isRoomHost(roomRow.hostId, hostId)) {
+      throw new Error("Only the host can create invites.");
+    }
+    const room = await persistResolvedRoom(tx as never, roomRow, new Date());
+    if (invitedUserId === room.hostId) {
+      throw new Error("The host cannot be invited.");
+    }
+    if (!canJoinRoomStatus(room.status)) {
+      throw new Error("This room is no longer accepting invites.");
+    }
+
+    const [invitee] = await tx
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, invitedUserId))
+      .limit(1);
+    if (!invitee) throw new Error("Invite target not found.");
+
+    const [existingMembership] = await tx
+      .select()
+      .from(hypeRoomMembers)
+      .where(
+        and(
+          eq(hypeRoomMembers.roomId, roomId),
+          eq(hypeRoomMembers.userId, invitedUserId)
+        )
+      )
+      .limit(1);
+    if (existingMembership?.bannedAt) {
+      throw new Error("You are banned from this room.");
+    }
+    if (existingMembership && existingMembership.leftAt == null) {
+      throw new Error("This user is already a member of this room.");
+    }
+
+    const now = new Date();
+    const [existing] = await tx
+      .select()
+      .from(hypeRoomInvites)
+      .where(
+        and(
+          eq(hypeRoomInvites.roomId, roomId),
+          eq(hypeRoomInvites.invitedUserId, invitedUserId)
+        )
+      )
+      .limit(1);
+
+    if (existing) {
+      if (existing.status === "accepted") {
+        throw new Error("This user has already been invited and accepted.");
+      }
+      if (existing.status === "pending") {
+        throw new Error("An invite is already pending for this user.");
+      }
+      // revoked/declined → re-open as pending
+      const [reopened] = await tx
+        .update(hypeRoomInvites)
+        .set({ status: "pending", updatedAt: now, consumedAt: null })
+        .where(eq(hypeRoomInvites.id, existing.id))
+        .returning();
+      if (!reopened) throw new Error("Failed to create invite.");
+      return reopened;
+    }
+
+    const [created] = await tx
+      .insert(hypeRoomInvites)
+      .values({
+        roomId,
+        invitedUserId,
+        createdBy: hostId,
+        status: "pending",
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    if (!created) throw new Error("Failed to create invite.");
+    return created;
+  });
+}
+
+/**
+ * Invited user consumes a pending invite → joins under normal rules.
+ * Atomic: membership change + pending→accepted share one transaction, so a
+ * successful join cannot leave a permanently pending invite (and vice versa).
+ * Concurrent accepts: unique membership + status='pending' guard; loser rolls back.
+ */
+export async function acceptHypeRoomInvite(
+  inviteId: number,
+  userId: number
+): Promise<{ invite: HypeRoomInviteRow; membership: HypeRoomMemberRow }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  return db.transaction(async tx => {
+    const [invite] = await tx
+      .select()
+      .from(hypeRoomInvites)
+      .where(eq(hypeRoomInvites.id, inviteId))
+      .limit(1);
+    if (!invite) throw new Error("Invite not found.");
+    if (invite.invitedUserId !== userId) {
+      throw new Error("This invite was not created for you.");
+    }
+    if (invite.status !== "pending") {
+      throw new Error("This invite is no longer valid.");
+    }
+
+    // Join validates lifecycle, bans, duplicates — same rules as joinHypeRoom.
+    const membership = await joinHypeRoomInTx(tx, invite.roomId, userId);
+
+    const now = new Date();
+    const [updated] = await tx
+      .update(hypeRoomInvites)
+      .set({ status: "accepted", consumedAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(hypeRoomInvites.id, inviteId),
+          eq(hypeRoomInvites.status, "pending")
+        )
+      )
+      .returning();
+    if (!updated) {
+      throw new Error("This invite is no longer valid.");
+    }
+    return { invite: updated, membership };
+  });
+}
+
+/** Host lists invites for a room. */
+export async function listHypeRoomInvites(
+  roomId: number,
+  actorId: number
+): Promise<HypeRoomInviteRow[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const [room] = await db
+    .select()
+    .from(hypeRooms)
+    .where(eq(hypeRooms.id, roomId))
+    .limit(1);
+  if (!room) throw new Error("Room not found.");
+  if (!isRoomHost(room.hostId, actorId)) {
+    throw new Error("Only the host can list invites.");
+  }
+
+  return db
+    .select()
+    .from(hypeRoomInvites)
+    .where(eq(hypeRoomInvites.roomId, roomId))
+    .orderBy(asc(hypeRoomInvites.createdAt), asc(hypeRoomInvites.id));
+}
+
+/** Authenticated user lists their pending invites. */
+export async function listMyHypeRoomInvites(
+  userId: number
+): Promise<HypeRoomInviteRow[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  return db
+    .select()
+    .from(hypeRoomInvites)
+    .where(
+      and(
+        eq(hypeRoomInvites.invitedUserId, userId),
+        eq(hypeRoomInvites.status, "pending")
+      )
+    )
+    .orderBy(asc(hypeRoomInvites.createdAt), asc(hypeRoomInvites.id));
 }
 
 /**

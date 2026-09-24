@@ -62,6 +62,14 @@ const hypeRoomsMocks = vi.hoisted(() => ({
   matchesRoomListFilter: vi.fn(),
   isEligibleRoomHost: vi.fn(),
   decideRemoveMember: vi.fn(),
+  toggleHypeRoomMessageReaction: vi.fn(),
+  setHypeRoomMemberRole: vi.fn(),
+  updateHypeRoomSettings: vi.fn(),
+  createHypeRoomInvite: vi.fn(),
+  acceptHypeRoomInvite: vi.fn(),
+  listHypeRoomInvites: vi.fn(),
+  listMyHypeRoomInvites: vi.fn(),
+  HYPE_ROOM_REACTIONS: ["like", "love", "fire", "clap"],
   ROOM_DURATION_HOURS: [4, 6, 12, 24],
   ROOM_MAX_LEAD_MS: 7 * 24 * 60 * 60 * 1000,
   ROOM_MESSAGE_MIN_LENGTH: 1,
@@ -627,7 +635,7 @@ describe("hypeRooms procedures — M4 messages and host controls", () => {
     await expect(
       appRouter.createCaller(context(null)).hypeRooms.messages({ roomId: 11 })
     ).resolves.toEqual(messages);
-    expect(hypeRoomsMocks.listRoomMessages).toHaveBeenCalledWith(11);
+    expect(hypeRoomsMocks.listRoomMessages).toHaveBeenCalledWith(11, null);
   });
 
   it("maps messages on missing room to NOT_FOUND", async () => {
@@ -652,7 +660,8 @@ describe("hypeRooms procedures — M4 messages and host controls", () => {
     expect(hypeRoomsMocks.sendHypeRoomMessage).toHaveBeenCalledWith(
       11,
       user.id,
-      "hi there"
+      "hi there",
+      { parentId: null, mentionedUserIds: [] }
     );
   });
 

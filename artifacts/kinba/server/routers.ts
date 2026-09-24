@@ -78,21 +78,29 @@ import {
   adminArchiveHypeRoom,
   adminBanHypeRoomMember,
   adminForceEndHypeRoom,
+  acceptHypeRoomInvite,
   cancelHypeRoom,
   createHypeRoom,
+  createHypeRoomInvite,
   endHypeRoom,
   getHypeRoom,
   joinHypeRoom,
   leaveHypeRoom,
   listActiveHypeRooms,
   listAdminHypeRooms,
+  listHypeRoomInvites,
   listHypeRoomMembers,
+  listMyHypeRoomInvites,
   listRoomMessages,
   pinHypeRoomMessage,
   removeHypeRoomMember,
   resolveHypeRoomExpiry,
   sendHypeRoomMessage,
+  setHypeRoomMemberRole,
+  toggleHypeRoomMessageReaction,
   unpinHypeRoomMessage,
+  updateHypeRoomSettings,
+  HYPE_ROOM_REACTIONS,
   ROOM_DURATION_HOURS,
   ROOM_MESSAGE_MAX_LENGTH,
 } from "./hypeRooms";
@@ -199,6 +207,44 @@ function mapHypeRoomMemberError(error: unknown, _op: string): TRPCError {
   }
   if (message.startsWith("Only verified company/creator")) {
     return new TRPCError({ code: "FORBIDDEN", message });
+  }
+  // M-A1/M-A2 — chat depth, roles, settings, invites.
+  if (message === "Invite not found." || message === "Invite target not found.") {
+    return new TRPCError({ code: "NOT_FOUND", message });
+  }
+  if (
+    message === "Reply target is not in this room." ||
+    message === "Cannot reply to itself." ||
+    message === "You can only reply to top-level messages." ||
+    message === "Message does not belong to this room." ||
+    message === "Invalid reaction type." ||
+    message === "Invalid mention target." ||
+    message === "You can only mention active members of this room." ||
+    message === "Invalid room role." ||
+    message === "No settings provided."
+  ) {
+    return new TRPCError({ code: "BAD_REQUEST", message });
+  }
+  if (
+    message === "Only the host can change member roles." ||
+    message === "Only the host can update room settings." ||
+    message === "Only the host can create invites." ||
+    message === "Only the host can list invites." ||
+    message === "The host role cannot be changed." ||
+    message === "The host cannot be invited." ||
+    message === "This invite was not created for you."
+  ) {
+    return new TRPCError({ code: "FORBIDDEN", message });
+  }
+  if (
+    message === "This room can no longer be edited." ||
+    message === "This room is no longer accepting invites." ||
+    message === "This invite is no longer valid." ||
+    message === "An invite is already pending for this user." ||
+    message === "This user has already been invited and accepted." ||
+    message === "This user is already a member of this room."
+  ) {
+    return new TRPCError({ code: "CONFLICT", message });
   }
   // M8 — admin forceEnd / archive / banUser status guards.
   if (
@@ -1093,10 +1139,10 @@ export const appRouter = router({
     // M4 — messages + host controls (same fail-closed flag; M1–M3 untouched).
     messages: publicProcedure
       .input(z.object({ roomId: z.number().int().positive() }))
-      .query(async ({ input }) => {
+      .query(async ({ input, ctx }) => {
         await requireFeatureFlag("time_limited_communities");
         try {
-          return await listRoomMessages(input.roomId);
+          return await listRoomMessages(input.roomId, ctx.user?.id ?? null);
         } catch (error) {
           throw mapHypeRoomMemberError(error, "messages");
         }
@@ -1106,20 +1152,132 @@ export const appRouter = router({
         z.object({
           roomId: z.number().int().positive(),
           body: z.string().trim().min(1).max(ROOM_MESSAGE_MAX_LENGTH),
+          parentId: z.number().int().positive().nullish(),
+          mentionedUserIds: z
+            .array(z.number().int().positive())
+            .max(50)
+            .optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
         await requireFeatureFlag("time_limited_communities");
         try {
-          return await sendHypeRoomMessage(
-            input.roomId,
-            ctx.user.id,
-            input.body
-          );
+          return await sendHypeRoomMessage(input.roomId, ctx.user.id, input.body, {
+            parentId: input.parentId ?? null,
+            mentionedUserIds: input.mentionedUserIds ?? [],
+          });
         } catch (error) {
           throw mapHypeRoomMemberError(error, "sendMessage");
         }
       }),
+    toggleReaction: protectedProcedure
+      .input(
+        z.object({
+          roomId: z.number().int().positive(),
+          messageId: z.number().int().positive(),
+          reaction: z.enum(HYPE_ROOM_REACTIONS),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await toggleHypeRoomMessageReaction(
+            input.roomId,
+            ctx.user.id,
+            input.messageId,
+            input.reaction
+          );
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "toggleReaction");
+        }
+      }),
+    setMemberRole: protectedProcedure
+      .input(
+        z.object({
+          roomId: z.number().int().positive(),
+          userId: z.number().int().positive(),
+          role: z.enum(["speaker", "audience"]),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await setHypeRoomMemberRole(
+            input.roomId,
+            ctx.user.id,
+            input.userId,
+            input.role
+          );
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "setMemberRole");
+        }
+      }),
+    updateSettings: protectedProcedure
+      .input(
+        z.object({
+          roomId: z.number().int().positive(),
+          title: z.string().trim().min(3).max(180).optional(),
+          topic: z.string().trim().max(120).nullable().optional(),
+          description: z.string().trim().max(2000).nullable().optional(),
+          visibility: z.enum(["public", "link_only"]).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        const { roomId, ...patch } = input;
+        try {
+          return await updateHypeRoomSettings(roomId, ctx.user.id, patch);
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "updateSettings");
+        }
+      }),
+    createInvite: protectedProcedure
+      .input(
+        z.object({
+          roomId: z.number().int().positive(),
+          invitedUserId: z.number().int().positive(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await createHypeRoomInvite(
+            input.roomId,
+            ctx.user.id,
+            input.invitedUserId
+          );
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "createInvite");
+        }
+      }),
+    acceptInvite: protectedProcedure
+      .input(z.object({ inviteId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await acceptHypeRoomInvite(input.inviteId, ctx.user.id);
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "acceptInvite");
+        }
+      }),
+    listInvites: protectedProcedure
+      .input(z.object({ roomId: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await listHypeRoomInvites(input.roomId, ctx.user.id);
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "listInvites");
+        }
+      }),
+    listMyInvites: protectedProcedure.query(async ({ ctx }) => {
+      await requireFeatureFlag("time_limited_communities");
+      try {
+        return await listMyHypeRoomInvites(ctx.user.id);
+      } catch (error) {
+        throw mapHypeRoomMemberError(error, "listMyInvites");
+      }
+    }),
     end: protectedProcedure
       .input(z.object({ roomId: z.number().int().positive() }))
       .mutation(async ({ ctx, input }) => {

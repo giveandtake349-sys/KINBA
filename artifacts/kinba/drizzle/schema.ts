@@ -73,6 +73,8 @@ export const hypeRoomVisibility = pgEnum("hype_room_visibility", [
 export const hypeRoomMemberRole = pgEnum("hype_room_member_role", [
   "member",
   "host",
+  "speaker",
+  "audience",
 ]);
 export const dropStatus = pgEnum("drop_status", [
   "draft",
@@ -946,6 +948,8 @@ export const hypeRoomMessages = pgTable(
     body: text("body"),
     audioUrl: text("audioUrl"),
     audioDuration: integer("audioDuration"),
+    // M-A1 one-level reply: nullable parent within the same room (enforced in service).
+    parentId: integer("parentId"),
     pinned: boolean("pinned").default(false).notNull(),
     createdAt: createdAt(),
     moderatedAt: timestamp("moderatedAt", { withTimezone: true }),
@@ -957,6 +961,100 @@ export const hypeRoomMessages = pgTable(
   table => [
     index("hype_room_messages_room_created_idx").on(table.roomId, table.createdAt),
     index("hype_room_messages_user_idx").on(table.userId),
+    index("hype_room_messages_parent_idx").on(table.parentId),
+    foreignKey({
+      name: "hype_room_messages_parentId_hype_room_messages_id_fk",
+      columns: [table.parentId],
+      foreignColumns: [table.id],
+    }).onDelete("set null"),
+  ]
+);
+
+export const hypeRoomMessageReactions = pgTable(
+  "hype_room_message_reactions",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    roomId: integer("roomId")
+      .notNull()
+      .references(() => hypeRooms.id, { onDelete: "cascade" }),
+    messageId: integer("messageId")
+      .notNull()
+      .references(() => hypeRoomMessages.id, { onDelete: "cascade" }),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    reaction: varchar("reaction", { length: 32 }).notNull(),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("hype_room_message_reactions_unique").on(
+      table.messageId,
+      table.userId,
+      table.reaction
+    ),
+    index("hype_room_message_reactions_message_idx").on(table.messageId),
+    index("hype_room_message_reactions_room_idx").on(table.roomId),
+  ]
+);
+
+export const hypeRoomMessageMentions = pgTable(
+  "hype_room_message_mentions",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    roomId: integer("roomId")
+      .notNull()
+      .references(() => hypeRooms.id, { onDelete: "cascade" }),
+    messageId: integer("messageId")
+      .notNull()
+      .references(() => hypeRoomMessages.id, { onDelete: "cascade" }),
+    mentionedUserId: integer("mentionedUserId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("hype_room_message_mentions_unique").on(
+      table.messageId,
+      table.mentionedUserId
+    ),
+    index("hype_room_message_mentions_message_idx").on(table.messageId),
+    index("hype_room_message_mentions_user_idx").on(table.mentionedUserId),
+    index("hype_room_message_mentions_room_idx").on(table.roomId),
+  ]
+);
+
+export const hypeRoomInviteStatus = pgEnum("hype_room_invite_status", [
+  "pending",
+  "accepted",
+  "revoked",
+  "declined",
+]);
+
+export const hypeRoomInvites = pgTable(
+  "hype_room_invites",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    roomId: integer("roomId")
+      .notNull()
+      .references(() => hypeRooms.id, { onDelete: "cascade" }),
+    invitedUserId: integer("invitedUserId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdBy: integer("createdBy")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    status: hypeRoomInviteStatus("status").default("pending").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    consumedAt: timestamp("consumedAt", { withTimezone: true }),
+  },
+  table => [
+    uniqueIndex("hype_room_invites_room_user_unique").on(
+      table.roomId,
+      table.invitedUserId
+    ),
+    index("hype_room_invites_room_status_idx").on(table.roomId, table.status),
+    index("hype_room_invites_user_idx").on(table.invitedUserId),
   ]
 );
 
