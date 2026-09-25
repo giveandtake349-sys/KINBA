@@ -2681,3 +2681,89 @@ export async function createCommunityAnnouncement(
     return announcement;
   });
 }
+
+export async function updateCommunityAnnouncement(
+  announcementId: number,
+  userId: number,
+  body: string
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [owned] = await db
+    .select({ id: communityAnnouncements.id })
+    .from(communityAnnouncements)
+    .where(
+      and(
+        eq(communityAnnouncements.id, announcementId),
+        eq(communityAnnouncements.userId, userId)
+      )
+    )
+    .limit(1);
+  if (!owned) throw new Error("Post not found or you are not the author.");
+  const nextBody = body.trim();
+  if (!nextBody) {
+    const [attachment] = await db
+      .select({ id: communityAnnouncementAttachments.id })
+      .from(communityAnnouncementAttachments)
+      .where(eq(communityAnnouncementAttachments.announcementId, announcementId))
+      .limit(1);
+    if (!attachment)
+      throw new Error("An announcement needs text or an attachment.");
+  }
+  const [updated] = await db
+    .update(communityAnnouncements)
+    .set({ body: nextBody, updatedAt: new Date() })
+    .where(
+      and(
+        eq(communityAnnouncements.id, announcementId),
+        eq(communityAnnouncements.userId, userId)
+      )
+    )
+    .returning();
+  if (!updated) throw new Error("Post not found or you are not the author.");
+  return updated;
+}
+
+export async function deleteCommunityAnnouncement(
+  announcementId: number,
+  userId: number
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [owned] = await db
+    .select({ id: communityAnnouncements.id })
+    .from(communityAnnouncements)
+    .where(
+      and(
+        eq(communityAnnouncements.id, announcementId),
+        eq(communityAnnouncements.userId, userId)
+      )
+    )
+    .limit(1);
+  if (!owned) throw new Error("Post not found or you are not the author.");
+  const attachments = await db
+    .select({ mediaUrl: communityAnnouncementAttachments.mediaUrl })
+    .from(communityAnnouncementAttachments)
+    .where(
+      eq(communityAnnouncementAttachments.announcementId, announcementId)
+    );
+  await db
+    .delete(communityAnnouncements)
+    .where(
+      and(
+        eq(communityAnnouncements.id, announcementId),
+        eq(communityAnnouncements.userId, userId)
+      )
+    );
+  await Promise.all(
+    attachments.map(({ mediaUrl }) =>
+      storageDelete(mediaUrl).catch(error => {
+        console.warn(
+          `[Storage] Failed to clean up deleted announcement media: ${mediaUrl}`,
+          error
+        );
+      })
+    )
+  );
+  return { deleted: true, announcementId };
+}

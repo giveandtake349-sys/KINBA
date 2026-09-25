@@ -10,6 +10,8 @@ import {
 import {
   createAnnouncementComment,
   createCommunityAnnouncement,
+  updateCommunityAnnouncement,
+  deleteCommunityAnnouncement,
   toggleCommunityBookmark,
   toggleCommunityReaction,
   createVideo,
@@ -1512,6 +1514,20 @@ export const appRouter = router({
       .input(communityAnnouncementInput)
       .mutation(({ ctx, input }) =>
         createCommunityAnnouncement(ctx.user.id, input)
+      ),
+    update: protectedProcedure
+      .input(
+        announcementIdInput.extend({
+          body: z.string().trim().max(5000).default(""),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        updateCommunityAnnouncement(input.announcementId, ctx.user.id, input.body)
+      ),
+    delete: protectedProcedure
+      .input(announcementIdInput)
+      .mutation(({ ctx, input }) =>
+        deleteCommunityAnnouncement(input.announcementId, ctx.user.id)
       ),
     react: protectedProcedure
       .input(announcementIdInput)

@@ -2009,9 +2009,12 @@ function CommentDrawer({
                     ? `Hide replies to ${authorLabel}`
                     : `View replies to ${authorLabel}`
                 }
-                onClick={() => toggleThread(comment.id)}
+                onClick={event => {
+                  event.stopPropagation();
+                  toggleThread(comment.id);
+                }}
               >
-                {isExpanded ? "▾" : "↳"} {replyCountLabel(replyCount)}
+                ↳ {replyCountLabel(replyCount)}
               </button>
             ) : null}
             {replyTo?.id === comment.id ? (
@@ -3790,6 +3793,232 @@ function AnnouncementComments({
   );
 }
 
+function AnnouncementManagementMenu({
+  announcement,
+}: {
+  announcement: { id: number; body: string; author: { id: number } };
+}) {
+  const auth = useAuth();
+  const utils = trpc.useUtils();
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [body, setBody] = useState(announcement.body);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({
+    top: 0,
+    right: 0,
+  });
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const updateMutation = trpc.community.update.useMutation();
+  const deleteMutation = trpc.community.delete.useMutation();
+  if (auth.user?.id !== announcement.author.id) return null;
+
+  const refreshFeed = async () => {
+    await Promise.all([
+      utils.community.list.invalidate(),
+      utils.community.mine.invalidate(),
+    ]);
+  };
+
+  const saveBody = async () => {
+    try {
+      await updateMutation.mutateAsync({
+        announcementId: announcement.id,
+        body: body.trim(),
+      });
+      await refreshFeed();
+      setEditing(false);
+      setOpen(false);
+      toast.success("Announcement updated.");
+    } catch (error) {
+      notifyError(error);
+    }
+  };
+
+  const removeAnnouncement = async () => {
+    try {
+      await deleteMutation.mutateAsync({ announcementId: announcement.id });
+      await refreshFeed();
+      setConfirming(false);
+      setOpen(false);
+      toast.success("Announcement deleted.");
+    } catch (error) {
+      notifyError(error);
+    }
+  };
+
+  const toggleMenu = () => {
+    if (!open && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setMenuPos({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setOpen(value => !value);
+    setEditing(false);
+    setConfirming(false);
+  };
+
+  const closeAll = () => {
+    setOpen(false);
+    setEditing(false);
+    setConfirming(false);
+  };
+
+  const openEditor = () => {
+    setBody(announcement.body);
+    setOpen(false);
+    setEditing(true);
+  };
+
+  useEffect(() => {
+    if (!open && !editing && !confirming) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeAll();
+    };
+    const onClickOutside = (event: Event) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest(
+          ".post-management, .post-management__menu, .post-management__dialog"
+        )
+      )
+        return;
+      closeAll();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("mousedown", onClickOutside);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("mousedown", onClickOutside);
+    };
+  }, [open, editing, confirming]);
+
+  const menuContent =
+    open || editing || confirming
+      ? createPortal(
+          <>
+            {open && !editing && !confirming && (
+              <div
+                className="post-management__menu"
+                role="menu"
+                style={{
+                  position: "fixed",
+                  top: menuPos.top,
+                  right: menuPos.right,
+                  zIndex: 2147483000,
+                }}
+              >
+                <button type="button" onClick={openEditor} role="menuitem">
+                  Edit Announcement
+                </button>
+                <button
+                  type="button"
+                  className="is-danger"
+                  onClick={() => {
+                    setOpen(false);
+                    setConfirming(true);
+                  }}
+                  role="menuitem"
+                >
+                  Delete Announcement
+                </button>
+              </div>
+            )}
+            {editing && (
+              <div
+                className="post-management__dialog"
+                role="dialog"
+                aria-label="Edit announcement"
+                style={{
+                  position: "fixed",
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  zIndex: 2147483000,
+                }}
+              >
+                <strong>Edit Announcement</strong>
+                <textarea
+                  value={body}
+                  maxLength={5000}
+                  onChange={event => setBody(event.target.value)}
+                  autoFocus
+                />
+                <div className="post-management__dialog-actions">
+                  <button
+                    type="button"
+                    onClick={closeAll}
+                    disabled={updateMutation.isPending}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="is-primary"
+                    onClick={() => void saveBody()}
+                    disabled={updateMutation.isPending}
+                  >
+                    {updateMutation.isPending ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              </div>
+            )}
+            {confirming && (
+              <div
+                className="post-management__dialog"
+                role="alertdialog"
+                aria-label="Confirm announcement deletion"
+                style={{
+                  position: "fixed",
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  zIndex: 2147483000,
+                }}
+              >
+                <strong>Delete this announcement?</strong>
+                <p>
+                  This permanently removes the announcement, its attachments,
+                  and its comments.
+                </p>
+                <div className="post-management__dialog-actions">
+                  <button type="button" onClick={closeAll} disabled={deleteMutation.isPending}>
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="is-danger"
+                    onClick={() => void removeAnnouncement()}
+                    disabled={deleteMutation.isPending}
+                  >
+                    {deleteMutation.isPending ? "Deleting…" : "Delete"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>,
+          document.body
+        )
+      : null;
+
+  return (
+    <div className="post-management" onClick={event => event.stopPropagation()}>
+      <button
+        ref={triggerRef}
+        type="button"
+        className="feed-post-more"
+        aria-label="Announcement options"
+        onClick={toggleMenu}
+      >
+        <MoreHorizontal size={19} />
+      </button>
+      {menuContent}
+    </div>
+  );
+}
+
 export function CommunityAnnouncements() {
   const auth = useAuth();
   const profileQuery = trpc.profile.me.useQuery(undefined, {
@@ -3884,6 +4113,7 @@ export function CommunityAnnouncements() {
                 <time dateTime={new Date(announcement.createdAt).toISOString()}>
                   {new Date(announcement.createdAt).toLocaleDateString()}
                 </time>
+                <AnnouncementManagementMenu announcement={announcement} />
               </div>
               {announcement.body && <p>{announcement.body}</p>}
               <div

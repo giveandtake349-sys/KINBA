@@ -1962,7 +1962,7 @@ export default function Home() {
   const publicProfileData = publicProfileQuery.data;
   const ownProfileData = profileQuery.data;
   const profile = (publicProfileId ? publicProfileData : ownProfileData) as ProfileSnapshot | undefined;
-  const profileForHeader = publicProfileId ? (publicProfileData ?? ownProfileData) : ownProfileData;
+  const profileForHeader = publicProfileId ? publicProfileData : ownProfileData;
   const isOwner = Boolean(
     auth.user?.id && profileForHeader?.user?.id && auth.user.id === profileForHeader.user.id
   );

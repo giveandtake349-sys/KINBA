@@ -4,6 +4,8 @@ import type { TrpcContext } from "./_core/context";
 const databaseMocks = vi.hoisted(() => ({
   createAnnouncementComment: vi.fn(),
   createCommunityAnnouncement: vi.fn(),
+  updateCommunityAnnouncement: vi.fn(),
+  deleteCommunityAnnouncement: vi.fn(),
   createVideo: vi.fn(),
   createVideoComment: vi.fn(),
   ensureProfile: vi.fn(),
@@ -325,6 +327,68 @@ describe("KINBA protected procedures", () => {
           expect.objectContaining({ mediaType: "VIDEO" }),
         ]),
       })
+    );
+  });
+
+  it("scopes announcement updates to the calling author", async () => {
+    const updated = { id: 602, body: "Updated official update" };
+    databaseMocks.updateCommunityAnnouncement.mockResolvedValue(updated);
+
+    await expect(
+      appRouter.createCaller(context()).community.update({
+        announcementId: 602,
+        body: "Updated official update",
+      })
+    ).resolves.toEqual(updated);
+    expect(databaseMocks.updateCommunityAnnouncement).toHaveBeenCalledWith(
+      602,
+      user.id,
+      "Updated official update"
+    );
+  });
+
+  it("rejects an announcement update the caller does not own", async () => {
+    databaseMocks.updateCommunityAnnouncement.mockRejectedValue(
+      new Error("Post not found or you are not the author.")
+    );
+
+    await expect(
+      appRouter.createCaller(context()).community.update({
+        announcementId: 602,
+        body: "Not mine",
+      })
+    ).rejects.toThrow("Post not found or you are not the author.");
+    expect(databaseMocks.updateCommunityAnnouncement).toHaveBeenCalledWith(
+      602,
+      user.id,
+      "Not mine"
+    );
+  });
+
+  it("scopes announcement deletion to the calling author", async () => {
+    const deleted = { deleted: true, announcementId: 602 };
+    databaseMocks.deleteCommunityAnnouncement.mockResolvedValue(deleted);
+
+    await expect(
+      appRouter.createCaller(context()).community.delete({ announcementId: 602 })
+    ).resolves.toEqual(deleted);
+    expect(databaseMocks.deleteCommunityAnnouncement).toHaveBeenCalledWith(
+      602,
+      user.id
+    );
+  });
+
+  it("rejects an announcement deletion the caller does not own", async () => {
+    databaseMocks.deleteCommunityAnnouncement.mockRejectedValue(
+      new Error("Post not found or you are not the author.")
+    );
+
+    await expect(
+      appRouter.createCaller(context()).community.delete({ announcementId: 602 })
+    ).rejects.toThrow("Post not found or you are not the author.");
+    expect(databaseMocks.deleteCommunityAnnouncement).toHaveBeenCalledWith(
+      602,
+      user.id
     );
   });
 });
