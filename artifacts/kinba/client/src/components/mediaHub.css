@@ -2537,7 +2537,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 12px 8px;
+  padding: 0;
   background: #000;
 }
 .feed-photo-lightbox img {
@@ -2617,7 +2617,7 @@
 }
 @media (max-width: 560px) {
   .feed-photo-lightbox {
-    padding: 12px 4px;
+    padding: 0;
   }
   .feed-photo-lightbox-nav {
     width: 38px;
@@ -3382,10 +3382,11 @@
 }
 
 /* --- Photo viewer: image-derived blurred backdrop (static, CSS-only) ---
-   The backdrop is the SAME photo as a cover-sized background, blurred and
-   darkened, so the empty space left/right of a portrait image is never a
-   flat black bar. A background-image (not an <img>) keeps it immune to the
-   `.feed-photo-lightbox img` sizing rules that target the sharp image. */
+   A cover-sized copy of the same photo sits behind the sharp image. It is
+   fully occluded by the full-bleed foreground, and only ever shows through
+   as black if the foreground fails to paint. A background-image (not an
+   <img>) keeps it immune to the `.feed-photo-lightbox img` sizing rules
+   that target the sharp image. */
 .feed-photo-lightbox-backdrop {
   /* Oversized box (not a scale transform) so the blur kernel never pulls in
      transparent pixels at the viewport edges — order-independent. */
@@ -3403,10 +3404,18 @@
   background-size: cover;
   filter: blur(40px) saturate(1.35) brightness(0.58);
 }
-/* Keep the sharp image painted above the backdrop layer. */
+/* Keep the sharp image painted above the backdrop layer, and make it fill the
+   viewer edge-to-edge (left -> right, top -> bottom) with no side bands.
+   `!important` is required to beat the older `.feed-photo-lightbox img`
+   blanket rule above; `>` keeps the owner avatar (a nested <img>) untouched. */
 .feed-photo-lightbox > img {
   position: relative;
   z-index: 1;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  max-height: none !important;
+  object-fit: cover !important;
 }
 
 /* --- Photo viewer: 3-dot menu (images only) --- */

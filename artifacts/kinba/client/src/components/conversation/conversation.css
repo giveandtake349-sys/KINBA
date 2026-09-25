@@ -1,33 +1,37 @@
 /* Shared conversation interaction primitives (comments / replies / mentions) */
 
+/* Multi-reaction chips — same visual/interaction contract as Hype Room's
+   `.hype-room-reactions` (bordered pill + glyph + count + `+` tray). */
 .conv-reactions {
   position: relative;
   display: inline-flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
 
 .conv-reaction {
   align-items: center;
   background: transparent;
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
   border-radius: 999px;
   color: var(--muted);
   cursor: pointer;
   display: inline-flex;
-  font-size: 11px;
-  gap: 3px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  gap: 4px;
   min-height: 28px;
   min-width: 28px;
   justify-content: center;
-  padding: 2px 7px;
+  padding: 0.26rem 0.55rem;
   transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
 }
 
 .conv-reaction:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--text);
+  background: transparent;
+  border-color: var(--accent-border);
+  color: var(--accent);
 }
 
 .conv-reaction:disabled {
@@ -36,8 +40,8 @@
 }
 
 .conv-reaction--on {
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
   color: var(--accent);
 }
 
@@ -46,6 +50,8 @@
 }
 
 .conv-reaction-count {
+  font-family: "DM Mono", monospace;
+  font-size: 0.68rem;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
@@ -58,11 +64,11 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 6px;
+  padding: 5px 8px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--surface-raised, var(--page-bg));
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  background: var(--surface);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
 }
 
 .conv-reaction-tray > button {
@@ -160,11 +166,16 @@
   display: flex;
   gap: 8px;
   justify-content: space-between;
-  padding: 6px 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--accent-border);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: var(--accent-soft);
   color: var(--accent);
-  font-size: 11px;
+  font-size: 0.78rem;
+}
+
+.conv-reply-banner strong {
+  font-weight: 800;
 }
 
 .conv-reply-banner-cancel {
@@ -343,12 +354,31 @@
   font-weight: 600;
 }
 
+/* Hype Room `.hype-room-message-foot` rhythm: reactions left, reply affordances
+   right, on their own line under the body. */
 .conv-comment-foot {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-top: 6px;
   min-width: 0;
+}
+
+/* Inline "Replying to @x" indicator on the comment being answered — the same
+   accent chip language as the composer banner and Hype Room parent block. */
+.conv-reply-context {
+  align-items: center;
+  display: inline-flex;
+  gap: 4px;
+  margin-left: auto;
+  padding: 0.26rem 0.55rem;
+  border: 1px solid var(--accent-border);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 700;
 }
 
 .conv-comment-reply-count {
@@ -374,6 +404,18 @@
   padding: 4px 0;
 }
 
+/* --- Comment card structure (Hype Room MessageCard reference) ---
+   Each root comment is its own bordered card so roots never collapse into a
+   flat list; replies sit in an indented rail under their parent card. */
+.comment-drawer-list > .conv-comment-thread.conv-comment-thread--root {
+  gap: 10px;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--page-bg) 70%, var(--surface));
+  position: relative;
+}
+
 .conv-comment-thread {
   display: grid;
   gap: 8px;
@@ -385,6 +427,14 @@
   min-width: 0;
 }
 
+/* Nested reply card inside the rail — reads as a reply, not a root. */
+.conv-comment-thread--reply > .conv-comment {
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--page-bg) 55%, var(--surface));
+}
+
 /* Threaded reply expansion — one batch at a time, nested under its parent. */
 .conv-comment-reply-thread {
   display: grid;
@@ -392,7 +442,7 @@
   justify-items: stretch;
   margin-left: 14px;
   padding-left: 12px;
-  border-left: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-left: 2px solid var(--accent-border);
 }
 
 .conv-comment-reply-toggle.is-open {

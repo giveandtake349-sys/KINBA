@@ -1951,9 +1951,10 @@ function CommentDrawer({
         className={
           depth
             ? "conv-comment-thread conv-comment-thread--reply"
-            : "conv-comment-thread"
+            : "conv-comment-thread conv-comment-thread--root"
         }
         key={comment.id}
+        data-comment-depth={depth}
       >
         <article className="conv-comment" data-comment-id={comment.id}>
           <div className="conv-comment-head">
@@ -2018,7 +2019,7 @@ function CommentDrawer({
               </button>
             ) : null}
             {replyTo?.id === comment.id ? (
-              <span className="video-comment-replying">
+              <span className="conv-reply-context">
                 Replying to {authorLabel}
               </span>
             ) : null}
@@ -2881,7 +2882,7 @@ export function FeedPhotoLightbox({
         </button>
       )}
       <img
-        className="max-w-full max-h-[90vh] object-contain"
+        className="w-full h-full object-cover"
         src={resolveMediaUrl(photoUrl ?? "")}
         alt={alt}
         onClick={event => event.stopPropagation()}
