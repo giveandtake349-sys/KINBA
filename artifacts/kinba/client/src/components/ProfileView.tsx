@@ -777,7 +777,7 @@ export default function ProfileView({
       <FollowListModal
         open={followList !== null}
         mode={followList ?? "followers"}
-        userId={userId ?? 0}
+        userId={userId ?? profile?.user?.id ?? 0}
         onClose={() => setFollowList(null)}
       />
     </main>

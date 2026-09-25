@@ -220,6 +220,35 @@ describe("KINBA protected procedures", () => {
     );
   });
 
+  it("creates a reply with options.parentId", async () => {
+    const reply = {
+      id: 702,
+      videoId: 501,
+      userId: user.id,
+      body: "Replying to Great video",
+      parentId: 701,
+    };
+    databaseMocks.createVideoComment.mockResolvedValue(reply);
+
+    await expect(
+      appRouter.createCaller(context()).videos.comments.create({
+        videoId: 501,
+        body: "Replying to Great video",
+        parentId: 701,
+      })
+    ).resolves.toEqual(reply);
+    expect(databaseMocks.createVideoComment).toHaveBeenCalledWith(
+      501,
+      user.id,
+      "Replying to Great video",
+      {
+        audioUrl: undefined,
+        audioDuration: undefined,
+        parentId: 701,
+      }
+    );
+  });
+
   it("toggles a comment reaction through the react procedure", async () => {
     const result = { commentId: 701, reaction: "fire" as const, active: true };
     databaseMocks.toggleCommentReaction.mockResolvedValue(result);

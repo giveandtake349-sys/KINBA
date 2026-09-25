@@ -1784,6 +1784,8 @@ function CommentDrawer({
   ) => {
     if (!auth.isAuthenticated) return auth.openAuth();
     const replyParentId = replyTo?.id;
+    const needsExpand =
+      replyParentId != null && !expandedIds.includes(replyParentId);
     await createComment.mutateAsync({
       videoId: postId,
       body: body.trim(),
@@ -1794,8 +1796,18 @@ function CommentDrawer({
     setBody("");
     setReplyTo(null);
     setMentionPickerOpen(false);
-    await commentsQuery.refetch();
-    await refreshThreads(replyParentId);
+    if (replyParentId != null && needsExpand) {
+      setExpandedIds(prev =>
+        prev.includes(replyParentId) ? prev : [...prev, replyParentId]
+      );
+    }
+    await Promise.all([
+      commentsQuery.refetch(),
+      needsExpand && replyParentId != null
+        ? loadReplies(replyParentId, 0)
+        : Promise.resolve(),
+      refreshThreads(replyParentId),
+    ]);
   };
 
   const reactToComment = async (

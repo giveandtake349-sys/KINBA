@@ -1016,6 +1016,28 @@ function NotificationsPanel({ enabled }: { enabled: boolean }) {
     }
   };
 
+  const autoReadRef = useRef(false);
+  useEffect(() => {
+    if (!enabled) {
+      autoReadRef.current = false;
+      return;
+    }
+    if (durableQuery.isPending || durableQuery.isError) return;
+    if (unreadDurable.length === 0) {
+      autoReadRef.current = false;
+      return;
+    }
+    if (autoReadRef.current || markReadMut.isPending) return;
+    autoReadRef.current = true;
+    void markAll();
+  }, [
+    enabled,
+    durableQuery.isPending,
+    durableQuery.isError,
+    unreadDurable.length,
+    markReadMut.isPending,
+  ]);
+
   const openDurable = async (item: DurableNotification) => {
     const target = durableNotificationTarget(item);
     if (item.readAt == null) {
