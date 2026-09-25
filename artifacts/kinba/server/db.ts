@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import {
@@ -868,7 +868,9 @@ async function listUnifiedHomeFeed(viewerId?: number) {
 export async function listNotifications(userId: number) {
   const db = await getDb();
   if (!db) return [];
-  const [reactions, shares, comments, newFollowers] = await Promise.all([
+  // Follows are deliberately absent: they are durable notifications now
+  // (server/notifications.ts notifyNewFollower) and would otherwise render twice.
+  const [reactions, shares, comments] = await Promise.all([
     db
       .select({
         id: videoReactions.id,
@@ -908,27 +910,11 @@ export async function listNotifications(userId: number) {
       .where(eq(videos.userId, userId))
       .orderBy(desc(videoComments.createdAt))
       .limit(30),
-    db
-      .select({
-        id: follows.id,
-        createdAt: follows.createdAt,
-        actorName: users.name,
-      })
-      .from(follows)
-      .innerJoin(users, eq(follows.followerId, users.id))
-      .where(eq(follows.followedId, userId))
-      .orderBy(desc(follows.createdAt))
-      .limit(30),
   ]);
   return [
     ...reactions.map(item => ({ ...item, kind: "reaction" as const })),
     ...shares.map(item => ({ ...item, kind: "share" as const })),
     ...comments.map(item => ({ ...item, kind: "comment" as const })),
-    ...newFollowers.map(item => ({
-      ...item,
-      kind: "follow" as const,
-      videoTitle: null,
-    })),
   ]
     .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
     .slice(0, 50);
@@ -1306,7 +1292,35 @@ export async function deleteComment(commentId: number, userId: number) {
   throw new Error("Comment not found or you are not authorized to delete it.");
 }
 
-export async function listVideoComments(videoId: number, viewerId?: number) {
+export const COMMENT_ROOT_LIMIT = 100;
+export const COMMENT_REPLY_BATCH_DEFAULT = 5;
+export const COMMENT_REPLY_BATCH_MAX = 50;
+
+export type VideoCommentListOptions = {
+  /** When set, only direct replies of this comment are returned (batched). */
+  parentId?: number | null;
+  /** Reply batch size — ignored for the root listing. */
+  limit?: number;
+  /** Replies already loaded for this parent (batched paging). */
+  offset?: number;
+};
+
+/**
+ * Comment listing with threaded reply batching.
+ *
+ * - No `parentId`: top-level comments only (each carries `replyCount`).
+ * - `parentId`: one batch of direct replies for that comment, newest first,
+ *   paged with `limit`/`offset`. The parent must belong to `videoId`,
+ *   otherwise the batch is empty (reply loading authorization).
+ *
+ * Ordering matches the legacy flat listing (createdAt desc) in both modes,
+ * and legacy `comment_likes` + merged multi-reaction behaviour are unchanged.
+ */
+export async function listVideoComments(
+  videoId: number,
+  viewerId?: number,
+  options?: VideoCommentListOptions
+) {
   const db = await getDb();
   if (!db) return [];
   // Legacy fields keep their exact comment_likes semantics (read-only compat).
@@ -1321,20 +1335,72 @@ export async function listVideoComments(videoId: number, viewerId?: number) {
           and comment_likes."userId" = ${viewerId}
       )`
     : sql<boolean>`false`;
-  const rows = await db
-    .select({
-      comment: videoComments,
-      user: users,
-      profile: profiles,
-      likeCount,
-      viewerLiked,
-    })
-    .from(videoComments)
-    .innerJoin(users, eq(videoComments.userId, users.id))
-    .leftJoin(profiles, eq(videoComments.userId, profiles.userId))
-    .where(eq(videoComments.videoId, videoId))
-    .orderBy(desc(videoComments.createdAt))
-    .limit(100);
+  // Real reply totals (used by the UI to show the expand affordance and the
+  // "view more replies" action) — one correlated count, no extra round trip.
+  const replyCount = sql<number>`(
+    select count(*) from video_comments
+    where video_comments."parentId" = ${videoComments.id}
+  )`;
+  const parentId = options?.parentId ?? null;
+
+  if (parentId != null) {
+    const [parent] = await db
+      .select({ id: videoComments.id })
+      .from(videoComments)
+      .where(
+        and(
+          eq(videoComments.id, parentId),
+          eq(videoComments.videoId, videoId)
+        )
+      )
+      .limit(1);
+    // Parent missing or belongs to another video → empty batch.
+    if (!parent) return [];
+  }
+
+  const selectCommentRows = () =>
+    db
+      .select({
+        comment: videoComments,
+        user: users,
+        profile: profiles,
+        likeCount,
+        viewerLiked,
+        replyCount,
+      })
+      .from(videoComments)
+      .innerJoin(users, eq(videoComments.userId, users.id))
+      .leftJoin(profiles, eq(videoComments.userId, profiles.userId));
+
+  const rows =
+    parentId != null
+      ? await selectCommentRows()
+          .where(
+            and(
+              eq(videoComments.videoId, videoId),
+              eq(videoComments.parentId, parentId)
+            )
+          )
+          .orderBy(desc(videoComments.createdAt))
+          .limit(
+            Math.min(
+              Math.max(
+                Math.trunc(options?.limit ?? COMMENT_REPLY_BATCH_DEFAULT),
+                1
+              ),
+              COMMENT_REPLY_BATCH_MAX
+            )
+          )
+          .offset(Math.max(Math.trunc(options?.offset ?? 0), 0))
+      : await selectCommentRows()
+          .where(
+            and(
+              eq(videoComments.videoId, videoId),
+              isNull(videoComments.parentId)
+            )
+          )
+          .orderBy(desc(videoComments.createdAt))
+          .limit(COMMENT_ROOT_LIMIT);
 
   // Merged multi-reaction view: comment_reactions ∪ legacy comment_likes for "like".
   // Read-only — no legacy rows are rewritten here.
@@ -1414,6 +1480,7 @@ export async function listVideoComments(videoId: number, viewerId?: number) {
         : null,
       likeCount: Number(row.likeCount ?? 0),
       viewerLiked: Boolean(row.viewerLiked),
+      replyCount: Number(row.replyCount ?? 0),
       reactions,
       author: {
         id: row.user.id,
@@ -1692,6 +1759,103 @@ export async function getFollowState(followerId: number, followedId: number) {
     .from(users)
     .where(eq(users.id, followedId));
   return { following: Boolean(state?.following) };
+}
+
+/** One row of a profile's follower / following list. */
+export type FollowListEntry = {
+  userId: number;
+  name: string | null;
+  username: string | null;
+  photoUrl: string | null;
+  /** Viewer already follows this account. */
+  isFollowing: boolean;
+  /** This account follows the viewer (drives "follow back"). */
+  isFollowedBy: boolean;
+};
+
+/** Hard cap per request; callers page with offset in 50-row batches. */
+const FOLLOW_LIST_LIMIT = 200;
+/** Backend default batch when the caller does not ask for one. */
+export const FOLLOW_LIST_PAGE_SIZE = 50;
+
+export type FollowListPageOptions = {
+  /** Rows to return (clamped to 1..FOLLOW_LIST_LIMIT, default 50). */
+  limit?: number;
+  /** Rows to skip — real backend paging, never a client-side slice. */
+  offset?: number;
+};
+
+async function listFollowEdges(
+  direction: "followers" | "following",
+  profileUserId: number,
+  viewerId?: number,
+  options?: FollowListPageOptions
+): Promise<FollowListEntry[]> {
+  const db = await getDb();
+  if (!db) return [];
+  if (!Number.isInteger(profileUserId) || profileUserId < 1) return [];
+  const edge =
+    direction === "followers" ? follows.followedId : follows.followerId;
+  const counterparty =
+    direction === "followers" ? follows.followerId : follows.followedId;
+  const hasViewer =
+    typeof viewerId === "number" && Number.isInteger(viewerId) && viewerId > 0;
+  const viewerFollowing = hasViewer
+    ? sql<boolean>`exists (select 1 from follows where follows."followerId" = ${viewerId} and follows."followedId" = users.id)`
+    : sql<boolean>`false`;
+  const followedByViewer = hasViewer
+    ? sql<boolean>`exists (select 1 from follows where follows."followerId" = users.id and follows."followedId" = ${viewerId})`
+    : sql<boolean>`false`;
+
+  const rows = await db
+    .select({
+      userId: users.id,
+      name: users.name,
+      username: profiles.username,
+      photoUrl: profiles.photoUrl,
+      isFollowing: viewerFollowing,
+      isFollowedBy: followedByViewer,
+      createdAt: follows.createdAt,
+    })
+    .from(follows)
+    .innerJoin(users, eq(counterparty, users.id))
+    .leftJoin(profiles, eq(profiles.userId, users.id))
+    .where(eq(edge, profileUserId))
+    .orderBy(desc(follows.createdAt), desc(follows.id))
+    .limit(
+      Math.min(
+        Math.max(Math.trunc(options?.limit ?? FOLLOW_LIST_PAGE_SIZE), 1),
+        FOLLOW_LIST_LIMIT
+      )
+    )
+    .offset(Math.max(Math.trunc(options?.offset ?? 0), 0));
+
+  return rows.map(row => ({
+    userId: row.userId,
+    name: row.name,
+    username: row.username,
+    photoUrl: row.photoUrl,
+    isFollowing: Boolean(row.isFollowing),
+    isFollowedBy: Boolean(row.isFollowedBy),
+  }));
+}
+
+/** Accounts following this profile, newest first (viewer-aware, paged). */
+export async function listFollowers(
+  profileUserId: number,
+  viewerId?: number,
+  options?: FollowListPageOptions
+) {
+  return listFollowEdges("followers", profileUserId, viewerId, options);
+}
+
+/** Accounts this profile follows, newest first (viewer-aware, paged). */
+export async function listFollowing(
+  profileUserId: number,
+  viewerId?: number,
+  options?: FollowListPageOptions
+) {
+  return listFollowEdges("following", profileUserId, viewerId, options);
 }
 
 export async function listSponsorBidsSessions() {

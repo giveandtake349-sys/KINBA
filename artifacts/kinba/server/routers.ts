@@ -45,6 +45,8 @@ import {
   listSessionWinners,
   getWalletBalance,
   getFollowState,
+  listFollowers,
+  listFollowing,
   createLiveSponsor,
   adminListDashboard,
   adminCreateSponsorBidsSession,
@@ -75,6 +77,7 @@ import {
   getUnreadNotificationCount,
   listUserNotifications,
   markUserNotificationsRead,
+  notifyNewFollower,
 } from "./notifications";
 import {
   adminArchiveHypeRoom,
@@ -380,6 +383,11 @@ function mapModerationError(error: unknown, _op: string): TRPCError {
 }
 
 const videoIdInput = z.object({ videoId: z.number().int().positive() });
+// Follower/following pages: backend offset/limit (50-row batches, max 100).
+const followListPageInput = z.object({
+  limit: z.number().int().min(1).max(100).optional(),
+  offset: z.number().int().min(0).optional(),
+});
 const announcementIdInput = z.object({
   announcementId: z.number().int().positive(),
 });
@@ -551,7 +559,38 @@ export const appRouter = router({
       .query(({ ctx, input }) => getFollowState(ctx.user.id, input.userId)),
     toggleFollow: protectedProcedure
       .input(z.object({ userId: z.number().int().positive() }))
-      .mutation(({ ctx, input }) => toggleFollow(ctx.user.id, input.userId)),
+      .mutation(async ({ ctx, input }) => {
+        const state = await toggleFollow(ctx.user.id, input.userId);
+        // Durable alert only on the follow-start transition (never unfollow).
+        if (state.following) {
+          await notifyNewFollower(ctx.user.id, input.userId);
+        }
+        return state;
+      }),
+    followers: publicProcedure
+      .input(
+        followListPageInput.extend({
+          userId: z.number().int().positive(),
+        })
+      )
+      .query(({ ctx, input }) =>
+        listFollowers(input.userId, ctx.user?.id, {
+          limit: input.limit,
+          offset: input.offset,
+        })
+      ),
+    following: publicProcedure
+      .input(
+        followListPageInput.extend({
+          userId: z.number().int().positive(),
+        })
+      )
+      .query(({ ctx, input }) =>
+        listFollowing(input.userId, ctx.user?.id, {
+          limit: input.limit,
+          offset: input.offset,
+        })
+      ),
   }),
   home: router({
     search: publicProcedure
@@ -658,9 +697,24 @@ export const appRouter = router({
         return recordVideoView(input.videoId, ip);
       }),
     comments: router({
+      // Threaded reply batching: without `parentId` the caller gets top-level
+      // comments (+ replyCount); with `parentId` it gets one batch of direct
+      // replies for that comment. Existing callers keep the same array shape.
       list: publicProcedure
-        .input(videoIdInput)
-        .query(({ ctx, input }) => listVideoComments(input.videoId, ctx.user?.id)),
+        .input(
+          videoIdInput.extend({
+            parentId: z.number().int().positive().optional(),
+            limit: z.number().int().min(1).max(50).optional(),
+            offset: z.number().int().min(0).optional(),
+          })
+        )
+        .query(({ ctx, input }) =>
+          listVideoComments(input.videoId, ctx.user?.id, {
+            parentId: input.parentId,
+            limit: input.limit,
+            offset: input.offset,
+          })
+        ),
       create: protectedProcedure
         .input(
           videoIdInput

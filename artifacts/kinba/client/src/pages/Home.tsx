@@ -63,6 +63,7 @@ import MediaHub, {
   FeedPhotoLightbox,
 } from "@/components/MediaHub";
 import ProfileView, { ProfileSkeleton } from "@/components/ProfileView";
+import FollowListModal, { type FollowListMode } from "@/components/FollowListModal";
 import "./profile.css";
 
 type Screen = "landing" | "dashboard" | "profile";
@@ -191,21 +192,48 @@ function ProfileIdentity({
 
 function ProfileStatsGrid({ profile }: { profile?: ProfileSnapshot }) {
   const stats = profile?.stats;
-  const items = [
-    [stats?.reactionsReceived ?? 0, "reactions received"],
-    [stats?.iconsCount ?? 0, "icons"],
-    [stats?.followingCount ?? 0, "following"],
-    [stats?.followersCount ?? 0, "followers"],
+  const [followList, setFollowList] = useState<FollowListMode | null>(null);
+  const profileUserId = profile?.user?.id ?? 0;
+  const items: Array<{ value: number; label: string; mode?: FollowListMode }> = [
+    { value: stats?.reactionsReceived ?? 0, label: "reactions received" },
+    { value: stats?.iconsCount ?? 0, label: "icons" },
+    {
+      value: stats?.followingCount ?? 0,
+      label: "following",
+      mode: "following",
+    },
+    { value: stats?.followersCount ?? 0, label: "followers", mode: "followers" },
   ];
   return (
-    <div className="drawer-stat-grid">
-      {items.map(([value, label]) => (
-        <div className="drawer-stat" key={label}>
-          <strong>{value}</strong>
-          <span>{label}</span>
-        </div>
-      ))}
-    </div>
+    <>
+      <div className="drawer-stat-grid">
+        {items.map(item =>
+          item.mode && profileUserId > 0 ? (
+            <button
+              type="button"
+              className="drawer-stat drawer-stat--link"
+              key={item.label}
+              aria-label={`Show ${item.label}`}
+              onClick={safeClick(() => setFollowList(item.mode ?? null))}
+            >
+              <strong>{item.value}</strong>
+              <span>{item.label}</span>
+            </button>
+          ) : (
+            <div className="drawer-stat" key={item.label}>
+              <strong>{item.value}</strong>
+              <span>{item.label}</span>
+            </div>
+          )
+        )}
+      </div>
+      <FollowListModal
+        open={followList !== null}
+        mode={followList ?? "followers"}
+        userId={profileUserId}
+        onClose={() => setFollowList(null)}
+      />
+    </>
   );
 }
 
@@ -588,8 +616,8 @@ function MobileDrawer({
         },
         {
           section: "offline",
-          label: "Offline videos",
-          description: "Your saved viewing list",
+          label: "Saved",
+          description: "Your saved posts and videos",
           icon: Film,
         },
         {
@@ -942,12 +970,14 @@ function NotificationsPanel({ enabled }: { enabled: boolean }) {
       enabled,
       refetchOnWindowFocus: false,
       staleTime: 15_000,
+      refetchInterval: enabled ? 15_000 : false,
     }
   );
   const activityQuery = trpc.home.notifications.useQuery(undefined, {
     enabled,
     refetchOnWindowFocus: false,
     staleTime: 30_000,
+    refetchInterval: enabled ? 30_000 : false,
   });
   const utils = trpc.useUtils();
   const markReadMut = trpc.notifications.markRead.useMutation({
@@ -1082,7 +1112,8 @@ function NotificationsPanel({ enabled }: { enabled: boolean }) {
               <Bell size={18} />
               <h3>No notifications yet.</h3>
               <p>
-                Drops and Hype Room alerts will appear here when they happen.
+                New followers, drops, and Hype Room alerts will appear here
+                when they happen.
               </p>
             </div>
           ) : null}
@@ -1112,9 +1143,7 @@ function NotificationsPanel({ enabled }: { enabled: boolean }) {
                         ? " reacted to your video"
                         : item.kind === "share"
                           ? " shared your video"
-                          : item.kind === "comment"
-                            ? " commented on your video"
-                            : " started following you"}
+                          : " commented on your video"}
                       {item.videoTitle ? (
                         <>
                           : <span>{item.videoTitle}</span>
@@ -1131,8 +1160,7 @@ function NotificationsPanel({ enabled }: { enabled: boolean }) {
           ) : hasDurable ? null : !durableQuery.isError ? (
             <div className="media-empty">
               <p>
-                Reactions, comments, shares, and new followers will appear
-                here.
+                Reactions, comments, and shares will appear here.
               </p>
             </div>
           ) : null}
@@ -1678,7 +1706,7 @@ function OfflineVideosModal({
   onBrowse: () => void;
 }) {
   return (
-    <ActionModal title="Offline Videos" open={open} onClose={onClose}>
+    <ActionModal title="Saved" open={open} onClose={onClose}>
       <OfflineVideosPanel onBrowse={onBrowse} />
     </ActionModal>
   );
@@ -1813,19 +1841,19 @@ function OfflineVideosPanel({ onBrowse }: { onBrowse: () => void }) {
       <div className="media-section-heading">
         <div>
           <p className="eyebrow">Personal library</p>
-          <h2 id="offline-heading">Offline videos.</h2>
+          <h2 id="offline-heading">Saved.</h2>
         </div>
         <Film size={22} aria-hidden="true" />
       </div>
       {saved.isPending ? (
         <div className="utility-loading" aria-busy="true">
-          Loading your saved videos…
+          Loading your saved library…
         </div>
       ) : saved.isError ? (
         <div className="media-empty" role="alert">
           <Film size={22} />
-          <h3>Your saved videos are unavailable.</h3>
-          <p>We could not reach the saved-video library. Try again.</p>
+          <h3>Your saved items are unavailable.</h3>
+          <p>We could not reach your saved library. Try again.</p>
           <button
             type="button"
             className="muted-btn"
@@ -1835,7 +1863,7 @@ function OfflineVideosPanel({ onBrowse }: { onBrowse: () => void }) {
           </button>
         </div>
       ) : saved.data?.length ? (
-        <div className="offline-video-list" aria-label="Saved videos">
+        <div className="offline-video-list" aria-label="Saved items">
           {saved.data.map(video => (
             <a
               className="offline-video-item"
@@ -1866,8 +1894,8 @@ function OfflineVideosPanel({ onBrowse }: { onBrowse: () => void }) {
       ) : (
         <div className="media-empty">
           <Film size={22} />
-          <h3>No saved videos yet.</h3>
-          <p>Use Save on any video to keep it in this personal library.</p>
+          <h3>Nothing saved yet.</h3>
+          <p>Use Save on any post, photo, or video to keep it in this library.</p>
           <button type="button" className="primary-btn" onClick={onBrowse}>
             Browse feed
           </button>
@@ -1906,6 +1934,7 @@ export default function Home() {
     enabled: auth.isAuthenticated,
     refetchOnWindowFocus: false,
     staleTime: 15_000,
+    refetchInterval: auth.isAuthenticated ? 15_000 : false,
   });
   const notificationCount = Math.min(unreadCountQuery.data ?? 0, 99);
   const publicProfileData = publicProfileQuery.data;

@@ -43,6 +43,9 @@ const databaseMocks = vi.hoisted(() => ({
   getDb: vi.fn(),
   ensureProfile: vi.fn(),
   listNotifications: vi.fn(),
+  toggleFollow: vi.fn(),
+  listFollowers: vi.fn(),
+  listFollowing: vi.fn(),
   createAnnouncementComment: vi.fn(),
   createCommunityAnnouncement: vi.fn(),
   createVideo: vi.fn(),
@@ -189,6 +192,7 @@ import {
   notifyRoomWentLive,
   notifyRoomExpired,
   notifyMemberRemoved,
+  notifyNewFollower,
   NOTIFICATION_TYPES,
 } from "./notifications";
 import { appRouter } from "./routers";
@@ -509,6 +513,7 @@ describe("§22 writers — flag gating + payloads", () => {
         "drop_claim_cancelled",
         "drop_claim_fulfilled",
         "drop_sold_out",
+        "new_follower",
         "room_expired",
         "room_member_removed",
         "room_started",
@@ -578,5 +583,121 @@ describe("M7 — feature flag / home path regression", () => {
     await expect(
       appRouter.createCaller(context()).drops.list()
     ).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+  });
+});
+
+let valuePayloads: Array<Record<string, unknown>> = [];
+
+/**
+ * select() answers queue position by call order: follower lookup → dedupe
+ * lookup → recipient check (or the toggleFollow select sequence when driven
+ * through the router).
+ */
+function installFollowDb(selectResults: unknown[][]) {
+  let call = 0;
+  valuePayloads = [];
+  const db = {
+    select: vi.fn(() => {
+      const index = Math.min(call++, Math.max(selectResults.length - 1, 0));
+      return chain(selectResults[index] ?? []);
+    }),
+    insert: vi.fn((...args: unknown[]) => {
+      dbState.insertCalls.push(args);
+      const c = chain([
+        {
+          id: 91,
+          userId: 2,
+          type: NOTIFICATION_TYPES.newFollower,
+          title: "New follower",
+        },
+      ]) as Record<string, (payload: Record<string, unknown>) => unknown>;
+      const values = c.values;
+      c.values = payload => {
+        valuePayloads.push(payload);
+        return values(payload);
+      };
+      return c;
+    }),
+    delete: vi.fn(() => chain([])),
+    update: vi.fn(() => chain([])),
+    transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(db)),
+  };
+  dbState.insertCalls = [];
+  databaseMocks.getDb.mockResolvedValue(db);
+  return db;
+}
+
+describe("notifyNewFollower — follow-start durable writer", () => {
+  const follower = { id: 7, name: "Asha" };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    databaseMocks.getDb.mockReset();
+  });
+
+  it("inserts a durable alert for the followed account", async () => {
+    installFollowDb([[follower], [], [{ id: 2 }]]);
+    await expect(notifyNewFollower(7, 2)).resolves.toMatchObject({ id: 91 });
+    expect(dbState.insertCalls).toHaveLength(1);
+  });
+
+  it("skips when a follow alert for that pair already exists", async () => {
+    installFollowDb([[follower], [{ id: 12 }], [{ id: 2 }]]);
+    await expect(notifyNewFollower(7, 2)).resolves.toBeNull();
+    expect(dbState.insertCalls).toHaveLength(0);
+  });
+
+  it("never fires for self-follow or invalid ids", async () => {
+    installFollowDb([[], [], []]);
+    await expect(notifyNewFollower(7, 7)).resolves.toBeNull();
+    await expect(notifyNewFollower(0, 2)).resolves.toBeNull();
+    expect(dbState.insertCalls).toHaveLength(0);
+  });
+
+  it("addresses the recipient profile directly", async () => {
+    installFollowDb([[follower], [], [{ id: 2 }]]);
+    await notifyNewFollower(7, 2);
+    expect(valuePayloads[0]).toMatchObject({
+      userId: 2,
+      type: "new_follower",
+      link: "/profile/7",
+      entityType: "user",
+      entityId: 7,
+    });
+  });
+});
+
+describe("profile.toggleFollow — follow alert wiring", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    databaseMocks.getDb.mockReset();
+  });
+
+  it("notifies the followed account only when a follow starts", async () => {
+    databaseMocks.toggleFollow.mockResolvedValue({ following: true });
+    // follower lookup → dedupe lookup → recipient check
+    installFollowDb([[{ id: 41, name: "KINBA Notified" }], [], [{ id: 2 }]]);
+    const caller = appRouter.createCaller(context());
+    await expect(caller.profile.toggleFollow({ userId: 2 })).resolves.toEqual({
+      following: true,
+    });
+    expect(databaseMocks.toggleFollow).toHaveBeenCalledWith(41, 2);
+    const alert = valuePayloads.find(item => item.type === "new_follower");
+    expect(alert).toMatchObject({
+      userId: 2,
+      entityId: 41,
+      entityType: "user",
+      link: "/profile/41",
+    });
+  });
+
+  it("does not notify when the follow is removed", async () => {
+    databaseMocks.toggleFollow.mockResolvedValue({ following: false });
+    installFollowDb([[{ id: 41, name: "KINBA Notified" }], [], [{ id: 2 }]]);
+    const caller = appRouter.createCaller(context());
+    await expect(caller.profile.toggleFollow({ userId: 2 })).resolves.toEqual({
+      following: false,
+    });
+    expect(valuePayloads).toHaveLength(0);
   });
 });

@@ -637,6 +637,21 @@ h3 {
   color: var(--muted);
   font-size: 10px;
 }
+/* Stats that open the follower/following list. */
+.drawer-stat--link {
+  cursor: pointer;
+  font: inherit;
+  width: 100%;
+  transition: border-color 0.12s, background 0.12s;
+}
+.drawer-stat--link:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.drawer-stat--link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
 .drawer-nav {
   border-top: 1px solid var(--border);
   display: grid;

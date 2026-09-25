@@ -30,6 +30,7 @@ import { trpc } from "@/lib/trpc";
 import { uploadImage } from "@/lib/mediaUpload";
 import { resolveMediaUrl } from "@/lib/runtimeConfig";
 import AvatarCropModal from "./AvatarCropModal";
+import FollowListModal, { type FollowListMode } from "./FollowListModal";
 import { ReportDialog } from "./ReportDialog";
 import "./profileRedesign.css";
 
@@ -298,6 +299,7 @@ export default function ProfileView({
   const [editOpen, setEditOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [followList, setFollowList] = useState<FollowListMode | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -484,14 +486,24 @@ export default function ProfileView({
             <span className="pr-stat-value">{formatCount(stats?.iconsCount ?? 0)}</span>
             <span className="pr-stat-label">Posts</span>
           </div>
-          <div className="pr-stat">
+          <button
+            type="button"
+            className="pr-stat pr-stat--link"
+            aria-label="Show followers"
+            onClick={() => setFollowList("followers")}
+          >
             <span className="pr-stat-value">{formatCount(stats?.followersCount ?? 0)}</span>
             <span className="pr-stat-label">Followers</span>
-          </div>
-          <div className="pr-stat">
+          </button>
+          <button
+            type="button"
+            className="pr-stat pr-stat--link"
+            aria-label="Show following"
+            onClick={() => setFollowList("following")}
+          >
             <span className="pr-stat-value">{formatCount(stats?.followingCount ?? 0)}</span>
             <span className="pr-stat-label">Following</span>
-          </div>
+          </button>
           <div className="pr-stat">
             <span className="pr-stat-value">{formatCount(stats?.reactionsReceived ?? 0)}</span>
             <span className="pr-stat-label">Pookies</span>
@@ -761,6 +773,12 @@ export default function ProfileView({
         targetType="user"
         targetId={userId ?? null}
         title="Report user"
+      />
+      <FollowListModal
+        open={followList !== null}
+        mode={followList ?? "followers"}
+        userId={userId ?? 0}
+        onClose={() => setFollowList(null)}
       />
     </main>
   );

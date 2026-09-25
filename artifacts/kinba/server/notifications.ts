@@ -36,6 +36,8 @@ export const NOTIFICATION_TYPES = {
   roomStarted: "room_started",
   roomExpired: "room_expired",
   memberRemoved: "room_member_removed",
+  /** JHILIK follow writer — attached to the follow-start transition only. */
+  newFollower: "new_follower",
 } as const;
 
 const TYPE_MAX = 64;
@@ -123,6 +125,64 @@ export async function insertNotification(
     })
     .returning();
   return inserted ?? null;
+}
+
+/**
+ * Follow-start writer (JHILIK Activity Center).
+ *
+ * Called by profile.toggleFollow only when a new follow row was created —
+ * never on unfollow or on reads. Idempotent per follower: re-following the
+ * same person does not stack duplicate alerts (app-level dedupe; no schema
+ * change). Best-effort like every other writer: a failure never breaks the
+ * follow transition itself.
+ */
+export async function notifyNewFollower(
+  followerId: number,
+  followedId: number
+): Promise<NotificationRow | null> {
+  if (!Number.isInteger(followerId) || !Number.isInteger(followedId)) {
+    return null;
+  }
+  if (followerId === followedId) return null;
+  try {
+    const db = await getDb();
+    if (!db) return null;
+    const [follower] = await db
+      .select({ id: users.id, name: users.name })
+      .from(users)
+      .where(eq(users.id, followerId))
+      .limit(1);
+    if (!follower) return null;
+
+    const [existing] = await db
+      .select({ id: notifications.id })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.userId, followedId),
+          eq(notifications.type, NOTIFICATION_TYPES.newFollower),
+          eq(notifications.entityId, followerId)
+        )
+      )
+      .limit(1);
+    if (existing) return null;
+
+    return await insertNotification(
+      {
+        userId: followedId,
+        type: NOTIFICATION_TYPES.newFollower,
+        title: "New follower",
+        body: `${follower.name?.trim() || "Someone"} started following you.`,
+        entityType: "user",
+        entityId: followerId,
+        link: `/profile/${followerId}`,
+      },
+      db
+    );
+  } catch (error) {
+    console.warn("[Notifications] Follow writer insert failed:", error);
+    return null;
+  }
 }
 
 /** Parent flag gate for Phase 2 writers (fail closed on errors). */

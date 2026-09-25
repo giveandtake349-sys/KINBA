@@ -22,6 +22,7 @@ import {
   ChevronRight,
   CornerUpLeft,
   Copy,
+  Download,
   Flag,
   Heart,
   Image,
@@ -73,6 +74,7 @@ import {
   type ConversationReactionId,
 } from "./conversation";
 import { isAbsoluteHttpUrl, resolveMediaUrl } from "@/lib/runtimeConfig";
+import { isAndroidApp, saveImageToGallery } from "@/lib/galleryDownload";
 import "./mediaHub.css";
 import "./kinbaModern.css";
 import "./feedUi.css";
@@ -1634,6 +1636,10 @@ function EngagementActions({
     </div>
   );
 }
+/** Replies fetched per batch when a thread is expanded (4–5 by design). */
+const COMMENT_REPLY_BATCH = 5;
+const COMMENT_REPLY_BATCH_MAX = 50;
+
 function CommentDrawer({
   postId,
   postOwnerId,
@@ -1662,26 +1668,122 @@ function CommentDrawer({
   const reactComment = trpc.videos.comments.react.useMutation();
   const deleteComment = trpc.videos.comments.delete.useMutation();
   const comments = commentsQuery.data ?? [];
+  type CommentRow = NonNullable<(typeof commentsQuery.data)>[number];
+  const utils = trpc.useUtils();
+  // Threaded replies: only the threads the member opened are fetched, in
+  // COMMENT_REPLY_BATCH-sized batches, straight from videos.comments.list.
+  const [expandedIds, setExpandedIds] = useState<number[]>([]);
+  const [repliesByParent, setRepliesByParent] = useState<
+    Record<number, CommentRow[]>
+  >({});
+  const [threadMeta, setThreadMeta] = useState<
+    Record<number, { loading: boolean; exhausted: boolean }>
+  >({});
+
+  const loadReplies = async (parentId: number, offset: number) => {
+    setThreadMeta(prev => ({
+      ...prev,
+      [parentId]: {
+        loading: true,
+        exhausted: prev[parentId]?.exhausted ?? false,
+      },
+    }));
+    try {
+      const batch = await utils.videos.comments.list.fetch({
+        videoId: postId,
+        parentId,
+        limit: COMMENT_REPLY_BATCH,
+        offset,
+      });
+      setRepliesByParent(prev => {
+        const existing = offset > 0 ? (prev[parentId] ?? []) : [];
+        const seen = new Set(existing.map(item => item.id));
+        return {
+          ...prev,
+          [parentId]: [
+            ...existing,
+            ...batch.filter(item => !seen.has(item.id)),
+          ],
+        };
+      });
+      setThreadMeta(prev => ({
+        ...prev,
+        [parentId]: {
+          loading: false,
+          exhausted: batch.length < COMMENT_REPLY_BATCH,
+        },
+      }));
+    } catch (error) {
+      setThreadMeta(prev => ({
+        ...prev,
+        [parentId]: {
+          loading: false,
+          exhausted: prev[parentId]?.exhausted ?? false,
+        },
+      }));
+      notifyError(error);
+    }
+  };
+
+  const toggleThread = (commentId: number) => {
+    if (expandedIds.includes(commentId)) {
+      setExpandedIds(prev => prev.filter(id => id !== commentId));
+      setRepliesByParent(prev => {
+        const next = { ...prev };
+        delete next[commentId];
+        return next;
+      });
+      setThreadMeta(prev => {
+        const next = { ...prev };
+        delete next[commentId];
+        return next;
+      });
+      return;
+    }
+    setExpandedIds(prev => [...prev, commentId]);
+    void loadReplies(commentId, 0);
+  };
+
+  // Re-reads every open thread so mutations stay correct without refetching
+  // all replies. `growFor` widens one batch by one row (a newly created reply).
+  const refreshThreads = async (growFor?: number | null) => {
+    await Promise.all(
+      expandedIds.map(async parentId => {
+        const current = repliesByParent[parentId] ?? [];
+        const limit = Math.min(
+          Math.max(current.length, COMMENT_REPLY_BATCH) +
+            (growFor === parentId ? 1 : 0),
+          COMMENT_REPLY_BATCH_MAX
+        );
+        try {
+          const batch = await utils.videos.comments.list.fetch({
+            videoId: postId,
+            parentId,
+            limit,
+            offset: 0,
+          });
+          setRepliesByParent(prev => ({ ...prev, [parentId]: batch }));
+          setThreadMeta(prev => ({
+            ...prev,
+            [parentId]: { loading: false, exhausted: batch.length < limit },
+          }));
+        } catch {
+          // Roots refetch below still refreshes reply counters.
+        }
+      })
+    );
+  };
 
   useEffect(() => {
     if (replyTo) inputRef.current?.focus();
   }, [replyTo]);
-
-  const replyCounts = useMemo(() => {
-    const map = new Map<number, number>();
-    for (const row of comments) {
-      if (row.parentId != null) {
-        map.set(row.parentId, (map.get(row.parentId) ?? 0) + 1);
-      }
-    }
-    return map;
-  }, [comments]);
 
   const submitComment = async (
     audioUrl: string | null,
     audioDuration: number | null
   ) => {
     if (!auth.isAuthenticated) return auth.openAuth();
+    const replyParentId = replyTo?.id;
     await createComment.mutateAsync({
       videoId: postId,
       body: body.trim(),
@@ -1693,6 +1795,7 @@ function CommentDrawer({
     setReplyTo(null);
     setMentionPickerOpen(false);
     await commentsQuery.refetch();
+    await refreshThreads(replyParentId);
   };
 
   const reactToComment = async (
@@ -1704,7 +1807,7 @@ function CommentDrawer({
     setReactingId(commentId);
     try {
       await reactComment.mutateAsync({ commentId, reaction });
-      await commentsQuery.refetch();
+      await Promise.all([commentsQuery.refetch(), refreshThreads()]);
     } catch (error) {
       notifyError(error);
     } finally {
@@ -1717,7 +1820,12 @@ function CommentDrawer({
     try {
       await deleteComment.mutateAsync({ commentId });
       if (replyTo?.id === commentId) setReplyTo(null);
-      await commentsQuery.refetch();
+      setRepliesByParent(prev => {
+        const next = { ...prev };
+        delete next[commentId];
+        return next;
+      });
+      await Promise.all([commentsQuery.refetch(), refreshThreads()]);
     } catch (error) {
       notifyError(error);
     }
@@ -1750,8 +1858,10 @@ function CommentDrawer({
     const canDelete =
       auth.user?.id === comment.author.id || auth.user?.id === postOwnerId;
     const isOwn = auth.user?.id === comment.author.id;
-    const replies = comments.filter(reply => reply.parentId === comment.id);
-    const replyCount = replyCounts.get(comment.id) ?? 0;
+    const replyCount = comment.replyCount ?? 0;
+    const isExpanded = expandedIds.includes(comment.id);
+    const replies = repliesByParent[comment.id] ?? [];
+    const threadState = threadMeta[comment.id];
     const authorLabel = `@${username}`;
 
     // Shared conversation reaction surface: backend returns merged
@@ -1878,9 +1988,19 @@ function CommentDrawer({
               Reply
             </button>
             {replyCount > 0 ? (
-              <span className="conv-comment-reply-count" aria-label={`${replyCount} replies`}>
-                ↳ {replyCountLabel(replyCount)}
-              </span>
+              <button
+                type="button"
+                className={`conv-comment-reply-count conv-comment-reply-toggle${isExpanded ? " is-open" : ""}`}
+                aria-expanded={isExpanded}
+                aria-label={
+                  isExpanded
+                    ? `Hide replies to ${authorLabel}`
+                    : `View replies to ${authorLabel}`
+                }
+                onClick={() => toggleThread(comment.id)}
+              >
+                {isExpanded ? "▾" : "↳"} {replyCountLabel(replyCount)}
+              </button>
             ) : null}
             {replyTo?.id === comment.id ? (
               <span className="video-comment-replying">
@@ -1889,7 +2009,25 @@ function CommentDrawer({
             ) : null}
           </div>
         </article>
-        {replies.map(reply => renderComment(reply, depth + 1))}
+        {isExpanded ? (
+          <div className="conv-comment-reply-thread">
+            {threadState?.loading && replies.length === 0 ? (
+              <span className="conv-comment-reply-status">Loading replies…</span>
+            ) : (
+              replies.map(reply => renderComment(reply, depth + 1))
+            )}
+            {threadState && !threadState.exhausted ? (
+              <button
+                type="button"
+                className="conv-comment-more-replies"
+                disabled={threadState.loading}
+                onClick={() => void loadReplies(comment.id, replies.length)}
+              >
+                {threadState.loading ? "Loading…" : "View more replies"}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     );
   };
@@ -2519,6 +2657,30 @@ function FeedRecovery() {
   );
 }
 
+/** Filename used when saving an image to the device gallery/Downloads. */
+function resolveImageDownloadName(source: string, mimeType: string) {
+  const extensionByType: Record<string, string> = {
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+    "image/avif": ".avif",
+  };
+  let base = "image";
+  try {
+    const pathname = new URL(
+      source,
+      typeof window !== "undefined" ? window.location.origin : "http://localhost"
+    ).pathname;
+    const last = pathname.split("/").filter(Boolean).pop() ?? "";
+    base = decodeURIComponent(last).replace(/\.[a-z0-9]+$/i, "") || base;
+  } catch {
+    // Keep the generic name when the source is not parseable.
+  }
+  return `${base}${extensionByType[mimeType.toLowerCase()] ?? ""}`;
+}
+
 export function FeedPhotoLightbox({
   attachments = [],
   index,
@@ -2543,6 +2705,8 @@ export function FeedPhotoLightbox({
 }) {
   const auth = useAuth();
   const [sharing, setSharing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const imageAttachments = attachments.filter(
     item => item.mediaType === "IMAGE"
   );
@@ -2563,14 +2727,78 @@ export function FeedPhotoLightbox({
   }, [current, imageAttachments.length, index, onChange, onClose]);
   if (!current && !imageUrl) return null;
   const photoUrl = imageUrl ?? current?.mediaUrl;
+  const resolvedPhotoUrl = resolveMediaUrl(photoUrl ?? "") ?? photoUrl ?? "";
+
+  /**
+   * Saves the full-resolution image to the device.
+   * - Android app: writes into the gallery (Pictures/KINBA) through the
+   *   native MediaStore plugin — the Capacitor WebView has no download
+   *   listener, so blob/anchor saves silently do nothing there. Success is
+   *   only toasted after the native save resolves; failures show the real
+   *   native message (permission denied, not an image, network/storage error).
+   * - Web: blob + anchor keeps the original bytes (no re-encode), with a
+   *   window.open fallback handed to the browser's save flow.
+   * Images only — this component never renders videos or Shorts, and the
+   * file is never added to the in-app Saved library.
+   */
+  const downloadImage = async () => {
+    if (!resolvedPhotoUrl || downloading) return;
+    setDownloading(true);
+    try {
+      if (isAndroidApp()) {
+        await saveImageToGallery(resolvedPhotoUrl);
+        toast.success("Saved to your gallery.");
+        return;
+      }
+      const response = await fetch(resolvedPhotoUrl, { mode: "cors" });
+      if (!response.ok) throw new Error("Could not download this image.");
+      const blob = await response.blob();
+      if (blob.type && !blob.type.startsWith("image/")) {
+        throw new Error("That link is not an image.");
+      }
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = resolveImageDownloadName(resolvedPhotoUrl, blob.type);
+      anchor.rel = "noopener";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+      toast.success("Image downloaded to your device.");
+    } catch (error) {
+      if (isAndroidApp()) {
+        // No window.open fallback on Android — report why the save failed.
+        notifyError(error);
+      } else {
+        const opened = window.open(resolvedPhotoUrl, "_blank", "noopener");
+        if (opened) {
+          toast.message(
+            "Opened the full-size image — save it from your browser's menu."
+          );
+        } else {
+          notifyError(error);
+        }
+      }
+    } finally {
+      setDownloading(false);
+      setMenuOpen(false);
+    }
+  };
   return (
     <div
       className="fixed inset-0 z-[9999] bg-black flex items-center justify-center feed-photo-lightbox"
       role="dialog"
       aria-modal="true"
       aria-label="Photo viewer"
-      onClick={onClose}
+      onClick={() => {
+        setMenuOpen(false);
+        onClose();
+      }}
     >
+      <div className="feed-photo-lightbox-backdrop" aria-hidden="true">
+        <img src={resolvedPhotoUrl} alt="" />
+      </div>
       <button
         type="button"
         className="absolute top-4 right-4 feed-photo-lightbox-close"
@@ -2579,6 +2807,37 @@ export function FeedPhotoLightbox({
       >
         <X size={22} />
       </button>
+      <div className="feed-photo-lightbox-menu">
+        <button
+          type="button"
+          className="feed-photo-lightbox-menu-trigger"
+          aria-label="Photo options"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          onClick={event => {
+            event.stopPropagation();
+            setMenuOpen(value => !value);
+          }}
+        >
+          <MoreHorizontal size={22} />
+        </button>
+        {menuOpen ? (
+          <div className="feed-photo-lightbox-menu-pop" role="menu">
+            <button
+              type="button"
+              role="menuitem"
+              disabled={downloading}
+              onClick={event => {
+                event.stopPropagation();
+                void downloadImage();
+              }}
+            >
+              <Download size={15} />
+              {downloading ? "Downloading…" : "Download image"}
+            </button>
+          </div>
+        ) : null}
+      </div>
       {imageAttachments.length > 1 && (
         <span className="feed-photo-lightbox-counter">
           {(index ?? 0) + 1} of {imageAttachments.length}

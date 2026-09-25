@@ -375,6 +375,39 @@
   padding-left: 10px;
 }
 
+/* Threaded reply expansion — one batch at a time, nested under its parent. */
+.conv-comment-reply-thread {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.conv-comment-reply-toggle.is-open {
+  color: var(--accent);
+}
+
+.conv-comment-reply-status {
+  color: var(--muted);
+  font-size: 11px;
+  padding: 2px 4px;
+}
+
+.conv-comment-more-replies {
+  justify-self: start;
+  background: transparent;
+  border: 0;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 6px;
+}
+
+.conv-comment-more-replies:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 @media (max-width: 560px) {
   .conv-comment-thread--reply {
     margin-left: 8px;
