@@ -379,17 +379,20 @@
   gap: 8px;
 }
 
+/* Replies stay full-width rows inside the thread (the thread owns the rail),
+   so a collapsed/expanded block always reads as one nested conversation. */
 .conv-comment-thread--reply {
-  border-left: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  margin-left: 14px;
-  padding-left: 10px;
+  min-width: 0;
 }
 
 /* Threaded reply expansion — one batch at a time, nested under its parent. */
 .conv-comment-reply-thread {
   display: grid;
-  gap: 8px;
-  justify-items: start;
+  gap: 10px;
+  justify-items: stretch;
+  margin-left: 14px;
+  padding-left: 12px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .conv-comment-reply-toggle.is-open {
@@ -419,7 +422,7 @@
 }
 
 @media (max-width: 560px) {
-  .conv-comment-thread--reply {
+  .conv-comment-reply-thread {
     margin-left: 8px;
     padding-left: 8px;
   }

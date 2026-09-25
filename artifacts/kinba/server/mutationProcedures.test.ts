@@ -10,6 +10,7 @@ const databaseMocks = vi.hoisted(() => ({
   createVideoComment: vi.fn(),
   ensureProfile: vi.fn(),
   getOwnProfile: vi.fn(),
+  getPublicProfile: vi.fn(),
   listAnnouncementComments: vi.fn(),
   listVideoComments: vi.fn(),
   submitVerificationTransaction: vi.fn(),
@@ -107,6 +108,45 @@ describe("KINBA protected procedures", () => {
     ).resolves.toEqual(profile);
     expect(databaseMocks.ensureProfile).toHaveBeenCalledWith(user.id);
     expect(databaseMocks.getOwnProfile).toHaveBeenCalledWith(user.id);
+  });
+
+  it("resolves profile.byId for the requested user, not the caller", async () => {
+    const requestedProfile = {
+      user: { id: 123, name: "User B" },
+      profile: { userId: 123, username: "userb" },
+      stats: { followersCount: 9, followingCount: 2, iconsCount: 5, reactionsReceived: 1 },
+    };
+    databaseMocks.getPublicProfile.mockResolvedValue(requestedProfile);
+
+    await expect(
+      appRouter.createCaller(context()).profile.byId({ userId: 123 })
+    ).resolves.toEqual(requestedProfile);
+    expect(databaseMocks.getPublicProfile).toHaveBeenCalledTimes(1);
+    expect(databaseMocks.getPublicProfile).toHaveBeenCalledWith(123);
+    expect(databaseMocks.getPublicProfile).not.toHaveBeenCalledWith(user.id);
+    expect(databaseMocks.getOwnProfile).not.toHaveBeenCalled();
+  });
+
+  it("keeps the root comment list free of replies", async () => {
+    databaseMocks.listVideoComments.mockResolvedValue([]);
+    const caller = appRouter.createCaller(context());
+
+    await caller.videos.comments.list({ videoId: 701 });
+    const rootCall = databaseMocks.listVideoComments.mock.calls[0];
+    expect(rootCall?.[0]).toBe(701);
+    expect(rootCall?.[2]).toMatchObject({ parentId: undefined });
+
+    await caller.videos.comments.list({
+      videoId: 701,
+      parentId: 9,
+      limit: 4,
+      offset: 4,
+    });
+    expect(databaseMocks.listVideoComments).toHaveBeenLastCalledWith(
+      701,
+      user.id,
+      { parentId: 9, limit: 4, offset: 4 }
+    );
   });
 
   it("stores a valid manual verification payment for review", async () => {

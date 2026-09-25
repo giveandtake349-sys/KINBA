@@ -1636,8 +1636,8 @@ function EngagementActions({
     </div>
   );
 }
-/** Replies fetched per batch when a thread is expanded (4–5 by design). */
-const COMMENT_REPLY_BATCH = 5;
+/** Replies fetched per batch when a thread is expanded (Facebook-style 3–4). */
+const COMMENT_REPLY_BATCH = 4;
 const COMMENT_REPLY_BATCH_MAX = 50;
 
 function CommentDrawer({
@@ -2811,9 +2811,15 @@ export function FeedPhotoLightbox({
         onClose();
       }}
     >
-      <div className="feed-photo-lightbox-backdrop" aria-hidden="true">
-        <img src={resolvedPhotoUrl} alt="" />
-      </div>
+      <div
+        className="feed-photo-lightbox-backdrop"
+        aria-hidden="true"
+        style={
+          resolvedPhotoUrl
+            ? { backgroundImage: `url(${JSON.stringify(resolvedPhotoUrl)})` }
+            : undefined
+        }
+      />
       <button
         type="button"
         className="absolute top-4 right-4 feed-photo-lightbox-close"

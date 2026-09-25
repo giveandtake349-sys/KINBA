@@ -42,6 +42,11 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import {
+  isPublicProfileRoute,
+  matchesRouteProfile,
+  parsePublicProfileRoute,
+} from "@/lib/profileRoute";
 import { useTheme } from "@/contexts/ThemeContext";
 import { SupabaseAuthDialog } from "@/components/SupabaseAuthDialog";
 import { useScrollDirection } from "@/hooks/useScrollDirection";
@@ -1933,8 +1938,8 @@ export default function Home() {
   const utils = trpc.useUtils();
   const topNavRef = useRef<HTMLDivElement>(null);
   const [location, navigate] = useLocation();
-  const publicProfileMatch = location.match(/^\/profile\/(\d+)$/);
-  const publicProfileId = publicProfileMatch ? Number(publicProfileMatch[1]) : undefined;
+  const publicProfileId = parsePublicProfileRoute(location);
+  const onPublicProfileRoute = isPublicProfileRoute(location);
   const { theme } = useTheme();
   const [activeView, setActiveView] = useState<FeedSection>("videos");
   const [activeModal, setActiveModal] = useState<AppModal>(null);
@@ -1944,7 +1949,7 @@ export default function Home() {
   const [initialShortVideo, setInitialShortVideo] = useState<VideoRecord | null>(null);
   const [photoViewer, setPhotoViewer] = useState<VideoRecord | null>(null);
   const profileQuery = trpc.profile.me.useQuery(undefined, {
-    enabled: auth.isAuthenticated && !publicProfileId,
+    enabled: auth.isAuthenticated && !onPublicProfileRoute,
     refetchOnWindowFocus: false,
     staleTime: 30_000,
   });
@@ -1959,17 +1964,34 @@ export default function Home() {
     refetchInterval: auth.isAuthenticated ? 15_000 : false,
   });
   const notificationCount = Math.min(unreadCountQuery.data ?? 0, 99);
-  const publicProfileData = publicProfileQuery.data;
+  // Public route: only a snapshot whose own user.id equals the id in the URL
+  // may be rendered — a cached or stale snapshot never substitutes for it.
+  const cachedPublicProfile = publicProfileQuery.data;
+  const publicProfileData = matchesRouteProfile(cachedPublicProfile, publicProfileId)
+    ? cachedPublicProfile
+    : undefined;
   const ownProfileData = profileQuery.data;
-  const profile = (publicProfileId ? publicProfileData : ownProfileData) as ProfileSnapshot | undefined;
-  const profileForHeader = publicProfileId ? publicProfileData : ownProfileData;
+  const profile = (onPublicProfileRoute
+    ? publicProfileData
+    : ownProfileData) as ProfileSnapshot | undefined;
+  const profileForHeader = profile;
+  // Ownership follows the route id, not whatever snapshot is in cache.
   const isOwner = Boolean(
-    auth.user?.id && profileForHeader?.user?.id && auth.user.id === profileForHeader.user.id
+    auth.user?.id &&
+      (onPublicProfileRoute
+        ? publicProfileId === auth.user.id
+        : profileForHeader?.user?.id === auth.user.id)
   );
+  const publicProfileLoading =
+    onPublicProfileRoute &&
+    publicProfileId !== undefined &&
+    !publicProfileData &&
+    !publicProfileQuery.isError &&
+    publicProfileQuery.isPending;
   const screen: Screen =
     location === "/login"
       ? "landing"
-      : publicProfileId || profileOpen
+      : onPublicProfileRoute || profileOpen
         ? "profile"
         : "dashboard";
 
@@ -2037,7 +2059,7 @@ export default function Home() {
   };
   const closeProfile = () => {
     setProfileOpen(false);
-    if (location === "/profile") navigate("/");
+    if (onPublicProfileRoute || location === "/profile") navigate("/");
   };
   const selectDrawerAction = (next: DrawerAction) => {
     if (next === "profile") {
@@ -2134,6 +2156,10 @@ export default function Home() {
                 />
               )}
             </section>
+          ) : publicProfileLoading ? (
+            // Public route with no matching snapshot yet: neutral skeleton,
+            // never the viewer's own profile.
+            <ProfileSkeleton />
           ) : (
             <ProfileView
               profile={profileForHeader}
