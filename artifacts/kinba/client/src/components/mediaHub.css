@@ -2961,7 +2961,7 @@
   width: auto !important;
   height: auto !important;
   max-width: 100% !important;
-  max-height: 90vh !important;
+  max-height: 100% !important;
   object-fit: contain !important;
   object-position: center center !important;
   border-radius: 0 !important;
@@ -3390,7 +3390,10 @@
   /* Oversized box (not a scale transform) so the blur kernel never pulls in
      transparent pixels at the viewport edges — order-independent. */
   position: absolute;
-  inset: -15%;
+  top: -15%;
+  left: -15%;
+  width: 130%;
+  height: 130%;
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
@@ -3398,7 +3401,7 @@
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
-  filter: blur(40px) saturate(1.35) brightness(0.42);
+  filter: blur(40px) saturate(1.35) brightness(0.58);
 }
 /* Keep the sharp image painted above the backdrop layer. */
 .feed-photo-lightbox > img {

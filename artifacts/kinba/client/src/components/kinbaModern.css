@@ -2527,9 +2527,8 @@ body {
   width: auto !important;
   max-width: 100% !important;
   height: auto !important;
-  max-height: calc(100dvh - 24px) !important;
+  max-height: 100% !important;
   object-fit: contain !important;
-  background: #000 !important;
 }
 
 .media-hub .feed-photo-lightbox-close {
@@ -2638,7 +2637,7 @@ body {
   width: auto !important;
   height: auto !important;
   max-width: 100% !important;
-  max-height: 90vh !important;
+  max-height: 100% !important;
   object-fit: contain !important;
 }
 
