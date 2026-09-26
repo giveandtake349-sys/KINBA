@@ -1679,6 +1679,25 @@ function CommentDrawer({
   const [threadMeta, setThreadMeta] = useState<
     Record<number, { loading: boolean; exhausted: boolean }>
   >({});
+  // Authoritative parent map: the server's `parentId` plus the parent recorded
+  // when this session created the reply. Rows with a known parent are never
+  // eligible to render as root comments and always stay in that parent's thread.
+  const [replyParentByCommentId, setReplyParentByCommentId] = useState<
+    Record<number, number>
+  >({});
+  const parentOf = (row: CommentRow): number | null =>
+    row.parentId ?? replyParentByCommentId[row.id] ?? null;
+  // Replies for one parent: the fetched batch plus any reply row that arrived
+  // in the listing, deduped, so a parent's children always stay grouped.
+  const repliesFor = (parentId: number): CommentRow[] => {
+    const batch = repliesByParent[parentId] ?? [];
+    const strays = comments.filter(row => parentOf(row) === parentId);
+    if (!strays.length) return batch;
+    const seen = new Set(batch.map(row => row.id));
+    return [...batch, ...strays.filter(row => !seen.has(row.id))].sort(
+      (a, b) => (a.createdAt < b.createdAt ? 1 : -1)
+    );
+  };
 
   const loadReplies = async (parentId: number, offset: number) => {
     setThreadMeta(prev => ({
@@ -1786,13 +1805,22 @@ function CommentDrawer({
     const replyParentId = replyTo?.id;
     const needsExpand =
       replyParentId != null && !expandedIds.includes(replyParentId);
-    await createComment.mutateAsync({
+    const created = await createComment.mutateAsync({
       videoId: postId,
       body: body.trim(),
       audioUrl,
       audioDuration,
-      parentId: replyTo?.id,
+      parentId: replyParentId,
     });
+    // Pin the new reply to its parent for this session so it can never fall
+    // back to the root list, even before the refetch lands.
+    const createdId = created?.id ?? null;
+    if (replyParentId != null && createdId != null) {
+      setReplyParentByCommentId(prev => ({
+        ...prev,
+        [createdId]: replyParentId,
+      }));
+    }
     setBody("");
     setReplyTo(null);
     setMentionPickerOpen(false);
@@ -1870,9 +1898,11 @@ function CommentDrawer({
     const canDelete =
       auth.user?.id === comment.author.id || auth.user?.id === postOwnerId;
     const isOwn = auth.user?.id === comment.author.id;
-    const replyCount = comment.replyCount ?? 0;
     const isExpanded = expandedIds.includes(comment.id);
-    const replies = repliesByParent[comment.id] ?? [];
+    // Server batch first, then any listing row already attributed to this
+    // parent — a reply can only ever render inside its parent's thread.
+    const replies = repliesFor(comment.id);
+    const replyCount = Math.max(comment.replyCount ?? 0, replies.length);
     const threadState = threadMeta[comment.id];
     const authorLabel = `@${username}`;
 
@@ -2036,7 +2066,14 @@ function CommentDrawer({
                 type="button"
                 className="conv-comment-more-replies"
                 disabled={threadState.loading}
-                onClick={() => void loadReplies(comment.id, replies.length)}
+                onClick={() =>
+                  // Page by the server batch only — listing rows already
+                  // attributed here are not part of the server's offset.
+                  void loadReplies(
+                    comment.id,
+                    (repliesByParent[comment.id] ?? []).length
+                  )
+                }
               >
                 {threadState.loading ? "Loading…" : "View more replies"}
               </button>
@@ -2076,7 +2113,8 @@ function CommentDrawer({
   }, [open]);
 
   if (!open) return null;
-  const roots = comments.filter(comment => !comment.parentId);
+  // Roots are only rows with no known parent — a reply never qualifies.
+  const roots = comments.filter(comment => parentOf(comment) == null);
   return createPortal(
     <div className="comment-drawer-layer" role="presentation">
       <button

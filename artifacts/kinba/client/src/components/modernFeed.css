@@ -81,11 +81,12 @@
   overflow: hidden;
 }
 
+/* Full-width, natural ratio: no max-height clamp, so `object-fit: contain`
+   never letterboxes left/right bars beside the photo. */
 .k-post__media img {
   display: block;
   width: 100%;
   height: auto;
-  max-height: min(calc(100svh - 260px), 720px);
   object-fit: contain;
   background: #08090b;
 }
