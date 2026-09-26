@@ -2517,7 +2517,6 @@ body {
   width: 100vw !important;
   height: 100dvh !important;
   max-height: 100dvh !important;
-  padding: 12px 8px !important;
   background: #000 !important;
   isolation: isolate !important;
 }
