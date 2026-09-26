@@ -2919,7 +2919,7 @@ export function FeedPhotoLightbox({
         </button>
       )}
       <img
-        className="max-w-full max-h-[90vh] object-contain"
+        className="max-w-full object-contain"
         src={resolveMediaUrl(photoUrl ?? "")}
         alt={alt}
         onClick={event => event.stopPropagation()}
