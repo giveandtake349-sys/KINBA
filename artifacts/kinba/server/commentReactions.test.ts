@@ -29,7 +29,11 @@ vi.mock("./databaseConfig", () => ({
 }));
 vi.mock("./storage", () => ({ storageDelete: vi.fn(), MEDIA_BUCKET: "signal-media" }));
 
-import { listVideoComments, toggleCommentReaction } from "./db";
+import {
+  listVideoComments,
+  toggleCommentLike,
+  toggleCommentReaction,
+} from "./db";
 
 type SelectRows = unknown[] | undefined;
 
@@ -40,6 +44,7 @@ type SelectRows = unknown[] | undefined;
 function makeDb(selectRows: SelectRows[]) {
   const queue = [...selectRows];
   const fromCalls: unknown[] = [];
+  const lockCalls: string[] = [];
   const insertValues = vi.fn();
   const deleteWheres = vi.fn();
   const insertReturning = vi.fn(async () => [{ id: 1 }]);
@@ -62,6 +67,10 @@ function makeDb(selectRows: SelectRows[]) {
         leftJoin: vi.fn(() => chain),
         where: vi.fn(() => chain),
         orderBy: vi.fn(() => chain),
+        for: vi.fn((mode: string) => {
+          lockCalls.push(mode);
+          return chain;
+        }),
         limit: vi.fn(async () => rows),
         then: (
           onFulfilled?: (v: unknown) => unknown,
@@ -90,6 +99,7 @@ function makeDb(selectRows: SelectRows[]) {
     __deleteWheres: deleteWheres,
     __insertReturning: insertReturning,
     __fromCalls: fromCalls,
+    __lockCalls: lockCalls,
     __queue: queue,
   };
   return db;
@@ -170,7 +180,7 @@ describe("toggleCommentReaction — activation", () => {
 
 describe("toggleCommentReaction — deactivation", () => {
   it("removes an existing typed reaction", async () => {
-    const db = makeDb([[commentRow()], [{ id: 77 }]]);
+    const db = makeDb([[commentRow()], [{ id: 77, reaction: "fire" }]]);
     holder.db = db;
 
     await expect(toggleCommentReaction(5, 41, "fire")).resolves.toEqual({
@@ -201,7 +211,11 @@ describe("toggleCommentReaction — deactivation", () => {
   });
 
   it("removes both sources when a like exists in comment_reactions and comment_likes", async () => {
-    const db = makeDb([[commentRow()], [{ id: 77 }], [{ id: 55 }]]);
+    const db = makeDb([
+      [commentRow()],
+      [{ id: 77, reaction: "like" }],
+      [{ id: 55 }],
+    ]);
     holder.db = db;
 
     await expect(toggleCommentReaction(5, 41, "like")).resolves.toEqual({
@@ -211,6 +225,69 @@ describe("toggleCommentReaction — deactivation", () => {
     });
     expect(db.__deleteWheres).toHaveBeenCalledTimes(2);
     expect(db.__insertValues).not.toHaveBeenCalled();
+  });
+});
+
+describe("toggleCommentReaction — one reaction per user per target", () => {
+  it("clears every existing type before inserting the replacement", async () => {
+    const db = makeDb([[commentRow()], [{ id: 77, reaction: "fire" }]]);
+    holder.db = db;
+
+    await expect(toggleCommentReaction(5, 41, "clap")).resolves.toEqual({
+      commentId: 5,
+      reaction: "clap",
+      active: true,
+    });
+    expect(db.__insertValues).toHaveBeenCalledTimes(1);
+    expect(db.__insertValues).toHaveBeenCalledWith({
+      commentId: 5,
+      userId: 41,
+      reaction: "clap",
+    });
+    // Two clearing statements — every typed row for this user, plus the legacy
+    // comment_likes row by predicate — and they run before the insert, so the
+    // user can never hold two types, not even transiently.
+    expect(db.__deleteWheres).toHaveBeenCalledTimes(2);
+    expect(db.__deleteWheres.mock.invocationCallOrder[0]).toBeLessThan(
+      db.__insertValues.mock.invocationCallOrder[0]
+    );
+  });
+
+  it("clears a legacy comment_likes row when switching to another type", async () => {
+    const db = makeDb([[commentRow()], []]);
+    holder.db = db;
+
+    await expect(toggleCommentReaction(5, 41, "fire")).resolves.toEqual({
+      commentId: 5,
+      reaction: "fire",
+      active: true,
+    });
+    // The legacy row is cleared by predicate, so comment_likes is never read
+    // for a non-like activation (historical query shape preserved).
+    expect(db.__deleteWheres).toHaveBeenCalledTimes(1);
+    expect(db.__fromCalls).toEqual([videoComments, commentReactions]);
+  });
+
+  it("locks the comment row FOR UPDATE inside a single transaction", async () => {
+    const db = makeDb([[commentRow()], [{ id: 77, reaction: "fire" }]]);
+    holder.db = db;
+
+    await toggleCommentReaction(5, 41, "clap");
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(db.__lockCalls).toEqual(["update"]);
+  });
+
+  it("deactivating the active type never inserts a replacement", async () => {
+    const db = makeDb([[commentRow()], [{ id: 77, reaction: "clap" }]]);
+    holder.db = db;
+
+    await expect(toggleCommentReaction(5, 41, "clap")).resolves.toEqual({
+      commentId: 5,
+      reaction: "clap",
+      active: false,
+    });
+    expect(db.__insertValues).not.toHaveBeenCalled();
+    expect(db.__deleteWheres).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -235,6 +312,54 @@ describe("toggleCommentReaction — unique race", () => {
     await expect(toggleCommentReaction(5, 41, "like")).rejects.toThrow(
       "Failed to toggle reaction."
     );
+  });
+});
+
+describe("toggleCommentLike — legacy path (locked)", () => {
+  it("inserts the like and reports it, locking the comment row in the transaction", async () => {
+    const db = makeDb([[commentRow()], [], [{ count: 4 }]]);
+    holder.db = db;
+
+    await expect(toggleCommentLike(5, 41)).resolves.toEqual({
+      commentId: 5,
+      likeCount: 4,
+      viewerLiked: true,
+    });
+    expect(db.__insertValues).toHaveBeenCalledWith({
+      commentId: 5,
+      userId: 41,
+    });
+    expect(db.__deleteWheres).not.toHaveBeenCalled();
+    // Target-row lock is taken on the comment, inside the same transaction
+    // that performs the comment_likes mutation.
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(db.__lockCalls).toEqual(["update"]);
+    expect(db.__fromCalls[0]).toBe(videoComments);
+  });
+
+  it("removes an existing like and keeps the same return shape", async () => {
+    const db = makeDb([[commentRow()], [{ id: 55 }], [{ count: 2 }]]);
+    holder.db = db;
+
+    await expect(toggleCommentLike(5, 41)).resolves.toEqual({
+      commentId: 5,
+      likeCount: 2,
+      viewerLiked: false,
+    });
+    expect(db.__deleteWheres).toHaveBeenCalledTimes(1);
+    expect(db.__insertValues).not.toHaveBeenCalled();
+    expect(db.__lockCalls).toEqual(["update"]);
+  });
+
+  it("keeps the original missing-comment error", async () => {
+    const db = makeDb([[]]);
+    holder.db = db;
+
+    await expect(toggleCommentLike(404, 41)).rejects.toThrow(
+      "Comment not found."
+    );
+    expect(db.__insertValues).not.toHaveBeenCalled();
+    expect(db.__deleteWheres).not.toHaveBeenCalled();
   });
 });
 

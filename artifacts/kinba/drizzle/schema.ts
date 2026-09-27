@@ -59,6 +59,7 @@ export const featureFlagKey = pgEnum("feature_flag_key", [
   "milestone_rewards",
   "free_verification",
   "moderation_v1",
+  "unified_reactions",
 ]);
 export const hypeRoomStatus = pgEnum("hype_room_status", [
   "scheduled",

@@ -1147,7 +1147,18 @@ export type ReactionToggleResult = {
 
 /**
  * Toggle a reaction on a room message.
- * Active members only; message must belong to roomId; unique(user, message, reaction).
+ * Active members only; message must belong to roomId.
+ *
+ * One reaction per (message, user): activating X first clears every row this
+ * user holds on that message, then inserts X, so a user can never hold two
+ * types at once (including rows written before this invariant existed).
+ * Deactivating removes only the tapped type.
+ *
+ * Concurrency: the message row is locked FOR UPDATE inside the transaction.
+ * All reaction writes for a message funnel through that row, so the
+ * read-modify-write below is serialized — the unique index alone cannot stop
+ * two different types racing (it only guards (messageId, userId, reaction)).
+ * Lock order is always message → reaction rows.
  */
 export async function toggleHypeRoomMessageReaction(
   roomId: number,
@@ -1181,6 +1192,7 @@ export async function toggleHypeRoomMessageReaction(
       .select()
       .from(hypeRoomMessages)
       .where(eq(hypeRoomMessages.id, messageId))
+      .for("update")
       .limit(1);
     if (!message || message.hiddenAt) {
       throw new Error("Message not found.");
@@ -1189,23 +1201,44 @@ export async function toggleHypeRoomMessageReaction(
       throw new Error("Message does not belong to this room.");
     }
 
-    const [existing] = await tx
-      .select()
+    // Every typed reaction this user holds on this message (all types).
+    const existingRows = await tx
+      .select({
+        id: hypeRoomMessageReactions.id,
+        reaction: hypeRoomMessageReactions.reaction,
+      })
       .from(hypeRoomMessageReactions)
       .where(
         and(
           eq(hypeRoomMessageReactions.messageId, messageId),
-          eq(hypeRoomMessageReactions.userId, userId),
-          eq(hypeRoomMessageReactions.reaction, reaction)
+          eq(hypeRoomMessageReactions.userId, userId)
         )
-      )
-      .limit(1);
+      );
 
-    if (existing) {
+    const matchingTyped = existingRows.filter(row => row.reaction === reaction);
+    if (matchingTyped.length > 0) {
       await tx
         .delete(hypeRoomMessageReactions)
-        .where(eq(hypeRoomMessageReactions.id, existing.id));
+        .where(
+          and(
+            eq(hypeRoomMessageReactions.messageId, messageId),
+            eq(hypeRoomMessageReactions.userId, userId),
+            eq(hypeRoomMessageReactions.reaction, reaction)
+          )
+        );
       return { messageId, reaction: reaction as HypeRoomReaction, active: false };
+    }
+
+    // Activating: clear every source first so exactly one type survives.
+    if (existingRows.length > 0) {
+      await tx
+        .delete(hypeRoomMessageReactions)
+        .where(
+          and(
+            eq(hypeRoomMessageReactions.messageId, messageId),
+            eq(hypeRoomMessageReactions.userId, userId)
+          )
+        );
     }
 
     const [inserted] = await tx

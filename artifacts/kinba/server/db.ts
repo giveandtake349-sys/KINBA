@@ -1530,37 +1530,54 @@ export async function createVideoComment(
   return comment;
 }
 
+/**
+ * Toggle the legacy like on a video comment (comment_likes only).
+ *
+ * Same toggle semantics, return shape and errors as before — but the mutation
+ * now runs inside a transaction that locks the comment row FOR UPDATE. The
+ * legacy like shares comment_likes with the typed reaction path, so without
+ * that lock a concurrent `toggleCommentReaction` could clear the like and have
+ * a racing legacy toggle re-insert it, leaving a user with two reaction types.
+ * Lock order matches `toggleCommentReaction`: comment → comment_likes.
+ */
 export async function toggleCommentLike(commentId: number, userId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const [comment] = await db
-    .select({ id: videoComments.id })
-    .from(videoComments)
-    .where(eq(videoComments.id, commentId))
-    .limit(1);
-  if (!comment) throw new Error("Comment not found.");
-  const [existing] = await db
-    .select({ id: commentLikes.id })
-    .from(commentLikes)
-    .where(
-      and(
-        eq(commentLikes.commentId, commentId),
-        eq(commentLikes.userId, userId)
+
+  return db.transaction(async tx => {
+    const [comment] = await tx
+      .select({ id: videoComments.id })
+      .from(videoComments)
+      .where(eq(videoComments.id, commentId))
+      .for("update")
+      .limit(1);
+    if (!comment) throw new Error("Comment not found.");
+
+    const [existing] = await tx
+      .select({ id: commentLikes.id })
+      .from(commentLikes)
+      .where(
+        and(
+          eq(commentLikes.commentId, commentId),
+          eq(commentLikes.userId, userId)
+        )
       )
-    )
-    .limit(1);
-  if (existing)
-    await db.delete(commentLikes).where(eq(commentLikes.id, existing.id));
-  else await db.insert(commentLikes).values({ commentId, userId });
-  const [{ count }] = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(commentLikes)
-    .where(eq(commentLikes.commentId, commentId));
-  return {
-    commentId,
-    likeCount: Number(count ?? 0),
-    viewerLiked: !existing,
-  };
+      .limit(1);
+    if (existing)
+      await tx.delete(commentLikes).where(eq(commentLikes.id, existing.id));
+    else await tx.insert(commentLikes).values({ commentId, userId });
+
+    const [{ count }] = await tx
+      .select({ count: sql<number>`count(*)` })
+      .from(commentLikes)
+      .where(eq(commentLikes.commentId, commentId));
+
+    return {
+      commentId,
+      likeCount: Number(count ?? 0),
+      viewerLiked: !existing,
+    };
+  });
 }
 
 export type CommentReactionToggleResult = {
@@ -1571,10 +1588,21 @@ export type CommentReactionToggleResult = {
 
 /**
  * Toggle a multi-reaction on a video comment (replies included).
- * Legacy comment_likes is only read as part of the "like" active-state check —
- * a user with a legacy like never gets a duplicate comment_reactions like row;
- * unliking removes whichever source(s) hold the like. Other reaction types
- * live exclusively in comment_reactions.
+ *
+ * One reaction per (comment, user): activating X first clears every source the
+ * user holds on that comment (all comment_reactions rows + the legacy
+ * comment_likes row), then inserts X — so a user can never hold two types at
+ * once, including rows written before this invariant existed. Deactivating
+ * removes only the tapped type (typed row, plus the legacy like when the type
+ * is "like"). Legacy comment_likes keeps its exact read semantics: it counts
+ * as an active "like", feeds `likeCount`/`viewerLiked`, and is never migrated
+ * or duplicated.
+ *
+ * Concurrency: the comment row is locked FOR UPDATE inside the transaction.
+ * All reaction writes for a comment funnel through that row, so the
+ * read-modify-write below is serialized — the unique index alone cannot stop
+ * two different types racing (it only guards (commentId, userId, reaction)).
+ * Lock order is always comment → reaction rows, matching the rest of the file.
  */
 export async function toggleCommentReaction(
   commentId: number,
@@ -1592,22 +1620,23 @@ export async function toggleCommentReaction(
       .select({ id: videoComments.id })
       .from(videoComments)
       .where(eq(videoComments.id, commentId))
+      .for("update")
       .limit(1);
     if (!comment) throw new Error("Comment not found.");
 
-    const [existing] = await tx
-      .select({ id: commentReactions.id })
+    // Every typed reaction this user holds on this comment (all types).
+    const existingRows = await tx
+      .select({ id: commentReactions.id, reaction: commentReactions.reaction })
       .from(commentReactions)
       .where(
         and(
           eq(commentReactions.commentId, commentId),
-          eq(commentReactions.userId, userId),
-          eq(commentReactions.reaction, reaction)
+          eq(commentReactions.userId, userId)
         )
-      )
-      .limit(1);
+      );
 
-    let activeExisting = Boolean(existing);
+    // Legacy like counts as an active "like" — read only when the tapped
+    // type is "like", so other types keep their historical query shape.
     let legacyLike: { id: number } | undefined;
     if (reaction === "like") {
       [legacyLike] = await tx
@@ -1620,19 +1649,52 @@ export async function toggleCommentReaction(
           )
         )
         .limit(1);
-      activeExisting = activeExisting || Boolean(legacyLike);
     }
 
-    if (activeExisting) {
-      if (existing) {
+    const matchingTyped = existingRows.filter(row => row.reaction === reaction);
+    const active = matchingTyped.length > 0 || Boolean(legacyLike);
+
+    if (active) {
+      if (matchingTyped.length > 0) {
         await tx
           .delete(commentReactions)
-          .where(eq(commentReactions.id, existing.id));
+          .where(
+            and(
+              eq(commentReactions.commentId, commentId),
+              eq(commentReactions.userId, userId),
+              eq(commentReactions.reaction, reaction)
+            )
+          );
       }
       if (legacyLike) {
         await tx.delete(commentLikes).where(eq(commentLikes.id, legacyLike.id));
       }
       return { commentId, reaction: reaction as ReactionType, active: false };
+    }
+
+    // Activating: clear every source first so exactly one type survives.
+    if (existingRows.length > 0) {
+      await tx
+        .delete(commentReactions)
+        .where(
+          and(
+            eq(commentReactions.commentId, commentId),
+            eq(commentReactions.userId, userId)
+          )
+        );
+    }
+    if (reaction !== "like") {
+      // A legacy like must not survive a switch to another type. Not selected
+      // above (reaction !== "like"), so clear it by predicate — a no-op when
+      // the user has no legacy row.
+      await tx
+        .delete(commentLikes)
+        .where(
+          and(
+            eq(commentLikes.commentId, commentId),
+            eq(commentLikes.userId, userId)
+          )
+        );
     }
 
     const [inserted] = await tx

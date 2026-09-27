@@ -138,6 +138,7 @@ const inviteRow = (over: Record<string, unknown> = {}) => ({
  */
 function fakeDb(selectRows: unknown[]) {
   const queue = [...selectRows];
+  const lockCalls: string[] = [];
   const insertValues = vi.fn();
   const updateSets = vi.fn();
   const deleteWheres = vi.fn();
@@ -160,6 +161,10 @@ function fakeDb(selectRows: unknown[]) {
         orderBy: vi.fn(async () => rows),
         leftJoin: vi.fn(() => chain),
         innerJoin: vi.fn(() => chain),
+        for: vi.fn((mode: string) => {
+          lockCalls.push(mode);
+          return chain;
+        }),
         // Await the builder itself when the chain ends at .where() (e.g. parent snapshot).
         then: (
           onFulfilled?: (v: unknown) => unknown,
@@ -202,6 +207,7 @@ function fakeDb(selectRows: unknown[]) {
     __deleteWheres: deleteWheres,
     __insertReturning: insertReturning,
     __updateReturning: updateReturning,
+    __lockCalls: lockCalls,
     __queue: queue,
   };
   return db;
@@ -541,8 +547,9 @@ describe("FIX 5 — reaction unique race", () => {
       { id: 11 }, // room
       activeMember(), // membership
       messageRow(), // message
-      opts.existing ?? null, // existing reaction
-      opts.confirmed ?? null, // confirm after conflict
+      // Reaction slots: [] means "no rows" (asRows() would otherwise wrap null).
+      opts.existing ?? [], // existing reactions for this user
+      opts.confirmed ?? [], // confirm after conflict
     ]);
     db.__insertReturning.mockResolvedValue(
       (opts.insertReturning ?? []) as never
@@ -628,6 +635,67 @@ describe("FIX 5 — reaction unique race", () => {
       toggleHypeRoomMessageReaction(11, 41, 3, "nope")
     ).rejects.toThrow("Invalid reaction type.");
     expect(databaseMocks.getDb).not.toHaveBeenCalled();
+  });
+
+  it("replaces the previous type instead of stacking a second one", async () => {
+    const db = reactionDb({
+      existing: {
+        id: 7,
+        roomId: 11,
+        messageId: 3,
+        userId: 41,
+        reaction: "fire",
+        createdAt: new Date(),
+      },
+      insertReturning: [
+        {
+          id: 9,
+          roomId: 11,
+          messageId: 3,
+          userId: 41,
+          reaction: "clap",
+          createdAt: new Date(),
+        },
+      ],
+    });
+    databaseMocks.getDb.mockResolvedValue(db as never);
+
+    await expect(
+      toggleHypeRoomMessageReaction(11, 41, 3, "clap")
+    ).resolves.toMatchObject({ active: true, reaction: "clap" });
+
+    expect(db.__insertValues).toHaveBeenCalledWith({
+      roomId: 11,
+      messageId: 3,
+      userId: 41,
+      reaction: "clap",
+    });
+    // Clear every type this user holds first, then insert — never insert-then-clear.
+    expect(db.__deleteWheres).toHaveBeenCalledTimes(1);
+    expect(db.__deleteWheres.mock.invocationCallOrder[0]).toBeLessThan(
+      db.__insertValues.mock.invocationCallOrder[0]
+    );
+  });
+
+  it("locks the message row FOR UPDATE inside a single transaction", async () => {
+    const db = reactionDb({
+      existing: null,
+      insertReturning: [
+        {
+          id: 1,
+          roomId: 11,
+          messageId: 3,
+          userId: 41,
+          reaction: "like",
+          createdAt: new Date(),
+        },
+      ],
+    });
+    databaseMocks.getDb.mockResolvedValue(db as never);
+
+    await toggleHypeRoomMessageReaction(11, 41, 3, "like");
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(db.__lockCalls).toEqual(["update"]);
   });
 
   it("still rejects hidden message and cross-room message", async () => {
