@@ -1,6 +1,8 @@
 /**
  * Single source of truth for the multi-reaction vocabulary
- * (comments + Hype Room messages). Do not redefine this list elsewhere.
+ * (comments, Hype Room messages, and the typed video/community reaction
+ * columns — the binary video/community paths always write "like").
+ * Do not redefine this list elsewhere.
  */
 export const REACTION_TYPES = ["like", "love", "fire", "clap"] as const;
 export type ReactionType = (typeof REACTION_TYPES)[number];

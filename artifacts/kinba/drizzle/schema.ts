@@ -482,6 +482,7 @@ export const videoReactions = pgTable(
     userId: integer("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    reaction: varchar("reaction", { length: 32 }).notNull().default("like"),
     createdAt: createdAt(),
   },
   table => [
@@ -674,6 +675,7 @@ export const communityReactions = pgTable(
     userId: integer("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    reaction: varchar("reaction", { length: 32 }).notNull().default("like"),
     createdAt: createdAt(),
   },
   table => [

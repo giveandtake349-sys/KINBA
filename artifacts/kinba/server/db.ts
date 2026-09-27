@@ -1725,24 +1725,64 @@ export async function toggleCommentReaction(
   });
 }
 
-export async function toggleVideoReaction(videoId: number, userId: number) {
+/**
+ * Toggle the viewer's reaction on a video.
+ *
+ * One reaction per (video, user), enforced by video_reactions_pair_unique.
+ * Omitting `reaction` preserves the historical binary behavior: every
+ * pre-existing row resolves to "like" (column default), so an omitted call
+ * removes an active reaction and otherwise inserts one. Passing a type equal
+ * to the stored one removes it; passing a different type replaces the row in
+ * place (id/createdAt preserved). Unknown types are rejected.
+ *
+ * Concurrency: the video row is locked FOR UPDATE inside the transaction, so
+ * the read-modify-write below is serialized — the pair-unique index alone
+ * cannot arbitrate two racing replaces on the same (video, user) pair.
+ * Lock order is always video → reaction rows, matching the rest of the file.
+ */
+export async function toggleVideoReaction(
+  videoId: number,
+  userId: number,
+  reaction: ReactionType = "like"
+) {
+  if (!isValidReaction(reaction)) throw new Error("Invalid reaction type.");
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const existing = await db
-    .select({ id: videoReactions.id })
-    .from(videoReactions)
-    .where(
-      and(
-        eq(videoReactions.videoId, videoId),
-        eq(videoReactions.userId, userId)
+
+  await db.transaction(async tx => {
+    const [video] = await tx
+      .select({ id: videos.id })
+      .from(videos)
+      .where(eq(videos.id, videoId))
+      .for("update")
+      .limit(1);
+    if (!video) throw new Error("Video not found.");
+
+    const [existing] = await tx
+      .select({ id: videoReactions.id, reaction: videoReactions.reaction })
+      .from(videoReactions)
+      .where(
+        and(
+          eq(videoReactions.videoId, videoId),
+          eq(videoReactions.userId, userId)
+        )
       )
-    )
-    .limit(1);
-  if (existing[0])
-    await db
-      .delete(videoReactions)
-      .where(eq(videoReactions.id, existing[0].id));
-  else await db.insert(videoReactions).values({ videoId, userId });
+      .limit(1);
+
+    if (!existing) {
+      await tx.insert(videoReactions).values({ videoId, userId, reaction });
+      return;
+    }
+    if (existing.reaction === reaction) {
+      await tx.delete(videoReactions).where(eq(videoReactions.id, existing.id));
+      return;
+    }
+    await tx
+      .update(videoReactions)
+      .set({ reaction })
+      .where(eq(videoReactions.id, existing.id));
+  });
+
   return getVideoEngagement(videoId, userId);
 }
 
@@ -2610,30 +2650,73 @@ export async function listCommunityAnnouncements(userId?: number) {
   }));
 }
 
+/**
+ * Toggle the viewer's reaction on a community announcement.
+ *
+ * One reaction per (announcement, user), enforced by
+ * community_reactions_pair_unique. Omitting `reaction` preserves the
+ * historical binary behavior: every pre-existing row resolves to "like"
+ * (column default), so an omitted call removes an active reaction and
+ * otherwise inserts one. Passing a type equal to the stored one removes it;
+ * passing a different type replaces the row in place (id/createdAt
+ * preserved). Unknown types are rejected.
+ *
+ * Concurrency: the announcement row is locked FOR UPDATE inside the
+ * transaction, so the read-modify-write below is serialized — the
+ * pair-unique index alone cannot arbitrate two racing replaces on the same
+ * (announcement, user) pair. Lock order is always announcement → reaction
+ * rows, matching the rest of the file.
+ */
 export async function toggleCommunityReaction(
   announcementId: number,
-  userId: number
-) {
+  userId: number,
+  reaction: ReactionType = "like"
+): Promise<{ viewerReacted: boolean }> {
+  if (!isValidReaction(reaction)) throw new Error("Invalid reaction type.");
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const [existing] = await db
-    .select({ id: communityReactions.id })
-    .from(communityReactions)
-    .where(
-      and(
-        eq(communityReactions.announcementId, announcementId),
-        eq(communityReactions.userId, userId)
+
+  return db.transaction(async tx => {
+    const [announcement] = await tx
+      .select({ id: communityAnnouncements.id })
+      .from(communityAnnouncements)
+      .where(eq(communityAnnouncements.id, announcementId))
+      .for("update")
+      .limit(1);
+    if (!announcement) throw new Error("Community announcement not found.");
+
+    const [existing] = await tx
+      .select({
+        id: communityReactions.id,
+        reaction: communityReactions.reaction,
+      })
+      .from(communityReactions)
+      .where(
+        and(
+          eq(communityReactions.announcementId, announcementId),
+          eq(communityReactions.userId, userId)
+        )
       )
-    )
-    .limit(1);
-  if (existing) {
-    await db
-      .delete(communityReactions)
+      .limit(1);
+
+    if (!existing) {
+      await tx
+        .insert(communityReactions)
+        .values({ announcementId, userId, reaction });
+      return { viewerReacted: true };
+    }
+    if (existing.reaction === reaction) {
+      await tx
+        .delete(communityReactions)
+        .where(eq(communityReactions.id, existing.id));
+      return { viewerReacted: false };
+    }
+    await tx
+      .update(communityReactions)
+      .set({ reaction })
       .where(eq(communityReactions.id, existing.id));
-    return { viewerReacted: false };
-  }
-  await db.insert(communityReactions).values({ announcementId, userId });
-  return { viewerReacted: true };
+    return { viewerReacted: true };
+  });
 }
 
 export async function toggleCommunityBookmark(
