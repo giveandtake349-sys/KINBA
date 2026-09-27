@@ -1337,9 +1337,12 @@ export async function listVideoComments(
     : sql<boolean>`false`;
   // Real reply totals (used by the UI to show the expand affordance and the
   // "view more replies" action) — one correlated count, no extra round trip.
+  // The inner table is aliased (`rc`): without it `video_comments` inside the
+  // subquery shadows the outer table of the same name and the predicate
+  // collapses to `parentId = id`, reporting 0 replies for every comment.
   const replyCount = sql<number>`(
-    select count(*) from video_comments
-    where video_comments."parentId" = ${videoComments.id}
+    select count(*) from video_comments rc
+    where rc."parentId" = ${videoComments.id}
   )`;
   const parentId = options?.parentId ?? null;
 
