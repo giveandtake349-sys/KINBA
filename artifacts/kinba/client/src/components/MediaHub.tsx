@@ -1616,23 +1616,6 @@ function EngagementActions({
         <span>{engagement.viewerReacted ? "Pookied" : "Pookie"}</span>
         <strong>{formatCount(engagement.reactionCount)}</strong>
       </button>
-      {onSelectReaction ? (
-        <ReactionSummaryPill
-          active={engagement.viewerReaction}
-          disabled={pending === "react"}
-          ariaLabel={
-            engagement.viewerReaction
-              ? "Change your reaction"
-              : "Choose a reaction"
-          }
-          title="Choose a reaction"
-          onClick={event => {
-            event.preventDefault();
-            event.stopPropagation();
-            picker.openFromEvent(event);
-          }}
-        />
-      ) : null}
       <button
         type="button"
         onClick={event => {
@@ -2440,7 +2423,6 @@ function PostManagementMenu({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const updateMutation = trpc.videos.updateDescription.useMutation();
   const deleteMutation = trpc.videos.delete.useMutation();
-  if (auth.user?.id !== video.owner.id) return null;
   const [caption, setCaption] = useState([video.title, video.description].filter(Boolean).join("\n\n"));
 
   const saveCaption = async () => {
@@ -2503,6 +2485,9 @@ function PostManagementMenu({
       window.removeEventListener("mousedown", onClickOutside);
     };
   }, [open, editing, confirming]);
+
+  if (auth.user?.id !== video.owner.id) return null;
+
   const menuContent = (open || editing || confirming) ? createPortal(
     <>
       {open && !editing && !confirming && (
@@ -4034,7 +4019,6 @@ function AnnouncementManagementMenu({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const updateMutation = trpc.community.update.useMutation();
   const deleteMutation = trpc.community.delete.useMutation();
-  if (auth.user?.id !== announcement.author.id) return null;
 
   const refreshFeed = async () => {
     await Promise.all([
@@ -4117,6 +4101,8 @@ function AnnouncementManagementMenu({
       window.removeEventListener("mousedown", onClickOutside);
     };
   }, [open, editing, confirming]);
+
+  if (auth.user?.id !== announcement.author.id) return null;
 
   const menuContent =
     open || editing || confirming
