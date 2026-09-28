@@ -59,6 +59,10 @@ import {
   listBookmarkedVideos,
   toggleVideoBookmark,
   toggleVideoReaction,
+  listVideoReactors,
+  listCommentReactors,
+  listCommunityReactors,
+  listHypeRoomMessageReactors,
   toggleFollow,
   getRawPulse,
   voteRawPulse,
@@ -390,6 +394,11 @@ const followListPageInput = z.object({
   limit: z.number().int().min(1).max(100).optional(),
   offset: z.number().int().min(0).optional(),
 });
+// M3 — reactor identity pages: offset/limit (50-row pages, limit+1 hasMore).
+const reactorPageInput = z.object({
+  limit: z.number().int().min(1).max(50).optional(),
+  offset: z.number().int().min(0).optional(),
+});
 const announcementIdInput = z.object({
   announcementId: z.number().int().positive(),
 });
@@ -676,6 +685,15 @@ export const appRouter = router({
       .mutation(({ ctx, input }) =>
         toggleVideoReaction(input.videoId, ctx.user.id)
       ),
+    reactors: publicProcedure
+      .input(reactorPageInput.extend({ videoId: z.number().int().positive() }))
+      .query(({ ctx, input }) =>
+        listVideoReactors(input.videoId, {
+          limit: input.limit,
+          offset: input.offset,
+          viewerId: ctx.user?.id ?? null,
+        })
+      ),
     share: protectedProcedure
       .input(videoIdInput)
       .mutation(({ ctx, input }) =>
@@ -756,6 +774,19 @@ export const appRouter = router({
         )
         .mutation(({ ctx, input }) =>
           toggleCommentReaction(input.commentId, ctx.user.id, input.reaction)
+        ),
+      reactors: publicProcedure
+        .input(
+          reactorPageInput.extend({
+            commentId: z.number().int().positive(),
+          })
+        )
+        .query(({ ctx, input }) =>
+          listCommentReactors(input.commentId, {
+            limit: input.limit,
+            offset: input.offset,
+            viewerId: ctx.user?.id ?? null,
+          })
         ),
     }),
   }),
@@ -1215,6 +1246,29 @@ export const appRouter = router({
           throw mapHypeRoomMemberError(error, "messages");
         }
       }),
+    messageReactors: publicProcedure
+      .input(
+        reactorPageInput.extend({
+          roomId: z.number().int().positive(),
+          messageId: z.number().int().positive(),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await listHypeRoomMessageReactors(
+            input.roomId,
+            input.messageId,
+            {
+              limit: input.limit,
+              offset: input.offset,
+              viewerId: ctx.user?.id ?? null,
+            }
+          );
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "messageReactors");
+        }
+      }),
     sendMessage: protectedProcedure
       .input(
         z.object({
@@ -1533,6 +1587,19 @@ export const appRouter = router({
       .input(announcementIdInput)
       .mutation(({ ctx, input }) =>
         toggleCommunityReaction(input.announcementId, ctx.user.id)
+      ),
+    reactors: publicProcedure
+      .input(
+        reactorPageInput.extend({
+          announcementId: z.number().int().positive(),
+        })
+      )
+      .query(({ ctx, input }) =>
+        listCommunityReactors(input.announcementId, {
+          limit: input.limit,
+          offset: input.offset,
+          viewerId: ctx.user?.id ?? null,
+        })
       ),
     bookmark: protectedProcedure
       .input(announcementIdInput)

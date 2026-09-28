@@ -1,4 +1,16 @@
-import { and, asc, desc, eq, gt, ilike, inArray, isNull, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  ilike,
+  inArray,
+  isNull,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import {
@@ -15,6 +27,10 @@ import {
   wallets,
   walletTransactions,
   follows,
+  hypeRoomMessages,
+  hypeRoomMessageReactions,
+  hypeRooms,
+  profileAccountType,
   profiles,
   type InsertUser,
   users,
@@ -1961,6 +1977,252 @@ export async function listFollowing(
   options?: FollowListPageOptions
 ) {
   return listFollowEdges("following", profileUserId, viewerId, options);
+}
+
+/** M3 — reactor identity pages shared by all four reaction surfaces. */
+
+export const REACTOR_PAGE_DEFAULT_LIMIT = 50;
+export const REACTOR_PAGE_MAX_LIMIT = 50;
+
+type ProfileAccountType = (typeof profileAccountType.enumValues)[number];
+
+export type ReactorListOptions = {
+  /** Rows to return (clamped to 1..REACTOR_PAGE_MAX_LIMIT, default 50). */
+  limit?: number;
+  /** Rows to skip — backend paging, never a client-side slice. */
+  offset?: number;
+  /** Authenticated viewer for viewerReactions (anonymous when absent/null). */
+  viewerId?: number | null;
+};
+
+/**
+ * Safe public projection of one reactor — never the raw users row
+ * (no email, openId, role, or other auth columns).
+ */
+export type ReactorEntry = {
+  userId: number;
+  name: string | null;
+  username: string | null;
+  photoUrl: string | null;
+  accountType: ProfileAccountType;
+  isVerified: boolean;
+  /** Distinct active types for this user, in REACTION_TYPES order. */
+  reactions: ReactionType[];
+};
+
+export type ReactorListPage = {
+  reactors: ReactorEntry[];
+  hasMore: boolean;
+  offset: number;
+  limit: number;
+  /** The viewer's own types on this target ([] when anonymous). */
+  viewerReactions: ReactionType[];
+};
+
+/** Vocabulary-ordered distinct types; unknown stored values are ignored. */
+function toReactionTypes(values: readonly string[]): ReactionType[] {
+  const present = new Set(values);
+  return REACTION_TYPES.filter(type => present.has(type));
+}
+
+/**
+ * One grouped page of reactor identities for a single target.
+ *
+ * `makeSource` must return a target-scoped subquery aliased exactly
+ * `reactor_source` with columns ("userId", "reaction", "createdAt").
+ * Two queries run per call (none when there is nothing to load): the
+ * grouped page — users inner-joined and profile left-joined onto the
+ * source, ordered by MAX(createdAt) DESC then userId DESC (deterministic,
+ * and MAX not MIN so a user's latest reaction row sets their position) —
+ * plus one batched type lookup covering the page's users and the viewer.
+ * Cost is constant regardless of reactor count: no N+1.
+ */
+async function loadReactorPage(
+  makeSource: () => SQL,
+  options?: ReactorListOptions
+): Promise<ReactorListPage> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const limit = Math.min(
+    Math.max(Math.trunc(options?.limit ?? REACTOR_PAGE_DEFAULT_LIMIT), 1),
+    REACTOR_PAGE_MAX_LIMIT
+  );
+  const offset = Math.max(Math.trunc(options?.offset ?? 0), 0);
+  const viewerId =
+    typeof options?.viewerId === "number" &&
+    Number.isInteger(options.viewerId) &&
+    options.viewerId > 0
+      ? options.viewerId
+      : null;
+
+  const pageRows = await db
+    .select({
+      userId: users.id,
+      name: users.name,
+      username: profiles.username,
+      photoUrl: profiles.photoUrl,
+      accountType: profiles.accountType,
+      isVerified: profiles.isVerified,
+    })
+    .from(makeSource())
+    .innerJoin(users, sql`reactor_source."userId" = ${users.id}`)
+    .leftJoin(profiles, sql`${profiles.userId} = ${users.id}`)
+    .groupBy(users.id, profiles.id)
+    .orderBy(desc(sql`max(reactor_source."createdAt")`), desc(users.id))
+    .limit(limit + 1)
+    .offset(offset);
+
+  const hasMore = pageRows.length > limit;
+  const page = hasMore ? pageRows.slice(0, limit) : pageRows;
+
+  const typeUserIds = page.map(row => row.userId);
+  if (viewerId !== null && !typeUserIds.includes(viewerId)) {
+    typeUserIds.push(viewerId);
+  }
+
+  const reactionsByUser = new Map<number, string[]>();
+  if (typeUserIds.length > 0) {
+    const typeRows = await db
+      .select({
+        userId: sql<number>`reactor_source."userId"`,
+        reaction: sql<string>`reactor_source."reaction"`,
+      })
+      .from(makeSource())
+      .where(inArray(sql`reactor_source."userId"`, typeUserIds));
+    for (const row of typeRows) {
+      const list = reactionsByUser.get(row.userId);
+      if (list) list.push(row.reaction);
+      else reactionsByUser.set(row.userId, [row.reaction]);
+    }
+  }
+
+  const reactors: ReactorEntry[] = page.map(row => ({
+    userId: row.userId,
+    name: row.name ?? null,
+    username: row.username ?? null,
+    photoUrl: row.photoUrl ?? null,
+    accountType: row.accountType ?? "member",
+    isVerified: Boolean(row.isVerified),
+    reactions: toReactionTypes(reactionsByUser.get(row.userId) ?? []),
+  }));
+
+  return {
+    reactors,
+    hasMore,
+    offset,
+    limit,
+    viewerReactions:
+      viewerId !== null
+        ? toReactionTypes(reactionsByUser.get(viewerId) ?? [])
+        : [],
+  };
+}
+
+/** Reactors on a video (public read; missing target → "Video not found."). */
+export async function listVideoReactors(
+  videoId: number,
+  options?: ReactorListOptions
+): Promise<ReactorListPage> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [video] = await db
+    .select({ id: videos.id })
+    .from(videos)
+    .where(eq(videos.id, videoId))
+    .limit(1);
+  if (!video) throw new Error("Video not found.");
+  return loadReactorPage(
+    () =>
+      sql`(select "userId", "reaction", "createdAt" from "video_reactions" where "videoId" = ${videoId}) as "reactor_source"`,
+    options
+  );
+}
+
+/**
+ * Reactors on a video comment (public read; missing target →
+ * "Comment not found."). Legacy `comment_likes` rows are unioned in as
+ * type "like" so the list matches the count semantics of
+ * listVideoComments — read-only, legacy data is never modified.
+ */
+export async function listCommentReactors(
+  commentId: number,
+  options?: ReactorListOptions
+): Promise<ReactorListPage> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [comment] = await db
+    .select({ id: videoComments.id })
+    .from(videoComments)
+    .where(eq(videoComments.id, commentId))
+    .limit(1);
+  if (!comment) throw new Error("Comment not found.");
+  return loadReactorPage(
+    () =>
+      sql`(select "userId", "reaction", "createdAt" from "comment_reactions" where "commentId" = ${commentId} union all select "userId", 'like' as "reaction", "createdAt" from "comment_likes" where "commentId" = ${commentId}) as "reactor_source"`,
+    options
+  );
+}
+
+/**
+ * Reactors on a community announcement (public read; missing target →
+ * "Community announcement not found.").
+ */
+export async function listCommunityReactors(
+  announcementId: number,
+  options?: ReactorListOptions
+): Promise<ReactorListPage> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [announcement] = await db
+    .select({ id: communityAnnouncements.id })
+    .from(communityAnnouncements)
+    .where(eq(communityAnnouncements.id, announcementId))
+    .limit(1);
+  if (!announcement) throw new Error("Community announcement not found.");
+  return loadReactorPage(
+    () =>
+      sql`(select "userId", "reaction", "createdAt" from "community_reactions" where "announcementId" = ${announcementId}) as "reactor_source"`,
+    options
+  );
+}
+
+/**
+ * Reactors on a Hype Room message (public read semantics of
+ * listRoomMessages: room existence only, no membership gate). Hidden or
+ * missing messages and cross-room bindings reuse the exact write-path
+ * errors so moderated content never leaks reaction data.
+ */
+export async function listHypeRoomMessageReactors(
+  roomId: number,
+  messageId: number,
+  options?: ReactorListOptions
+): Promise<ReactorListPage> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [row] = await db
+    .select({
+      roomExists: hypeRooms.id,
+      messageId: hypeRoomMessages.id,
+      messageRoomId: hypeRoomMessages.roomId,
+      messageHiddenAt: hypeRoomMessages.hiddenAt,
+    })
+    .from(hypeRooms)
+    .leftJoin(hypeRoomMessages, eq(hypeRoomMessages.id, messageId))
+    .where(eq(hypeRooms.id, roomId))
+    .limit(1);
+  if (!row) throw new Error("Room not found.");
+  if (row.messageId == null || row.messageHiddenAt != null) {
+    throw new Error("Message not found.");
+  }
+  if (row.messageRoomId !== roomId) {
+    throw new Error("Message does not belong to this room.");
+  }
+  return loadReactorPage(
+    () =>
+      sql`(select "userId", "reaction", "createdAt" from "hype_room_message_reactions" where "messageId" = ${messageId}) as "reactor_source"`,
+    options
+  );
 }
 
 export async function listSponsorBidsSessions() {
