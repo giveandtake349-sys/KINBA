@@ -1,15 +1,21 @@
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import { X } from "lucide-react";
 import {
   CONVERSATION_REACTIONS,
   type ConversationReactionEntry,
   type ConversationReactionId,
 } from "./shared";
+import { ReactionSummaryPill } from "../reactions/ReactionSummaryPill";
+import type { LongPressHandlers } from "@/hooks/useLongPress";
 
 /**
  * Shared reaction chips + expand tray — Hype Room UX reference.
  * Pass `reactions` from backend; `available` filters which options are offered
  * (e.g. single-type surfaces). Does not invent types the backend rejects.
+ *
+ * When `longPress` is supplied the whole zone becomes a long-press target for
+ * the shared picker, and `onTotalClick` renders the always-clickable pill that
+ * keeps long-press from being the only activation path.
  */
 export function ReactionBar({
   reactions,
@@ -18,6 +24,10 @@ export function ReactionBar({
   disabled,
   busy,
   ariaLabel = "Reactions",
+  total,
+  active,
+  longPress,
+  onTotalClick,
 }: {
   reactions: ConversationReactionEntry[];
   availableIds?: ReadonlyArray<ConversationReactionId>;
@@ -25,6 +35,11 @@ export function ReactionBar({
   disabled?: boolean;
   busy?: boolean;
   ariaLabel?: string;
+  /** Total across all chips — omitted when the surface renders no pill. */
+  total?: number;
+  active?: ConversationReactionId | null;
+  longPress?: LongPressHandlers;
+  onTotalClick?: (event: MouseEvent<HTMLButtonElement>) => void;
 }) {
   const [trayOpen, setTrayOpen] = useState(false);
   const options = availableIds
@@ -35,7 +50,22 @@ export function ReactionBar({
   if (options.length === 0) return null;
 
   return (
-    <div className="conv-reactions" role="group" aria-label={ariaLabel}>
+    <div
+      className="conv-reactions"
+      role="group"
+      aria-label={ariaLabel}
+      {...(longPress ?? {})}
+    >
+      {onTotalClick ? (
+        <ReactionSummaryPill
+          count={total ?? 0}
+          active={active}
+          disabled={disabled}
+          ariaLabel="Choose a reaction"
+          title="Choose a reaction"
+          onClick={onTotalClick}
+        />
+      ) : null}
       {options.map(option => {
         const entry = reactions.find(row => row.reaction === option.id);
         const count = entry?.count ?? 0;

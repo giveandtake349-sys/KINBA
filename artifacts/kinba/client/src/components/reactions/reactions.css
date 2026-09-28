@@ -1,0 +1,201 @@
+/* ---------------------------------------------------------------------------
+   Unified reaction surfaces (M4–M6): the long-press picker, the count pill and
+   the reactor list sheet. Scoped to dedicated class names so the Shorts stage
+   cascade (body:has(...) gates in shorts-stage.css) never rewrites them.
+   --------------------------------------------------------------------------- */
+
+.reaction-picker-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483002;
+  pointer-events: none;
+}
+
+.reaction-picker-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  background: transparent;
+}
+
+.reaction-picker {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 236px;
+  max-width: calc(100vw - 16px);
+  padding: 10px;
+  pointer-events: auto;
+  background: var(--surface, #121825);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.13));
+  border-radius: 18px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+}
+
+.reaction-picker:focus-visible {
+  outline: 2px solid var(--accent, #ff5e56);
+  outline-offset: 2px;
+}
+
+.reaction-picker__row {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.reaction-picker__option {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  padding: 7px 4px 6px;
+  font: inherit;
+  color: var(--text, #f4f7ff);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 120ms var(--line, ease), background 120ms ease,
+    border-color 120ms ease;
+}
+
+.reaction-picker__option:hover {
+  background: var(--surface-raised, #1b2536);
+}
+
+.reaction-picker__option:active {
+  transform: scale(0.94);
+}
+
+.reaction-picker__option[aria-checked="true"] {
+  background: var(--accent-soft, rgba(255, 94, 86, 0.12));
+  border-color: var(--accent-border, rgba(255, 94, 86, 0.45));
+}
+
+.reaction-picker__glyph {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.reaction-picker__label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted, #9aa8bf);
+}
+
+.reaction-picker__option[aria-checked="true"] .reaction-picker__label {
+  color: var(--accent, #ff5e56);
+}
+
+.reaction-picker__footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #f4f7ff);
+  background: var(--surface-raised, #1b2536);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.13));
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.reaction-picker__footer:hover {
+  border-color: var(--accent-border, rgba(255, 94, 86, 0.45));
+}
+
+.reaction-count-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--text, #f4f7ff);
+  background: var(--surface-raised, #1b2536);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.13));
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 120ms ease, transform 120ms var(--line, ease);
+}
+
+.reaction-count-pill:hover:not(:disabled) {
+  border-color: var(--accent-border, rgba(255, 94, 86, 0.45));
+}
+
+.reaction-count-pill:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.reaction-count-pill:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.reaction-count-pill__glyph {
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* --- M6: reactor list sheet ------------------------------------------------ */
+
+.reaction-reactor-viewer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--text, #f4f7ff);
+  background: var(--accent-soft, rgba(255, 94, 86, 0.12));
+  border: 1px solid var(--accent-border, rgba(255, 94, 86, 0.45));
+  border-radius: 12px;
+}
+
+.reaction-reactor-types {
+  display: inline-flex;
+  gap: 3px;
+  margin-left: auto;
+}
+
+.reaction-reactor-type {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  background: var(--surface-raised, #1b2536);
+  border-radius: 999px;
+}
+
+.reaction-reactor-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.reaction-reactor-self {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent, #ff5e56);
+}
+
+@media (max-width: 640px) {
+  .reaction-picker {
+    min-width: 220px;
+  }
+}

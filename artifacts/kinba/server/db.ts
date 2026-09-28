@@ -57,6 +57,14 @@ import { resolvePostgresDatabaseUrl } from "./databaseConfig";
 import { selectNomineeIds, selectSecondaryWinnerId } from "./sponsorBidsDraw";
 import { storageDelete } from "./storage";
 
+/**
+ * The viewer's stored reaction, narrowed to the shared vocabulary so no raw
+ * database string can leak into the client's `ReactionType` unions.
+ */
+function narrowReaction(value: string | null | undefined): ReactionType | null {
+  return value != null && isValidReaction(value) ? value : null;
+}
+
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: Pool | null = null;
 
@@ -506,6 +514,7 @@ function shapeVideoRow(row: any) {
     bookmarkCount: Number(row.bookmarkCount),
     viewCount: Number(row.video.viewCount ?? 0),
     viewerReacted: Boolean(row.viewerReacted),
+    viewerReaction: narrowReaction(row.viewerReaction),
     viewerShared: Boolean(row.viewerShared),
     viewerBookmarked: Boolean(row.viewerBookmarked),
     owner: {
@@ -533,6 +542,9 @@ async function selectVideos(
   const viewerReacted = viewerId
     ? sql<boolean>`exists (select 1 from video_reactions where video_reactions."videoId" = ${videos.id} and video_reactions."userId" = ${viewerId})`
     : sql<boolean>`false`;
+  const viewerReaction = viewerId
+    ? sql<string | null>`(select video_reactions."reaction" from video_reactions where video_reactions."videoId" = ${videos.id} and video_reactions."userId" = ${viewerId} limit 1)`
+    : sql<string | null>`null`;
   const viewerShared = viewerId
     ? sql<boolean>`exists (select 1 from video_shares where video_shares."videoId" = ${videos.id} and video_shares."userId" = ${viewerId})`
     : sql<boolean>`false`;
@@ -549,6 +561,7 @@ async function selectVideos(
       commentCount,
       bookmarkCount,
       viewerReacted,
+      viewerReaction,
       viewerShared,
       viewerBookmarked,
     })
@@ -853,7 +866,7 @@ async function listUnifiedHomeFeed(viewerId?: number) {
       viewerId,
       "recent"
     ),
-    listCommunityAnnouncements().catch(error => {
+    listCommunityAnnouncements(undefined, viewerId ?? null).catch(error => {
       console.error("[Feed] Community posts unavailable:", error);
       return [];
     }),
@@ -2854,7 +2867,10 @@ export async function adminSetSponsorStatus(
   return updated;
 }
 
-export async function listCommunityAnnouncements(userId?: number) {
+export async function listCommunityAnnouncements(
+  ownerId?: number,
+  viewerId?: number | null
+) {
   const db = await getDb();
   if (!db) return [];
   const commentCount = sql<number>`(
@@ -2865,6 +2881,21 @@ export async function listCommunityAnnouncements(userId?: number) {
     select count(*) from community_reactions
     where community_reactions."announcementId" = ${communityAnnouncements.id}
   )`;
+  const viewerReacted = viewerId
+    ? sql<boolean>`exists (
+        select 1 from community_reactions
+        where community_reactions."announcementId" = ${communityAnnouncements.id}
+          and community_reactions."userId" = ${viewerId}
+      )`
+    : sql<boolean>`false`;
+  const viewerReaction = viewerId
+    ? sql<string | null>`(
+        select community_reactions."reaction" from community_reactions
+        where community_reactions."announcementId" = ${communityAnnouncements.id}
+          and community_reactions."userId" = ${viewerId}
+        limit 1
+      )`
+    : sql<string | null>`null`;
   const rows = await db
     .select({
       announcement: communityAnnouncements,
@@ -2872,11 +2903,13 @@ export async function listCommunityAnnouncements(userId?: number) {
       profile: profiles,
       commentCount,
       reactionCount,
+      viewerReacted,
+      viewerReaction,
     })
     .from(communityAnnouncements)
     .innerJoin(users, eq(communityAnnouncements.userId, users.id))
     .leftJoin(profiles, eq(communityAnnouncements.userId, profiles.userId))
-    .where(userId ? eq(communityAnnouncements.userId, userId) : undefined)
+    .where(ownerId ? eq(communityAnnouncements.userId, ownerId) : undefined)
     .orderBy(desc(communityAnnouncements.createdAt))
     .limit(60);
   if (!rows.length) return [];
@@ -2899,7 +2932,8 @@ export async function listCommunityAnnouncements(userId?: number) {
     ...row.announcement,
     commentCount: Number(row.commentCount ?? 0),
     reactionCount: Number(row.reactionCount ?? 0),
-    viewerReacted: false,
+    viewerReacted: Boolean(row.viewerReacted),
+    viewerReaction: narrowReaction(row.viewerReaction),
     viewerBookmarked: false,
     author: {
       id: row.user.id,

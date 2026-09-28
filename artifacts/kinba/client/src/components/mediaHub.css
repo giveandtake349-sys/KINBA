@@ -474,6 +474,12 @@
 .announcement-attachments.has-grid video {
   aspect-ratio: 1;
 }
+.announcement-reactions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
 .media-empty {
   align-items: center;
   background: rgba(11, 18, 30, 0.32);

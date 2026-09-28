@@ -75,6 +75,21 @@ import {
 } from "./conversation";
 import { isAbsoluteHttpUrl, resolveMediaUrl } from "@/lib/runtimeConfig";
 import { isAndroidApp, saveImageToGallery } from "@/lib/galleryDownload";
+import { useVideoReaction } from "@/hooks/useVideoReaction";
+import {
+  activeReactionEntry,
+  adoptSingleReaction,
+  applySingleReaction,
+  totalReactionCount,
+  type SingleReactionState,
+} from "@/lib/reactionState";
+import {
+  ReactionPicker,
+  ReactionSummaryPill,
+  ReactorList,
+  useReactionPicker,
+} from "./reactions";
+import type { ReactionType } from "@shared/reactions";
 import "./mediaHub.css";
 import "./kinbaModern.css";
 import "./feedUi.css";
@@ -131,6 +146,7 @@ export type VideoRecord = {
   commentCount: number;
   shareCount: number;
   viewerReacted: boolean;
+  viewerReaction?: ReactionType | null;
   viewerShared: boolean;
   bookmarkCount: number;
   viewerBookmarked: boolean;
@@ -157,6 +173,7 @@ type Engagement = {
   shareCount: number;
   commentCount: number;
   viewerReacted: boolean;
+  viewerReaction: ReactionType | null;
   viewerShared: boolean;
 };
 type ImageSelection = { file: File; previewUrl: string };
@@ -674,36 +691,20 @@ function VoiceCommentComposer({
 function useOptimisticEngagement(video: VideoRecord) {
   const auth = useAuth();
   const utils = trpc.useUtils();
-  const [override, setOverride] = useState<Engagement | null>(null);
-  const [pending, setPending] = useState<"react" | "share" | null>(null);
-  const reactMutation = trpc.videos.react.useMutation();
+  const reaction = useVideoReaction(video, { onError: notifyError });
+  const [shareOverride, setShareOverride] = useState<{
+    shareCount: number;
+    viewerShared: boolean;
+  } | null>(null);
+  const [sharePending, setSharePending] = useState(false);
   const shareMutation = trpc.videos.share.useMutation();
-  const current = override ?? {
-    reactionCount: video.reactionCount,
-    shareCount: video.shareCount,
+  const current: Engagement = {
+    reactionCount: reaction.state.reactionCount,
+    shareCount: shareOverride?.shareCount ?? video.shareCount,
     commentCount: video.commentCount,
-    viewerReacted: video.viewerReacted,
-    viewerShared: video.viewerShared,
-  };
-  const react = async () => {
-    if (!auth.isAuthenticated) return auth.openAuth();
-    const previous = current;
-    setOverride({
-      ...previous,
-      viewerReacted: !previous.viewerReacted,
-      reactionCount: previous.reactionCount + (previous.viewerReacted ? -1 : 1),
-    });
-    setPending("react");
-    try {
-      setOverride(await reactMutation.mutateAsync({ videoId: video.id }));
-      await utils.home.feed.invalidate();
-      await utils.videos.list.invalidate();
-    } catch (error) {
-      setOverride(previous);
-      notifyError(error);
-    } finally {
-      setPending(null);
-    }
+    viewerReacted: reaction.state.viewerReacted,
+    viewerReaction: reaction.state.viewerReaction,
+    viewerShared: shareOverride?.viewerShared ?? video.viewerShared,
   };
   const share = async () => {
     if (!auth.isAuthenticated) return auth.openAuth();
@@ -719,24 +720,45 @@ function useOptimisticEngagement(video: VideoRecord) {
         await navigator.clipboard.writeText(url);
         toast.success("Video link copied.");
       }
-      const previous = current;
-      setOverride({
-        ...previous,
-        viewerShared: true,
-        shareCount: previous.shareCount + (previous.viewerShared ? 0 : 1),
-      });
-      setPending("share");
-      setOverride(await shareMutation.mutateAsync({ videoId: video.id }));
-      await utils.home.feed.invalidate();
-      await utils.videos.list.invalidate();
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       notifyError(error);
+      return;
+    }
+    const previous = current;
+    const previousOverride = shareOverride;
+    setShareOverride({
+      viewerShared: true,
+      shareCount: previous.shareCount + (previous.viewerShared ? 0 : 1),
+    });
+    setSharePending(true);
+    try {
+      const response = await shareMutation.mutateAsync({ videoId: video.id });
+      setShareOverride({
+        shareCount: response.shareCount,
+        viewerShared: response.viewerShared,
+      });
+      await utils.home.feed.invalidate();
+      await utils.videos.list.invalidate();
+    } catch (error) {
+      setShareOverride(previousOverride);
+      notifyError(error);
     } finally {
-      setPending(null);
+      setSharePending(false);
     }
   };
-  return { current, react, share, pending };
+  const pending: "react" | "share" | null = reaction.pending
+    ? "react"
+    : sharePending
+      ? "share"
+      : null;
+  return {
+    current,
+    react: reaction.react,
+    selectReaction: reaction.select,
+    share,
+    pending,
+  };
 }
 
 function QualityVideoPlayer({
@@ -1489,7 +1511,9 @@ function ForYouVideoPlayer({
 
 function EngagementActions({
   engagement,
+  videoId,
   onReact,
+  onSelectReaction,
   onShare,
   onComments,
   pending,
@@ -1500,7 +1524,9 @@ function EngagementActions({
   owner,
 }: {
   engagement: Engagement;
+  videoId?: number;
   onReact: () => void;
+  onSelectReaction?: (reaction: ReactionType) => void;
   onShare: () => void;
   onComments: () => void;
   pending: "react" | "share" | null;
@@ -1512,6 +1538,8 @@ function EngagementActions({
 }) {
   const auth = useAuth();
   const utils = trpc.useUtils();
+  const picker = useReactionPicker(Boolean(onSelectReaction));
+  const [reactorsOpen, setReactorsOpen] = useState(false);
   const followState = trpc.profile.followState.useQuery(
     { userId: owner?.id ?? 0 },
     {
@@ -1571,6 +1599,7 @@ function EngagementActions({
       <button
         type="button"
         className={engagement.viewerReacted ? "is-active" : ""}
+        {...picker.longPress}
         onClick={event => {
           event.preventDefault();
           event.stopPropagation();
@@ -1587,6 +1616,23 @@ function EngagementActions({
         <span>{engagement.viewerReacted ? "Pookied" : "Pookie"}</span>
         <strong>{formatCount(engagement.reactionCount)}</strong>
       </button>
+      {onSelectReaction ? (
+        <ReactionSummaryPill
+          active={engagement.viewerReaction}
+          disabled={pending === "react"}
+          ariaLabel={
+            engagement.viewerReaction
+              ? "Change your reaction"
+              : "Choose a reaction"
+          }
+          title="Choose a reaction"
+          onClick={event => {
+            event.preventDefault();
+            event.stopPropagation();
+            picker.openFromEvent(event);
+          }}
+        />
+      ) : null}
       <button
         type="button"
         onClick={event => {
@@ -1633,12 +1679,64 @@ function EngagementActions({
           <span>{bookmarked ? "Saved" : "Save"}</span>
         </button>
       )}
+      {onSelectReaction ? (
+        <>
+          <ReactionPicker
+            open={picker.open}
+            anchor={picker.anchor}
+            active={engagement.viewerReaction}
+            disabled={pending === "react"}
+            label="Choose a video reaction"
+            onSelect={onSelectReaction}
+            onClose={picker.close}
+            onOpenReactors={() => setReactorsOpen(true)}
+          />
+          {videoId != null ? (
+            <ReactorList
+              open={reactorsOpen}
+              title="Video reactions"
+              source={{ kind: "video", videoId }}
+              onClose={() => setReactorsOpen(false)}
+            />
+          ) : null}
+        </>
+      ) : null}
     </div>
   );
 }
 /** Replies fetched per batch when a thread is expanded (Facebook-style 3–4). */
 const COMMENT_REPLY_BATCH = 4;
 const COMMENT_REPLY_BATCH_MAX = 50;
+
+type CommentReactionSource = {
+  reactions?: Array<{
+    reaction: ConversationReactionId;
+    count: number;
+    reactedByMe: boolean;
+  }> | null;
+  likeCount?: number | null;
+  viewerLiked?: boolean | null;
+};
+
+/** Backend multi-reaction rows, with the legacy binary-like fallback. */
+function commentReactionEntries(
+  comment: CommentReactionSource
+): ConversationReactionEntry[] {
+  if (comment.reactions && comment.reactions.length) {
+    return comment.reactions.map(row => ({
+      reaction: row.reaction,
+      count: row.count,
+      reactedByMe: row.reactedByMe,
+    }));
+  }
+  return [
+    {
+      reaction: "like",
+      count: comment.likeCount ?? 0,
+      reactedByMe: Boolean(comment.viewerLiked),
+    },
+  ];
+}
 
 function CommentDrawer({
   postId,
@@ -1658,6 +1756,19 @@ function CommentDrawer({
     username: string;
   } | null>(null);
   const [reactingId, setReactingId] = useState<number | null>(null);
+  const [reactionTargetId, setReactionTargetId] = useState<number | null>(null);
+  const [reactorsOpen, setReactorsOpen] = useState(false);
+  // Long-press carries no React state, so recover the comment it came from
+  // from the rendered row and remember it until the tray closes.
+  const picker = useReactionPicker(open, gesture => {
+    const target =
+      gesture.target instanceof HTMLElement ? gesture.target : null;
+    const raw = target
+      ?.closest("[data-comment-id]")
+      ?.getAttribute("data-comment-id");
+    const id = raw == null ? Number.NaN : Number(raw);
+    setReactionTargetId(Number.isInteger(id) && id > 0 ? id : null);
+  });
   const [mentionPickerOpen, setMentionPickerOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const commentsQuery = trpc.videos.comments.list.useQuery(
@@ -1698,6 +1809,20 @@ function CommentDrawer({
       (a, b) => (a.createdAt < b.createdAt ? 1 : -1)
     );
   };
+
+  // Which comment the shared reaction tray is acting on: set when a pill is
+  // tapped or when a long-press is recovered from a rendered row above.
+  const reactionTargetRow =
+    reactionTargetId == null
+      ? null
+      : (comments.find(row => row.id === reactionTargetId) ??
+        Object.values(repliesByParent)
+          .flat()
+          .find(row => row.id === reactionTargetId) ??
+        null);
+  const reactionTargetActive = reactionTargetRow
+    ? activeReactionEntry(commentReactionEntries(reactionTargetRow))
+    : null;
 
   const loadReplies = async (parentId: number, offset: number) => {
     setThreadMeta(prev => ({
@@ -1908,20 +2033,7 @@ function CommentDrawer({
 
     // Shared conversation reaction surface: backend returns merged
     // multi-reaction entries (comment_reactions ∪ legacy comment_likes "like").
-    const reactionEntries: ConversationReactionEntry[] =
-      comment.reactions && comment.reactions.length
-        ? comment.reactions.map(row => ({
-            reaction: row.reaction,
-            count: row.count,
-            reactedByMe: row.reactedByMe,
-          }))
-        : [
-            {
-              reaction: "like",
-              count: comment.likeCount ?? 0,
-              reactedByMe: Boolean(comment.viewerLiked),
-            },
-          ];
+    const reactionEntries = commentReactionEntries(comment);
 
     const activeReaction =
       reactionEntries.find(row => row.reactedByMe)?.reaction ?? null;
@@ -2020,6 +2132,15 @@ function CommentDrawer({
               disabled={reactingId !== null}
               busy={reactingId === comment.id}
               ariaLabel="Comment reactions"
+              total={totalReactionCount(reactionEntries)}
+              active={activeReaction}
+              longPress={picker.longPress}
+              onTotalClick={event => {
+                event.preventDefault();
+                event.stopPropagation();
+                setReactionTargetId(comment.id);
+                picker.openFromEvent(event);
+              }}
             />
             <button
               type="button"
@@ -2199,6 +2320,27 @@ function CommentDrawer({
           />
         </div>
       </section>
+      <ReactionPicker
+        open={picker.open}
+        anchor={picker.anchor}
+        active={reactionTargetActive}
+        disabled={reactingId !== null}
+        label="Choose a comment reaction"
+        onSelect={reaction => {
+          if (reactionTargetId == null) return;
+          void reactToComment(reactionTargetId, reaction);
+        }}
+        onClose={picker.close}
+        onOpenReactors={() => setReactorsOpen(true)}
+      />
+      {reactionTargetId != null ? (
+        <ReactorList
+          open={reactorsOpen}
+          title="Comment reactions"
+          source={{ kind: "comment", commentId: reactionTargetId }}
+          onClose={() => setReactorsOpen(false)}
+        />
+      ) : null}
     </div>,
     document.body
   );
@@ -2502,7 +2644,10 @@ function VideoCard({
   };
   const [views, setViews] = useState(video.viewCount);
   const viewMutation = trpc.videos.view.useMutation();
-  const { current, react, share, pending } = useOptimisticEngagement(video);
+  const { current, react, selectReaction, share, pending } =
+    useOptimisticEngagement(video);
+  const picker = useReactionPicker();
+  const [reactorsOpen, setReactorsOpen] = useState(false);
   const openViewer = (event: MouseEvent<HTMLElement>) => {
     if (!onOpenViewer) return;
     const target = event.target;
@@ -2635,12 +2780,27 @@ function VideoCard({
           <button
             type="button"
             className={current.viewerReacted ? "is-active" : ""}
+            {...picker.longPress}
             onClick={react}
             disabled={!!pending}
+            aria-pressed={current.viewerReacted}
+            aria-label={current.viewerReacted ? "Remove Pookie" : "Pookie video"}
           >
             <Heart size={16} fill={current.viewerReacted ? "currentColor" : "none"} />
             <span>{current.viewerReacted ? "Pookied" : "Pookie"}</span>
           </button>
+          <ReactionSummaryPill
+            count={current.reactionCount}
+            active={current.viewerReaction}
+            disabled={!!pending}
+            ariaLabel="Choose a reaction"
+            title="Choose a reaction"
+            onClick={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              picker.openFromEvent(event);
+            }}
+          />
           <button
             type="button"
             onClick={() => {
@@ -2670,6 +2830,22 @@ function VideoCard({
           postOwnerId={video.owner.id}
           open={commentsOpen}
           onClose={() => setCommentsOpen(false)}
+        />
+        <ReactionPicker
+          open={picker.open}
+          anchor={picker.anchor}
+          active={current.viewerReaction}
+          disabled={!!pending}
+          label="Choose a video reaction"
+          onSelect={selectReaction}
+          onClose={picker.close}
+          onOpenReactors={() => setReactorsOpen(true)}
+        />
+        <ReactorList
+          open={reactorsOpen}
+          title="Video reactions"
+          source={{ kind: "video", videoId: video.id }}
+          onClose={() => setReactorsOpen(false)}
         />
       </article>
     );
@@ -3207,7 +3383,8 @@ function ShortVideoCard({
       notifyError(error);
     }
   };
-  const { current, react, share, pending } = useOptimisticEngagement(video);
+  const { current, react, selectReaction, share, pending } =
+    useOptimisticEngagement(video);
   if (deleted) return null;
   return (
     <article
@@ -3301,7 +3478,9 @@ function ShortVideoCard({
         <div className="shorts-overlay-actions">
           <EngagementActions
             engagement={current}
+            videoId={video.id}
             onReact={react}
+            onSelectReaction={selectReaction}
             onShare={share}
             onComments={() => {
               if (!auth.isAuthenticated) return auth.openAuth();
@@ -4063,6 +4242,116 @@ function AnnouncementManagementMenu({
   );
 }
 
+function announcementState(row: {
+  reactionCount: number;
+  viewerReacted: boolean;
+  viewerReaction: ReactionType | null;
+}): SingleReactionState {
+  return {
+    reactionCount: row.reactionCount,
+    viewerReacted: row.viewerReacted,
+    viewerReaction: row.viewerReaction,
+  };
+}
+
+/**
+ * Announcement reactions: the count pill is the always-available tap target
+ * and the long-press zone, so the shared picker (and, through its footer, the
+ * reactor list) is reachable without a gesture. State lives in the
+ * `community.list` cache — nothing is painted that the server did not confirm.
+ */
+function AnnouncementReactionBar({
+  announcement,
+}: {
+  announcement: {
+    id: number;
+    reactionCount: number;
+    viewerReacted: boolean;
+    viewerReaction: ReactionType | null;
+  };
+}) {
+  const auth = useAuth();
+  const utils = trpc.useUtils();
+  const picker = useReactionPicker();
+  const [reactorsOpen, setReactorsOpen] = useState(false);
+  const reactMut = trpc.community.react.useMutation();
+  const state = announcementState(announcement);
+
+  const commit = async (type: ReactionType) => {
+    if (!auth.isAuthenticated) {
+      auth.openAuth();
+      return;
+    }
+    const before = state;
+    utils.community.list.setData(undefined, rows =>
+      rows?.map(row =>
+        row.id === announcement.id
+          ? { ...row, ...applySingleReaction(announcementState(row), type) }
+          : row
+      )
+    );
+    try {
+      const result = await reactMut.mutateAsync({
+        announcementId: announcement.id,
+        reaction: type,
+      });
+      utils.community.list.setData(undefined, rows =>
+        rows?.map(row =>
+          row.id === announcement.id
+            ? { ...row, ...adoptSingleReaction(before, type, result) }
+            : row
+        )
+      );
+    } catch (error) {
+      notifyError(error);
+    } finally {
+      await utils.community.list.invalidate();
+    }
+  };
+
+  return (
+    <div
+      className="announcement-reactions"
+      role="group"
+      aria-label="Announcement reactions"
+      {...picker.longPress}
+    >
+      <ReactionSummaryPill
+        count={state.reactionCount}
+        active={state.viewerReaction}
+        disabled={reactMut.isPending}
+        ariaLabel={
+          state.viewerReaction
+            ? "Change your reaction"
+            : "React to this announcement"
+        }
+        title="React"
+        onClick={event => {
+          event.preventDefault();
+          event.stopPropagation();
+          picker.openFromEvent(event);
+        }}
+      />
+      <ReactionPicker
+        open={picker.open}
+        anchor={picker.anchor}
+        active={state.viewerReaction}
+        disabled={reactMut.isPending}
+        label="Choose an announcement reaction"
+        onSelect={type => void commit(type)}
+        onClose={picker.close}
+        onOpenReactors={() => setReactorsOpen(true)}
+      />
+      <ReactorList
+        open={reactorsOpen}
+        title="Announcement reactions"
+        source={{ kind: "community", announcementId: announcement.id }}
+        onClose={() => setReactorsOpen(false)}
+      />
+    </div>
+  );
+}
+
 export function CommunityAnnouncements() {
   const auth = useAuth();
   const profileQuery = trpc.profile.me.useQuery(undefined, {
@@ -4189,6 +4478,7 @@ export function CommunityAnnouncements() {
                   )
                 )}
               </div>
+              <AnnouncementReactionBar announcement={announcement} />
               <AnnouncementComments
                 announcementId={announcement.id}
                 commentCount={announcement.commentCount}

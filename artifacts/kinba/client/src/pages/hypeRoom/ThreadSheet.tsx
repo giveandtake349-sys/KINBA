@@ -16,6 +16,7 @@ export function ThreadSheet({
   messages,
   members,
   hostId,
+  roomId,
   viewerId,
   isHostViewer,
   isActiveMember,
@@ -37,6 +38,8 @@ export function ThreadSheet({
   messages: MessageRow[];
   members: MemberRow[];
   hostId: number | null;
+  /** Enables the M6 reactor list on each thread card when present. */
+  roomId?: number;
   viewerId?: number | null;
   isHostViewer: boolean;
   isActiveMember: boolean;
@@ -103,6 +106,7 @@ export function ThreadSheet({
               row={root}
               members={members}
               hostId={hostId}
+              roomId={roomId}
               viewerId={viewerId ?? null}
               isHostViewer={isHostViewer}
               isActiveMember={isActiveMember}
@@ -123,6 +127,7 @@ export function ThreadSheet({
                 row={row}
                 members={members}
                 hostId={hostId}
+                roomId={roomId}
                 viewerId={viewerId ?? null}
                 isHostViewer={isHostViewer}
                 isActiveMember={isActiveMember}

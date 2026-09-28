@@ -17,6 +17,10 @@ import { getTrpcCode, useNow } from "./HypeRooms";
 import { RoomHeader } from "./hypeRoom/RoomHeader";
 import { ActivityBar, PinnedHostNote } from "./hypeRoom/ActivityBar";
 import { MessageCard, type HypeReactionId } from "./hypeRoom/MessageCard";
+import {
+  applyReactionEntries,
+  toReactionEntries,
+} from "@/lib/reactionState";
 import { ThreadSheet } from "./hypeRoom/ThreadSheet";
 import { MembersPanel } from "./hypeRoom/MembersPanel";
 import { DropPanel } from "./hypeRoom/DropPanel";
@@ -67,24 +71,15 @@ function applyReactionOptimistic(
 ): MessageRow[] {
   return rows.map(row => {
     if (row.message.id !== messageId) return row;
-    const list = [...(row.reactions ?? [])];
-    const idx = list.findIndex(entry => entry.reaction === reaction);
-    const existing = idx >= 0 ? list[idx] : null;
-    const wasMine = existing?.reactedByMe ?? false;
-    const count = existing?.count ?? 0;
-    if (wasMine) {
-      const next = count - 1;
-      if (next <= 0) {
-        if (idx >= 0) list.splice(idx, 1);
-      } else if (idx >= 0) {
-        list[idx] = { reaction, count: next, reactedByMe: false };
-      }
-    } else if (idx >= 0) {
-      list[idx] = { reaction, count: count + 1, reactedByMe: true };
-    } else {
-      list.push({ reaction, count: 1, reactedByMe: true });
-    }
-    return { ...row, reactions: list };
+    // Mirror the server's exclusivity rule: toggling the active chip off,
+    // swapping the single chip I hold, or adding the first one.
+    return {
+      ...row,
+      reactions: applyReactionEntries(
+        toReactionEntries(row.reactions),
+        reaction
+      ),
+    };
   });
 }
 
@@ -870,6 +865,7 @@ export default function HypeRoomDetail({
                           row={row}
                           members={members}
                           hostId={room.hostId}
+                          roomId={roomId ?? undefined}
                           viewerId={userId}
                           isHostViewer={isHost}
                           isActiveMember={isActiveMember}
@@ -934,6 +930,7 @@ export default function HypeRoomDetail({
                 messages={messages}
                 members={members}
                 hostId={room.hostId}
+                roomId={roomId ?? undefined}
                 viewerId={userId}
                 isHostViewer={isHost}
                 isActiveMember={isActiveMember}

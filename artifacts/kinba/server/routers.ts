@@ -681,9 +681,13 @@ export const appRouter = router({
       .input(videoIdInput)
       .mutation(({ ctx, input }) => deleteVideo(input.videoId, ctx.user.id)),
     react: protectedProcedure
-      .input(videoIdInput)
+      .input(
+        videoIdInput.extend({
+          reaction: z.enum(REACTION_TYPES).optional(),
+        })
+      )
       .mutation(({ ctx, input }) =>
-        toggleVideoReaction(input.videoId, ctx.user.id)
+        toggleVideoReaction(input.videoId, ctx.user.id, input.reaction)
       ),
     reactors: publicProcedure
       .input(reactorPageInput.extend({ videoId: z.number().int().positive() }))
@@ -1562,8 +1566,12 @@ export const appRouter = router({
       }),
   }),
   community: router({
-    list: publicProcedure.query(() => listCommunityAnnouncements()),
-    mine: protectedProcedure.query(({ ctx }) => listCommunityAnnouncements(ctx.user.id)),
+    list: publicProcedure.query(({ ctx }) =>
+      listCommunityAnnouncements(undefined, ctx.user?.id ?? null)
+    ),
+    mine: protectedProcedure.query(({ ctx }) =>
+      listCommunityAnnouncements(ctx.user.id, ctx.user.id)
+    ),
     create: protectedProcedure
       .input(communityAnnouncementInput)
       .mutation(({ ctx, input }) =>
@@ -1584,9 +1592,13 @@ export const appRouter = router({
         deleteCommunityAnnouncement(input.announcementId, ctx.user.id)
       ),
     react: protectedProcedure
-      .input(announcementIdInput)
+      .input(
+        announcementIdInput.extend({
+          reaction: z.enum(REACTION_TYPES).optional(),
+        })
+      )
       .mutation(({ ctx, input }) =>
-        toggleCommunityReaction(input.announcementId, ctx.user.id)
+        toggleCommunityReaction(input.announcementId, ctx.user.id, input.reaction)
       ),
     reactors: publicProcedure
       .input(

@@ -18,6 +18,17 @@ import {
 } from "./shared";
 
 import { REACTION_OPTIONS, type ReactionType } from "@shared/reactions";
+import {
+  ReactionPicker,
+  ReactionSummaryPill,
+  ReactorList,
+  useReactionPicker,
+} from "@/components/reactions";
+import {
+  activeReactionEntry,
+  toReactionEntries,
+  totalReactionCount,
+} from "@/lib/reactionState";
 
 export type HypeReactionId = ReactionType;
 
@@ -68,6 +79,7 @@ export function MessageCard({
   row,
   members,
   hostId,
+  roomId,
   viewerId,
   isHostViewer,
   isActiveMember,
@@ -86,6 +98,8 @@ export function MessageCard({
   row: MessageRow;
   members: MemberRow[];
   hostId: number | null;
+  /** Enables the M6 reactor list for this message when present. */
+  roomId?: number;
   viewerId?: number | null;
   isHostViewer: boolean;
   isActiveMember: boolean;
@@ -103,6 +117,12 @@ export function MessageCard({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [trayOpen, setTrayOpen] = useState(false);
+  const [reactorsOpen, setReactorsOpen] = useState(false);
+  const picker = useReactionPicker(isActiveMember && !busy);
+
+  const entries = toReactionEntries(row.reactions);
+  const activeReaction = activeReactionEntry(entries);
+  const reactionTotal = totalReactionCount(entries);
 
   const name = displayMessageName(row);
   const role = roleFor(row, hostId, members);
@@ -274,7 +294,20 @@ export function MessageCard({
           className="hype-room-reactions"
           role="group"
           aria-label="Message reactions"
+          {...picker.longPress}
         >
+          <ReactionSummaryPill
+            count={reactionTotal}
+            active={activeReaction}
+            disabled={!isActiveMember || busy}
+            ariaLabel="Choose a reaction"
+            title="Choose a reaction"
+            onClick={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              picker.openFromEvent(event);
+            }}
+          />
           {HYPE_REACTIONS.map(({ id, label, glyph }) => {
             const entry = (row.reactions ?? []).find(r => r.reaction === id);
             const count = entry?.count ?? 0;
@@ -371,6 +404,27 @@ export function MessageCard({
             <X size={13} />
           </button>
         </div>
+      ) : null}
+
+      <ReactionPicker
+        open={picker.open}
+        anchor={picker.anchor}
+        active={activeReaction}
+        disabled={!isActiveMember || busy}
+        label="Choose a message reaction"
+        onSelect={onReact}
+        onClose={picker.close}
+        onOpenReactors={
+          roomId != null ? () => setReactorsOpen(true) : undefined
+        }
+      />
+      {roomId != null ? (
+        <ReactorList
+          open={reactorsOpen}
+          title="Message reactions"
+          source={{ kind: "hypeMessage", roomId, messageId: row.message.id }}
+          onClose={() => setReactorsOpen(false)}
+        />
       ) : null}
 
       {menuOpen ? (
