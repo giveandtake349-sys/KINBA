@@ -2,6 +2,8 @@ import { FormEvent, useState } from "react";
 import { ArrowRight, Loader2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { GoogleIcon } from "@/components/GoogleIcon";
+import { startGoogleSignIn, oauthErrorMessage } from "@/lib/oauth";
 
 type SupabaseAuthDialogProps = {
   open: boolean;
@@ -16,6 +18,7 @@ export function SupabaseAuthDialog({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
+  const [googlePending, setGooglePending] = useState(false);
 
   if (!open) return null;
 
@@ -50,6 +53,18 @@ export function SupabaseAuthDialog({
       );
     } finally {
       setPending(false);
+    }
+  };
+
+  const continueWithGoogle = async () => {
+    setGooglePending(true);
+    try {
+      await startGoogleSignIn(
+        `${window.location.pathname}${window.location.search}`
+      );
+    } catch (error) {
+      toast.error(oauthErrorMessage(error, "Unable to start Google sign-in."));
+      setGooglePending(false);
     }
   };
 
@@ -115,6 +130,22 @@ export function SupabaseAuthDialog({
             "Create account"
           )}
           <ArrowRight size={16} />
+        </button>
+        <div className="auth-divider">
+          <span>or</span>
+        </div>
+        <button
+          type="button"
+          className="oauth-btn"
+          onClick={continueWithGoogle}
+          disabled={pending || googlePending}
+        >
+          {googlePending ? (
+            <Loader2 className="spin" size={16} />
+          ) : (
+            <GoogleIcon size={16} />
+          )}
+          Continue with Google
         </button>
         <button
           type="button"

@@ -6,6 +6,7 @@ import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { SupabaseAuthProvider } from "./contexts/SupabaseAuthContext";
 import Home from "./pages/Home";
 import Admin from "./pages/Admin";
+import AuthCallback from "./pages/AuthCallback";
 import HypeRooms from "./pages/HypeRooms";
 import CreateHypeRoom from "./pages/CreateHypeRoom";
 import HypeRoomDetail from "./pages/HypeRoomDetail";
@@ -27,6 +28,7 @@ export default function App() {
             <ThemedToaster />
             <Switch>
               <Route path="/admin" component={Admin} />
+              <Route path="/auth/callback" component={AuthCallback} />
               {/* /rooms/new must be registered before /rooms/:id so "new" is not captured as an id. */}
               <Route path="/rooms/new" component={CreateHypeRoom} />
               <Route path="/rooms/:id" component={HypeRoomDetail} />

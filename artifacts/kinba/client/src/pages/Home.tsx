@@ -20,6 +20,7 @@ import {
   Film,
   Home as HomeIcon,
   ImagePlus,
+  Loader2,
   LogOut,
   Menu,
   Moon,
@@ -49,6 +50,8 @@ import {
 } from "@/lib/profileRoute";
 import { useTheme } from "@/contexts/ThemeContext";
 import { SupabaseAuthDialog } from "@/components/SupabaseAuthDialog";
+import { GoogleIcon } from "@/components/GoogleIcon";
+import { useGoogleIdentity } from "@/hooks/useGoogleIdentity";
 import { useScrollDirection } from "@/hooks/useScrollDirection";
 import {
   getImageDimensions,
@@ -1198,6 +1201,7 @@ function NotificationsPanel({ enabled }: { enabled: boolean }) {
 }
 
 function SettingsPanel({ onLogout }: { onLogout: () => void }) {
+  const google = useGoogleIdentity();
   return (
     <section
       className="media-section utility-section"
@@ -1216,6 +1220,35 @@ function SettingsPanel({ onLogout }: { onLogout: () => void }) {
             <span>Switch the app appearance instantly.</span>
           </div>
           <ThemeToggle />
+        </div>
+        <div>
+          <div>
+            <strong>Google account</strong>
+            <span>
+              {google.linked
+                ? "Connected. You can sign in with Google."
+                : "Link Google to sign in without a password."}
+            </span>
+          </div>
+          {google.linked ? (
+            <span className="settings-connected">
+              <Check size={15} /> Connected
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="settings-connect"
+              onClick={safeClick(google.connect)}
+              disabled={google.pending}
+            >
+              {google.pending ? (
+                <Loader2 className="spin" size={15} />
+              ) : (
+                <GoogleIcon size={15} />
+              )}
+              Connect
+            </button>
+          )}
         </div>
         <button type="button" className="settings-logout" onClick={safeClick(onLogout)}>
           <LogOut size={17} /> Log out
