@@ -5,7 +5,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { Flag, Radio, RefreshCw, ArrowLeft } from "lucide-react";
+import { Flag, Radio, RefreshCw, X } from "lucide-react";
 import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -15,7 +15,7 @@ import { ReportDialog } from "@/components/ReportDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getTrpcCode, useNow } from "./HypeRooms";
 import { RoomHeader } from "./hypeRoom/RoomHeader";
-import { ActivityBar, PinnedHostNote } from "./hypeRoom/ActivityBar";
+import { PinnedHostNote } from "./hypeRoom/ActivityBar";
 import { MessageCard, type HypeReactionId } from "./hypeRoom/MessageCard";
 import {
   applyReactionEntries,
@@ -28,7 +28,6 @@ import { EmptyRoom } from "./hypeRoom/EmptyRoom";
 import { SettingsModal } from "./hypeRoom/SettingsModal";
 import { InviteModal } from "./hypeRoom/InviteModal";
 import { RoomLinkBar } from "./hypeRoom/RoomLinkBar";
-import { LifecycleBanner } from "./hypeRoom/LifecycleBanner";
 import { Composer } from "./hypeRoom/Composer";
 import {
   displayMemberName,
@@ -61,6 +60,27 @@ function DetailState({
       <h3>{title}</h3>
       <p>{body}</p>
       {action ? <div className="hype-room-state-action">{action}</div> : null}
+    </div>
+  );
+}
+
+/** Compact × / HYPE ROOM bar for loading + error states (no room menu yet). */
+function DetailTopBar({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="hype-room-topbar">
+      <button
+        type="button"
+        className="hype-room-icon-btn hype-room-topbar-close"
+        aria-label="Back to rooms"
+        onClick={onClose}
+      >
+        <X size={17} aria-hidden="true" />
+      </button>
+      <span className="hype-room-identity">
+        <Radio size={13} aria-hidden="true" />
+        HYPE ROOM
+      </span>
+      <span aria-hidden="true" />
     </div>
   );
 }
@@ -140,6 +160,15 @@ export default function HypeRoomDetail({
     (roomQuery.isError &&
       typeof roomQuery.error?.message === "string" &&
       roomQuery.error.message.includes("currently disabled"));
+
+  // Mirrors the render chain below: only the loaded-room branch renders its
+  // own top bar (RoomHeader), every other branch uses DetailTopBar instead.
+  const showRoomHeader =
+    validId &&
+    !roomQuery.isPending &&
+    !roomQuery.isError &&
+    !unavailable &&
+    room != null;
 
   const membersQuery = trpc.hypeRooms.members.useQuery(
     { roomId: roomId ?? -1 },
@@ -696,11 +725,8 @@ export default function HypeRoomDetail({
 
   return (
     <div className="kinba-app hype-rooms-shell">
-      <main className="hype-rooms-page section-shell">
-        <button type="button" className="hype-rooms-back" onClick={backToLobby}>
-          <ArrowLeft size={15} />
-          Back to rooms
-        </button>
+      <main className="hype-rooms-page hype-room-detail-page section-shell">
+        {showRoomHeader ? null : <DetailTopBar onClose={backToLobby} />}
 
         {!validId ? (
           <DetailState
@@ -784,6 +810,7 @@ export default function HypeRoomDetail({
               onOpenInvite={openInvite}
               onOpenReport={openRoomReport}
               onSignIn={() => auth.openAuth()}
+              onClose={backToLobby}
             />
 
             <RoomLinkBar
@@ -791,23 +818,6 @@ export default function HypeRoomDetail({
               canManage={canEditSettings}
               busy={actionBusy}
               onManage={openSettings}
-            />
-
-            <LifecycleBanner room={room} nowMs={nowMs} />
-
-            <ActivityBar
-              participantCount={membersQuery.data ? members.length : null}
-              messageCount={
-                messagesQuery.data != null ? messages.length : null
-              }
-              hasDrop={dropId != null}
-              dropLabel={
-                dropData
-                  ? `${Math.max(0, dropData.remainingQuantity)} left`
-                  : dropId != null
-                    ? "linked"
-                    : undefined
-              }
             />
 
             {pinnedMessage ? (
@@ -821,46 +831,6 @@ export default function HypeRoomDetail({
             ) : null}
 
             <div className="hype-room-detail-grid">
-              <div className="hype-room-side">
-                <MembersPanel
-                  members={members}
-                  invites={invites}
-                  hostId={room.hostId}
-                  isHostViewer={isHost}
-                  viewerId={userId}
-                  busy={actionBusy}
-                  loading={membersQuery.isPending}
-                  error={membersQuery.isError}
-                  invitesReady={Boolean(invitesQuery.data)}
-                  onRetry={() => void membersQuery.refetch()}
-                  onSetRole={(id, role) => void handleSetRole(id, role)}
-                  onRemove={id => void handleRemoveMember(id)}
-                />
-
-                {dropId != null ? (
-                  <DropPanel
-                    drop={
-                      dropData
-                        ? {
-                            id: dropData.id,
-                            title: dropData.title,
-                            status: dropData.status,
-                            discountedPrice: dropData.discountedPrice,
-                            originalPrice: dropData.originalPrice,
-                            currency: dropData.currency,
-                            remainingQuantity: dropData.remainingQuantity,
-                            startsAt: dropData.startsAt,
-                            endsAt: dropData.endsAt,
-                          }
-                        : null
-                    }
-                    loading={dropQuery.isPending}
-                    error={dropQuery.isError}
-                    onRetry={() => void dropQuery.refetch()}
-                  />
-                ) : null}
-              </div>
-
               <section
                 className="hype-room-panel hype-room-chat"
                 aria-label="Room chat"
@@ -985,6 +955,46 @@ export default function HypeRoomDetail({
                   </p>
                 ) : null}
               </section>
+
+              <div className="hype-room-side">
+                <MembersPanel
+                  members={members}
+                  invites={invites}
+                  hostId={room.hostId}
+                  isHostViewer={isHost}
+                  viewerId={userId}
+                  busy={actionBusy}
+                  loading={membersQuery.isPending}
+                  error={membersQuery.isError}
+                  invitesReady={Boolean(invitesQuery.data)}
+                  onRetry={() => void membersQuery.refetch()}
+                  onSetRole={(id, role) => void handleSetRole(id, role)}
+                  onRemove={id => void handleRemoveMember(id)}
+                />
+
+                {dropId != null ? (
+                  <DropPanel
+                    drop={
+                      dropData
+                        ? {
+                            id: dropData.id,
+                            title: dropData.title,
+                            status: dropData.status,
+                            discountedPrice: dropData.discountedPrice,
+                            originalPrice: dropData.originalPrice,
+                            currency: dropData.currency,
+                            remainingQuantity: dropData.remainingQuantity,
+                            startsAt: dropData.startsAt,
+                            endsAt: dropData.endsAt,
+                          }
+                        : null
+                    }
+                    loading={dropQuery.isPending}
+                    error={dropQuery.isError}
+                    onRetry={() => void dropQuery.refetch()}
+                  />
+                ) : null}
+              </div>
             </div>
 
             {threadRoot ? (

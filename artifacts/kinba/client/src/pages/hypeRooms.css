@@ -12,6 +12,14 @@
   padding: 28px clamp(14px, 4vw, 48px) 110px;
 }
 
+/* Detail page — tighter vertical rhythm than the lobby so the conversation
+   stays the primary area on mobile. Touch targets are left untouched. */
+.hype-room-detail-page {
+  gap: 10px;
+  max-width: 1000px;
+  padding: 16px clamp(14px, 4vw, 48px) 72px;
+}
+
 .hype-rooms-back {
   align-items: center;
   background: transparent;
@@ -389,7 +397,7 @@
 
 .hype-room-detail-grid {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .hype-room-panel {
@@ -398,7 +406,7 @@
   border-radius: 18px;
   display: flex;
   flex-direction: column;
-  min-height: 220px;
+  min-height: 180px;
   overflow: hidden;
 }
 
@@ -433,12 +441,12 @@
 
 .hype-room-panel-body {
   display: grid;
-  gap: 10px;
-  padding: 14px;
+  gap: 8px;
+  padding: 12px;
 }
 
 .hype-room-messages {
-  max-height: 340px;
+  max-height: min(58vh, 480px);
   overflow-y: auto;
 }
 
@@ -613,7 +621,7 @@
 
 @media (min-width: 720px) {
   .hype-room-detail-grid {
-    grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.4fr);
+    grid-template-columns: minmax(0, 1.45fr) minmax(240px, 0.85fr);
     align-items: start;
   }
 
@@ -1131,15 +1139,22 @@
 
 .hype-room-header {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
+/* Compact top bar: × close (left) · HYPE ROOM (centered) · ⋯ menu (right). */
 .hype-room-topbar {
   align-items: center;
-  display: flex;
+  display: grid;
   gap: 10px;
-  justify-content: space-between;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
   min-height: 36px;
+}
+
+.hype-room-topbar-close {
+  border-radius: 10px;
+  height: 34px;
+  width: 34px;
 }
 
 .hype-room-identity {
@@ -1150,11 +1165,13 @@
   font-size: 0.7rem;
   font-weight: 700;
   gap: 7px;
+  justify-self: center;
   letter-spacing: 0.14em;
+  white-space: nowrap;
 }
 
 .hype-room-overflow {
-  margin-left: auto;
+  justify-self: end;
   position: relative;
 }
 
@@ -1216,8 +1233,8 @@
   border: 1px solid var(--border);
   border-radius: 20px;
   display: grid;
-  gap: 10px;
-  padding: 16px 16px 18px;
+  gap: 8px;
+  padding: 14px;
 }
 
 .hype-room-hero-status {
@@ -1414,7 +1431,7 @@
 
 @media (max-width: 560px) {
   .hype-room-hero {
-    padding: 14px 14px 16px;
+    padding: 12px 12px 13px;
   }
 
   .hype-room-overflow-menu {
@@ -1429,52 +1446,7 @@
   }
 }
 
-/* Phases 2–15 — activity, messages, threads, mentions, drops, empty, lifecycle, composer */
-
-.hype-room-activity {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  display: grid;
-  gap: 10px;
-  padding: 12px 14px;
-}
-
-.hype-room-activity-title {
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  margin: 0;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.hype-room-activity-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.hype-room-activity-list li {
-  align-items: center;
-  color: var(--muted);
-  display: inline-flex;
-  font-size: 0.8rem;
-  gap: 6px;
-}
-
-.hype-room-activity-value {
-  color: var(--text);
-  font-family: "DM Mono", monospace;
-  font-weight: 700;
-}
-
-.hype-room-activity-drop {
-  color: var(--teal) !important;
-}
+/* Phases 2–15 — messages, threads, mentions, drops, empty, composer */
 
 /* Hype Room upgrade — compact product/website link (header → link → comments).
    Single horizontal row, no card, no thumbnail. The component renders nothing
@@ -1533,10 +1505,10 @@
 .hype-room-host-note {
   background: var(--teal-soft);
   border: 1px solid color-mix(in srgb, var(--teal) 40%, transparent);
-  border-radius: 14px;
+  border-radius: 12px;
   display: grid;
-  gap: 6px;
-  padding: 11px 13px;
+  gap: 4px;
+  padding: 8px 11px;
 }
 
 .hype-room-host-note-label {
@@ -1566,8 +1538,27 @@
 
 .hype-room-side {
   display: grid;
-  gap: 14px;
+  gap: 10px;
   align-content: start;
+}
+
+/* Compact Members/Drop stack — sits below the conversation on every width. */
+.hype-room-side .hype-room-panel {
+  border-radius: 16px;
+}
+
+.hype-room-side .hype-room-panel-header {
+  padding: 9px 12px;
+}
+
+.hype-room-side .hype-room-panel-body {
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.hype-room-side .hype-room-member-list li {
+  border-radius: 10px;
+  padding: 7px 10px;
 }
 
 .hype-room-message-card {
@@ -1936,54 +1927,6 @@
   gap: 8px;
 }
 
-.hype-room-lifecycle {
-  align-items: flex-start;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  display: flex;
-  gap: 10px;
-  padding: 11px 13px;
-}
-
-.hype-room-lifecycle div {
-  display: grid;
-  gap: 2px;
-}
-
-.hype-room-lifecycle strong {
-  font-size: 0.78rem;
-  letter-spacing: 0.06em;
-}
-
-.hype-room-lifecycle span {
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
-.hype-room-lifecycle--upcoming {
-  background: var(--teal-soft);
-  border-color: color-mix(in srgb, var(--teal) 40%, transparent);
-  color: var(--teal);
-}
-
-.hype-room-lifecycle--live {
-  background: var(--accent-soft);
-  border-color: var(--accent-border);
-  color: var(--accent);
-}
-
-.hype-room-lifecycle--ending {
-  background: color-mix(in srgb, #d97706 14%, transparent);
-  border-color: color-mix(in srgb, #d97706 40%, transparent);
-  color: #d97706;
-}
-
-.hype-room-lifecycle--ended,
-.hype-room-lifecycle--archived {
-  background: color-mix(in srgb, var(--surface) 88%, var(--page-bg));
-  color: var(--muted);
-}
-
 .hype-room-thread-layer .hype-room-thread-sheet {
   max-height: min(90vh, 760px);
   width: min(100%, 560px);
@@ -2038,11 +1981,6 @@
     left: 8px;
     right: 8px;
     min-width: 0;
-  }
-
-  .hype-room-activity-list {
-    flex-direction: column;
-    gap: 8px;
   }
 }
 

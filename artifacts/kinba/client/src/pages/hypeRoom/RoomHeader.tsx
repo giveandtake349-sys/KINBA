@@ -251,6 +251,7 @@ export function RoomHeader({
   onOpenInvite,
   onOpenReport,
   onSignIn,
+  onClose,
 }: {
   room: HeaderRoom;
   nowMs: number;
@@ -278,6 +279,7 @@ export function RoomHeader({
   onOpenInvite: () => void;
   onOpenReport: () => void;
   onSignIn: () => void;
+  onClose: () => void;
 }) {
   const [infoOpen, setInfoOpen] = useState(false);
   const phase = roomPhase(room, nowMs);
@@ -337,6 +339,14 @@ export function RoomHeader({
   return (
     <header className="hype-room-header">
       <div className="hype-room-topbar">
+        <button
+          type="button"
+          className="hype-room-icon-btn hype-room-topbar-close"
+          aria-label="Back to rooms"
+          onClick={onClose}
+        >
+          <X size={17} aria-hidden="true" />
+        </button>
         <span className="hype-room-identity">
           <Radio size={13} aria-hidden="true" />
           HYPE ROOM
