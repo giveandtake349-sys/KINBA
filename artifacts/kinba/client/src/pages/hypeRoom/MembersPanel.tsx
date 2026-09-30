@@ -1,4 +1,5 @@
 import { Mail, Send, Trash2, Users } from "lucide-react";
+import { useLocation } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   displayInviteName,
@@ -39,6 +40,7 @@ export function MembersPanel({
   onSetRole: (userId: number, role: "speaker" | "audience") => void;
   onRemove: (userId: number) => void;
 }) {
+  const [, navigate] = useLocation();
   return (
     <section
       className="hype-room-panel"
@@ -89,7 +91,14 @@ export function MembersPanel({
               >
                 <span className="hype-room-member-main">
                   <span className="hype-room-member-name">
-                    {displayMemberName(member)}
+                    <button
+                      type="button"
+                      className="hype-room-member-profile-link"
+                      title={`View ${displayMemberName(member)}'s profile`}
+                      onClick={() => navigate(`/profile/${member.user.id}`)}
+                    >
+                      {displayMemberName(member)}
+                    </button>
                   </span>
                   <span
                     className={`hype-room-role-badge hype-room-role--${currentRole}`}

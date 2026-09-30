@@ -101,6 +101,9 @@ const hypeRoomsMocks = vi.hoisted(() => ({
   toggleHypeRoomMessageReaction: vi.fn(),
   setHypeRoomMemberRole: vi.fn(),
   updateHypeRoomSettings: vi.fn(),
+  setHypeRoomLink: vi.fn(),
+  hideHypeRoomMessage: vi.fn(),
+  ROOM_LINK_MAX_LENGTH: 2048,
   createHypeRoomInvite: vi.fn(),
   acceptHypeRoomInvite: vi.fn(),
   listHypeRoomInvites: vi.fn(),
@@ -508,14 +511,22 @@ describe("§22 writers — flag gating + payloads", () => {
   });
 
   it("exposes only approved §22 type constants", () => {
+    // Exact list (no extras) — the five Hype Room upgrade types below are the
+    // ones this upgrade introduced (comment/reply/mention/invite/moderation);
+    // anything else would silently widen the durable notification surface.
     expect(Object.values(NOTIFICATION_TYPES).sort()).toEqual(
       [
         "drop_claim_cancelled",
         "drop_claim_fulfilled",
         "drop_sold_out",
         "new_follower",
+        "room_comment",
         "room_expired",
+        "room_invite",
         "room_member_removed",
+        "room_mention",
+        "room_message_hidden",
+        "room_reply",
         "room_started",
       ].sort()
     );

@@ -193,3 +193,33 @@ describe("MessageCard reactions", () => {
     expect(chip.disabled).toBe(true);
   });
 });
+
+describe("MessageCard host moderation", () => {
+  function openMenu(overrides: Partial<Parameters<typeof MessageCard>[0]> = {}) {
+    renderCard({ isHostViewer: true, viewerId: 9, ...overrides });
+    fireEvent.click(screen.getByRole("button", { name: "Message actions" }));
+  }
+
+  it("offers Hide message to the host on someone else's message", () => {
+    const onHide = vi.fn();
+    openMenu({ onHide });
+
+    const item = screen.getByRole("menuitem", { name: "Hide message" });
+    fireEvent.click(item);
+    expect(onHide).toHaveBeenCalledTimes(1);
+  });
+
+  it("never offers Hide message on the host's own message", () => {
+    openMenu({ viewerId: 7, onHide: vi.fn() });
+    expect(
+      screen.queryByRole("menuitem", { name: "Hide message" })
+    ).toBeNull();
+  });
+
+  it("never offers Hide message to a viewer who is not the host", () => {
+    openMenu({ isHostViewer: false, onHide: vi.fn() });
+    expect(
+      screen.queryByRole("menuitem", { name: "Hide message" })
+    ).toBeNull();
+  });
+});

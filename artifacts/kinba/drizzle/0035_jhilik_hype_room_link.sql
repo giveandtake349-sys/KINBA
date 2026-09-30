@@ -1,0 +1,16 @@
+-- JHILIK Hype Room upgrade — optional product/website link (additive only).
+-- No DROP/TRUNCATE/RENAME. Existing hype_rooms rows are untouched; the new
+-- column is nullable so every existing room keeps linkUrl = NULL (renders
+-- nothing on the client).
+-- Do not execute against production from CI;
+-- production uses the companion *_APPLY.sql under separate review.
+--
+-- Idempotency / rerun safety:
+-- - ADD COLUMN uses IF NOT EXISTS, so re-running the whole file is a no-op
+--   once the column exists.
+-- - This canonical file has no BEGIN/COMMIT (drizzle-kit migration runner
+--   wraps the file); the *_APPLY.sql companion wraps the same statement in
+--   BEGIN/COMMIT.
+-- - Rollback path (only after confirming no room links are in use):
+--   ALTER TABLE "hype_rooms" DROP COLUMN IF EXISTS "linkUrl";
+ALTER TABLE "hype_rooms" ADD COLUMN IF NOT EXISTS "linkUrl" varchar(2048);--> statement-breakpoint

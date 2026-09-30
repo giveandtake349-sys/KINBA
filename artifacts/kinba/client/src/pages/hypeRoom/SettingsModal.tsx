@@ -6,11 +6,14 @@ type RoomSettingsValues = {
   topic: string;
   description: string;
   visibility: "public" | "link_only";
+  /** Optional product/website link — empty string clears it (max one per room). */
+  link: string;
 };
 
 /**
  * Premium-feeling room settings sheet — only title/topic/description/
- * visibility (matches server updateSettings). Lifecycle/host stay server-owned.
+ * visibility plus the optional product/website link (matches server
+ * updateSettings + setLink). Lifecycle/host stay server-owned.
  */
 export function SettingsModal({
   initial,
@@ -27,6 +30,7 @@ export function SettingsModal({
   const [topic, setTopic] = useState(initial.topic);
   const [description, setDescription] = useState(initial.description);
   const [visibility, setVisibility] = useState(initial.visibility);
+  const [link, setLink] = useState(initial.link);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -35,6 +39,7 @@ export function SettingsModal({
       topic: topic.trim(),
       description: description.trim(),
       visibility,
+      link: link.trim(),
     });
   };
 
@@ -65,8 +70,8 @@ export function SettingsModal({
           onSubmit={event => void handleSubmit(event)}
         >
           <p className="report-dialog-hint">
-            Title, topic, description, and visibility only. Lifecycle and host
-            cannot change here.
+            Title, topic, description, visibility, and one optional
+            product/website link. Lifecycle and host cannot change here.
           </p>
           <label htmlFor="hype-settings-title">
             Title <span className="report-dialog-req">(required)</span>
@@ -117,6 +122,33 @@ export function SettingsModal({
               <option value="link_only">Link only</option>
             </select>
           </label>
+          <label htmlFor="hype-settings-link">
+            Product / website link{" "}
+            <span className="report-dialog-optional">
+              (optional — leave empty to remove)
+            </span>
+            <input
+              id="hype-settings-link"
+              value={link}
+              onChange={event => setLink(event.target.value)}
+              maxLength={2048}
+              type="url"
+              inputMode="url"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="https://example.com/product"
+            />
+          </label>
+          {link.trim().length > 0 ? (
+            <button
+              type="button"
+              className="muted-btn hype-settings-remove-link"
+              onClick={() => setLink("")}
+              disabled={saving}
+            >
+              Remove link
+            </button>
+          ) : null}
           <div className="report-dialog-actions">
             <button
               type="button"

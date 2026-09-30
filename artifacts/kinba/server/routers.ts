@@ -95,6 +95,7 @@ import {
   createHypeRoomInvite,
   endHypeRoom,
   getHypeRoom,
+  hideHypeRoomMessage,
   joinHypeRoom,
   leaveHypeRoom,
   listActiveHypeRooms,
@@ -107,12 +108,14 @@ import {
   removeHypeRoomMember,
   resolveHypeRoomExpiry,
   sendHypeRoomMessage,
+  setHypeRoomLink,
   setHypeRoomMemberRole,
   toggleHypeRoomMessageReaction,
   unpinHypeRoomMessage,
   updateHypeRoomSettings,
   HYPE_ROOM_REACTIONS,
   ROOM_DURATION_HOURS,
+  ROOM_LINK_MAX_LENGTH,
   ROOM_MESSAGE_MAX_LENGTH,
 } from "./hypeRooms";
 import {
@@ -232,7 +235,8 @@ function mapHypeRoomMemberError(error: unknown, _op: string): TRPCError {
     message === "Invalid mention target." ||
     message === "You can only mention active members of this room." ||
     message === "Invalid room role." ||
-    message === "No settings provided."
+    message === "No settings provided." ||
+    message.startsWith("Room link must")
   ) {
     return new TRPCError({ code: "BAD_REQUEST", message });
   }
@@ -243,7 +247,9 @@ function mapHypeRoomMemberError(error: unknown, _op: string): TRPCError {
     message === "Only the host can list invites." ||
     message === "The host role cannot be changed." ||
     message === "The host cannot be invited." ||
-    message === "This invite was not created for you."
+    message === "This invite was not created for you." ||
+    message === "Only the host can update the room link." ||
+    message === "Only the host can hide messages in this room."
   ) {
     return new TRPCError({ code: "FORBIDDEN", message });
   }
@@ -1357,6 +1363,28 @@ export const appRouter = router({
           throw mapHypeRoomMemberError(error, "updateSettings");
         }
       }),
+    // Hype Room upgrade — single optional product/website link per room.
+    // Server owns scheme allow-list + host authorization (validateRoomLink).
+    setLink: protectedProcedure
+      .input(
+        z.object({
+          roomId: z.number().int().positive(),
+          // Transport guard only; validateRoomLink enforces length + scheme.
+          url: z.string().max(ROOM_LINK_MAX_LENGTH * 4).nullable().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await setHypeRoomLink(
+            input.roomId,
+            ctx.user.id,
+            input.url ?? null
+          );
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "setLink");
+        }
+      }),
     createInvite: protectedProcedure
       .input(
         z.object({
@@ -1432,6 +1460,18 @@ export const appRouter = router({
           return await unpinHypeRoomMessage(input.roomId, ctx.user.id);
         } catch (error) {
           throw mapHypeRoomMemberError(error, "unpin");
+        }
+      }),
+    // Host-scoped moderation through the existing message architecture
+    // (same hiddenAt column admin moderation uses). Server re-checks hostId.
+    hideMessage: protectedProcedure
+      .input(z.object({ messageId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        await requireFeatureFlag("time_limited_communities");
+        try {
+          return await hideHypeRoomMessage(input.messageId, ctx.user.id);
+        } catch (error) {
+          throw mapHypeRoomMemberError(error, "hideMessage");
         }
       }),
     removeMember: protectedProcedure

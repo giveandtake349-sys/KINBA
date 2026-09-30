@@ -485,6 +485,21 @@
   white-space: nowrap;
 }
 
+.hype-room-member-profile-link {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+}
+
+.hype-room-member-profile-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 .hype-room-pinned {
   align-items: flex-start;
   background: var(--teal-soft);
@@ -1459,6 +1474,60 @@
 
 .hype-room-activity-drop {
   color: var(--teal) !important;
+}
+
+/* Hype Room upgrade — compact product/website link (header → link → comments).
+   Single horizontal row, no card, no thumbnail. The component renders nothing
+   when the room has no link, so this never leaves a blank block behind. */
+.hype-room-link-bar {
+  align-items: center;
+  background: color-mix(in srgb, var(--surface) 88%, var(--page-bg));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 6px 5px 10px;
+}
+
+.hype-room-link-bar-anchor {
+  align-items: center;
+  color: var(--text);
+  display: inline-flex;
+  flex: 1;
+  font-size: 0.8rem;
+  font-weight: 700;
+  gap: 7px;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.hype-room-link-bar-anchor:hover {
+  color: var(--accent);
+}
+
+.hype-room-link-bar-icon {
+  align-items: center;
+  background: var(--teal-soft);
+  border-radius: 8px;
+  color: var(--teal);
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}
+
+.hype-room-link-bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hype-room-link-bar-edit {
+  flex-shrink: 0;
+  height: 26px;
+  width: 26px;
 }
 
 .hype-room-host-note {

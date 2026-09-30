@@ -912,6 +912,9 @@ export const hypeRooms = pgTable(
     expiredAt: timestamp("expiredAt", { withTimezone: true }),
     archivedAt: timestamp("archivedAt", { withTimezone: true }),
     cancelReason: text("cancelReason"),
+    // Optional creator-configured product/website link (max one per room).
+    // Nullable → renders nothing when absent. Server validates the scheme.
+    linkUrl: varchar("linkUrl", { length: 2048 }),
   },
   table => [
     index("hype_rooms_status_ends_idx").on(table.status, table.endsAt),

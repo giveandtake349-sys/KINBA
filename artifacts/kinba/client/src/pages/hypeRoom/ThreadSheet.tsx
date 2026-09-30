@@ -32,6 +32,7 @@ export function ThreadSheet({
   onReact,
   onPin,
   onReport,
+  onHide,
   onClose,
 }: {
   root: MessageRow;
@@ -55,6 +56,7 @@ export function ThreadSheet({
   onReact: (messageId: number, reaction: HypeReactionId) => void;
   onPin?: (messageId: number) => void;
   onReport?: (messageId: number) => void;
+  onHide?: (messageId: number) => void;
   onClose: () => void;
 }) {
   const closeRef = useRef<HTMLButtonElement | null>(null);
@@ -120,6 +122,7 @@ export function ThreadSheet({
               onReact={reaction => onReact(root.message.id, reaction)}
               onPin={onPin ? () => onPin(root.message.id) : undefined}
               onReport={onReport ? () => onReport(root.message.id) : undefined}
+              onHide={onHide ? () => onHide(root.message.id) : undefined}
             />
             {replies.map(row => (
               <MessageCard
@@ -142,6 +145,7 @@ export function ThreadSheet({
                 onReport={
                   onReport ? () => onReport(row.message.id) : undefined
                 }
+                onHide={onHide ? () => onHide(row.message.id) : undefined}
               />
             ))}
             {replies.length === 0 ? (

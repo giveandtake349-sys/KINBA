@@ -11,7 +11,7 @@
  * No drops, claims, or rewards in this module.
  * M7: durable notifications fire only on actual status transitions (§22).
  */
-import { and, asc, eq, inArray, isNull, isNotNull, ne } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, isNotNull, ne, sql } from "drizzle-orm";
 import {
   hypeRoomInvites,
   hypeRoomMembers,
@@ -32,8 +32,11 @@ import {
 } from "@shared/stateMachines";
 import { getDb } from "./db";
 import {
+  notifyHypeRoomMessage,
   notifyMemberRemoved,
   notifyRoomExpired,
+  notifyRoomInvited,
+  notifyRoomMessageHidden,
   notifyRoomWentLive,
 } from "./notifications";
 
@@ -267,6 +270,72 @@ export function matchesRoomListFilter(
   return room.hostId === userId;
 }
 
+/**
+ * Discovery visibility (spec §8.4 "public listing vs link-only").
+ * Public rooms are discoverable by anyone; link-only rooms are unlisted and
+ * only surface to the host or an active member of that room. Anonymous
+ * viewers never see a link-only room in a list.
+ */
+export function canDiscoverRoom(
+  room: Pick<HypeRoomRow, "id" | "visibility" | "hostId">,
+  viewerId: number | null | undefined,
+  memberRoomIds: ReadonlySet<number>
+): boolean {
+  if (room.visibility === "public") return true;
+  if (viewerId == null) return false;
+  if (room.hostId === viewerId) return true;
+  return memberRoomIds.has(room.id);
+}
+
+/** Active (not left, not banned) room ids the viewer belongs to. */
+async function listViewerMemberRoomIds(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  userId: number
+): Promise<Set<number>> {
+  const rows = await db
+    .select({ roomId: hypeRoomMembers.roomId })
+    .from(hypeRoomMembers)
+    .where(
+      and(
+        eq(hypeRoomMembers.userId, userId),
+        isNull(hypeRoomMembers.leftAt),
+        isNull(hypeRoomMembers.bannedAt)
+      )
+    );
+  return new Set(rows.map(row => row.roomId));
+}
+
+/** Active participant counts per room (host + joined, non-banned members). */
+async function countRoomParticipants(
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
+  roomIds: number[]
+): Promise<Map<number, number>> {
+  const counts = new Map<number, number>();
+  if (roomIds.length === 0) return counts;
+  const rows = await db
+    .select({
+      roomId: hypeRoomMembers.roomId,
+      value: sql<number>`count(*)::int`,
+    })
+    .from(hypeRoomMembers)
+    .where(
+      and(
+        inArray(hypeRoomMembers.roomId, roomIds),
+        isNull(hypeRoomMembers.leftAt),
+        isNull(hypeRoomMembers.bannedAt)
+      )
+    )
+    .groupBy(hypeRoomMembers.roomId);
+  for (const row of rows) {
+    counts.set(row.roomId, Number(row.value));
+  }
+  return counts;
+}
+
+/** Room row + active participant count (discovery payload). */
+export type HypeRoomSummary = HypeRoomRow & { participantCount: number };
+
+
 async function persistResolvedRoom(
   db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
   room: HypeRoomRow,
@@ -414,6 +483,8 @@ export async function getHypeRoom(
  * - live: currently live
  * - upcoming: scheduled, not yet live
  * - mine: rooms hosted by userId (parallel to drops.list mine)
+ * Visibility: link-only rooms are unlisted — only the host or an active
+ * member sees them (see canDiscoverRoom).
  * Order: startsAt, id (unchanged from M1).
  */
 export async function listActiveHypeRooms(
@@ -421,7 +492,7 @@ export async function listActiveHypeRooms(
     filter?: HypeRoomListFilter;
     userId?: number | null;
   } = {}
-): Promise<HypeRoomRow[]> {
+): Promise<HypeRoomSummary[]> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const now = new Date();
@@ -440,14 +511,30 @@ export async function listActiveHypeRooms(
     .where(inArray(hypeRooms.status, [...baseStatuses]))
     .orderBy(asc(hypeRooms.startsAt), asc(hypeRooms.id));
 
+  const memberRoomIds =
+    userId != null
+      ? await listViewerMemberRoomIds(db, userId)
+      : new Set<number>();
+
   const matched: HypeRoomRow[] = [];
   for (const row of rows) {
     const resolved = await persistResolvedRoom(db, row, now);
-    if (matchesRoomListFilter(resolved, filter, userId)) {
+    if (
+      matchesRoomListFilter(resolved, filter, userId) &&
+      canDiscoverRoom(resolved, userId, memberRoomIds)
+    ) {
       matched.push(resolved);
     }
   }
-  return matched;
+
+  const counts = await countRoomParticipants(
+    db,
+    matched.map(room => room.id)
+  );
+  return matched.map(room => ({
+    ...room,
+    participantCount: counts.get(room.id) ?? 0,
+  }));
 }
 
 /**
@@ -1051,7 +1138,7 @@ export async function sendHypeRoomMessage(
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
-  return db.transaction(async tx => {
+  const outcome = await db.transaction(async tx => {
     const [roomRow] = await tx
       .select()
       .from(hypeRooms)
@@ -1072,6 +1159,7 @@ export async function sendHypeRoomMessage(
     }
 
     let parentId: number | null = null;
+    let parentAuthorId: number | null = null;
     if (options.parentId != null) {
       const [parent] = await tx
         .select()
@@ -1079,6 +1167,7 @@ export async function sendHypeRoomMessage(
         .where(eq(hypeRoomMessages.id, options.parentId))
         .limit(1);
       parentId = validateReplyParent(options.parentId, parent ?? null, roomId);
+      parentAuthorId = parent?.userId ?? null;
     }
 
     // Mentions: only active room members (not left, not banned) may be targeted.
@@ -1135,8 +1224,36 @@ export async function sendHypeRoomMessage(
         }))
       );
     }
-    return inserted;
+    return {
+      message: inserted,
+      parentAuthorId,
+      room: {
+        id: room.id,
+        title: room.title,
+        hostId: room.hostId,
+      },
+    };
   });
+
+  // §22-style writers fire only after the send transaction commits; they are
+  // best-effort and never fail the parent send (see notifyHypeRoomMessage).
+  try {
+    await notifyHypeRoomMessage({
+      room: outcome.room,
+      message: {
+        id: outcome.message.id,
+        userId,
+        parentId: outcome.message.parentId,
+      },
+      body: validated,
+      parentAuthorId: outcome.parentAuthorId,
+      mentionedUserIds: mentionIds,
+    });
+  } catch (error) {
+    console.warn("[Notifications] Hype Room message notify failed:", error);
+  }
+
+  return outcome.message;
 }
 
 export type ReactionToggleResult = {
@@ -1454,8 +1571,87 @@ export async function updateHypeRoomSettings(
   return updated;
 }
 
-export type HypeRoomInviteRow = typeof hypeRoomInvites.$inferSelect;
+// ---------------------------------------------------------------------------
+// Optional product / website link (creator-configurable, max one per room)
+// ---------------------------------------------------------------------------
 
+/** Matches the DB column length (varchar(2048)). */
+export const ROOM_LINK_MAX_LENGTH = 2048;
+
+/** Only web schemes are allowed — rejects javascript:, data:, vbscript:, etc. */
+export const ROOM_LINK_PROTOCOLS = ["https:", "http:"] as const;
+
+/**
+ * Server-side URL validation for a room product/website link.
+ * Returns the normalized (trimmed) URL, or null when the input means "remove".
+ * HTTPS is the preferred scheme; plain http stays allowed because the existing
+ * product already accepts http external links (sponsor externalLink).
+ */
+export function validateRoomLink(
+  raw: string | null | undefined
+): string | null {
+  if (raw == null) return null;
+  const value = String(raw).trim();
+  if (!value) return null;
+  if (value.length > ROOM_LINK_MAX_LENGTH) {
+    throw new Error(
+      `Room link must be at most ${ROOM_LINK_MAX_LENGTH} characters.`
+    );
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new Error("Room link must be a valid URL.");
+  }
+  if (!(ROOM_LINK_PROTOCOLS as readonly string[]).includes(parsed.protocol)) {
+    throw new Error("Room link must use https:// or http://.");
+  }
+  if (!parsed.hostname) {
+    throw new Error("Room link must include a host.");
+  }
+  return parsed.toString();
+}
+
+/**
+ * Host-only add / edit / remove of the room's single product/website link.
+ * Authorization (room.hostId === userId) is checked server-side before any
+ * lifecycle work; empty/null clears the link.
+ */
+export async function setHypeRoomLink(
+  roomId: number,
+  userId: number,
+  raw: string | null | undefined
+): Promise<HypeRoomRow> {
+  const linkUrl = validateRoomLink(raw);
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const [roomRow] = await db
+    .select()
+    .from(hypeRooms)
+    .where(eq(hypeRooms.id, roomId))
+    .limit(1);
+  if (!roomRow) throw new Error("Room not found.");
+  // Host check before lifecycle persist (hostId is immutable across resolve).
+  if (!isRoomHost(roomRow.hostId, userId)) {
+    throw new Error("Only the host can update the room link.");
+  }
+  const room = await persistResolvedRoom(db, roomRow, new Date());
+  if (!canUpdateRoomSettings(room.status)) {
+    throw new Error("This room can no longer be edited.");
+  }
+
+  const [updated] = await db
+    .update(hypeRooms)
+    .set({ linkUrl, updatedAt: new Date() })
+    .where(eq(hypeRooms.id, roomId))
+    .returning();
+  if (!updated) throw new Error("Room not found.");
+  return updated;
+}
+
+export type HypeRoomInviteRow = typeof hypeRoomInvites.$inferSelect;
 /**
  * Host creates (or re-opens) a user-targeted invite.
  * Unique(roomId, invitedUserId). No public share tokens.
@@ -1471,7 +1667,7 @@ export async function createHypeRoomInvite(
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
-  return db.transaction(async tx => {
+  const { invite, roomTitle } = await db.transaction(async tx => {
     const [roomRow] = await tx
       .select()
       .from(hypeRooms)
@@ -1540,7 +1736,7 @@ export async function createHypeRoomInvite(
         .where(eq(hypeRoomInvites.id, existing.id))
         .returning();
       if (!reopened) throw new Error("Failed to create invite.");
-      return reopened;
+      return { invite: reopened, roomTitle: room.title };
     }
 
     const [created] = await tx
@@ -1555,8 +1751,22 @@ export async function createHypeRoomInvite(
       })
       .returning();
     if (!created) throw new Error("Failed to create invite.");
-    return created;
+    return { invite: created, roomTitle: room.title };
   });
+
+  // §22-style writer fires only after the invite transaction commits; it is
+  // best-effort and never fails the parent invite (see notifyRoomInvited).
+  try {
+    await notifyRoomInvited(
+      { id: roomId, title: roomTitle },
+      invitedUserId,
+      hostId
+    );
+  } catch (error) {
+    console.warn("[Notifications] Hype Room invite notify failed:", error);
+  }
+
+  return invite;
 }
 
 /**
@@ -1791,6 +2001,85 @@ export async function unpinHypeRoomMessage(
     if (!updated) throw new Error("Room not found.");
     return updated;
   });
+}
+
+/**
+ * Host soft-hides a message in their own room (sets hiddenAt + moderatedAt
+ * + moderatedBy) through the existing message architecture — the same
+ * hiddenAt column admin moderation uses, so listRoomMessages keeps excluding
+ * it. Host-scoped: admins keep their own admin.messages.hide path.
+ */
+export async function hideHypeRoomMessage(
+  messageId: number,
+  actorId: number
+): Promise<HypeRoomMessageRow> {
+  if (!Number.isInteger(messageId) || messageId <= 0) {
+    throw new Error("Message id is required.");
+  }
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const { hidden, room } = await db.transaction(async tx => {
+    const [message] = await tx
+      .select()
+      .from(hypeRoomMessages)
+      .where(eq(hypeRoomMessages.id, messageId))
+      .limit(1);
+    if (!message || message.hiddenAt) throw new Error("Message not found.");
+
+    const [roomRow] = await tx
+      .select()
+      .from(hypeRooms)
+      .where(eq(hypeRooms.id, message.roomId))
+      .limit(1);
+    if (!roomRow) throw new Error("Room not found.");
+    // Server-side host authorization — never trusts a client-provided host id.
+    if (!isRoomHost(roomRow.hostId, actorId)) {
+      throw new Error("Only the host can hide messages in this room.");
+    }
+
+    const now = new Date();
+    const [hiddenRow] = await tx
+      .update(hypeRoomMessages)
+      .set({ hiddenAt: now, moderatedAt: now, moderatedBy: actorId })
+      .where(
+        and(
+          eq(hypeRoomMessages.id, messageId),
+          isNull(hypeRoomMessages.hiddenAt)
+        )
+      )
+      .returning();
+    if (!hiddenRow) throw new Error("Message not found.");
+
+    // Keep the room pin consistent when the pinned message is hidden.
+    if (roomRow.pinnedMessageId === messageId) {
+      await tx
+        .update(hypeRooms)
+        .set({ pinnedMessageId: null, updatedAt: now })
+        .where(eq(hypeRooms.id, roomRow.id));
+    }
+    return {
+      hidden: hiddenRow,
+      room: { id: roomRow.id, title: roomRow.title, hostId: roomRow.hostId },
+    };
+  });
+
+  // §22 "content removed" writer — only the message author is told, never the
+  // host who performed the hide. Best-effort; never fails the moderation action.
+  const authorId = hidden.userId;
+  if (authorId != null && authorId !== actorId) {
+    try {
+      await notifyRoomMessageHidden(
+        room,
+        { id: hidden.id, roomId: hidden.roomId },
+        authorId
+      );
+    } catch (error) {
+      console.warn("[Notifications] Hype Room hide notify failed:", error);
+    }
+  }
+
+  return hidden;
 }
 
 /**

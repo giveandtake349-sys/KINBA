@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import {
   CornerUpLeft,
   Copy,
+  EyeOff,
   Flag,
   MoreHorizontal,
   Pin,
@@ -93,6 +94,7 @@ export function MessageCard({
   onReact,
   onPin,
   onReport,
+  onHide,
   onOpenThread,
 }: {
   row: MessageRow;
@@ -113,6 +115,8 @@ export function MessageCard({
   onReact: (reaction: HypeReactionId) => void;
   onPin?: () => void;
   onReport?: () => void;
+  /** Host-only moderation: soft-hides this message server-side. */
+  onHide?: () => void;
   onOpenThread?: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -179,6 +183,15 @@ export function MessageCard({
       label: "Pin message",
       icon: <Pin size={14} />,
       run: onPin,
+    });
+  }
+  if (onHide && isHostViewer && !isOwn) {
+    actions.push({
+      id: "hide",
+      label: "Hide message",
+      icon: <EyeOff size={14} />,
+      run: onHide,
+      danger: true,
     });
   }
   if (onReport && canReport) {

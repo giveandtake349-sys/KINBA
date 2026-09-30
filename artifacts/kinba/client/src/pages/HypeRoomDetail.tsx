@@ -6,7 +6,7 @@ import {
   type ReactNode,
 } from "react";
 import { Flag, Radio, RefreshCw, ArrowLeft } from "lucide-react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { toast } from "sonner";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
@@ -27,6 +27,7 @@ import { DropPanel } from "./hypeRoom/DropPanel";
 import { EmptyRoom } from "./hypeRoom/EmptyRoom";
 import { SettingsModal } from "./hypeRoom/SettingsModal";
 import { InviteModal } from "./hypeRoom/InviteModal";
+import { RoomLinkBar } from "./hypeRoom/RoomLinkBar";
 import { LifecycleBanner } from "./hypeRoom/LifecycleBanner";
 import { Composer } from "./hypeRoom/Composer";
 import {
@@ -105,6 +106,7 @@ export default function HypeRoomDetail({
   const [settingsVisibility, setSettingsVisibility] = useState<
     "public" | "link_only"
   >("public");
+  const [settingsLink, setSettingsLink] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteTerm, setInviteTerm] = useState("");
   const [inviteDebounced, setInviteDebounced] = useState("");
@@ -205,6 +207,8 @@ export default function HypeRoomDetail({
   const reactionMut = trpc.hypeRooms.toggleReaction.useMutation();
   const setRoleMut = trpc.hypeRooms.setMemberRole.useMutation();
   const updateSettingsMut = trpc.hypeRooms.updateSettings.useMutation();
+  const setLinkMut = trpc.hypeRooms.setLink.useMutation();
+  const hideMessageMut = trpc.hypeRooms.hideMessage.useMutation();
   const createInviteMut = trpc.hypeRooms.createInvite.useMutation();
 
   const canEditSettings =
@@ -285,6 +289,26 @@ export default function HypeRoomDetail({
     if (threadRootId == null) return null;
     return messages.find(row => row.message.id === threadRootId) ?? null;
   }, [threadRootId, messages]);
+
+  // Deep link from a durable notification: /rooms/:id?msg=<messageId>.
+  // Highlights and scrolls the anchored message once the list is available.
+  const search = useSearch();
+  const deepLinkMessageId = useMemo(() => {
+    const raw = Number(new URLSearchParams(search ?? "").get("msg") ?? "");
+    return Number.isInteger(raw) && raw > 0 ? raw : null;
+  }, [search]);
+
+  useEffect(() => {
+    if (deepLinkMessageId == null || messagesQuery.isPending) return;
+    if (!messages.some(row => row.message.id === deepLinkMessageId)) return;
+    setSelectedMessageId(current => current ?? deepLinkMessageId);
+    const node = document.querySelector(
+      `[data-message-id="${deepLinkMessageId}"]`
+    );
+    if (node instanceof HTMLElement) {
+      node.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }, [deepLinkMessageId, messages, messagesQuery.isPending]);
 
   const userId = auth.user?.id ?? null;
   const isHost = room != null && userId != null && room.hostId === userId;
@@ -502,6 +526,7 @@ export default function HypeRoomDetail({
     setSettingsTopic(room.topic ?? "");
     setSettingsDescription(room.description ?? "");
     setSettingsVisibility(room.visibility);
+    setSettingsLink(room.linkUrl ?? "");
     setSettingsOpen(true);
   };
 
@@ -510,12 +535,15 @@ export default function HypeRoomDetail({
     topic: string;
     description: string;
     visibility: "public" | "link_only";
+    link: string;
   }) => {
     if (!requireAuth() || roomId == null) return;
     if (values.title.length < 3) {
       toast.error("Room title must be 3–180 characters.");
       return;
     }
+    const nextLink = values.link.trim();
+    const linkChanged = nextLink !== (room?.linkUrl ?? "").trim();
     try {
       await updateSettingsMut.mutateAsync({
         roomId,
@@ -524,14 +552,34 @@ export default function HypeRoomDetail({
         description: values.description ? values.description : null,
         visibility: values.visibility,
       });
+      if (linkChanged) {
+        await setLinkMut.mutateAsync({ roomId, url: nextLink || null });
+      }
       setSettingsOpen(false);
       await invalidateRoom();
-      toast.success("Room settings updated.");
+      toast.success(
+        linkChanged && nextLink === ""
+          ? "Room settings updated — link removed."
+          : "Room settings updated."
+      );
     } catch (error) {
       toast.error(
         error instanceof Error
           ? error.message
           : "Could not update room settings."
+      );
+    }
+  };
+
+  const handleHideMessage = async (messageId: number) => {
+    if (!requireAuth()) return;
+    try {
+      await hideMessageMut.mutateAsync({ messageId });
+      await utils.hypeRooms.messages.invalidate();
+      toast.success("Message hidden.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not hide the message."
       );
     }
   };
@@ -636,6 +684,7 @@ export default function HypeRoomDetail({
     reactionMut.isPending ||
     setRoleMut.isPending ||
     updateSettingsMut.isPending ||
+    hideMessageMut.isPending ||
     createInviteMut.isPending;
 
   const pinnedMessage = useMemo(() => {
@@ -735,6 +784,13 @@ export default function HypeRoomDetail({
               onOpenInvite={openInvite}
               onOpenReport={openRoomReport}
               onSignIn={() => auth.openAuth()}
+            />
+
+            <RoomLinkBar
+              url={room.linkUrl ?? null}
+              canManage={canEditSettings}
+              busy={actionBusy}
+              onManage={openSettings}
             />
 
             <LifecycleBanner room={room} nowMs={nowMs} />
@@ -891,6 +947,13 @@ export default function HypeRoomDetail({
                               ? () => openMessageReport(row.message.id)
                               : undefined
                           }
+                          onHide={
+                            isHost &&
+                            row.user.id != null &&
+                            row.user.id !== userId
+                              ? () => void handleHideMessage(row.message.id)
+                              : undefined
+                          }
                           onOpenThread={() => openThread(row)}
                         />
                       ))}
@@ -951,6 +1014,7 @@ export default function HypeRoomDetail({
                 onReact={(id, reaction) => void handleReaction(id, reaction)}
                 onPin={isHost ? id => void handlePin(id) : undefined}
                 onReport={id => openMessageReport(id)}
+                onHide={id => void handleHideMessage(id)}
                 onClose={() => {
                   setThreadRootId(null);
                   setReplyTarget(null);
@@ -965,8 +1029,9 @@ export default function HypeRoomDetail({
                   topic: settingsTopic,
                   description: settingsDescription,
                   visibility: settingsVisibility,
+                  link: settingsLink,
                 }}
-                saving={updateSettingsMut.isPending}
+                saving={updateSettingsMut.isPending || setLinkMut.isPending}
                 onClose={() => setSettingsOpen(false)}
                 onSubmit={handleSettingsSubmit}
               />

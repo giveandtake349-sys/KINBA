@@ -115,6 +115,8 @@ export type RoomCard = {
   endsAt: Date | string;
   visibility: "public" | "link_only";
   hostId: number;
+  /** Server-counted active participants (host + joined, non-banned). */
+  participantCount?: number;
 };
 
 function countdownFor(
@@ -193,6 +195,18 @@ function RoomCard({
             </dt>
             <dd>{room.durationHours}h window</dd>
           </div>
+          {typeof room.participantCount === "number" ? (
+            <div>
+              <dt>
+                <Users size={13} aria-hidden="true" />
+                <span className="sr-only">Participants</span>
+              </dt>
+              <dd>
+                {room.participantCount} participant
+                {room.participantCount === 1 ? "" : "s"}
+              </dd>
+            </div>
+          ) : null}
           <div>
             <dt>
               <CalendarClock size={13} aria-hidden="true" />
