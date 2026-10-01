@@ -443,6 +443,19 @@ function optionalText(value: string | null | undefined) {
   return normalized || null;
 }
 
+/** Placeholder older rows stored when a post had no caption at all. */
+const EMPTY_DESCRIPTION_PLACEHOLDER = "No description provided.";
+
+/**
+ * Captions are user text, never a fabricated string. Older rows stored
+ * EMPTY_DESCRIPTION_PLACEHOLDER when the caller published without a caption,
+ * so that placeholder is stripped before a description reaches a client.
+ */
+function captionText(value: string | null | undefined) {
+  const text = value ?? "";
+  return text.trim() === EMPTY_DESCRIPTION_PLACEHOLDER ? "" : text;
+}
+
 function withSourceMap<T extends { id: number }>(
   rows: T[],
   sources: (typeof videoSources.$inferSelect)[]
@@ -503,6 +516,7 @@ function publicMediaUrl(value: string | null | undefined) {
 function shapeVideoRow(row: any) {
   return {
     ...row.video,
+    description: captionText(row.video.description),
     videoUrl: publicMediaUrl(row.video.videoUrl) ?? "",
     thumbnailUrl: publicMediaUrl(row.video.thumbnailUrl),
     hlsMasterUrl: publicMediaUrl(row.video.hlsMasterUrl),
@@ -994,7 +1008,7 @@ export async function createVideo(
     .values({
       userId,
       title: requiredText(input.title, "Untitled video"),
-      description: requiredText(input.description, "No description provided."),
+      description: optionalText(input.description) ?? "",
       videoUrl: requiredText(input.videoUrl, "about:blank"),
       thumbnailUrl: optionalText(input.thumbnailUrl),
       mediaType: "VIDEO",
@@ -1040,7 +1054,7 @@ export async function createPhotoPost(
     .values({
       userId,
       title: requiredText(input.title, "Untitled photo"),
-      description: requiredText(input.description, "No description provided."),
+      description: optionalText(input.description) ?? "",
       videoUrl: requiredText(input.imageUrl, "about:blank"),
       thumbnailUrl: optionalText(input.imageUrl),
       mediaType: "IMAGE",

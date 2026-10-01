@@ -18,6 +18,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { SupabaseAuthDialog } from "@/components/SupabaseAuthDialog";
+import { Caption } from "@/components/Caption";
 import { Skeleton } from "@/components/ui/skeleton";
 import "./hypeRooms.css";
 
@@ -179,7 +180,11 @@ function RoomCard({
         <h3 id={`hype-room-${room.id}`}>{room.title}</h3>
         {room.topic ? <p className="hype-room-topic">{room.topic}</p> : null}
         {room.description ? (
-          <p className="hype-room-desc">{room.description}</p>
+          <Caption
+            text={room.description}
+            maxLines={3}
+            className="hype-room-desc"
+          />
         ) : null}
         {countdown ? (
           <p className="hype-room-countdown" aria-live="polite">

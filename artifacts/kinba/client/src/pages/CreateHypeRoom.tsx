@@ -5,6 +5,13 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { SupabaseAuthDialog } from "@/components/SupabaseAuthDialog";
 import { getTrpcCode } from "./HypeRooms";
+import {
+  ROOM_DESCRIPTION_MAX,
+  ROOM_TITLE_MAX,
+  ROOM_TITLE_MIN,
+  validateRoomDescription,
+  validateRoomTitle,
+} from "./hypeRoom/roomText";
 import "./hypeRooms.css";
 
 const DURATION_OPTIONS = [4, 6, 12, 24] as const;
@@ -82,17 +89,17 @@ export default function CreateHypeRoom() {
 
   const validate = (): ClientErrors => {
     const errors: ClientErrors = {};
-    const trimmedTitle = title.trim();
-    if (trimmedTitle.length < 3 || trimmedTitle.length > 180) {
-      errors.title = "Title must be 3–180 characters.";
+    const titleError = validateRoomTitle(title);
+    if (titleError) {
+      errors.title = titleError;
     }
     const trimmedTopic = topic.trim();
     if (trimmedTopic.length > 120) {
       errors.topic = "Topic must be at most 120 characters.";
     }
-    const trimmedDescription = description.trim();
-    if (trimmedDescription.length > 2000) {
-      errors.description = "Description must be at most 2000 characters.";
+    const descriptionError = validateRoomDescription(description);
+    if (descriptionError) {
+      errors.description = descriptionError;
     }
     if (startsAtLocal) {
       const parsed = new Date(startsAtLocal);
@@ -213,10 +220,9 @@ export default function CreateHypeRoom() {
               value={title}
               onChange={event => setTitle(event.target.value)}
               minLength={3}
-              maxLength={180}
               required
               autoComplete="off"
-              placeholder="Room title (3–180 characters)"
+              placeholder={`Room title (${ROOM_TITLE_MIN}–${ROOM_TITLE_MAX} characters)`}
               aria-invalid={fieldErrors.title ? true : undefined}
             />
             {fieldErrors.title ? (
@@ -250,9 +256,8 @@ export default function CreateHypeRoom() {
               id="hype-create-description"
               value={description}
               onChange={event => setDescription(event.target.value)}
-              maxLength={2000}
               rows={4}
-              placeholder="What is this room about? (max 2000 characters)"
+              placeholder={`What is this room about? (max ${ROOM_DESCRIPTION_MAX} characters)`}
               aria-invalid={fieldErrors.description ? true : undefined}
             />
             {fieldErrors.description ? (

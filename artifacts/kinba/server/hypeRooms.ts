@@ -418,8 +418,12 @@ export async function createHypeRoom(
   const startsAt = normalizeStartsAt(input.startsAt, now);
   const endsAt = computeEndsAt(startsAt, durationHours);
   const title = input.title.trim();
-  if (title.length < 3 || title.length > 180) {
-    throw new Error("Room title must be 3–180 characters.");
+  if (title.length < 3 || title.length > 100) {
+    throw new Error("Room title must be 3–100 characters.");
+  }
+  const description = input.description?.trim() || null;
+  if (description != null && description.length > 500) {
+    throw new Error("Room description must be at most 500 characters.");
   }
 
   const db = await getDb();
@@ -443,7 +447,7 @@ export async function createHypeRoom(
       hostId,
       title,
       topic: input.topic?.trim() || null,
-      description: input.description?.trim() || null,
+      description,
       status: "scheduled",
       durationHours,
       startsAt,
@@ -1527,8 +1531,8 @@ export async function updateHypeRoomSettings(
 
   if (input.title !== undefined) {
     const title = input.title.trim();
-    if (title.length < 3 || title.length > 180) {
-      throw new Error("Room title must be 3–180 characters.");
+    if (title.length < 3 || title.length > 100) {
+      throw new Error("Room title must be 3–100 characters.");
     }
     patch.title = title;
     touched = true;
@@ -1544,8 +1548,8 @@ export async function updateHypeRoomSettings(
   if (input.description !== undefined) {
     const description =
       input.description == null ? null : input.description.trim();
-    if (description != null && description.length > 2000) {
-      throw new Error("Room description must be at most 2000 characters.");
+    if (description != null && description.length > 500) {
+      throw new Error("Room description must be at most 500 characters.");
     }
     patch.description = description || null;
     touched = true;

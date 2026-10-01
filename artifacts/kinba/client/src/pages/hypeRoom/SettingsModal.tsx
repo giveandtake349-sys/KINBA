@@ -1,5 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { Settings, X } from "lucide-react";
+import {
+  ROOM_DESCRIPTION_MAX,
+  ROOM_TITLE_MAX,
+  validateRoomDescription,
+  validateRoomTitle,
+} from "./roomText";
 
 type RoomSettingsValues = {
   title: string;
@@ -8,6 +14,11 @@ type RoomSettingsValues = {
   visibility: "public" | "link_only";
   /** Optional product/website link — empty string clears it (max one per room). */
   link: string;
+};
+
+type SettingsErrors = {
+  title?: string;
+  description?: string;
 };
 
 /**
@@ -31,9 +42,16 @@ export function SettingsModal({
   const [description, setDescription] = useState(initial.description);
   const [visibility, setVisibility] = useState(initial.visibility);
   const [link, setLink] = useState(initial.link);
+  const [errors, setErrors] = useState<SettingsErrors>({});
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    const nextErrors: SettingsErrors = {
+      title: validateRoomTitle(title) ?? undefined,
+      description: validateRoomDescription(description) ?? undefined,
+    };
+    setErrors(nextErrors);
+    if (nextErrors.title || nextErrors.description) return;
     await onSubmit({
       title: title.trim(),
       topic: topic.trim(),
@@ -78,13 +96,21 @@ export function SettingsModal({
             <input
               id="hype-settings-title"
               value={title}
-              onChange={event => setTitle(event.target.value)}
+              onChange={event => {
+                setTitle(event.target.value);
+                setErrors(current => ({ ...current, title: undefined }));
+              }}
               minLength={3}
-              maxLength={180}
               required
               autoComplete="off"
-              placeholder="Room title (3–180 characters)"
+              placeholder={`Room title (3–${ROOM_TITLE_MAX} characters)`}
+              aria-invalid={errors.title ? true : undefined}
             />
+            {errors.title ? (
+              <span className="hype-create-field-error" role="alert">
+                {errors.title}
+              </span>
+            ) : null}
           </label>
           <label htmlFor="hype-settings-topic">
             Topic <span className="report-dialog-optional">(optional)</span>
@@ -103,11 +129,22 @@ export function SettingsModal({
             <textarea
               id="hype-settings-description"
               value={description}
-              onChange={event => setDescription(event.target.value)}
-              maxLength={2000}
+              onChange={event => {
+                setDescription(event.target.value);
+                setErrors(current => ({
+                  ...current,
+                  description: undefined,
+                }));
+              }}
               rows={4}
-              placeholder="Room description (max 2000 characters)"
+              placeholder={`Room description (max ${ROOM_DESCRIPTION_MAX} characters)`}
+              aria-invalid={errors.description ? true : undefined}
             />
+            {errors.description ? (
+              <span className="hype-create-field-error" role="alert">
+                {errors.description}
+              </span>
+            ) : null}
           </label>
           <label htmlFor="hype-settings-visibility">
             Visibility

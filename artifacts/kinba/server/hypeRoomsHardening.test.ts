@@ -537,6 +537,45 @@ describe("FIX 4 — settings authorization order", () => {
   });
 });
 
+describe("room text limits — 100 char title, 500 char description", () => {
+  it("rejects a settings title longer than 100 characters before writing", async () => {
+    const db = fakeDb([baseRoom({ hostId: 10 })]);
+    databaseMocks.getDb.mockResolvedValue(db as never);
+
+    await expect(
+      updateHypeRoomSettings(11, 10, { title: "x".repeat(101) })
+    ).rejects.toThrow("Room title must be 3–100 characters.");
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects a settings description longer than 500 characters before writing", async () => {
+    const db = fakeDb([baseRoom({ hostId: 10 })]);
+    databaseMocks.getDb.mockResolvedValue(db as never);
+
+    await expect(
+      updateHypeRoomSettings(11, 10, { description: "y".repeat(501) })
+    ).rejects.toThrow("Room description must be at most 500 characters.");
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it("accepts a 100 character title and a 500 character description", async () => {
+    const title = "t".repeat(100);
+    const description = "d".repeat(500);
+    const db = fakeDb([baseRoom({ hostId: 10 })]);
+    db.__updateReturning.mockResolvedValue([
+      baseRoom({ hostId: 10, title, description }),
+    ] as never);
+    databaseMocks.getDb.mockResolvedValue(db as never);
+
+    await expect(
+      updateHypeRoomSettings(11, 10, { title, description })
+    ).resolves.toMatchObject({ title, description });
+    expect(db.__updateSets).toHaveBeenCalledWith(
+      expect.objectContaining({ title, description })
+    );
+  });
+});
+
 describe("FIX 5 — reaction unique race", () => {
   function reactionDb(opts: {
     existing?: unknown;

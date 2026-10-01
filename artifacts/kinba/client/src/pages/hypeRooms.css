@@ -192,15 +192,17 @@
   margin: 0;
 }
 
-.hype-room-desc {
+/* Room descriptions render through the shared <Caption /> component, which
+   owns the line clamp plus the "See more" / "See less" toggle. This rule only
+   carries the typography and colours the toggle for lobby cards and the room
+   detail hero alike. */
+.hype-room-desc.caption-container {
   color: var(--muted);
-  display: -webkit-box;
   font-size: 0.84rem;
   line-height: 1.45;
   margin: 0;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  white-space: normal;
+  --caption-toggle-color: var(--muted);
 }
 
 .hype-room-chip {
@@ -374,10 +376,6 @@
   letter-spacing: -0.04em;
   margin: 0.35rem 0 0.25rem;
   overflow-wrap: anywhere;
-}
-
-.hype-room-detail-desc {
-  -webkit-line-clamp: 5;
 }
 
 .hype-room-detail-actions {

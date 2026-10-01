@@ -19,6 +19,7 @@ import {
   roomPhaseLabel,
   type RoomPhase,
 } from "./shared";
+import { Caption } from "@/components/Caption";
 
 export type HeaderRoom = {
   id: number;
@@ -392,7 +393,11 @@ export function RoomHeader({
 
         {room.topic ? <p className="hype-room-topic">{room.topic}</p> : null}
         {room.description ? (
-          <p className="hype-room-desc hype-room-detail-desc">{room.description}</p>
+          <Caption
+            text={room.description}
+            maxLines={5}
+            className="hype-room-desc"
+          />
         ) : null}
 
         <div className="hype-room-hero-facts">

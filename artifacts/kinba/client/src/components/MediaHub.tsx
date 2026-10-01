@@ -90,6 +90,8 @@ import {
   useReactionPicker,
 } from "./reactions";
 import type { ReactionType } from "@shared/reactions";
+import { postCaption } from "@/lib/postCaption";
+import { Caption } from "./Caption";
 import "./mediaHub.css";
 import "./kinbaModern.css";
 import "./feedUi.css";
@@ -2423,7 +2425,7 @@ function PostManagementMenu({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const updateMutation = trpc.videos.updateDescription.useMutation();
   const deleteMutation = trpc.videos.delete.useMutation();
-  const [caption, setCaption] = useState([video.title, video.description].filter(Boolean).join("\n\n"));
+  const [caption, setCaption] = useState(postCaption(video.title, video.description));
 
   const saveCaption = async () => {
     try {
@@ -2748,7 +2750,7 @@ function VideoCard({
             </div>
             <div className="k-post__bottom">
               {(() => {
-                const captionText = video.title || description || "";
+                const captionText = postCaption(video.title, description);
                 return captionText ? (
                   <Caption text={captionText} maxLines={3} className="k-post__caption" />
                 ) : null;
@@ -3177,56 +3179,6 @@ export function FeedPhotoLightbox({
   );
 }
 
-function Caption({ text, maxLines = 4, className = "" }: { text: string; maxLines?: number; className?: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const [isOverflowing, setIsOverflowing] = useState(false);
-
-  useEffect(() => {
-    if (ref.current) {
-      setIsOverflowing(ref.current.scrollHeight > ref.current.clientHeight);
-    }
-  }, [text, expanded]);
-
-  if (!text) return null;
-
-  return (
-    <div className={`caption-container ${className}`} style={{ maxHeight: expanded ? "none" : undefined }}>
-      <div
-        ref={ref}
-        style={{
-          maxHeight: expanded ? "none" : undefined,
-          overflow: "hidden",
-          display: "-webkit-box",
-          WebkitLineClamp: expanded ? undefined : maxLines,
-          WebkitBoxOrient: "vertical",
-        }}
-      >
-        {text}
-      </div>
-      {isOverflowing && (
-        <button
-          type="button"
-          onClick={() => setExpanded(e => !e)}
-          style={{
-            marginTop: 6,
-            padding: 0,
-            background: "none",
-            border: "none",
-            color: "rgba(255,255,255,0.8)",
-            fontSize: "0.82rem",
-            fontWeight: 500,
-            cursor: "pointer",
-            textAlign: "left",
-          }}
-        >
-          {expanded ? "See less" : "See more"}
-        </button>
-      )}
-    </div>
-  );
-}
-
 function HomeFeedPanel({
   tab,
   active = true,
@@ -3450,7 +3402,7 @@ function ShortVideoCard({
               </div>
             </a>
           </div>
-          <Caption text={video.title || description || ""} maxLines={3} className="short-caption" />
+          <Caption text={postCaption(video.title, description)} maxLines={3} className="short-caption" />
           <p className="media-caption-tags">
             {ownerHandle(video.owner.name, video.owner.username)} ·{" "}
             {hashtagsFromDescription(video.description)}
@@ -4744,7 +4696,7 @@ function SearchVideoCard({ video, onOpenVideo }: { video: VideoRecord; onOpenVid
             </span>
           </a>
         </div>
-        <Caption text={video.title || video.description || ""} maxLines={2} className="search-video-caption" />
+        <Caption text={postCaption(video.title, video.description)} maxLines={2} className="search-video-caption" />
         <span className="search-video-meta">
           {formatCount(video.viewCount)} views · {relativeTime(video.createdAt)}
         </span>

@@ -408,6 +408,59 @@ describe("M-A1/M-A2 — procedure wiring (flag ON)", () => {
     expect(hypeRoomsMocks.updateHypeRoomSettings).not.toHaveBeenCalled();
   });
 
+  it("rejects a settings title over 100 characters at the API boundary", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.updateSettings({
+        roomId: 1,
+        title: "x".repeat(101),
+      })
+    ).rejects.toThrow();
+    expect(hypeRoomsMocks.updateHypeRoomSettings).not.toHaveBeenCalled();
+  });
+
+  it("rejects a settings description over 500 characters at the API boundary", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.updateSettings({
+        roomId: 1,
+        description: "x".repeat(501),
+      })
+    ).rejects.toThrow();
+    expect(hypeRoomsMocks.updateHypeRoomSettings).not.toHaveBeenCalled();
+  });
+
+  it("rejects a create title over 100 characters before the service", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.create({
+        title: "x".repeat(101),
+        durationHours: 6,
+      } as never)
+    ).rejects.toThrow();
+    expect(hypeRoomsMocks.createHypeRoom).not.toHaveBeenCalled();
+  });
+
+  it("rejects a create description over 500 characters before the service", async () => {
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.create({
+        title: "Valid room title",
+        description: "x".repeat(501),
+        durationHours: 6,
+      } as never)
+    ).rejects.toThrow();
+    expect(hypeRoomsMocks.createHypeRoom).not.toHaveBeenCalled();
+  });
+
+  it("accepts a create title of exactly 100 characters", async () => {
+    const room = { id: 12, title: "x".repeat(100) };
+    hypeRoomsMocks.createHypeRoom.mockResolvedValue(room);
+    await expect(
+      appRouter.createCaller(context()).hypeRooms.create({
+        title: "x".repeat(100),
+        durationHours: 6,
+      } as never)
+    ).resolves.toEqual(room);
+    expect(hypeRoomsMocks.createHypeRoom).toHaveBeenCalled();
+  });
+
   it("maps non-host settings update to FORBIDDEN", async () => {
     hypeRoomsMocks.updateHypeRoomSettings.mockRejectedValue(
       new Error("Only the host can update room settings.")

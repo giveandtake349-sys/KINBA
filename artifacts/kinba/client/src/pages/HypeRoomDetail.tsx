@@ -27,6 +27,7 @@ import { DropPanel } from "./hypeRoom/DropPanel";
 import { EmptyRoom } from "./hypeRoom/EmptyRoom";
 import { SettingsModal } from "./hypeRoom/SettingsModal";
 import { InviteModal } from "./hypeRoom/InviteModal";
+import { validateRoomDescription, validateRoomTitle } from "./hypeRoom/roomText";
 import { RoomLinkBar } from "./hypeRoom/RoomLinkBar";
 import { Composer } from "./hypeRoom/Composer";
 import {
@@ -567,8 +568,14 @@ export default function HypeRoomDetail({
     link: string;
   }) => {
     if (!requireAuth() || roomId == null) return;
-    if (values.title.length < 3) {
-      toast.error("Room title must be 3–180 characters.");
+    const titleError = validateRoomTitle(values.title);
+    if (titleError) {
+      toast.error(titleError);
+      return;
+    }
+    const descriptionError = validateRoomDescription(values.description);
+    if (descriptionError) {
+      toast.error(descriptionError);
       return;
     }
     const nextLink = values.link.trim();

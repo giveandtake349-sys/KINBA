@@ -455,9 +455,9 @@ const paymentInput = z.object({
 });
 
 const hypeRoomCreateInput = z.object({
-  title: z.string().trim().min(3).max(180),
+  title: z.string().trim().min(3).max(100),
   topic: z.string().trim().max(120).nullable().optional(),
-  description: z.string().trim().max(2000).nullable().optional(),
+  description: z.string().trim().max(500).nullable().optional(),
   durationHours: z.union([
     z.literal(ROOM_DURATION_HOURS[0]),
     z.literal(ROOM_DURATION_HOURS[1]),
@@ -1348,9 +1348,9 @@ export const appRouter = router({
       .input(
         z.object({
           roomId: z.number().int().positive(),
-          title: z.string().trim().min(3).max(180).optional(),
+          title: z.string().trim().min(3).max(100).optional(),
           topic: z.string().trim().max(120).nullable().optional(),
-          description: z.string().trim().max(2000).nullable().optional(),
+          description: z.string().trim().max(500).nullable().optional(),
           visibility: z.enum(["public", "link_only"]).optional(),
         })
       )
