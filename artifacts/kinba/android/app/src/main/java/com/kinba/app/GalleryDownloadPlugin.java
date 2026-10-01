@@ -36,7 +36,7 @@ import java.util.Locale;
 
 /**
  * "Download image" for the photo viewer: writes the photo into the device
- * gallery (Android MediaStore → Pictures/KINBA) so it shows up in the system
+ * gallery (Android MediaStore → Pictures/JHILIK) so it shows up in the system
  * Photos / Gallery apps.
  *
  * Storage model:
@@ -61,7 +61,7 @@ import java.util.Locale;
 public class GalleryDownloadPlugin extends Plugin {
 
     private static final String STORAGE_ALIAS = "storage";
-    private static final String GALLERY_FOLDER = "KINBA";
+    private static final String GALLERY_FOLDER = "JHILIK";
     private static final long MAX_IMAGE_BYTES = 25L * 1024 * 1024;
     private static final int CONNECT_TIMEOUT_MS = 15_000;
     private static final int READ_TIMEOUT_MS = 30_000;
@@ -300,7 +300,7 @@ public class GalleryDownloadPlugin extends Plugin {
             base = base.substring(0, 40);
         }
         String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
-        return "KINBA_" + stamp + "_" + base + "." + extension;
+        return "JHILIK_" + stamp + "_" + base + "." + extension;
     }
 
     private Uri writeToGallery(byte[] bytes, String mime, String fileName) throws IOException {
@@ -310,7 +310,7 @@ public class GalleryDownloadPlugin extends Plugin {
         return writeToLegacyPictures(bytes, mime, fileName);
     }
 
-    /** Android 10+ — MediaStore insert into Pictures/KINBA, no permission. */
+    /** Android 10+ — MediaStore insert into Pictures/JHILIK, no permission. */
     private Uri writeToMediaStore(byte[] bytes, String mime, String fileName) throws IOException {
         Context context = getContext();
         ContentResolver resolver = context.getContentResolver();

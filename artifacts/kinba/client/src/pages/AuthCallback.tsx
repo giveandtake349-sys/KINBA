@@ -71,7 +71,7 @@ export default function AuthCallback() {
       <Loader2 className="spin" size={26} />
       <p>
         {status === "failed"
-          ? "Returning you to KINBA…"
+          ? "Returning you to JHILIK…"
           : "Finishing Google sign-in…"}
       </p>
     </div>

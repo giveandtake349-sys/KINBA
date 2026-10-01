@@ -45,7 +45,7 @@ function entryLabel(entry: ReactorSheetEntry): string {
   const name = entry.name?.trim();
   if (name && !name.includes("@")) return name;
   const username = entry.username?.trim();
-  return username ? `@${username}` : "KINBA member";
+  return username ? `@${username}` : "JHILIK member";
 }
 
 type Status = "loading" | "ready" | "error";

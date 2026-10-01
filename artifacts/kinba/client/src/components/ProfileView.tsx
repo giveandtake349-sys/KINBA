@@ -57,7 +57,7 @@ function profileDisplayName(profile?: ProfileSnapshot): string {
   const name = profile?.user?.name?.trim();
   if (name && !name.includes("@")) return name;
   const username = profile?.profile?.username?.trim();
-  return username ? `@${username}` : "KINBA member";
+  return username ? `@${username}` : "JHILIK member";
 }
 
 function formatCount(n: number): string {
@@ -230,7 +230,7 @@ function ProfileEditModal({
               minLength={3}
               maxLength={64}
               pattern="[A-Za-z0-9_]+"
-              placeholder="kinba_creator"
+              placeholder="jhilik_creator"
             />
           </label>
           <label className="pr-field">

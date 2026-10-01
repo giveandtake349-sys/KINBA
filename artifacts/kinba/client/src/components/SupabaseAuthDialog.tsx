@@ -41,8 +41,8 @@ export function SupabaseAuthDialog({
       } else {
         toast.success(
           mode === "sign-in"
-            ? "Welcome to Kinba."
-            : "Your Kinba account is ready."
+            ? "Welcome to JHILIK."
+            : "Your JHILIK account is ready."
         );
       }
       setPassword("");
@@ -85,8 +85,8 @@ export function SupabaseAuthDialog({
         >
           <X size={18} />
         </button>
-        <img src="/logo.png" alt="KINBA" className="auth-brand-logo" />
-        <p className="eyebrow">KINBA ACCOUNT</p>
+        <span className="auth-brand-wordmark">JHILIK</span>
+        <p className="eyebrow">JHILIK ACCOUNT</p>
         <h2 id="auth-title">
           {mode === "sign-in" ? "Welcome back." : "Join the network."}
         </h2>

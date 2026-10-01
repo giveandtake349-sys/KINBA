@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "KINBA"
+title = "JHILIK"
 description = "A community media platform where people share short videos, follow creators, participate in Wheels, and exchange value through real Supabase-backed interactions."
 version = "1.0.0"
 id = "artifacts/kinba"

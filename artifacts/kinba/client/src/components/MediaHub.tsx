@@ -232,7 +232,7 @@ function relativeTime(value: Date | string) {
 function displayName(
   name: string | null | undefined,
   username?: string | null,
-  fallback = "KINBA member"
+  fallback = "JHILIK member"
 ) {
   const cleanName = name?.trim();
   if (cleanName && !cleanName.includes("@")) return cleanName;
@@ -243,15 +243,15 @@ function displayName(
 function ownerHandle(name: string | null, username?: string | null) {
   const source = name?.includes("@") ? username : name;
   return `@${
-    (source ?? "kinba_creator")
+    (source ?? "jhilik_creator")
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_|_$/g, "") || "kinba_creator"
+      .replace(/^_|_$/g, "") || "jhilik_creator"
   }`;
 }
 function hashtagsFromDescription(description: string) {
   const tags = description.match(/#[\p{L}\p{N}_-]+/gu) ?? [];
-  return tags.slice(0, 3).join(" ") || "#kinba";
+  return tags.slice(0, 3).join(" ") || "#jhilik";
 }
 function isReportedLegacyMedia(
   video: Pick<VideoRecord, "title" | "description">
@@ -2947,7 +2947,7 @@ export function FeedPhotoLightbox({
 
   /**
    * Saves the full-resolution image to the device.
-   * - Android app: writes into the gallery (Pictures/KINBA) through the
+   * - Android app: writes into the gallery (Pictures/JHILIK) through the
    *   native MediaStore plugin — the Capacitor WebView has no download
    *   listener, so blob/anchor saves silently do nothing there. Success is
    *   only toasted after the native save resolves; failures show the real
@@ -3104,7 +3104,7 @@ export function FeedPhotoLightbox({
           <span>
             <strong>{displayName(owner.name, owner.username)}</strong>
             <small>
-              {owner.username ? `@${owner.username}` : "KINBA member"}
+              {owner.username ? `@${owner.username}` : "JHILIK member"}
             </small>
           </span>
         </a>
@@ -4352,7 +4352,7 @@ export function CommunityAnnouncements() {
                   onClick={event =>
                     navigateToProfile(event, announcement.author.id)
                   }
-                  aria-label={`Open ${announcement.author.name ?? "KINBA organization"} profile`}
+                  aria-label={`Open ${announcement.author.name ?? "JHILIK organization"} profile`}
                 >
                   <div className="announcement-author-avatar">
                     {announcement.author.photoUrl ? (
@@ -4370,7 +4370,7 @@ export function CommunityAnnouncements() {
                   <div>
                     <strong className="announcement-author-name">
                       <span>
-                        {announcement.author.name ?? "KINBA organization"}
+                        {announcement.author.name ?? "JHILIK organization"}
                       </span>
                       <BadgeCheck
                         className="verified-badge"
@@ -4520,7 +4520,7 @@ export function SearchFeed({
         {!hasQuery && (
           <div className="search-empty-state">
             <Search size={28} strokeWidth={1.5} />
-            <h3>Search KINBA</h3>
+            <h3>Search JHILIK</h3>
             <p>Find creators, videos, and content.</p>
           </div>
         )}

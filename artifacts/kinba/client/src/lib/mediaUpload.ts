@@ -171,7 +171,7 @@ function uploadFailureMessage(
   if (response.status === 404) {
     return (
       resource +
-      " upload endpoint was not found. Check that the Render domain is attached to the KINBA API service, not a static-only deployment."
+      " upload endpoint was not found. Check that the Render domain is attached to the JHILIK API service, not a static-only deployment."
     );
   }
   return (

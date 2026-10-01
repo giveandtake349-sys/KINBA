@@ -72,7 +72,7 @@ export function describeOAuthError(
 ): string {
   switch (code) {
     case "identity_already_exists":
-      return "That Google account is already linked to another KINBA account.";
+      return "That Google account is already linked to another JHILIK account.";
     case "manual_linking_disabled":
       return "Account linking is disabled for this project. Turn on manual linking in Supabase Auth settings.";
     case "provider_email_needs_confirmation":

@@ -76,7 +76,7 @@ export function serveStatic(app: Express) {
       res.status(200).type("html").send(html);
     } catch (error) {
       console.error("[Static] Could not serve the KINBA client:", error);
-      res.status(500).send("KINBA client is unavailable.");
+      res.status(500).send("JHILIK client is unavailable.");
     }
   };
 

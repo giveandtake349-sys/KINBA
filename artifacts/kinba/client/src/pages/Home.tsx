@@ -123,7 +123,7 @@ type ProfileSnapshot = {
 function OfficialLogo() {
   return (
     <div className="official-logo">
-      <span className="logo-fallback">KINBA</span>
+      <span className="logo-fallback">JHILIK</span>
     </div>
   );
 }
@@ -152,7 +152,7 @@ function profileDisplayName(profile?: ProfileSnapshot) {
   const name = profile?.user?.name?.trim();
   if (name && !name.includes("@")) return name;
   const username = profile?.profile?.username?.trim();
-  return username ? `@${username}` : "KINBA member";
+  return username ? `@${username}` : "JHILIK member";
 }
 
 function ProfileIdentity({
@@ -500,7 +500,7 @@ function AdminVerificationPanel() {
                           ? `@${profile.username.trim()}`
                           : user.name && !user.name.includes("@")
                             ? user.name
-                            : "KINBA member"}
+                            : "JHILIK member"}
                       </strong>
                     </td>
                     <td>
@@ -631,7 +631,7 @@ function MobileDrawer({
         {
           section: "qr",
           label: "QR code",
-          description: "Share your KINBA identity",
+          description: "Share your JHILIK identity",
           icon: QrCode,
         },
       ],
@@ -641,7 +641,7 @@ function MobileDrawer({
       items: [
         {
           section: "studio",
-          label: "KINBA Studio",
+          label: "JHILIK Studio",
           description: "Publish and manage your work",
           icon: Video,
         },
@@ -752,7 +752,7 @@ function AppHeader({
         aria-label="Go to Home Feed"
       >
         <OfficialLogo />
-        <span className="brand-name">KINBA</span>
+        <span className="brand-name">JHILIK</span>
       </button>
       <nav className="desktop-nav" aria-label="Primary navigation">
         <button type="button" onClick={safeClick(onHome)}>Feed</button>
@@ -932,7 +932,7 @@ function Landing({ onLogin }: { onLogin: () => void }) {
           comes next.
         </p>
         <button type="button" className="primary-btn" onClick={safeClick(onLogin)}>
-          Sign in to Kinba
+          Sign in to JHILIK
         </button>
       </div>
       <div className="landing-proof">
@@ -1210,7 +1210,7 @@ function SettingsPanel({ onLogout }: { onLogout: () => void }) {
       <div className="media-section-heading">
         <div>
           <p className="eyebrow">Settings</p>
-          <h2 id="settings-heading">Make KINBA yours.</h2>
+          <h2 id="settings-heading">Make JHILIK yours.</h2>
         </div>
       </div>
       <div className="settings-list">
@@ -1274,7 +1274,7 @@ function WalletPanel() {
       <div className="media-section-heading">
         <div>
           <p className="eyebrow">Assets</p>
-          <h2 id="wallet-heading">Your KINBA wallet.</h2>
+          <h2 id="wallet-heading">Your JHILIK wallet.</h2>
         </div>
         <Coins size={22} aria-hidden="true" />
       </div>
@@ -1650,7 +1650,7 @@ function UploadVideoModal({
         <>
           <div className="create-uploader-intro">
             <p className="eyebrow">Share something new</p>
-            <h2>Create on KINBA</h2>
+            <h2>Create on JHILIK</h2>
             <p>Choose a format and continue directly into its publishing workflow.</p>
           </div>
           <div className="create-uploader-wheel" aria-label="Create options">
@@ -1717,7 +1717,7 @@ function UploadVideoModal({
 
 function SearchModal({ open, onClose, onOpenVideo }: { open: boolean; onClose: () => void; onOpenVideo?: (video: VideoRecord) => void }) {
   return (
-    <ActionModal title="Search KINBA" open={open} onClose={onClose} className="search-action-modal">
+    <ActionModal title="Search JHILIK" open={open} onClose={onClose} className="search-action-modal">
       <SearchFeed onOpenVideo={onOpenVideo} />
     </ActionModal>
   );
@@ -1750,7 +1750,7 @@ function ActivityModal({
 }) {
   return (
     <ActionModal title="Activity Center" open={open} onClose={onClose}>
-      <p className="modal-intro">Track the reactions, comments, shares, and follows that matter to your KINBA account.</p>
+      <p className="modal-intro">Track the reactions, comments, shares, and follows that matter to your JHILIK account.</p>
       <NotificationsPanel enabled={enabled} />
     </ActionModal>
   );
@@ -1801,7 +1801,7 @@ function CreatorStudioModal({
 }) {
   const stats = profile?.stats;
   return (
-    <ActionModal title="KINBA Studio" open={open} onClose={onClose}>
+    <ActionModal title="JHILIK Studio" open={open} onClose={onClose}>
       <p className="modal-intro">Manage your publishing momentum from one creator workspace.</p>
       <div className="studio-stat-grid">
         <div><strong>{stats?.followersCount ?? 0}</strong><span>Followers</span></div>
@@ -1857,7 +1857,7 @@ function QrPanel({ profile }: { profile?: ProfileSnapshot }) {
       <div className="media-section-heading">
         <div>
           <p className="eyebrow">Identity card</p>
-          <h2 id="qr-heading">Share your KINBA profile.</h2>
+          <h2 id="qr-heading">Share your JHILIK profile.</h2>
         </div>
         <QrCode size={22} aria-hidden="true" />
       </div>
@@ -1868,7 +1868,7 @@ function QrPanel({ profile }: { profile?: ProfileSnapshot }) {
               "https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=12&data=" +
               encodeURIComponent(shareUrl)
             }
-            alt="QR code for your KINBA profile"
+            alt="QR code for your JHILIK profile"
           />
         </div>
         <div>
@@ -1940,7 +1940,7 @@ function OfflineVideosPanel({ onBrowse }: { onBrowse: () => void }) {
               <span>
                 <strong>{video.title}</strong>
                 <small>
-                  {video.owner.name ?? video.owner.username ?? "KINBA creator"}{" "}
+                  {video.owner.name ?? video.owner.username ?? "JHILIK creator"}{" "}
                   · {new Date(video.createdAt).toLocaleDateString()}
                 </small>
               </span>

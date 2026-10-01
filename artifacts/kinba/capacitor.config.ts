@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.kinba.app',
-  appName: 'Kinba',
+  appName: 'JHILIK',
   webDir: 'dist/public',
   server: {
     androidScheme: 'https',

@@ -439,13 +439,15 @@ h3 {
   right: 17px;
   top: 17px;
 }
-.auth-brand-logo {
+.auth-brand-wordmark {
+  color: var(--text);
   display: block;
-  height: 34px;
-  margin-bottom: 16px;
-  object-fit: contain;
-  object-position: left;
-  width: 42px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  line-height: 1;
+  margin-bottom: 14px;
 }
 .modal-copy {
   color: var(--muted);
@@ -1843,7 +1845,7 @@ h3 {
 }
 .drawer-head > span::after {
   color: var(--muted);
-  content: "  /  KINBA Studio";
+  content: "  /  JHILIK Studio";
   font-family: inherit;
   font-size: 0.55em;
   letter-spacing: 0.08em;

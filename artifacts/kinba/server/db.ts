@@ -100,7 +100,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   const db = await getDb();
   if (!db)
     throw new Error(
-      "Kinba PostgreSQL database is unavailable. Configure SUPABASE_DATABASE_URL or a PostgreSQL DATABASE_URL."
+      "JHILIK PostgreSQL database is unavailable. Configure SUPABASE_DATABASE_URL or a PostgreSQL DATABASE_URL."
     );
   const values: InsertUser = {
     openId: user.openId,

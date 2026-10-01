@@ -61,10 +61,10 @@ export function KINBAFeed() {
           className="kinba-feed-brand"
           type="button"
           onClick={event => stopAction(event, () => setActiveTab("ALL FEED"))}
-          aria-label="Go to KINBA home feed"
+          aria-label="Go to JHILIK home feed"
         >
-          <span className="kinba-feed-brand-mark">K</span>
-          <span>KINBA</span>
+          <span className="kinba-feed-brand-mark">J</span>
+          <span>JHILIK</span>
           <Sparkles size={13} aria-hidden="true" />
         </button>
         <div className="kinba-feed-actions">
@@ -142,7 +142,7 @@ export function KINBAFeed() {
           <div className="kinba-feed-poster-glow glow-one" />
           <div className="kinba-feed-poster-glow glow-two" />
           <div className="kinba-feed-poster-person">P</div>
-          <span className="kinba-feed-poster-label">KINBA ORIGINAL</span>
+          <span className="kinba-feed-poster-label">JHILIK ORIGINAL</span>
         </div>
 
         <div className="kinba-feed-gradient" />
@@ -163,7 +163,7 @@ export function KINBAFeed() {
           </div>
           <h1>Late night energy in the city.</h1>
           <p>Finding little sparks of joy between the noise. Stay for the feeling.</p>
-          <div className="kinba-feed-tags"><span>#citylights</span><span>#pookied</span><span>#kinba</span></div>
+          <div className="kinba-feed-tags"><span>#citylights</span><span>#pookied</span><span>#jhilik</span></div>
           <button type="button" className="kinba-feed-sound" onClick={event => stopAction(event, () => setPlaying(current => !current))}>
             {playing ? <Pause size={14} /> : <Music2 size={14} />}
             <span>{playing ? "Playing original sound" : "Original sound · Pookied"}</span>
@@ -220,7 +220,7 @@ export function KINBAFeed() {
           <button type="button" className="kinba-feed-modal-backdrop" onClick={event => stopAction(event, () => setComposerOpen(false))} aria-label="Close create dialog" />
           <section className="kinba-feed-composer" aria-label="Create a post">
             <button type="button" className="kinba-feed-modal-close" onClick={event => stopAction(event, () => setComposerOpen(false))} aria-label="Close create dialog"><X size={18} /></button>
-            <span className="kinba-feed-eyebrow">CREATE ON KINBA</span>
+            <span className="kinba-feed-eyebrow">CREATE ON JHILIK</span>
             <h2>Share your signal.</h2>
             <p>Record a short audio message or upload a video for your community.</p>
             <button type="button" className="kinba-feed-audio-box" onClick={event => stopAction(event, () => setPlaying(true))}>

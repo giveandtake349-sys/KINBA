@@ -38,7 +38,7 @@ export function toAbsoluteImageUrl(source: string): string {
 }
 
 /**
- * Saves the photo into the device gallery (Pictures/KINBA) via MediaStore.
+ * Saves the photo into the device gallery (Pictures/JHILIK) via MediaStore.
  * Resolves only after the bytes are committed; rejects with the native
  * message (permission denied, non-image, network/storage failure).
  */
