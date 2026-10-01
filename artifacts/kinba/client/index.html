@@ -2,6 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- Pre-React startup screens: the browser's default white paint and the
+     light page background shown while the empty #root waits for React. Paint
+     the JHILIK splash colour from the first frame so neither shows up before
+     the video. -->
+    <style>
+      html {
+        background: #050505;
+      }
+      #root:empty {
+        background: #050505;
+        min-height: 100vh;
+      }
+    </style>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <meta name="theme-color" content="#060a1c" />
     <meta name="description" content="Kinba connects what people need with what they can provide." />

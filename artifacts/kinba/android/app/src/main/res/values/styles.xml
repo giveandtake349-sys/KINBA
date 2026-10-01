@@ -16,7 +16,15 @@
     </style>
 
 
-    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+    <!-- Native launch splash: this theme derived from Theme.SplashScreen and
+         showed @drawable/splash, a KINBA screen in front of the JHILIK opening
+         video. Per the Capacitor SplashScreen docs, changing the parent to
+         AppTheme.NoActionBar disables the splash-screen compatibility layer.
+         The window now uses the JHILIK splash colour instead, and on Android
+         12+ the system splash is forced to that same colour with no icon. -->
+    <style name="AppTheme.NoActionBarLaunch" parent="AppTheme.NoActionBar">
+        <item name="android:windowBackground">#050505</item>
+        <item name="android:windowSplashScreenBackground">#050505</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@null</item>
     </style>
 </resources>
