@@ -46,6 +46,10 @@ export const NOTIFICATION_TYPES = {
   roomInvite: "room_invite",
   /** Hype Room moderation writer — host hid the recipient's own message. */
   roomMessageHidden: "room_message_hidden",
+  /** Direct Messaging writers. */
+  dmMessage: "dm_message",
+  dmRequest: "dm_request",
+  dmRequestAccepted: "dm_request_accepted",
 } as const;
 
 const TYPE_MAX = 64;

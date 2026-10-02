@@ -1,0 +1,687 @@
+/**
+ * JHILIK Direct Messaging (Phase 2).
+ *
+ * Direct Messages + Instagram-style follow-based Message Requests.
+ * Schema: dm_conversations, dm_messages, dm_message_requests, dm_conversation_reads.
+ * No feature flag required (core social feature).
+ * Spec: DMs between mutual followers; requests from non-followers.
+ */
+import { and, desc, eq, gt, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import {
+  dmConversationReads,
+  dmConversationStatus,
+  dmConversations,
+  dmMessageRequestStatus,
+  dmMessageRequests,
+  dmMessages,
+  follows,
+  profiles,
+  type DMConversationRow,
+  type DMMessageRow,
+  type DMMessageRequestRow,
+  type DMConversationReadRow,
+  users,
+} from "../drizzle/schema";
+import { getDb } from "./db";
+import { insertNotification, NOTIFICATION_TYPES } from "./notifications";
+
+export type DMConversationWithPartner = DMConversationRow & {
+  partner: { id: number; name: string | null; username: string | null; photoUrl: string | null };
+  unreadCount: number;
+  lastMessage?: DMMessageRow | null;
+};
+
+export type DMMessageWithSender = DMMessageRow & {
+  sender: { id: number; name: string | null; username: string | null; photoUrl: string | null };
+};
+
+export type DMMessageRequestWithRequester = DMMessageRequestRow & {
+  requester: { id: number; name: string | null; username: string | null; photoUrl: string | null };
+};
+
+const DM_MESSAGE_MAX_LENGTH = 4000;
+const DM_MEDIA_MAX_SIZE = 10 * 1024 * 1024;
+const LIST_DEFAULT_LIMIT = 50;
+const LIST_MAX_LIMIT = 100;
+
+type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+type TxClient = Parameters<Parameters<DbClient["transaction"]>[0]>[0];
+type DbLike = DbClient | TxClient;
+
+function sortUserPair(a: number, b: number): [number, number] {
+  return a < b ? [a, b] : [b, a];
+}
+
+async function getConversationOrThrow(
+  db: DbLike,
+  conversationId: number,
+  userId: number
+): Promise<DMConversationRow> {
+  const [conv] = await db
+    .select()
+    .from(dmConversations)
+    .where(
+      and(
+        eq(dmConversations.id, conversationId),
+        or(
+          eq(dmConversations.userAId, userId),
+          eq(dmConversations.userBId, userId)
+        ),
+        eq(dmConversations.status, "active")
+      )
+    )
+    .limit(1);
+  if (!conv) throw new Error("Conversation not found.");
+  return conv;
+}
+
+async function getPartnerId(conversation: DMConversationRow, userId: number): Promise<number> {
+  return conversation.userAId === userId ? conversation.userBId : conversation.userAId;
+}
+
+async function ensureConversationExists(
+  db: DbLike,
+  userId: number,
+  otherUserId: number
+): Promise<DMConversationRow> {
+  if (userId === otherUserId) throw new Error("Cannot message yourself.");
+  const [userAId, userBId] = sortUserPair(userId, otherUserId);
+
+  const [existing] = await db
+    .select()
+    .from(dmConversations)
+    .where(
+      and(
+        eq(dmConversations.userAId, userAId),
+        eq(dmConversations.userBId, userBId),
+        eq(dmConversations.status, "active")
+      )
+    )
+    .limit(1);
+
+  if (existing) return existing;
+
+  const [created] = await db
+    .insert(dmConversations)
+    .values({ userAId, userBId, status: "active" })
+    .returning();
+  if (!created) throw new Error("Failed to create conversation.");
+
+  await db.insert(dmConversationReads).values([
+    { conversationId: created.id, userId: userAId, unreadCount: 0 },
+    { conversationId: created.id, userId: userBId, unreadCount: 0 },
+  ]);
+
+  return created;
+}
+
+async function checkFollows(db: DbLike, followerId: number, followedId: number): Promise<boolean> {
+  const [row] = await db
+    .select({ id: follows.id })
+    .from(follows)
+    .where(and(eq(follows.followerId, followerId), eq(follows.followedId, followedId)))
+    .limit(1);
+  return !!row;
+}
+
+export async function listConversations(
+  userId: number,
+  limit: number = LIST_DEFAULT_LIMIT
+): Promise<DMConversationWithPartner[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const safeLimit = Math.min(Math.max(limit, 1), LIST_MAX_LIMIT);
+
+  const conversations = await db
+    .select()
+    .from(dmConversations)
+    .where(
+      and(
+        or(eq(dmConversations.userAId, userId), eq(dmConversations.userBId, userId)),
+        eq(dmConversations.status, "active")
+      )
+    )
+    .orderBy(desc(dmConversations.lastMessageAt))
+    .limit(safeLimit);
+
+  const reads = await db
+    .select()
+    .from(dmConversationReads)
+    .where(
+      and(
+        eq(dmConversationReads.userId, userId),
+        inArray(
+          dmConversationReads.conversationId,
+          conversations.map((c) => c.id)
+        )
+      )
+    );
+
+  const readMap = new Map(reads.map((r) => [r.conversationId, r.unreadCount]));
+
+  const partnerIds = conversations.map((c) =>
+    c.userAId === userId ? c.userBId : c.userAId
+  );
+  const partners = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      username: profiles.username,
+      photoUrl: profiles.photoUrl,
+    })
+    .from(users)
+    .leftJoin(profiles, eq(profiles.userId, users.id))
+    .where(inArray(users.id, partnerIds));
+
+  const partnerMap = new Map(partners.map((p) => [p.id, p]));
+
+  const lastMessageIds = conversations
+    .filter((c) => c.lastMessageAt)
+    .map((c) => c.id);
+  let lastMessages: DMMessageRow[] = [];
+  if (lastMessageIds.length > 0) {
+    lastMessages = await db
+      .select()
+      .from(dmMessages)
+      .where(
+        and(
+          inArray(dmMessages.conversationId, lastMessageIds),
+          isNull(dmMessages.readAt)
+        )
+      )
+      .orderBy(desc(dmMessages.createdAt));
+  }
+  const lastMessageMap = new Map(lastMessages.map((m) => [m.conversationId, m]));
+
+  return conversations.map((c) => ({
+    ...c,
+    partner: partnerMap.get(c.userAId === userId ? c.userBId : c.userAId)!,
+    unreadCount: readMap.get(c.id) ?? 0,
+    lastMessage: lastMessageMap.get(c.id) ?? null,
+  }));
+}
+
+export async function listMessages(
+  conversationId: number,
+  userId: number,
+  opts: { limit?: number; beforeId?: number } = {}
+): Promise<DMMessageWithSender[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await getConversationOrThrow(db, conversationId, userId);
+
+  const safeLimit = Math.min(Math.max(opts.limit ?? LIST_DEFAULT_LIMIT, 1), LIST_MAX_LIMIT);
+  const conditions = [eq(dmMessages.conversationId, conversationId)];
+  if (opts.beforeId != null) {
+    conditions.push(lt(dmMessages.id, opts.beforeId));
+  }
+
+  const messages = await db
+    .select()
+    .from(dmMessages)
+    .where(and(...conditions))
+    .orderBy(desc(dmMessages.id))
+    .limit(safeLimit);
+
+  const senderIds = [...new Set(messages.map((m) => m.senderId))];
+  const senders = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      username: profiles.username,
+      photoUrl: profiles.photoUrl,
+    })
+    .from(users)
+    .leftJoin(profiles, eq(profiles.userId, users.id))
+    .where(inArray(users.id, senderIds));
+  const senderMap = new Map(senders.map((s) => [s.id, s]));
+
+  return messages
+    .reverse()
+    .map((m) => ({ ...m, sender: senderMap.get(m.senderId)! }));
+}
+
+export async function sendMessage(
+  conversationId: number,
+  senderId: number,
+  body: string,
+  idempotencyKey: string,
+  media?: {
+    mediaUrl: string;
+    mediaType: string;
+    mediaWidth?: number | null;
+    mediaHeight?: number | null;
+    mediaDuration?: number | null;
+  }
+): Promise<DMMessageRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const conversation = await getConversationOrThrow(db, conversationId, senderId);
+  const partnerId = await getPartnerId(conversation, senderId);
+
+  const trimmedBody = body?.trim() ?? "";
+  if (!trimmedBody && !media?.mediaUrl) {
+    throw new Error("Message body or media is required.");
+  }
+  if (trimmedBody.length > DM_MESSAGE_MAX_LENGTH) {
+    throw new Error(`Message must be at most ${DM_MESSAGE_MAX_LENGTH} characters.`);
+  }
+
+  const [existing] = await db
+    .select()
+    .from(dmMessages)
+    .where(
+      and(
+        eq(dmMessages.conversationId, conversationId),
+        eq(dmMessages.senderId, senderId),
+        eq(dmMessages.idempotencyKey, idempotencyKey)
+      )
+    )
+    .limit(1);
+  if (existing) return existing;
+
+  const now = new Date();
+  const [message] = await db
+    .insert(dmMessages)
+    .values({
+      conversationId,
+      senderId,
+      body: trimmedBody || null,
+      mediaUrl: media?.mediaUrl ?? null,
+      mediaType: media?.mediaType ?? null,
+      mediaWidth: media?.mediaWidth ?? null,
+      mediaHeight: media?.mediaHeight ?? null,
+      mediaDuration: media?.mediaDuration ?? null,
+      idempotencyKey,
+      createdAt: now,
+      readAt: null,
+    })
+    .returning();
+  if (!message) throw new Error("Failed to send message.");
+
+  await db
+    .update(dmConversations)
+    .set({
+      lastMessageAt: now,
+      lastMessagePreview: trimmedBody.slice(0, 120) || "Media",
+      updatedAt: now,
+    })
+    .where(eq(dmConversations.id, conversationId));
+
+  await db
+    .update(dmConversationReads)
+    .set({
+      unreadCount: sql`${dmConversationReads.unreadCount} + 1`,
+      lastReadAt: now,
+    })
+    .where(
+      and(
+        eq(dmConversationReads.conversationId, conversationId),
+        eq(dmConversationReads.userId, partnerId)
+      )
+    );
+
+  try {
+    const [sender] = await db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, senderId))
+      .limit(1);
+    if (sender) {
+      await insertNotification(
+        {
+          userId: partnerId,
+          type: NOTIFICATION_TYPES.dmMessage,
+          title: "New message",
+          body: trimmedBody
+            ? `${sender.name?.trim() || "Someone"}: ${trimmedBody.slice(0, 100)}`
+            : `${sender.name?.trim() || "Someone"} sent media.`,
+          entityType: "dm_conversation",
+          entityId: conversationId,
+          link: `/messages/${conversationId}`,
+        },
+        db
+      );
+    }
+  } catch (error) {
+    console.warn("[DM] Notification insert failed:", error);
+  }
+
+  return message;
+}
+
+export async function sendMessageRequest(
+  requesterId: number,
+  recipientId: number,
+  body: string,
+  idempotencyKey: string,
+  media?: {
+    mediaUrl: string;
+    mediaType: string;
+    mediaWidth?: number | null;
+    mediaHeight?: number | null;
+    mediaDuration?: number | null;
+  }
+): Promise<DMMessageRequestRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  if (requesterId === recipientId) throw new Error("Cannot message yourself.");
+
+  const trimmedBody = body?.trim() ?? "";
+  const followsRecipient = await checkFollows(db, recipientId, requesterId);
+  if (followsRecipient) {
+    const conversation = await ensureConversationExists(db, requesterId, recipientId);
+
+    await sendMessage(
+      conversation.id,
+      requesterId,
+      body,
+      idempotencyKey,
+      media
+    );
+    return {
+      id: 0,
+      requesterId,
+      recipientId,
+      body: trimmedBody,
+      mediaUrl: media?.mediaUrl ?? null,
+      mediaType: media?.mediaType ?? null,
+      mediaWidth: media?.mediaWidth ?? null,
+      mediaHeight: media?.mediaHeight ?? null,
+      mediaDuration: media?.mediaDuration ?? null,
+      idempotencyKey,
+      status: "accepted" as const,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      respondedAt: new Date(),
+    } as DMMessageRequestRow;
+  }
+  if (!trimmedBody && !media?.mediaUrl) {
+    throw new Error("Message body or media is required.");
+  }
+  if (trimmedBody.length > DM_MESSAGE_MAX_LENGTH) {
+    throw new Error(`Message must be at most ${DM_MESSAGE_MAX_LENGTH} characters.`);
+  }
+
+  const [existing] = await db
+    .select()
+    .from(dmMessageRequests)
+    .where(
+      and(
+        eq(dmMessageRequests.requesterId, requesterId),
+        eq(dmMessageRequests.recipientId, recipientId),
+        eq(dmMessageRequests.idempotencyKey, idempotencyKey)
+      )
+    )
+    .limit(1);
+  if (existing) return existing;
+
+  const now = new Date();
+  const [request] = await db
+    .insert(dmMessageRequests)
+    .values({
+      requesterId,
+      recipientId,
+      body: trimmedBody,
+      mediaUrl: media?.mediaUrl ?? null,
+      mediaType: media?.mediaType ?? null,
+      mediaWidth: media?.mediaWidth ?? null,
+      mediaHeight: media?.mediaHeight ?? null,
+      mediaDuration: media?.mediaDuration ?? null,
+      idempotencyKey,
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
+    })
+    .returning();
+  if (!request) throw new Error("Failed to send message request.");
+
+  try {
+    const [requester] = await db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, requesterId))
+      .limit(1);
+    if (requester) {
+      await insertNotification(
+        {
+          userId: recipientId,
+          type: NOTIFICATION_TYPES.dmRequest,
+          title: "Message request",
+          body: `${requester.name?.trim() || "Someone"} wants to message you.`,
+          entityType: "dm_message_request",
+          entityId: request.id,
+          link: `/messages/requests`,
+        },
+        db
+      );
+    }
+  } catch (error) {
+    console.warn("[DM] Request notification insert failed:", error);
+  }
+
+  return request;
+}
+
+export async function listMessageRequests(
+  userId: number,
+  limit: number = LIST_DEFAULT_LIMIT
+): Promise<DMMessageRequestWithRequester[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const safeLimit = Math.min(Math.max(limit, 1), LIST_MAX_LIMIT);
+
+  const requests = await db
+    .select()
+    .from(dmMessageRequests)
+    .where(
+      and(
+        eq(dmMessageRequests.recipientId, userId),
+        eq(dmMessageRequests.status, "pending")
+      )
+    )
+    .orderBy(desc(dmMessageRequests.createdAt))
+    .limit(safeLimit);
+
+  const requesterIds = [...new Set(requests.map((r) => r.requesterId))];
+  const requesters = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      username: profiles.username,
+      photoUrl: profiles.photoUrl,
+    })
+    .from(users)
+    .leftJoin(profiles, eq(profiles.userId, users.id))
+    .where(inArray(users.id, requesterIds));
+  const requesterMap = new Map(requesters.map((r) => [r.id, r]));
+
+  return requests.map((r) => ({
+    ...r,
+    requester: requesterMap.get(r.requesterId)!,
+  }));
+}
+
+export async function acceptMessageRequest(
+  requestId: number,
+  userId: number
+): Promise<{ conversation: DMConversationRow; message: DMMessageRow }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const [request] = await db
+    .select()
+    .from(dmMessageRequests)
+    .where(
+      and(
+        eq(dmMessageRequests.id, requestId),
+        eq(dmMessageRequests.recipientId, userId),
+        eq(dmMessageRequests.status, "pending")
+      )
+    )
+    .limit(1);
+  if (!request) throw new Error("Message request not found.");
+
+  const conversation = await ensureConversationExists(
+    db,
+    request.requesterId,
+    request.recipientId
+  );
+
+  const message = await sendMessage(
+    conversation.id,
+    request.requesterId,
+    request.body,
+    request.idempotencyKey,
+    request.mediaUrl
+      ? {
+          mediaUrl: request.mediaUrl,
+          mediaType: request.mediaType ?? "",
+          mediaWidth: request.mediaWidth ?? undefined,
+          mediaHeight: request.mediaHeight ?? undefined,
+          mediaDuration: request.mediaDuration ?? undefined,
+        }
+      : undefined
+  );
+
+  await db
+    .update(dmMessageRequests)
+    .set({
+      status: "accepted",
+      respondedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(dmMessageRequests.id, requestId));
+
+  try {
+    const [recipient] = await db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, request.recipientId))
+      .limit(1);
+    if (recipient) {
+      await insertNotification(
+        {
+          userId: request.requesterId,
+          type: NOTIFICATION_TYPES.dmRequestAccepted,
+          title: "Request accepted",
+          body: `${recipient.name?.trim() || "Someone"} accepted your message request.`,
+          entityType: "dm_conversation",
+          entityId: conversation.id,
+          link: `/messages/${conversation.id}`,
+        },
+        db
+      );
+    }
+  } catch (error) {
+    console.warn("[DM] Accept notification insert failed:", error);
+  }
+
+  return { conversation, message };
+}
+
+export async function declineMessageRequest(
+  requestId: number,
+  userId: number
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  await db
+    .update(dmMessageRequests)
+    .set({
+      status: "declined",
+      respondedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(dmMessageRequests.id, requestId),
+        eq(dmMessageRequests.recipientId, userId),
+        eq(dmMessageRequests.status, "pending")
+      )
+    );
+}
+
+export async function markConversationRead(
+  conversationId: number,
+  userId: number
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const conversation = await getConversationOrThrow(db, conversationId, userId);
+
+  const [latestMessage] = await db
+    .select()
+    .from(dmMessages)
+    .where(eq(dmMessages.conversationId, conversationId))
+    .orderBy(desc(dmMessages.id))
+    .limit(1);
+
+  const now = new Date();
+  await db
+    .update(dmConversationReads)
+    .set({
+      lastReadMessageId: latestMessage?.id ?? null,
+      lastReadAt: now,
+      unreadCount: 0,
+    })
+    .where(
+      and(
+        eq(dmConversationReads.conversationId, conversationId),
+        eq(dmConversationReads.userId, userId)
+      )
+    );
+
+  await db
+    .update(dmMessages)
+    .set({ readAt: now })
+    .where(
+      and(
+        eq(dmMessages.conversationId, conversationId),
+        isNull(dmMessages.readAt),
+        // Don't mark sender's own messages as read
+        or(eq(dmMessages.senderId, userId), gt(dmMessages.senderId, 0))
+      )
+    );
+}
+
+export async function getUnreadMessageCount(userId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const reads = await db
+    .select({ unreadCount: dmConversationReads.unreadCount })
+    .from(dmConversationReads)
+    .where(eq(dmConversationReads.userId, userId));
+
+  return reads.reduce((sum, r) => sum + (r.unreadCount ?? 0), 0);
+}
+
+export async function getOrCreateConversation(
+  userId: number,
+  otherUserId: number
+): Promise<DMConversationRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return ensureConversationExists(db, userId, otherUserId);
+}
+
+export async function blockConversation(
+  conversationId: number,
+  userId: number
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const conversation = await getConversationOrThrow(db, conversationId, userId);
+  if (conversation.status === "blocked") return;
+
+  await db
+    .update(dmConversations)
+    .set({ status: "blocked", updatedAt: new Date() })
+    .where(eq(dmConversations.id, conversationId));
+}

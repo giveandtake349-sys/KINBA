@@ -849,8 +849,9 @@ function BottomNavigation({
   onHome,
   onOpenHypeRooms,
   onPublish,
-  onNotifications,
+  onMessages,
   onMenu,
+  dmUnreadCount,
 }: {
   className?: string;
   activePanel: FeedSection;
@@ -858,8 +859,9 @@ function BottomNavigation({
   onHome: () => void;
   onOpenHypeRooms: () => void;
   onPublish: () => void;
-  onNotifications: () => void;
+  onMessages: () => void;
   onMenu: () => void;
+  dmUnreadCount: number;
 }) {
   const isHome = ["videos", "shorts", "spotlight"].includes(activePanel);
   return (
@@ -897,12 +899,15 @@ function BottomNavigation({
       </button>
       <button
         type="button"
-        className={activePanel === "notifications" ? "active" : ""}
-        onClick={safeClick(onNotifications)}
-        aria-current={activePanel === "notifications" ? "page" : undefined}
+        className={activePanel === "messages" ? "active" : ""}
+        onClick={safeClick(onMessages)}
+        aria-current={activePanel === "messages" ? "page" : undefined}
       >
-        <Bell size={23} />
-        <span>Notifications</span>
+        <MessageCircle size={23} />
+        <span>Messages</span>
+        {dmUnreadCount > 0 && (
+          <span className="bottom-nav-badge">{dmUnreadCount > 99 ? "99+" : dmUnreadCount}</span>
+        )}
       </button>
       <button
         type="button"
@@ -1996,7 +2001,14 @@ export default function Home() {
     staleTime: 15_000,
     refetchInterval: auth.isAuthenticated ? 15_000 : false,
   });
+  const dmUnreadCountQuery = trpc.directMessages.getUnreadMessageCount.useQuery(undefined, {
+    enabled: auth.isAuthenticated,
+    refetchOnWindowFocus: false,
+    staleTime: 15_000,
+    refetchInterval: auth.isAuthenticated ? 15_000 : false,
+  });
   const notificationCount = Math.min(unreadCountQuery.data ?? 0, 99);
+  const dmUnreadCount = Math.min(dmUnreadCountQuery.data ?? 0, 99);
   // Public route: only a snapshot whose own user.id equals the id in the URL
   // may be rendered — a cached or stale snapshot never substitutes for it.
   const cachedPublicProfile = publicProfileQuery.data;
@@ -2287,8 +2299,9 @@ export default function Home() {
           onHome={goHome}
           onOpenHypeRooms={() => navigate("/rooms")}
           onPublish={() => openModal("upload")}
-          onNotifications={showNotifications}
+          onMessages={() => navigate("/messages")}
           onMenu={() => setMenuOpen(value => !value)}
+          dmUnreadCount={dmUnreadCount}
         />
       </div>
       {authDialog}

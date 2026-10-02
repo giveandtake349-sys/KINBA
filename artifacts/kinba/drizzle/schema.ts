@@ -1328,6 +1328,168 @@ export const notifications = pgTable(
 );
 
 // ---------------------------------------------------------------------------
+// JHILIK Direct Messaging — additive schema (no destructive changes).
+// Spec: Direct Messages + Instagram-style follow-based Message Requests.
+// ---------------------------------------------------------------------------
+
+export const dmConversationStatus = pgEnum("dm_conversation_status", [
+  "active",
+  "archived",
+  "blocked",
+]);
+
+export const dmConversations = pgTable(
+  "dm_conversations",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    // For direct messages: exactly 2 participants. Stored sorted (userA < userB)
+    // to enforce uniqueness and simplify lookups.
+    userAId: integer("userAId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    userBId: integer("userBId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: dmConversationStatus("status").default("active").notNull(),
+    lastMessageAt: timestamp("lastMessageAt", { withTimezone: true }),
+    lastMessagePreview: text("lastMessagePreview"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  table => [
+    uniqueIndex("dm_conversations_pair_unique").on(table.userAId, table.userBId),
+    index("dm_conversations_userA_idx").on(table.userAId, table.lastMessageAt),
+    index("dm_conversations_userB_idx").on(table.userBId, table.lastMessageAt),
+    index("dm_conversations_last_message_idx").on(table.lastMessageAt),
+    check(
+      "dm_conversations_distinct_users_check",
+      sql`"userAId" <> "userBId"`
+    ),
+    check(
+      "dm_conversations_sorted_check",
+      sql`"userAId" < "userBId"`
+    ),
+  ]
+);
+
+export const dmMessages = pgTable(
+  "dm_messages",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    conversationId: integer("conversationId")
+      .notNull()
+      .references(() => dmConversations.id, { onDelete: "cascade" }),
+    senderId: integer("senderId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    body: text("body"),
+    mediaUrl: varchar("mediaUrl", { length: 1024 }),
+    mediaType: varchar("mediaType", { length: 16 }),
+    mediaWidth: integer("mediaWidth"),
+    mediaHeight: integer("mediaHeight"),
+    mediaDuration: integer("mediaDuration"),
+    // Idempotency key for deduplication (client-generated, unique per sender).
+    idempotencyKey: varchar("idempotencyKey", { length: 160 }).notNull(),
+    createdAt: createdAt(),
+    readAt: timestamp("readAt", { withTimezone: true }),
+  },
+  table => [
+    uniqueIndex("dm_messages_idempotency_unique").on(
+      table.conversationId,
+      table.senderId,
+      table.idempotencyKey
+    ),
+    index("dm_messages_conversation_created_idx").on(
+      table.conversationId,
+      table.createdAt
+    ),
+    index("dm_messages_sender_idx").on(table.senderId),
+    index("dm_messages_unread_idx").on(table.conversationId, table.readAt),
+  ]
+);
+
+export const dmMessageRequestStatus = pgEnum("dm_message_request_status", [
+  "pending",
+  "accepted",
+  "declined",
+  "blocked",
+]);
+
+export const dmMessageRequests = pgTable(
+  "dm_message_requests",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    // Request from requester to recipient (who doesn't follow requester).
+    requesterId: integer("requesterId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    recipientId: integer("recipientId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // Initial message body that triggered the request.
+    body: text("body").notNull(),
+    mediaUrl: varchar("mediaUrl", { length: 1024 }),
+    mediaType: varchar("mediaType", { length: 16 }),
+    mediaWidth: integer("mediaWidth"),
+    mediaHeight: integer("mediaHeight"),
+    mediaDuration: integer("mediaDuration"),
+    // Idempotency key for deduplication.
+    idempotencyKey: varchar("idempotencyKey", { length: 160 }).notNull(),
+    status: dmMessageRequestStatus("status").default("pending").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    respondedAt: timestamp("respondedAt", { withTimezone: true }),
+  },
+  table => [
+    uniqueIndex("dm_message_requests_idempotency_unique").on(
+      table.requesterId,
+      table.recipientId,
+      table.idempotencyKey
+    ),
+    index("dm_message_requests_requester_idx").on(table.requesterId),
+    index("dm_message_requests_recipient_status_idx").on(
+      table.recipientId,
+      table.status
+    ),
+    index("dm_message_requests_pending_idx").on(
+      table.recipientId,
+      table.status,
+      table.createdAt
+    ),
+    check(
+      "dm_message_requests_distinct_users_check",
+      sql`"requesterId" <> "recipientId"`
+    ),
+  ]
+);
+
+// Per-user read cursor for each conversation (tracks unread count efficiently).
+export const dmConversationReads = pgTable(
+  "dm_conversation_reads",
+  {
+    conversationId: integer("conversationId")
+      .notNull()
+      .references(() => dmConversations.id, { onDelete: "cascade" }),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    lastReadMessageId: integer("lastReadMessageId").references(
+      () => dmMessages.id,
+      { onDelete: "set null" }
+    ),
+    lastReadAt: timestamp("lastReadAt", { withTimezone: true }).defaultNow().notNull(),
+    unreadCount: integer("unreadCount").default(0).notNull(),
+  },
+  table => [
+    uniqueIndex("dm_conversation_reads_unique").on(
+      table.conversationId,
+      table.userId
+    ),
+    index("dm_conversation_reads_user_idx").on(table.userId),
+  ]
+);
+
+// ---------------------------------------------------------------------------
 // JHILIK Phase 2 M9 — moderation (additive only; legacy `reports` untouched).
 // Spec §20.2 moderation_actions + §25 multi-target user reports.
 // ---------------------------------------------------------------------------
@@ -1395,3 +1557,7 @@ export type HypeRoomRow = typeof hypeRooms.$inferSelect;
 export type DropRow = typeof drops.$inferSelect;
 export type ModerationReportRow = typeof moderationReports.$inferSelect;
 export type ModerationActionRow = typeof moderationActions.$inferSelect;
+export type DMConversationRow = typeof dmConversations.$inferSelect;
+export type DMMessageRow = typeof dmMessages.$inferSelect;
+export type DMMessageRequestRow = typeof dmMessageRequests.$inferSelect;
+export type DMConversationReadRow = typeof dmConversationReads.$inferSelect;

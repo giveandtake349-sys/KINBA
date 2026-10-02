@@ -143,6 +143,19 @@ import {
   listModerationReports,
   resolveModerationReport,
 } from "./moderation";
+import {
+  acceptMessageRequest,
+  blockConversation,
+  declineMessageRequest,
+  getOrCreateConversation,
+  getUnreadMessageCount,
+  listConversations,
+  listMessageRequests,
+  listMessages,
+  markConversationRead,
+  sendMessage,
+  sendMessageRequest,
+} from "./directMessages";
 
 async function requireFeatureFlag(key: (typeof FEATURE_FLAG_KEYS)[number]) {
   const enabled = await isFeatureFlagEnabled(key);
@@ -383,6 +396,32 @@ function mapModerationError(error: unknown, _op: string): TRPCError {
     message === "Message id is required."
   ) {
     return new TRPCError({ code: "BAD_REQUEST", message });
+  }
+  if (error instanceof Error) {
+    return new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: error.message,
+      cause: error,
+    });
+  }
+  return new TRPCError({ code: "INTERNAL_SERVER_ERROR", cause: error });
+}
+
+/** Map DM service errors to controlled tRPC codes. */
+function mapDMError(error: unknown, _op: string): TRPCError {
+  if (error instanceof TRPCError) return error;
+  const message = error instanceof Error ? error.message : "";
+  if (message === "Conversation not found." || message === "Message request not found.") {
+    return new TRPCError({ code: "NOT_FOUND", message });
+  }
+  if (message === "Cannot message yourself.") {
+    return new TRPCError({ code: "BAD_REQUEST", message });
+  }
+  if (message === "Message body or media is required." || message.startsWith("Message must be at most")) {
+    return new TRPCError({ code: "BAD_REQUEST", message });
+  }
+  if (message.startsWith("Idempotency key")) {
+    return new TRPCError({ code: "CONFLICT", message });
   }
   if (error instanceof Error) {
     return new TRPCError({
@@ -1684,6 +1723,164 @@ export const appRouter = router({
             : createAnnouncementComment(input.announcementId, ctx.user.id, input.body)
         ),
     }),
+  }),
+  directMessages: router({
+    listConversations: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().int().min(1).max(100).optional(),
+        }).optional()
+      )
+      .query(async ({ ctx, input }) => {
+        try {
+          return await listConversations(ctx.user.id, input?.limit);
+        } catch (error) {
+          throw mapDMError(error, "listConversations");
+        }
+      }),
+    listMessages: protectedProcedure
+      .input(
+        z.object({
+          conversationId: z.number().int().positive(),
+          limit: z.number().int().min(1).max(100).optional(),
+          beforeId: z.number().int().positive().optional(),
+        })
+      )
+      .query(async ({ ctx, input }) => {
+        try {
+          return await listMessages(input.conversationId, ctx.user.id, {
+            limit: input.limit,
+            beforeId: input.beforeId,
+          });
+        } catch (error) {
+          throw mapDMError(error, "listMessages");
+        }
+      }),
+    sendMessage: protectedProcedure
+      .input(
+        z.object({
+          conversationId: z.number().int().positive(),
+          body: z.string().trim().max(4000).optional(),
+          idempotencyKey: z.string().trim().min(1).max(160),
+          media: z
+            .object({
+              mediaUrl: z.string().url().max(1024),
+              mediaType: z.string().max(16),
+              mediaWidth: z.number().int().positive().nullable().optional(),
+              mediaHeight: z.number().int().positive().nullable().optional(),
+              mediaDuration: z.number().int().positive().nullable().optional(),
+            })
+            .optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await sendMessage(
+            input.conversationId,
+            ctx.user.id,
+            input.body ?? "",
+            input.idempotencyKey,
+            input.media
+          );
+        } catch (error) {
+          throw mapDMError(error, "sendMessage");
+        }
+      }),
+    sendMessageRequest: protectedProcedure
+      .input(
+        z.object({
+          recipientId: z.number().int().positive(),
+          body: z.string().trim().max(4000).optional(),
+          idempotencyKey: z.string().trim().min(1).max(160),
+          media: z
+            .object({
+              mediaUrl: z.string().url().max(1024),
+              mediaType: z.string().max(16),
+              mediaWidth: z.number().int().positive().nullable().optional(),
+              mediaHeight: z.number().int().positive().nullable().optional(),
+              mediaDuration: z.number().int().positive().nullable().optional(),
+            })
+            .optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await sendMessageRequest(
+            ctx.user.id,
+            input.recipientId,
+            input.body ?? "",
+            input.idempotencyKey,
+            input.media
+          );
+        } catch (error) {
+          throw mapDMError(error, "sendMessageRequest");
+        }
+      }),
+    listMessageRequests: protectedProcedure
+      .input(
+        z.object({
+          limit: z.number().int().min(1).max(100).optional(),
+        }).optional()
+      )
+      .query(async ({ ctx, input }) => {
+        try {
+          return await listMessageRequests(ctx.user.id, input?.limit);
+        } catch (error) {
+          throw mapDMError(error, "listMessageRequests");
+        }
+      }),
+    acceptMessageRequest: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await acceptMessageRequest(input.requestId, ctx.user.id);
+        } catch (error) {
+          throw mapDMError(error, "acceptMessageRequest");
+        }
+      }),
+    declineMessageRequest: protectedProcedure
+      .input(z.object({ requestId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await declineMessageRequest(input.requestId, ctx.user.id);
+        } catch (error) {
+          throw mapDMError(error, "declineMessageRequest");
+        }
+      }),
+    markConversationRead: protectedProcedure
+      .input(z.object({ conversationId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await markConversationRead(input.conversationId, ctx.user.id);
+        } catch (error) {
+          throw mapDMError(error, "markConversationRead");
+        }
+      }),
+    getUnreadMessageCount: protectedProcedure.query(async ({ ctx }) => {
+      try {
+        return await getUnreadMessageCount(ctx.user.id);
+      } catch (error) {
+        throw mapDMError(error, "getUnreadMessageCount");
+      }
+    }),
+    getOrCreateConversation: protectedProcedure
+      .input(z.object({ otherUserId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await getOrCreateConversation(ctx.user.id, input.otherUserId);
+        } catch (error) {
+          throw mapDMError(error, "getOrCreateConversation");
+        }
+      }),
+    blockConversation: protectedProcedure
+      .input(z.object({ conversationId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await blockConversation(input.conversationId, ctx.user.id);
+        } catch (error) {
+          throw mapDMError(error, "blockConversation");
+        }
+      }),
   }),
 });
 export type AppRouter = typeof appRouter;
