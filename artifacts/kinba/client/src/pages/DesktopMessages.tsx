@@ -2,14 +2,17 @@ import { useEffect, useState } from "react";
 import { Switch, Route, useLocation, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Loader2, ChevronLeft, Search } from "lucide-react";
+import { Loader2, ChevronLeft, Search, ArrowLeft, AlertCircle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import MessageDetail from "./MessageDetail";
 import "./messages.css";
 
 export function DesktopMessages() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [location, navigate] = useLocation();
-  const [isDesktop, setIsDesktop] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== "undefined" && window.innerWidth >= 768
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const utils = trpc.useUtils();
 
@@ -23,50 +26,30 @@ export function DesktopMessages() {
   const showRequests = location === "/messages/requests";
   const showConversation = location.startsWith("/messages/") && !showRequests;
   const conversationId = showConversation ? Number(location.split("/")[2]) : null;
+  const showBackButton = !isDesktop && location === "/messages";
 
-  if (!isAuthenticated) {
-    return (
-      <div className="messages-shell desktop-messages-shell">
-        <div className="desktop-sidebar">
-          <header className="messages-header">
-            <h1>Messages</h1>
-          </header>
-          <div className="messages-empty">
-            <Loader2 size={48} className="spin" />
-            <h2>Sign in to view messages</h2>
-          </div>
-        </div>
-        {isDesktop && showConversation && (
-          <div className="desktop-chat">
-            <div className="message-detail-shell">
-              <div className="messages-empty" style={{ flex: 1 }}>
-                <Loader2 size={48} className="spin" />
-                <h2>Sign in to view conversation</h2>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
+  const handleBack = () => {
+    navigate("/");
+  };
 
+  // Hooks must run unconditionally: the auth session resolves after mount, so
+  // declaring queries behind the unauthenticated early return changes the hook
+  // order between renders. Queries stay disabled until the session exists, and
+  // until the conversation list is actually visible (mobile conversation view
+  // hides the sidebar, so it must not pay for inbox polling).
+  const listEnabled = isAuthenticated && (!showConversation || isDesktop);
   const conversationsQuery = trpc.directMessages.listConversations.useQuery(
     { limit: 50 },
-    { enabled: true, refetchInterval: 30000 }
+    { enabled: listEnabled, refetchInterval: 30000 }
   );
   const requestsQuery = trpc.directMessages.listMessageRequests.useQuery(
     { limit: 50 },
-    { enabled: true, refetchInterval: 30000 }
+    { enabled: listEnabled, refetchInterval: 30000 }
   );
   const unreadCountQuery = trpc.directMessages.getUnreadMessageCount.useQuery(
     undefined,
-    { enabled: true, refetchInterval: 30000 }
+    { enabled: isAuthenticated, refetchInterval: 30000 }
   );
-
-  const conversations = conversationsQuery.data ?? [];
-  const requests = requestsQuery.data ?? [];
-  const totalUnread = unreadCountQuery.data ?? 0;
-  const requestsUnread = requests.length;
 
   const acceptRequestMut = trpc.directMessages.acceptMessageRequest.useMutation({
     onSuccess: () => {
@@ -80,6 +63,55 @@ export function DesktopMessages() {
       utils.directMessages.listMessageRequests.invalidate();
     },
   });
+
+  if (!isAuthenticated) {
+    return (
+      <div className="messages-shell desktop-messages-shell">
+        {(!showConversation || isDesktop) && (
+        <div className="desktop-sidebar">
+          <header className="messages-header">
+            {showBackButton && (
+              <button type="button" className="back-btn" onClick={handleBack} aria-label="Back">
+                <ArrowLeft size={22} />
+              </button>
+            )}
+            <h1>Messages</h1>
+          </header>
+          {authLoading ? (
+            <div className="messages-list" aria-busy="true" aria-label="Loading messages">
+              <div className="messages-skeleton">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="conversation-skeleton">
+                    <Skeleton className="conversation-skeleton-avatar" />
+                    <div className="conversation-skeleton-content">
+                      <Skeleton className="conversation-skeleton-line short" />
+                      <Skeleton className="conversation-skeleton-line medium" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="messages-empty">
+              <Loader2 size={48} className="spin" />
+              <h2>Sign in to view messages</h2>
+            </div>
+          )}
+        </div>
+        )}
+        {showConversation && (
+          <div className="desktop-chat">
+            <Route path="/messages/:id" component={MessageDetail} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const conversations = conversationsQuery.data ?? [];
+  const requests = requestsQuery.data ?? [];
+  const totalUnread = unreadCountQuery.data ?? 0;
+  const requestsUnread = requests.length;
 
   const handleAcceptRequest = async (requestId: number) => {
     try {
@@ -115,6 +147,11 @@ export function DesktopMessages() {
       {(!showConversation || isDesktop) && (
         <aside className={`desktop-sidebar ${showConversation && isDesktop ? "has-chat" : ""}`}>
         <header className="messages-header">
+          {showBackButton && (
+            <button type="button" className="back-btn" onClick={handleBack} aria-label="Back">
+              <ArrowLeft size={22} />
+            </button>
+          )}
           <h1>Messages</h1>
           <button
             type="button"
@@ -157,9 +194,26 @@ export function DesktopMessages() {
         {showRequests ? (
           <div className="messages-list requests-list" role="list" aria-label="Message requests">
             {requestsQuery.isPending ? (
-              <div className="messages-loading">
-                <Loader2 size={24} className="spin" />
-                <span>Loading requests...</span>
+              <div className="messages-skeleton" aria-busy="true" aria-label="Loading message requests">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="request-skeleton">
+                    <Skeleton className="request-skeleton-avatar" />
+                    <div className="request-skeleton-content">
+                      <Skeleton className="request-skeleton-line short" />
+                      <Skeleton className="request-skeleton-line medium" />
+                      <Skeleton className="request-skeleton-line long" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : requestsQuery.isError && requestsQuery.data === undefined ? (
+              <div className="messages-empty">
+                <AlertCircle size={48} />
+                <h2>Couldn't load message requests</h2>
+                <p>The server may be waking up. Check your connection and try again.</p>
+                <button type="button" className="primary-btn" onClick={() => void requestsQuery.refetch()}>
+                  Try again
+                </button>
               </div>
             ) : requests.length === 0 ? (
               <div className="messages-empty">
@@ -234,9 +288,25 @@ export function DesktopMessages() {
         ) : (
           <div className="messages-list conversations-list" role="list" aria-label="Conversations">
             {conversationsQuery.isPending ? (
-              <div className="messages-loading">
-                <Loader2 size={24} className="spin" />
-                <span>Loading conversations...</span>
+              <div className="messages-skeleton" aria-busy="true" aria-label="Loading conversations">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="conversation-skeleton">
+                    <Skeleton className="conversation-skeleton-avatar" />
+                    <div className="conversation-skeleton-content">
+                      <Skeleton className="conversation-skeleton-line short" />
+                      <Skeleton className="conversation-skeleton-line medium" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : conversationsQuery.isError && conversationsQuery.data === undefined ? (
+              <div className="messages-empty">
+                <AlertCircle size={48} />
+                <h2>Couldn't load conversations</h2>
+                <p>The server may be waking up. Check your connection and try again.</p>
+                <button type="button" className="primary-btn" onClick={() => void conversationsQuery.refetch()}>
+                  Try again
+                </button>
               </div>
             ) : conversations.length === 0 ? (
               <div className="messages-empty">

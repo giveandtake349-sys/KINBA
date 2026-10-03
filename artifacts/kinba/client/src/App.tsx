@@ -13,7 +13,6 @@ import HypeRoomDetail from "./pages/HypeRoomDetail";
 import Drops from "./pages/Drops";
 import DropDetail from "./pages/DropDetail";
 import Messages from "./pages/Messages";
-import MessageDetail from "./pages/MessageDetail";
 import MessageRequests from "./pages/MessageRequests";
 import NotFound from "./pages/NotFound";
 import { DesktopMessages } from "./pages/DesktopMessages";
@@ -35,7 +34,11 @@ function AppRoutes() {
       <Route path="/drops/:id" component={DropDetail} />
       <Route path="/drops" component={Drops} />
       <Route path="/messages/requests" component={MessageRequests} />
-      <Route path="/messages/:id" component={MessageDetail} />
+      {/* /messages/:id must mount DesktopMessages, not MessageDetail: the
+          desktop two-pane shell renders MessageDetail inside its own
+          /messages/:id route. Mobile keeps the same full-screen MessageDetail
+          because DesktopMessages hides its sidebar for conversations. */}
+      <Route path="/messages/:id" component={DesktopMessages} />
       <Route path="/messages" component={DesktopMessages} />
       <Route path="/login" component={Home} />
       <Route path="/" component={Home} />

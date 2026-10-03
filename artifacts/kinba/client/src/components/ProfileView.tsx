@@ -24,8 +24,11 @@ import {
   Heart,
   ChevronRight,
   ChevronLeft,
+  MessageSquare,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { uploadImage } from "@/lib/mediaUpload";
 import { resolveMediaUrl } from "@/lib/runtimeConfig";
@@ -103,6 +106,131 @@ export function ProfileSkeleton() {
         </div>
       </div>
     </main>
+  );
+}
+
+function MessageComposeModal({
+  recipientId,
+  recipientName,
+  recipientPhotoUrl,
+  open,
+  onClose,
+  onSent,
+}: {
+  recipientId: number;
+  recipientName: string;
+  recipientPhotoUrl: string | null;
+  open: boolean;
+  onClose: () => void;
+  onSent: (conversationId: number, status: "accepted" | "pending") => void;
+}) {
+  const [messageText, setMessageText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const utils = trpc.useUtils();
+  const sendRequestMut = trpc.directMessages.sendMessageRequest.useMutation();
+
+  const handleSend = async () => {
+    const trimmed = messageText.trim();
+    if (!trimmed) return;
+    setSending(true);
+    setError(null);
+    try {
+      const idempotencyKey = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+      const result = await sendRequestMut.mutateAsync({
+        recipientId,
+        body: trimmed,
+        idempotencyKey,
+      });
+      if (result.status !== "accepted") {
+        onSent(0, "pending");
+        onClose();
+        return;
+      }
+      // The request was accepted, so the server created or reused the
+      // conversation. Read it back from the inbox instead of forcing one open.
+      let conversationId = 0;
+      try {
+        const conversations = await utils.directMessages.listConversations.fetch({
+          limit: 50,
+        });
+        conversationId =
+          conversations.find((conversation) => conversation.partner.id === recipientId)
+            ?.id ?? 0;
+      } catch {
+        conversationId = 0;
+      }
+      onSent(conversationId, "accepted");
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send message");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div className="pr-modal-overlay" role="dialog" aria-modal="true" aria-label="New message">
+      <div className="pr-modal">
+        <div className="pr-modal-header">
+          <h2>New Message</h2>
+          <button type="button" className="pr-modal-close" onClick={onClose} aria-label="Close" disabled={sending}>
+            <X size={18} />
+          </button>
+        </div>
+        <div className="pr-modal-body">
+          <div className="pr-message-recipient">
+            <div className="pr-avatar pr-avatar--small">
+              {recipientPhotoUrl ? (
+                <img src={recipientPhotoUrl} alt="" />
+              ) : (
+                <UserRound size={20} />
+              )}
+            </div>
+            <span>{recipientName}</span>
+          </div>
+          <label className="pr-field">
+            <span className="pr-field-label">Message</span>
+            <textarea
+              className="pr-input pr-textarea"
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              maxLength={4000}
+              rows={4}
+              placeholder="Write your message..."
+              disabled={sending}
+            />
+            <span className="pr-field-hint">{messageText.length}/4000</span>
+          </label>
+          {error && <p className="pr-message pr-message--error" role="alert">{error}</p>}
+          <div className="pr-modal-actions">
+            <button type="button" className="pr-btn pr-btn--ghost" onClick={onClose} disabled={sending}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="pr-btn pr-btn--primary"
+              onClick={handleSend}
+              disabled={sending || !messageText.trim()}
+            >
+              {sending ? (
+                <>
+                  <Loader2 size={14} className="pr-spin" />
+                  Sending…
+                </>
+              ) : (
+                <>
+                  <Send size={14} />
+                  Send
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -300,6 +428,8 @@ export default function ProfileView({
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [followList, setFollowList] = useState<FollowListMode | null>(null);
+  const [messageComposeOpen, setMessageComposeOpen] = useState(false);
+  const [messageOpening, setMessageOpening] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -307,6 +437,8 @@ export default function ProfileView({
   const isScrollingTabs = useRef(false);
   const isScrollingContent = useRef(false);
 
+  const utils = trpc.useUtils();
+  const [, navigate] = useLocation();
   const followState = trpc.profile.followState.useQuery(
     { userId: userId as number },
     {
@@ -383,6 +515,45 @@ export default function ProfileView({
       toast.success("Profile link copied.");
     }
   }, [userId, displayName]);
+
+  const handleMessageSent = useCallback(
+    (conversationId: number, status: "accepted" | "pending") => {
+      if (conversationId > 0) {
+        navigate(`/messages/${conversationId}`);
+      } else if (status === "accepted") {
+        toast.success("Message sent");
+      } else {
+        toast.success("Message request sent");
+      }
+    },
+    [navigate]
+  );
+
+  const handleMessageClick = useCallback(async () => {
+    if (!userId) return;
+    setMessageOpening(true);
+    try {
+      // Open an existing thread directly; the inbox only ever lists
+      // conversations the server already authorized us to see.
+      const conversations = await utils.directMessages.listConversations.fetch({
+        limit: 50,
+      });
+      const existing = conversations.find(
+        (conversation) => conversation.partner.id === userId
+      );
+      if (existing) {
+        navigate(`/messages/${existing.id}`);
+        return;
+      }
+      setMessageComposeOpen(true);
+    } catch {
+      // Inbox lookup failed: fall back to the server-authoritative flow,
+      // which applies the follow/request rules for a brand-new thread.
+      setMessageComposeOpen(true);
+    } finally {
+      setMessageOpening(false);
+    }
+  }, [userId, utils, navigate]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -521,18 +692,34 @@ export default function ProfileView({
               Edit Profile
             </button>
           ) : isAuthenticated && userId ? (
-            <button
-              type="button"
-              className={`pr-btn ${isFollowing ? "pr-btn--outline" : "pr-btn--primary"}`}
-              onClick={handleFollow}
-              disabled={toggleFollow.isPending || followState.isPending}
-            >
-              {toggleFollow.isPending
-                ? "…"
-                : isFollowing
-                  ? "Following"
-                  : "Follow"}
-            </button>
+            <>
+              <button
+                type="button"
+                className={`pr-btn ${isFollowing ? "pr-btn--outline" : "pr-btn--primary"}`}
+                onClick={handleFollow}
+                disabled={toggleFollow.isPending || followState.isPending}
+              >
+                {toggleFollow.isPending
+                  ? "…"
+                  : isFollowing
+                    ? "Following"
+                    : "Follow"}
+              </button>
+              <button
+                type="button"
+                className="pr-btn pr-btn--primary"
+                onClick={() => void handleMessageClick()}
+                disabled={messageOpening}
+                aria-label={`Message ${displayName}`}
+              >
+                {messageOpening ? (
+                  <Loader2 size={15} className="pr-spin" />
+                ) : (
+                  <MessageSquare size={15} />
+                )}
+                Message
+              </button>
+            </>
           ) : null}
           <button
             type="button"
@@ -779,6 +966,14 @@ export default function ProfileView({
         mode={followList ?? "followers"}
         userId={userId ?? profile?.user?.id ?? 0}
         onClose={() => setFollowList(null)}
+      />
+      <MessageComposeModal
+        recipientId={userId ?? 0}
+        recipientName={displayName}
+        recipientPhotoUrl={profile?.profile?.photoUrl ?? null}
+        open={messageComposeOpen}
+        onClose={() => setMessageComposeOpen(false)}
+        onSent={handleMessageSent}
       />
     </main>
   );

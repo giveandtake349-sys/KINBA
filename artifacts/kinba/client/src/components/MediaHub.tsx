@@ -4444,7 +4444,8 @@ export type FeedSection =
   | "settings"
   | "wallet"
   | "qr"
-  | "offline";
+  | "offline"
+  | "messages";
 
 export function SearchFeed({
   onOpenVideo,

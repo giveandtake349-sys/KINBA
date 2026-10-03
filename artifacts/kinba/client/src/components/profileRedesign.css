@@ -625,6 +625,29 @@
   text-align: center;
 }
 
+.pr-message-recipient {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.pr-message-recipient .pr-avatar--small {
+  width: 40px;
+  height: 40px;
+}
+
+.pr-message-recipient .pr-avatar--small svg {
+  color: var(--muted);
+}
+
+.pr-message--error {
+  color: #e5484d;
+  text-align: left;
+}
+
 .pr-modal-actions {
   display: flex;
   gap: 8px;
