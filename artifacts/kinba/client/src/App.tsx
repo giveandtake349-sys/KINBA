@@ -14,6 +14,7 @@ import Drops from "./pages/Drops";
 import DropDetail from "./pages/DropDetail";
 import Messages from "./pages/Messages";
 import MessageRequests from "./pages/MessageRequests";
+import Settings from "./pages/settings/Settings";
 import NotFound from "./pages/NotFound";
 import { DesktopMessages } from "./pages/DesktopMessages";
 
@@ -27,6 +28,10 @@ function AppRoutes() {
     <Switch>
       <Route path="/admin" component={Admin} />
       <Route path="/auth/callback" component={AuthCallback} />
+      {/* Account Center: /settings shows the category index (and, on desktop,
+          the default pane); /settings/:section deep-links one category. */}
+      <Route path="/settings" component={Settings} />
+      <Route path="/settings/:section" component={Settings} />
       {/* /rooms/new must be registered before /rooms/:id so "new" is not captured as an id. */}
       <Route path="/rooms/new" component={CreateHypeRoom} />
       <Route path="/rooms/:id" component={HypeRoomDetail} />

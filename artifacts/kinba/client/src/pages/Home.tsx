@@ -86,7 +86,7 @@ type AppModal =
   | "studio"
   | "announcements"
   | null;
-type DrawerAction = Exclude<AppModal, null> | "profile";
+type DrawerAction = Exclude<AppModal, null> | "profile" | "settings";
 
 function safeClick(action: () => void) {
   return (event: ReactMouseEvent<HTMLButtonElement>) => {
@@ -617,6 +617,12 @@ function MobileDrawer({
       title: "Personal tools",
       items: [
         {
+          section: "settings",
+          label: "Settings",
+          description: "Account, privacy and security",
+          icon: Settings,
+        },
+        {
           section: "activity",
           label: "Activity center",
           description: "Reactions, comments, and follows",
@@ -733,6 +739,7 @@ function AppHeader({
   onMenu,
   onProfile,
   onLogout,
+  onSettings,
 }: {
   profile?: ProfileSnapshot;
   notificationCount: number;
@@ -742,6 +749,7 @@ function AppHeader({
   onMenu: () => void;
   onProfile: () => void;
   onLogout: () => void;
+  onSettings: () => void;
 }) {
   return (
     <header className="topbar mobile-first-header">
@@ -800,6 +808,15 @@ function AppHeader({
         >
           <ProfileIdentity profile={profile} compact />
           <Menu size={22} />
+        </button>
+        <button
+          type="button"
+          className="topbar-icon-button"
+          onClick={safeClick(onSettings)}
+          aria-label="Settings"
+          title="Settings"
+        >
+          <Settings size={18} />
         </button>
         <ThemeToggle />
         <button type="button" className="logout-btn" onClick={safeClick(onLogout)}>
@@ -2111,6 +2128,11 @@ export default function Home() {
       openProfile();
       return;
     }
+    if (next === "settings") {
+      setMenuOpen(false);
+      navigate("/settings");
+      return;
+    }
     openModal(next);
   };
   const logout = async () => {
@@ -2169,6 +2191,7 @@ export default function Home() {
             onMenu={() => setMenuOpen(value => !value)}
             onProfile={openProfile}
             onLogout={logout}
+            onSettings={() => navigate("/settings")}
           />
           {screen === "dashboard" && (
             <FeedTabs activeSection={activeView} onSectionChange={showFeed} />

@@ -234,7 +234,8 @@ function MessageComposeModal({
   );
 }
 
-function ProfileEditModal({
+/** Exported so Settings › Account can reuse the exact same edit surface. */
+export function ProfileEditModal({
   profile,
   open,
   onClose,

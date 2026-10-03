@@ -2369,3 +2369,13 @@ summary,
 
 /* Feed surfaces own the full viewport instead of the page gutters. */
 .app-main-content.has-feed-tabs > .home-page { width: 100%; max-width: none; padding-left: 0 !important; padding-right: 0 !important; }
+/* Settings › Appearance — user override for reduced motion inside JHILIK.
+   Independent of the OS-level `prefers-reduced-motion` media queries. */
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
