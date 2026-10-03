@@ -84,7 +84,8 @@ function asBody(data: Buffer | Uint8Array | string) {
 export async function storagePut(
   relKey: string,
   data: Buffer | Uint8Array | string,
-  contentType = "application/octet-stream"
+  contentType = "application/octet-stream",
+  opts: { contentDisposition?: string } = {}
 ): Promise<{ key: string; url: string }> {
   const config = getR2Config();
   const key = appendHashSuffix(normalizeKey(relKey));
@@ -96,6 +97,9 @@ export async function storagePut(
         Body: asBody(data),
         ContentType: contentType,
         CacheControl: "public, max-age=3600",
+        ...(opts.contentDisposition
+          ? { ContentDisposition: opts.contentDisposition }
+          : {}),
       })
     );
   } catch (error) {
@@ -149,6 +153,15 @@ function keyFromStoredUrl(sourceUrl: string) {
     // Non-URL values are handled by the normal public fetch fallback below.
   }
   return null;
+}
+
+/**
+ * Map a previously stored media URL back to its object key.
+ * Returns null when the URL does not point at this bucket's public base,
+ * the shared r2.dev host, or the configured S3/R2 endpoint.
+ */
+export function storageKeyFromUrl(sourceUrl: string): string | null {
+  return keyFromStoredUrl(sourceUrl);
 }
 
 export async function storageDelete(sourceUrl: string): Promise<void> {

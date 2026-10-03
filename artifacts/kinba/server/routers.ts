@@ -420,8 +420,28 @@ function mapDMError(error: unknown, _op: string): TRPCError {
   if (message === "Message body or media is required." || message.startsWith("Message must be at most")) {
     return new TRPCError({ code: "BAD_REQUEST", message });
   }
+  // Attachment ownership / type / size validation from server/dmMedia.ts.
+  if (message.startsWith("Attachment")) {
+    return new TRPCError({ code: "BAD_REQUEST", message });
+  }
   if (message.startsWith("Idempotency key")) {
     return new TRPCError({ code: "CONFLICT", message });
+  }
+  // Concurrent retry with the same idempotency key loses the insert race but
+  // still resolves correctly on the next attempt — report it as a conflict
+  // instead of an opaque server error.
+  const pgCode = (error as { code?: unknown } | null)?.code;
+  const constraint = (error as { constraint?: unknown } | null)?.constraint;
+  if (
+    pgCode === "23505" &&
+    typeof constraint === "string" &&
+    constraint.startsWith("dm_messages")
+  ) {
+    return new TRPCError({
+      code: "CONFLICT",
+      message: "Idempotency key was already used.",
+      cause: error,
+    });
   }
   if (error instanceof Error) {
     return new TRPCError({

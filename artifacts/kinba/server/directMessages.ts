@@ -23,6 +23,11 @@ import {
   users,
 } from "../drizzle/schema";
 import { getDb } from "./db";
+import {
+  resolveOwnedDmMedia,
+  signDmMessageMediaUrl,
+  type DmMessageMedia,
+} from "./dmMedia";
 import { insertNotification, NOTIFICATION_TYPES } from "./notifications";
 
 export type DMConversationWithPartner = DMConversationRow & {
@@ -175,21 +180,31 @@ export async function listConversations(
 
   const partnerMap = new Map(partners.map((p) => [p.id, p]));
 
-  const lastMessageIds = conversations
+  const lastMessageConversationIds = conversations
     .filter((c) => c.lastMessageAt)
     .map((c) => c.id);
   let lastMessages: DMMessageRow[] = [];
-  if (lastMessageIds.length > 0) {
-    lastMessages = await db
-      .select()
+  if (lastMessageConversationIds.length > 0) {
+    // Latest message per conversation (preview must survive read receipts —
+    // the previous readAt-filtered query dropped previews once messages were
+    // opened, which also hid sent attachments from the inbox).
+    const latest = await db
+      .select({
+        id: sql<number>`max(${dmMessages.id})`,
+        conversationId: dmMessages.conversationId,
+      })
       .from(dmMessages)
-      .where(
-        and(
-          inArray(dmMessages.conversationId, lastMessageIds),
-          isNull(dmMessages.readAt)
-        )
-      )
-      .orderBy(desc(dmMessages.createdAt));
+      .where(inArray(dmMessages.conversationId, lastMessageConversationIds))
+      .groupBy(dmMessages.conversationId);
+    const latestIds = latest
+      .map((row) => Number(row.id))
+      .filter((id) => Number.isSafeInteger(id) && id > 0);
+    if (latestIds.length > 0) {
+      lastMessages = await db
+        .select()
+        .from(dmMessages)
+        .where(inArray(dmMessages.id, latestIds));
+    }
   }
   const lastMessageMap = new Map(lastMessages.map((m) => [m.conversationId, m]));
 
@@ -236,9 +251,23 @@ export async function listMessages(
     .where(inArray(users.id, senderIds));
   const senderMap = new Map(senders.map((s) => [s.id, s]));
 
-  return messages
-    .reverse()
-    .map((m) => ({ ...m, sender: senderMap.get(m.senderId)! }));
+  const ordered = messages.reverse();
+  // Members only: object keys become short-lived signed read URLs here, after
+  // getConversationOrThrow() has already proven the caller belongs to the
+  // conversation. Keys are never handed out through any other endpoint.
+  return Promise.all(
+    ordered.map(async (message) => {
+      let mediaUrl = message.mediaUrl;
+      if (mediaUrl?.startsWith("dm/")) {
+        try {
+          mediaUrl = await signDmMessageMediaUrl(mediaUrl);
+        } catch (error) {
+          console.warn("[DM] Media presign failed:", error);
+        }
+      }
+      return { ...message, mediaUrl, sender: senderMap.get(message.senderId)! };
+    })
+  );
 }
 
 export async function sendMessage(
@@ -246,13 +275,7 @@ export async function sendMessage(
   senderId: number,
   body: string,
   idempotencyKey: string,
-  media?: {
-    mediaUrl: string;
-    mediaType: string;
-    mediaWidth?: number | null;
-    mediaHeight?: number | null;
-    mediaDuration?: number | null;
-  }
+  media?: DmMessageMedia
 ): Promise<DMMessageRow> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -267,6 +290,8 @@ export async function sendMessage(
   if (trimmedBody.length > DM_MESSAGE_MAX_LENGTH) {
     throw new Error(`Message must be at most ${DM_MESSAGE_MAX_LENGTH} characters.`);
   }
+  // Attachment ownership / type / size enforcement (throws "Attachment …").
+  const attachment = media ? resolveOwnedDmMedia(senderId, media) : undefined;
 
   const [existing] = await db
     .select()
@@ -288,11 +313,11 @@ export async function sendMessage(
       conversationId,
       senderId,
       body: trimmedBody || null,
-      mediaUrl: media?.mediaUrl ?? null,
-      mediaType: media?.mediaType ?? null,
-      mediaWidth: media?.mediaWidth ?? null,
-      mediaHeight: media?.mediaHeight ?? null,
-      mediaDuration: media?.mediaDuration ?? null,
+      mediaUrl: attachment?.mediaUrl ?? null,
+      mediaType: attachment?.mediaType ?? null,
+      mediaWidth: attachment?.mediaWidth ?? null,
+      mediaHeight: attachment?.mediaHeight ?? null,
+      mediaDuration: attachment?.mediaDuration ?? null,
       idempotencyKey,
       createdAt: now,
       readAt: null,
@@ -356,13 +381,7 @@ export async function sendMessageRequest(
   recipientId: number,
   body: string,
   idempotencyKey: string,
-  media?: {
-    mediaUrl: string;
-    mediaType: string;
-    mediaWidth?: number | null;
-    mediaHeight?: number | null;
-    mediaDuration?: number | null;
-  }
+  media?: DmMessageMedia
 ): Promise<DMMessageRequestRow> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -370,6 +389,9 @@ export async function sendMessageRequest(
   if (requesterId === recipientId) throw new Error("Cannot message yourself.");
 
   const trimmedBody = body?.trim() ?? "";
+  // Same ownership/type/size rules as a normal message, enforced once here so
+  // both the "already follows back" and the pending-request branches are safe.
+  const attachment = media ? resolveOwnedDmMedia(requesterId, media) : undefined;
   const followsRecipient = await checkFollows(db, recipientId, requesterId);
   if (followsRecipient) {
     const conversation = await ensureConversationExists(db, requesterId, recipientId);
@@ -379,18 +401,18 @@ export async function sendMessageRequest(
       requesterId,
       body,
       idempotencyKey,
-      media
+      attachment
     );
     return {
       id: 0,
       requesterId,
       recipientId,
       body: trimmedBody,
-      mediaUrl: media?.mediaUrl ?? null,
-      mediaType: media?.mediaType ?? null,
-      mediaWidth: media?.mediaWidth ?? null,
-      mediaHeight: media?.mediaHeight ?? null,
-      mediaDuration: media?.mediaDuration ?? null,
+      mediaUrl: attachment?.mediaUrl ?? null,
+      mediaType: attachment?.mediaType ?? null,
+      mediaWidth: attachment?.mediaWidth ?? null,
+      mediaHeight: attachment?.mediaHeight ?? null,
+      mediaDuration: attachment?.mediaDuration ?? null,
       idempotencyKey,
       status: "accepted" as const,
       createdAt: new Date(),
@@ -398,7 +420,7 @@ export async function sendMessageRequest(
       respondedAt: new Date(),
     } as DMMessageRequestRow;
   }
-  if (!trimmedBody && !media?.mediaUrl) {
+  if (!trimmedBody && !attachment?.mediaUrl) {
     throw new Error("Message body or media is required.");
   }
   if (trimmedBody.length > DM_MESSAGE_MAX_LENGTH) {
@@ -425,11 +447,11 @@ export async function sendMessageRequest(
       requesterId,
       recipientId,
       body: trimmedBody,
-      mediaUrl: media?.mediaUrl ?? null,
-      mediaType: media?.mediaType ?? null,
-      mediaWidth: media?.mediaWidth ?? null,
-      mediaHeight: media?.mediaHeight ?? null,
-      mediaDuration: media?.mediaDuration ?? null,
+      mediaUrl: attachment?.mediaUrl ?? null,
+      mediaType: attachment?.mediaType ?? null,
+      mediaWidth: attachment?.mediaWidth ?? null,
+      mediaHeight: attachment?.mediaHeight ?? null,
+      mediaDuration: attachment?.mediaDuration ?? null,
       idempotencyKey,
       status: "pending",
       createdAt: now,

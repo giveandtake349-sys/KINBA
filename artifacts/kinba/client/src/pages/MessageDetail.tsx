@@ -1,32 +1,144 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLocation, useParams } from "wouter";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Send, ChevronLeft, MoreVertical, Loader2, Check, MessageSquare, AlertCircle, Shield } from "lucide-react";
+import {
+  Send,
+  ChevronLeft,
+  MoreVertical,
+  Loader2,
+  Check,
+  MessageSquare,
+  AlertCircle,
+  Shield,
+  Plus,
+  FileText,
+} from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { nanoid } from "nanoid";
+import { FeedPhotoLightbox } from "@/components/MediaHub";
+import { AttachmentMenu, PendingAttachmentStrip } from "./MessageAttachments";
+import {
+  buildDmSendPayloads,
+  parseDmMediaDisplay,
+  probeDmMedia,
+  startDmUpload,
+  validateDmFile,
+  type DmMessageMedia,
+  type DmPendingAttachment,
+  type DmUploadHandle,
+} from "@/lib/dmAttachment";
+import {
+  DM_DOCUMENT_ACCEPT,
+  DM_DOCUMENT_MEDIA_TYPE,
+  DM_IMAGE_ACCEPT,
+  DM_MAX_ATTACHMENTS,
+  DM_VIDEO_ACCEPT,
+  dmDocumentLabel,
+  formatDmFileSize,
+  type DMAttachmentKind,
+} from "@shared/dmMedia";
 import "./messages.css";
 
+type OptimisticMessage = {
+  idempotencyKey: string;
+  text: string;
+  media?: DmMessageMedia;
+  preview?: {
+    kind: DMAttachmentKind;
+    name: string;
+    size: number;
+    previewUrl?: string;
+  };
+  failed: boolean;
+};
+
 export default function MessageDetail() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, session } = useAuth();
   const [, navigateLoc] = useLocation();
   const utils = trpc.useUtils();
   const params = useParams();
   const conversationId = Number(params.id);
-  
+
   const [messageText, setMessageText] = useState("");
   const [sending, setSending] = useState(false);
-  const [optimisticMessages, setOptimisticMessages] = useState<Record<number, { text: string; idempotencyKey: string; failed: boolean }>>({});
+  const [optimisticMessages, setOptimisticMessages] = useState<
+    Record<number, OptimisticMessage>
+  >({});
+  const [attachments, setAttachments] = useState<DmPendingAttachment[]>([]);
+  const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [blocking, setBlocking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
+
+  const attachmentsRef = useRef<DmPendingAttachment[]>([]);
+  const uploadHandlesRef = useRef<Map<string, DmUploadHandle>>(new Map());
+  const previewUrlsRef = useRef<Set<string>>(new Set());
+  const optimisticCounterRef = useRef(0);
+
+  const updateAttachments = useCallback(
+    (
+      updater: (previous: DmPendingAttachment[]) => DmPendingAttachment[]
+    ) => {
+      const next = updater(attachmentsRef.current);
+      attachmentsRef.current = next;
+      setAttachments(next);
+    },
+    []
+  );
+
+  const patchAttachment = useCallback(
+    (id: string, patch: (item: DmPendingAttachment) => DmPendingAttachment) => {
+      updateAttachments(previous =>
+        previous.map(item => (item.id === id ? patch(item) : item))
+      );
+    },
+    [updateAttachments]
+  );
+
+  const registerPreviewUrl = useCallback((url: string) => {
+    previewUrlsRef.current.add(url);
+    return url;
+  }, []);
+
+  const releasePreviewUrl = useCallback((url?: string) => {
+    if (!url || !url.startsWith("blob:")) return;
+    previewUrlsRef.current.delete(url);
+    try {
+      URL.revokeObjectURL(url);
+    } catch {
+      // The URL may already be revoked; nothing to clean up.
+    }
+  }, []);
+
+  useEffect(() => {
+    const pendingUploads = uploadHandlesRef.current;
+    const pendingUrls = previewUrlsRef.current;
+    return () => {
+      for (const handle of pendingUploads.values()) handle.abort();
+      pendingUploads.clear();
+      for (const url of pendingUrls) {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          // ignore
+        }
+      }
+      pendingUrls.clear();
+    };
+  }, []);
 
   const conversationQuery = trpc.directMessages.listMessages.useQuery(
     { conversationId, limit: 50 },
-    { 
-      enabled: isAuthenticated && conversationId > 0, 
+    {
+      enabled: isAuthenticated && conversationId > 0,
       refetchInterval: 5000,
     }
   );
@@ -39,14 +151,11 @@ export default function MessageDetail() {
 
   const sendMessageMut = trpc.directMessages.sendMessage.useMutation({
     onSuccess: () => {
-      setMessageText("");
-      setOptimisticMessages({});
       utils.directMessages.listConversations.invalidate();
       utils.directMessages.getUnreadMessageCount.invalidate();
     },
-    onError: (error) => {
+    onError: error => {
       console.error("Failed to send message:", error);
-      setOptimisticMessages({});
     },
   });
 
@@ -56,7 +165,7 @@ export default function MessageDetail() {
       utils.directMessages.getUnreadMessageCount.invalidate();
       navigateLoc("/messages");
     },
-    onError: (error) => {
+    onError: error => {
       console.error("Failed to block conversation:", error);
     },
   });
@@ -84,37 +193,283 @@ export default function MessageDetail() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, optimisticMessages]);
 
-  const handleSendMessage = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = messageText.trim();
-    if (!trimmed) return;
-    
-    const idempotencyKey = nanoid();
-    const optimisticId = Date.now();
-    setOptimisticMessages((prev) => ({ ...prev, [optimisticId]: { text: trimmed, idempotencyKey, failed: false } }));
-    setSending(true);
-    
-    try {
-      await sendMessageMut.mutateAsync({
-        conversationId,
-        body: trimmed,
-        idempotencyKey,
-      });
-      setOptimisticMessages((prev) => {
-        const next = { ...prev };
+  const uploadingCount = attachments.filter(
+    item => item.status === "uploading"
+  ).length;
+  const readyCount = attachments.filter(item => item.status === "ready").length;
+  const hasText = messageText.trim().length > 0;
+  const canSend =
+    !sending && uploadingCount === 0 && (hasText || readyCount > 0);
+
+  const startUpload = useCallback(
+    async (kind: DMAttachmentKind, file: File, id: string) => {
+      try {
+        // Probe before upload so invalid/oversized-duration videos never hit
+        // storage, and images get real intrinsic dimensions for the message.
+        const metadata = await probeDmMedia(kind, file);
+        const handle = startDmUpload({
+          kind,
+          file,
+          accessToken: session?.access_token ?? null,
+          onProgress: percent =>
+            patchAttachment(id, item => ({ ...item, progress: percent })),
+        });
+        uploadHandlesRef.current.set(id, handle);
+        const uploaded = await handle.promise;
+        const media: DmMessageMedia = {
+          mediaUrl: uploaded.url,
+          mediaType: uploaded.mediaType,
+          mediaWidth: metadata.width ?? null,
+          mediaHeight: metadata.height ?? null,
+          mediaDuration: metadata.duration ?? null,
+        };
+        patchAttachment(id, item => ({
+          ...item,
+          status: "ready",
+          progress: 100,
+          name: uploaded.name,
+          size: uploaded.size,
+          media,
+          error: undefined,
+        }));
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return;
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : "Upload failed. Please try again.";
+        patchAttachment(id, item => ({
+          ...item,
+          status: "error",
+          error: message,
+        }));
+      } finally {
+        uploadHandlesRef.current.delete(id);
+      }
+    },
+    [session?.access_token, patchAttachment]
+  );
+
+  const handleFilesSelected = useCallback(
+    (kind: DMAttachmentKind, files: FileList | null) => {
+      if (!files || files.length === 0) return;
+      const incoming = Array.from(files);
+      const room = Math.max(0, DM_MAX_ATTACHMENTS - attachmentsRef.current.length);
+      if (incoming.length > room) {
+        toast.info(
+          `You can attach up to ${DM_MAX_ATTACHMENTS} files at a time.`
+        );
+      }
+      const accepted = incoming.slice(0, room);
+      const created: DmPendingAttachment[] = [];
+
+      for (const file of accepted) {
+        try {
+          validateDmFile(kind, file);
+        } catch (error) {
+          toast.error(
+            error instanceof Error ? error.message : "That file can't be sent."
+          );
+          continue;
+        }
+        const id = nanoid(10);
+        created.push({
+          id,
+          kind,
+          file,
+          name: file.name,
+          size: file.size,
+          previewUrl: registerPreviewUrl(URL.createObjectURL(file)),
+          status: "uploading",
+          progress: 0,
+        });
+      }
+      if (created.length === 0) return;
+
+      updateAttachments(previous => [...previous, ...created]);
+      for (const item of created) {
+        void startUpload(item.kind, item.file, item.id);
+      }
+    },
+    [registerPreviewUrl, startUpload, updateAttachments]
+  );
+
+  const handlePickAttachment = useCallback((kind: DMAttachmentKind) => {
+    setAttachmentMenuOpen(false);
+    if (kind === "image") photoInputRef.current?.click();
+    else if (kind === "video") videoInputRef.current?.click();
+    else documentInputRef.current?.click();
+  }, []);
+
+  const handleFileInputChange = useCallback(
+    (kind: DMAttachmentKind, event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = event.target.files;
+      event.target.value = "";
+      handleFilesSelected(kind, files);
+    },
+    [handleFilesSelected]
+  );
+
+  const handleRemoveAttachment = useCallback(
+    (id: string) => {
+      const handle = uploadHandlesRef.current.get(id);
+      if (handle) {
+        uploadHandlesRef.current.delete(id);
+        handle.abort();
+      }
+      const item = attachmentsRef.current.find(entry => entry.id === id);
+      releasePreviewUrl(item?.previewUrl);
+      updateAttachments(previous =>
+        previous.filter(entry => entry.id !== id)
+      );
+    },
+    [releasePreviewUrl, updateAttachments]
+  );
+
+  const handleRetryAttachment = useCallback(
+    (id: string) => {
+      const item = attachmentsRef.current.find(entry => entry.id === id);
+      if (!item || item.status !== "error") return;
+      patchAttachment(id, entry => ({
+        ...entry,
+        status: "uploading",
+        progress: 0,
+        error: undefined,
+      }));
+      void startUpload(item.kind, item.file, item.id);
+    },
+    [patchAttachment, startUpload]
+  );
+
+  const dispatchMessage = useCallback(
+    async (optimisticId: number, entry: OptimisticMessage) => {
+      try {
+        await sendMessageMut.mutateAsync({
+          conversationId,
+          body: entry.text,
+          idempotencyKey: entry.idempotencyKey,
+          ...(entry.media ? { media: entry.media } : {}),
+        });
+        // Pull the persisted row in before dropping the optimistic bubble so
+        // the thread never flashes empty.
+        await utils.directMessages.listMessages.invalidate();
+        setOptimisticMessages(previous => {
+          const next = { ...previous };
+          delete next[optimisticId];
+          return next;
+        });
+        releasePreviewUrl(entry.preview?.previewUrl);
+      } catch (error) {
+        console.error("Send failed:", error);
+        setOptimisticMessages(previous => ({
+          ...previous,
+          [optimisticId]: { ...(previous[optimisticId] ?? entry), failed: true },
+        }));
+      }
+    },
+    [conversationId, sendMessageMut, utils, releasePreviewUrl]
+  );
+
+  const handleSendMessage = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault();
+      if (sending || uploadingCount > 0) return;
+
+      const payloads = buildDmSendPayloads(
+        messageText,
+        attachmentsRef.current
+      );
+      if (payloads.length === 0) return;
+
+      setSending(true);
+      setMessageText("");
+
+      const consumedIds = new Set(
+        payloads
+          .map(payload => payload.attachmentId)
+          .filter((id): id is string => Boolean(id))
+      );
+      const consumed = attachmentsRef.current.filter(item =>
+        consumedIds.has(item.id)
+      );
+      updateAttachments(previous =>
+        previous.filter(item => !consumedIds.has(item.id))
+      );
+
+      const entries: Array<[number, OptimisticMessage]> = payloads.map(
+        payload => {
+          const attachment = payload.attachmentId
+            ? consumed.find(item => item.id === payload.attachmentId)
+            : undefined;
+          const optimisticId = (optimisticCounterRef.current += 1);
+          return [
+            optimisticId,
+            {
+              idempotencyKey: nanoid(),
+              text: payload.body,
+              media: payload.media,
+              preview: attachment
+                ? {
+                    kind: attachment.kind,
+                    name: attachment.name,
+                    size: attachment.size,
+                    previewUrl: attachment.previewUrl,
+                  }
+                : undefined,
+              failed: false,
+            },
+          ];
+        }
+      );
+      setOptimisticMessages(previous => ({
+        ...previous,
+        ...Object.fromEntries(entries),
+      }));
+
+      // Sequential sends keep multi-image ordering intact; each message keeps
+      // its own idempotency key so a failed one can be retried on its own.
+      for (const [optimisticId, entry] of entries) {
+        await dispatchMessage(optimisticId, entry);
+      }
+      setSending(false);
+    },
+    [
+      sending,
+      uploadingCount,
+      messageText,
+      updateAttachments,
+      dispatchMessage,
+    ]
+  );
+
+  const handleRetryMessage = useCallback(
+    (optimisticId: number) => {
+      const entry = optimisticMessages[optimisticId];
+      if (!entry || sending) return;
+      setOptimisticMessages(previous => ({
+        ...previous,
+        [optimisticId]: { ...previous[optimisticId], failed: false },
+      }));
+      setSending(true);
+      void dispatchMessage(optimisticId, entry).finally(() =>
+        setSending(false)
+      );
+    },
+    [optimisticMessages, sending, dispatchMessage]
+  );
+
+  const handleRemoveMessage = useCallback(
+    (optimisticId: number) => {
+      const entry = optimisticMessages[optimisticId];
+      releasePreviewUrl(entry?.preview?.previewUrl);
+      setOptimisticMessages(previous => {
+        const next = { ...previous };
         delete next[optimisticId];
         return next;
       });
-    } catch (error) {
-      console.error("Send failed:", error);
-      setOptimisticMessages((prev) => ({
-        ...prev,
-        [optimisticId]: { ...prev[optimisticId], failed: true },
-      }));
-    } finally {
-      setSending(false);
-    }
-  }, [messageText, conversationId, sendMessageMut]);
+    },
+    [optimisticMessages, releasePreviewUrl]
+  );
 
   const handleBack = useCallback(() => {
     navigateLoc("/messages");
@@ -267,6 +622,12 @@ export default function MessageDetail() {
               const isOwn = msg.senderId === user?.id;
               const showTime = idx === 0 || 
                 (messages[idx - 1] && new Date(msg.createdAt).getTime() - new Date(messages[idx - 1].createdAt).getTime() > 5 * 60 * 1000);
+              const mediaUrl = msg.mediaUrl;
+              const displayUrl =
+                mediaUrl && /^https?:\/\//i.test(mediaUrl) ? mediaUrl : undefined;
+              const isVideo = Boolean(msg.mediaType?.startsWith("video"));
+              const isDocument = msg.mediaType === DM_DOCUMENT_MEDIA_TYPE;
+              const documentMeta = isDocument ? parseDmMediaDisplay(mediaUrl) : null;
               return (
                 <div
                   key={msg.id}
@@ -285,10 +646,48 @@ export default function MessageDetail() {
                     <div className={`message-body${msg.mediaUrl ? " has-media" : ""}`}>
                       {msg.mediaUrl && (
                         <div className="message-media">
-                          {msg.mediaType?.startsWith("video") ? (
-                            <video src={msg.mediaUrl} controls />
+                          {!displayUrl ? (
+                            <span className="dm-media-unavailable">Attachment</span>
+                          ) : isVideo ? (
+                            <video src={displayUrl} controls preload="metadata" playsInline />
+                          ) : isDocument ? (
+                            <a
+                              className="dm-doc"
+                              href={displayUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={`Open ${
+                                documentMeta?.name ?? "document"
+                              }`}
+                            >
+                              <span className="dm-doc-icon" aria-hidden="true">
+                                <FileText size={18} />
+                              </span>
+                              <span className="dm-doc-text">
+                                <span className="dm-doc-name">
+                                  {documentMeta?.name ?? "Document"}
+                                </span>
+                                <span className="dm-doc-sub">
+                                  {[
+                                    documentMeta
+                                      ? dmDocumentLabel(documentMeta.ext)
+                                      : "FILE",
+                                    documentMeta
+                                      ? formatDmFileSize(documentMeta.size)
+                                      : "",
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" • ")}
+                                </span>
+                              </span>
+                            </a>
                           ) : (
-                            <img src={msg.mediaUrl} alt="Shared media" />
+                            <img
+                              src={displayUrl}
+                              alt="Shared photo"
+                              loading="lazy"
+                              onClick={() => setLightboxUrl(displayUrl)}
+                            />
                           )}
                         </div>
                       )}
@@ -307,8 +706,35 @@ export default function MessageDetail() {
                 return (
                   <div key={idStr} className={`message-bubble own optimistic${msg.failed ? " failed" : ""}`}>
                     <div className="message-content">
-                      <div className="message-body">
-                        <p>{msg.text}</p>
+                      <div className={`message-body${msg.media ? " has-media" : ""}`}>
+                        {msg.media && msg.preview && (
+                          <div className="message-media">
+                            {msg.preview.kind === "image" && msg.preview.previewUrl ? (
+                              <img src={msg.preview.previewUrl} alt={msg.preview.name} />
+                            ) : msg.preview.kind === "video" && msg.preview.previewUrl ? (
+                              <video
+                                src={msg.preview.previewUrl}
+                                controls
+                                preload="metadata"
+                                muted
+                                playsInline
+                              />
+                            ) : (
+                              <div className="dm-doc dm-doc--pending">
+                                <span className="dm-doc-icon" aria-hidden="true">
+                                  <FileText size={18} />
+                                </span>
+                                <span className="dm-doc-text">
+                                  <span className="dm-doc-name">{msg.preview.name}</span>
+                                  <span className="dm-doc-sub">
+                                    {formatDmFileSize(msg.preview.size)}
+                                  </span>
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {msg.text && <p>{msg.text}</p>}
                       </div>
                       <div className="message-time sending">
                         {msg.failed ? (
@@ -317,37 +743,19 @@ export default function MessageDetail() {
                             <button
                               type="button"
                               className="retry-btn"
-                              onClick={() => {
-                                const { text, idempotencyKey } = msg;
-                                setOptimisticMessages((prev) => {
-                                  const next = { ...prev };
-                                  next[id] = { ...next[id], failed: false };
-                                  return next;
-                                });
-                                setSending(true);
-                                sendMessageMut.mutateAsync({
-                                  conversationId,
-                                  body: text,
-                                  idempotencyKey,
-                                }).then(() => {
-                                  setOptimisticMessages((prev) => {
-                                    const next = { ...prev };
-                                    delete next[id];
-                                    return next;
-                                  });
-                                }).catch(() => {
-                                  setOptimisticMessages((prev) => ({
-                                    ...prev,
-                                    [id]: { ...prev[id], failed: true },
-                                  }));
-                                }).finally(() => {
-                                  setSending(false);
-                                });
-                              }}
+                              onClick={() => handleRetryMessage(id)}
                               disabled={sending}
                             >
                               <Loader2 size={12} className="spin" />
                               Retry
+                            </button>
+                            <button
+                              type="button"
+                              className="retry-btn retry-btn--ghost"
+                              onClick={() => handleRemoveMessage(id)}
+                              disabled={sending}
+                            >
+                              Remove
                             </button>
                       </>
                     ) : (
@@ -366,28 +774,83 @@ export default function MessageDetail() {
         )}
       </div>
 
-      <form className="message-detail-input" onSubmit={handleSendMessage}>
-        <div className="input-wrapper">
-          <textarea
-            ref={textareaRef}
-            placeholder="Message..."
-            value={messageText}
-            onChange={(e) => setMessageText(e.target.value)}
-            rows={1}
-            style={{ minHeight: "44px", maxHeight: "160px" }}
-            disabled={sending}
-            aria-label="Message input"
-          />
-        </div>
-        <button
-          type="submit"
-          className="send-btn"
-          disabled={!messageText.trim() || sending}
-          aria-label="Send message"
-        >
-          {sending ? <Loader2 size={20} className="spin" /> : <Send size={20} />}
-        </button>
-      </form>
+      <div className="composer-shell">
+        <PendingAttachmentStrip
+          items={attachments}
+          onRemove={handleRemoveAttachment}
+          onRetry={handleRetryAttachment}
+        />
+        <form className="message-detail-input" onSubmit={handleSendMessage}>
+          <div className="input-actions">
+            <button
+              type="button"
+              className="input-action-btn attach-btn"
+              aria-label="Add attachment"
+              aria-haspopup="menu"
+              aria-expanded={attachmentMenuOpen}
+              onClick={() => setAttachmentMenuOpen(open => !open)}
+              disabled={sending}
+            >
+              <Plus size={20} />
+            </button>
+            <AttachmentMenu
+              open={attachmentMenuOpen}
+              onPick={handlePickAttachment}
+              onClose={() => setAttachmentMenuOpen(false)}
+            />
+          </div>
+          <div className="input-wrapper">
+            <textarea
+              ref={textareaRef}
+              placeholder="Message..."
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              rows={1}
+              style={{ minHeight: "44px", maxHeight: "160px" }}
+              disabled={sending}
+              aria-label="Message input"
+            />
+          </div>
+          <button
+            type="submit"
+            className="send-btn"
+            disabled={!canSend}
+            aria-label="Send message"
+          >
+            {sending ? <Loader2 size={20} className="spin" /> : <Send size={20} />}
+          </button>
+        </form>
+        <input
+          ref={photoInputRef}
+          type="file"
+          hidden
+          accept={DM_IMAGE_ACCEPT}
+          multiple
+          onChange={event => handleFileInputChange("image", event)}
+        />
+        <input
+          ref={videoInputRef}
+          type="file"
+          hidden
+          accept={DM_VIDEO_ACCEPT}
+          onChange={event => handleFileInputChange("video", event)}
+        />
+        <input
+          ref={documentInputRef}
+          type="file"
+          hidden
+          accept={DM_DOCUMENT_ACCEPT}
+          onChange={event => handleFileInputChange("document", event)}
+        />
+      </div>
+
+      {lightboxUrl && (
+        <FeedPhotoLightbox
+          imageUrl={lightboxUrl}
+          alt="Shared photo"
+          onClose={() => setLightboxUrl(null)}
+        />
+      )}
     </div>
   );
 }

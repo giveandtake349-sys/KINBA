@@ -8,6 +8,7 @@ import { createContext } from "./context";
 import { isAllowedCorsOrigin, parseAllowedOrigins } from "../httpSecurity";
 import { serveStatic, setupVite } from "./vite";
 import { registerVideoUploadRoute } from "../videoUploadRoute";
+import { registerDmUploadRoute } from "../dmMedia";
 import { registerCommentRoutes } from "../commentRoutes";
 import { listSpotlightHighlights } from "../db";
 import { rateLimit } from "../rateLimiter";
@@ -85,6 +86,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerVideoUploadRoute(app);
+  registerDmUploadRoute(app);
   registerCommentRoutes(app);
 
   // --- Rate limiting ---

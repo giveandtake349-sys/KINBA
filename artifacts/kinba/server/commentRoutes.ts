@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { deleteComment, toggleCommentLike } from "./db";
-import { authenticate } from "./videoUploadRoute";
+import { authenticate } from "./authenticate";
 
 function positiveId(value: string | undefined) {
   const id = Number(value);

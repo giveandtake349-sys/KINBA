@@ -4,6 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Loader2, ChevronLeft, Search, ArrowLeft, AlertCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { dmConversationPreview } from "@shared/dmMedia";
 import MessageDetail from "./MessageDetail";
 import "./messages.css";
 
@@ -342,7 +343,7 @@ export function DesktopMessages() {
                       </time>
                     </div>
                     <p className={`conversation-preview${conv.unreadCount > 0 ? " unread" : ""}`}>
-                      {conv.lastMessage?.mediaUrl ? "📷 Media" : conv.lastMessage?.body || "No messages yet"}
+                      {dmConversationPreview(conv.lastMessage)}
                     </p>
                   </div>
                   {conv.unreadCount > 0 && (

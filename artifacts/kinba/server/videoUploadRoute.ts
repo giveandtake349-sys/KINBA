@@ -8,16 +8,10 @@ import {
   createVideo,
   deleteComment,
   deleteVideo,
-  getUserByOpenId,
   updateVideoDescription,
-  upsertUser,
 } from "./db";
+import { authenticate } from "./authenticate";
 import { storageCreateUploadUrl, storagePut } from "./storage";
-import {
-  supabaseDisplayName,
-  supabaseOpenId,
-  verifySupabaseAccessToken,
-} from "./supabaseAuth";
 import {
   MAX_LONG_VIDEO_DURATION_SECONDS,
   MAX_SHORT_VIDEO_DURATION_SECONDS,
@@ -99,19 +93,8 @@ function logUploadStage(
   console.info(`[MediaUpload] ${route} ${stage}`, details);
 }
 
-export async function authenticate(request: Request) {
-  const supabaseUser = await verifySupabaseAccessToken(request);
-  if (!supabaseUser) return null;
-  const openId = supabaseOpenId(supabaseUser.id);
-  await upsertUser({
-    openId,
-    name: supabaseDisplayName(supabaseUser),
-    email: supabaseUser.email ?? null,
-    loginMethod: "supabase",
-    lastSignedIn: new Date(),
-  });
-  return getUserByOpenId(openId);
-}
+// `authenticate` lives in ./authenticate (shared with the DM upload route);
+// imported here for the upload handlers below.
 
 export function registerVideoUploadRoute(app: Express) {
   app.delete("/api/comments/:id", async (req, res) => {
