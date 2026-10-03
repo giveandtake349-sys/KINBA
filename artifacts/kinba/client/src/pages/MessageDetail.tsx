@@ -32,9 +32,7 @@ import {
 import {
   DM_DOCUMENT_ACCEPT,
   DM_DOCUMENT_MEDIA_TYPE,
-  DM_IMAGE_ACCEPT,
   DM_MAX_ATTACHMENTS,
-  DM_VIDEO_ACCEPT,
   dmDocumentLabel,
   formatDmFileSize,
   type DMAttachmentKind,
@@ -251,9 +249,9 @@ export default function MessageDetail() {
   );
 
   const handleFilesSelected = useCallback(
-    (kind: DMAttachmentKind, files: FileList | null) => {
-      if (!files || files.length === 0) return;
+    (kind: DMAttachmentKind, files: readonly File[] | FileList) => {
       const incoming = Array.from(files);
+      if (incoming.length === 0) return;
       const room = Math.max(0, DM_MAX_ATTACHMENTS - attachmentsRef.current.length);
       if (incoming.length > room) {
         toast.info(
@@ -294,16 +292,26 @@ export default function MessageDetail() {
     [registerPreviewUrl, startUpload, updateAttachments]
   );
 
+  /**
+   * Opens the picker for the tapped action. The three file inputs are always
+   * mounted (never conditionally rendered with the menu), so the refs cannot be
+   * null here. The picker is triggered *first*, inside the same user gesture
+   * that tapped the menu item, and the menu is closed afterwards — closing
+   * first must never be able to tear down the control the picker runs on.
+   */
   const handlePickAttachment = useCallback((kind: DMAttachmentKind) => {
-    setAttachmentMenuOpen(false);
     if (kind === "image") photoInputRef.current?.click();
     else if (kind === "video") videoInputRef.current?.click();
     else documentInputRef.current?.click();
+    setAttachmentMenuOpen(false);
   }, []);
 
   const handleFileInputChange = useCallback(
     (kind: DMAttachmentKind, event: React.ChangeEvent<HTMLInputElement>) => {
-      const files = event.target.files;
+      // Snapshot the files *before* clearing the value: clearing resets the
+      // input's live FileList, and consuming the reference afterwards would
+      // silently drop the selection (no chip, no upload).
+      const files = Array.from(event.target.files ?? []);
       event.target.value = "";
       handleFilesSelected(kind, files);
     },
@@ -820,27 +828,37 @@ export default function MessageDetail() {
             {sending ? <Loader2 size={20} className="spin" /> : <Send size={20} />}
           </button>
         </form>
+        {/*
+          Always mounted, never `hidden`: `hidden`/`display:none` takes the
+          input out of layout and mobile browsers/WebView ignore a
+          programmatic .click() on a non-rendered file input, so the picker
+          never opens. `.sr-only` keeps it laid out (1×1, clipped) while
+          invisible — the same pattern the app's other working pickers use.
+        */}
         <input
           ref={photoInputRef}
           type="file"
-          hidden
-          accept={DM_IMAGE_ACCEPT}
+          className="sr-only"
+          accept="image/*"
           multiple
           onChange={event => handleFileInputChange("image", event)}
+          aria-label="Choose photos to send"
         />
         <input
           ref={videoInputRef}
           type="file"
-          hidden
-          accept={DM_VIDEO_ACCEPT}
+          className="sr-only"
+          accept="video/*"
           onChange={event => handleFileInputChange("video", event)}
+          aria-label="Choose a video to send"
         />
         <input
           ref={documentInputRef}
           type="file"
-          hidden
+          className="sr-only"
           accept={DM_DOCUMENT_ACCEPT}
           onChange={event => handleFileInputChange("document", event)}
+          aria-label="Choose a document to send"
         />
       </div>
 

@@ -944,6 +944,27 @@
   border-top: 1px solid var(--border-primary);
 }
 
+/*
+ * The three DM file pickers (Photos / Video / Document) live in the composer
+ * and are triggered with a programmatic `.click()`.
+ *
+ * They must stay *in layout*: `hidden` / `display:none` takes the input out of
+ * the box tree and mobile browsers + the Android/iOS WebView ignore a
+ * programmatic click on a file input that is not rendered, so the OS chooser
+ * never opens. 1×1 + clip keeps them invisible without hiding them.
+ */
+.composer-shell input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .input-actions {
   position: relative;
 }
