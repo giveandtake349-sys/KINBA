@@ -10,6 +10,7 @@ import {
 import {
   BadgeCheck,
   ArrowLeft,
+  Bookmark,
   Flag,
   MoreHorizontal,
   Share2,
@@ -21,9 +22,6 @@ import {
   Pencil,
   X,
   Link as LinkIcon,
-  Heart,
-  ChevronRight,
-  ChevronLeft,
   MessageSquare,
   Send,
 } from "lucide-react";
@@ -32,17 +30,23 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { uploadImage } from "@/lib/mediaUpload";
 import { resolveMediaUrl } from "@/lib/runtimeConfig";
+import { isReducedMotion } from "@/contexts/motionPreference";
 import AvatarCropModal from "./AvatarCropModal";
 import FollowListModal, { type FollowListMode } from "./FollowListModal";
 import { ReportDialog } from "./ReportDialog";
 import "./profileRedesign.css";
 
-type ProfileSnapshot = {
-  user?: { id: number; name: string | null } | null;
+export type ProfileSnapshot = {
+  user?: {
+    id: number;
+    name: string | null;
+    createdAt?: string | Date | null;
+  } | null;
   profile?: {
     username?: string | null;
     photoUrl?: string | null;
     isVerified?: boolean;
+    verificationStatus?: string | null;
     accountType?: "member" | "creator" | "company";
     about?: string | null;
   } | null;
@@ -54,7 +58,40 @@ type ProfileSnapshot = {
   };
 };
 
-type ProfileTab = "posts" | "videos" | "shorts" | "pookies";
+type ProfileTab = "posts" | "videos" | "shorts" | "saved";
+
+/** Every tab, in strip order. "Saved" only renders for the profile owner. */
+const TAB_META: ReadonlyArray<{ id: ProfileTab; label: string }> = [
+  { id: "posts", label: "Posts" },
+  { id: "videos", label: "Videos" },
+  { id: "shorts", label: "Shorts" },
+  { id: "saved", label: "Saved" },
+];
+
+const EMPTY_COPY: Record<ProfileTab, { title: string; owner: string; guest: string }> = {
+  posts: {
+    title: "No posts yet",
+    owner: "Share your first post with the community.",
+    guest: "No posts to show yet.",
+  },
+  videos: {
+    title: "No videos yet",
+    owner: "Share your first video with the community.",
+    guest: "No videos to show yet.",
+  },
+  shorts: {
+    title: "No shorts yet",
+    owner: "Post your first short with the community.",
+    guest: "No shorts to show yet.",
+  },
+  saved: {
+    title: "Nothing saved yet",
+    owner: "Videos you save will show up here.",
+    guest: "Nothing saved yet.",
+  },
+};
+
+const VERIFIED_STATUSES = new Set(["verified", "business_verified", "official"]);
 
 function profileDisplayName(profile?: ProfileSnapshot): string {
   const name = profile?.user?.name?.trim();
@@ -69,43 +106,70 @@ function formatCount(n: number): string {
   return String(n);
 }
 
+function formatJoinedLabel(value?: string | Date | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+/** Honour both the in-app motion toggle and the OS-level reduced motion setting. */
+function scrollBehavior(): ScrollBehavior {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return "smooth";
+  const systemReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return isReducedMotion() || systemReduced ? "auto" : "smooth";
+}
+
 function SkeletonBlock({ className }: { className: string }) {
   return <div className={`pr-skeleton ${className}`} />;
 }
 
 export function ProfileSkeleton() {
   return (
-    <main className="pr-page" aria-busy={true}>
+    <div className="pr-page" aria-busy={true}>
       <div className="pr-header">
-        <div className="pr-header-top">
-          <SkeletonBlock className="pr-skeleton-avatar" />
+        <div className="pr-identity">
+          <div className="pr-avatar pr-avatar--hero pr-skeleton pr-skeleton-avatar" />
           <div className="pr-header-info">
-            <SkeletonBlock className="pr-skeleton-name" />
-            <SkeletonBlock className="pr-skeleton-handle" />
+            <div className="pr-skeleton pr-skeleton-name" />
+            <div className="pr-skeleton pr-skeleton-handle" />
           </div>
         </div>
-        <SkeletonBlock className="pr-skeleton-about" />
+        <div className="pr-skeleton pr-skeleton-meta" />
+        <div className="pr-skeleton pr-skeleton-about" />
         <div className="pr-stats">
-          <SkeletonBlock className="pr-skeleton-stat" />
-          <SkeletonBlock className="pr-skeleton-stat" />
-          <SkeletonBlock className="pr-skeleton-stat" />
-          <SkeletonBlock className="pr-skeleton-stat" />
+          <div className="pr-stat">
+            <div className="pr-skeleton pr-skeleton-stat-value" />
+            <div className="pr-skeleton pr-skeleton-stat-label" />
+          </div>
+          <div className="pr-stat">
+            <div className="pr-skeleton pr-skeleton-stat-value" />
+            <div className="pr-skeleton pr-skeleton-stat-label" />
+          </div>
+          <div className="pr-stat">
+            <div className="pr-skeleton pr-skeleton-stat-value" />
+            <div className="pr-skeleton pr-skeleton-stat-label" />
+          </div>
+          <div className="pr-stat">
+            <div className="pr-skeleton pr-skeleton-stat-value" />
+            <div className="pr-skeleton pr-skeleton-stat-label" />
+          </div>
         </div>
-        <SkeletonBlock className="pr-skeleton-actions" />
+        <div className="pr-skeleton pr-skeleton-actions" />
       </div>
       <div className="pr-content">
-        <div className="pr-tabs">
-          <SkeletonBlock className="pr-skeleton-tab" />
-          <SkeletonBlock className="pr-skeleton-tab" />
-          <SkeletonBlock className="pr-skeleton-tab" />
+        <div className="pr-tabs pr-skeleton-tabs">
+          <div className="pr-skeleton pr-skeleton-tab" />
+          <div className="pr-skeleton pr-skeleton-tab" />
+          <div className="pr-skeleton pr-skeleton-tab" />
         </div>
         <div className="pr-grid">
           {Array.from({ length: 6 }).map((_, i) => (
-            <SkeletonBlock className="pr-skeleton-tile" key={i} />
+            <div className="pr-skeleton pr-skeleton-tile" key={i} />
           ))}
         </div>
       </div>
-    </main>
+    </div>
   );
 }
 
@@ -401,6 +465,81 @@ export function ProfileEditModal({
   );
 }
 
+/**
+ * One grid cell. Presentation lives here so the profile content surface can be
+ * restyled or extended without touching the header, stats, or tab wiring.
+ */
+function ProfileTile({
+  video,
+  onOpenPhoto,
+  onOpenShort,
+  onOpenVideo,
+}: {
+  video: VideoRecord;
+  onOpenPhoto?: (video: VideoRecord) => void;
+  onOpenShort?: (videoId: number) => void;
+  onOpenVideo?: (video: VideoRecord) => void;
+}) {
+  const open = () => {
+    if (video.mediaType === "IMAGE" && onOpenPhoto) {
+      onOpenPhoto(video);
+    } else if (video.mediaType === "VIDEO" && video.kind === "SHORT" && onOpenShort) {
+      onOpenShort(video.id);
+    } else if (video.mediaType === "VIDEO" && onOpenVideo) {
+      onOpenVideo(video);
+    }
+  };
+
+  return (
+    <article
+      className="pr-tile"
+      onClick={open}
+      role="button"
+      tabIndex={0}
+      onKeyDown={event => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        open();
+      }}
+    >
+      {video.mediaType === "TEXT" ? (
+        <div className="pr-tile-text">
+          <span className="pr-tile-text-content">{video.title || video.description || ""}</span>
+        </div>
+      ) : video.mediaType === "IMAGE" ? (
+        <img
+          src={resolveMediaUrl(video.videoUrl) ?? video.videoUrl}
+          className="pr-tile-img"
+          alt={video.title || "Post"}
+          loading="lazy"
+        />
+      ) : resolveMediaUrl(video.thumbnailUrl) ? (
+        <img
+          src={resolveMediaUrl(video.thumbnailUrl)}
+          className="pr-tile-img"
+          alt={video.title}
+          loading="lazy"
+        />
+      ) : (
+        <div className="pr-tile-fallback">
+          <Video size={22} />
+        </div>
+      )}
+      {video.mediaType === "VIDEO" && (
+        <span className="pr-tile-play">
+          <Video size={13} />
+        </span>
+      )}
+      {video.mediaType !== "TEXT" && (
+        <div className="pr-tile-meta">
+          <span className="pr-tile-title">{video.title}</span>
+          <span className="pr-tile-views">{formatCount(video.viewCount)} views</span>
+        </div>
+      )}
+    </article>
+  );
+}
+
 export default function ProfileView({
   profile,
   isOwner,
@@ -475,22 +614,32 @@ export default function ProfileView({
   const shorts = allVideos.filter(
     v => v.mediaType === "VIDEO" && v.kind === "SHORT"
   );
-  const pookies = (isOwner ? bookmarkedVideosQuery.data : []) ?? [];
+  const saved = (isOwner ? bookmarkedVideosQuery.data : []) ?? [];
 
-  const isLoading = activeTab === "pookies"
-    ? bookmarkedVideosQuery.isPending
-    : isOwner
-      ? videosQuery.isPending
-      : publicVideosQuery.isPending;
-
-  const activeContent =
-    activeTab === "posts"
+  const itemsForTab = (tab: ProfileTab): VideoRecord[] =>
+    tab === "posts"
       ? posts
-      : activeTab === "videos"
+      : tab === "videos"
         ? videos
-        : activeTab === "shorts"
+        : tab === "shorts"
           ? shorts
-          : pookies;
+          : saved;
+
+  const loadingForTab = (tab: ProfileTab): boolean =>
+    tab === "saved"
+      ? bookmarkedVideosQuery.isPending
+      : isOwner
+        ? videosQuery.isPending
+        : publicVideosQuery.isPending;
+
+  // Saved is the owner's private shelf: visitors never see the tab, so the
+  // strip never advertises content it cannot load for them.
+  const tabs = TAB_META.filter(tab => tab.id !== "saved" || isOwner).map(tab => ({
+    ...tab,
+    count: itemsForTab(tab.id).length,
+  }));
+  const tabIds = tabs.map(tab => tab.id);
+  const active: ProfileTab = tabIds.includes(activeTab) ? activeTab : tabIds[0];
 
   const displayName = profileDisplayName(profile);
   const handle = profile?.profile?.username
@@ -499,6 +648,16 @@ export default function ProfileView({
   const stats = profile?.stats;
   const isFollowing = Boolean(followState.data?.following);
   const about = profile?.profile?.about?.trim() || null;
+  const isVerified =
+    Boolean(profile?.profile?.isVerified) ||
+    VERIFIED_STATUSES.has(profile?.profile?.verificationStatus ?? "");
+  const accountTypeLabel =
+    profile?.profile?.accountType === "creator"
+      ? "Creator"
+      : profile?.profile?.accountType === "company"
+        ? "Company"
+        : null;
+  const joinedLabel = formatJoinedLabel(profile?.user?.createdAt);
 
   const handleFollow = useCallback(() => {
     if (!userId) return;
@@ -567,10 +726,14 @@ export default function ProfileView({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [menuOpen]);
 
-  const tabOrder: ProfileTab[] = ["posts", "videos", "shorts", "pookies"];
+  // Keep the id list readable from callbacks without re-creating them.
+  const tabIdsRef = useRef<ProfileTab[]>(["posts", "videos", "shorts"]);
+  useEffect(() => {
+    tabIdsRef.current = tabIds;
+  }, [tabIds]);
 
-  const scrollToTab = useCallback((tab: ProfileTab, behavior: ScrollBehavior = "smooth") => {
-    const index = tabOrder.indexOf(tab);
+  const scrollToTab = useCallback((tab: ProfileTab, behavior: ScrollBehavior = scrollBehavior()) => {
+    const index = tabIdsRef.current.indexOf(tab);
     if (index === -1 || !contentRef.current) return;
     isScrollingContent.current = true;
     contentRef.current.scrollTo({
@@ -578,9 +741,11 @@ export default function ProfileView({
       behavior,
     });
     setActiveTab(tab);
-    if (tabsRef.current && tabButtonsRef.current[index]) {
+    const button = tabButtonsRef.current[index];
+    if (button) {
       isScrollingTabs.current = true;
-      tabButtonsRef.current[index].scrollIntoView({ behavior, inline: "center" });
+      // block "nearest": the strip is pinned, so never drag the page itself.
+      button.scrollIntoView({ behavior, block: "nearest", inline: "center" });
     }
     setTimeout(() => {
       isScrollingContent.current = false;
@@ -594,14 +759,17 @@ export default function ProfileView({
     const handleScroll = () => {
       if (isScrollingContent.current) return;
       const index = Math.round(container.scrollLeft / container.clientWidth);
-      const clampedIndex = Math.max(0, Math.min(index, tabOrder.length - 1));
-      const newTab = tabOrder[clampedIndex];
-      if (newTab !== activeTab) {
+      const ids = tabIdsRef.current;
+      const clampedIndex = Math.max(0, Math.min(index, ids.length - 1));
+      const newTab = ids[clampedIndex];
+      if (newTab && newTab !== activeTab) {
         isScrollingTabs.current = true;
         setActiveTab(newTab);
-        if (tabsRef.current && tabButtonsRef.current[clampedIndex]) {
-          tabButtonsRef.current[clampedIndex].scrollIntoView({ behavior: "smooth", inline: "center" });
-        }
+        tabButtonsRef.current[clampedIndex]?.scrollIntoView({
+          behavior: scrollBehavior(),
+          block: "nearest",
+          inline: "center",
+        });
         setTimeout(() => { isScrollingTabs.current = false; }, 150);
       }
     };
@@ -609,15 +777,47 @@ export default function ProfileView({
     return () => container.removeEventListener("scroll", handleScroll);
   }, [activeTab]);
 
+  // Re-align the panels when the active tab changes from a tap or a swipe.
+  // The first run only records the initial tab: loading must never yank the
+  // page down to the strip before the visitor has seen the profile header.
+  const initialTabRef = useRef<ProfileTab | null>(null);
   useEffect(() => {
-    if (isScrollingTabs.current) return;
-    scrollToTab(activeTab, "smooth");
-  }, [activeTab, scrollToTab]);
+    if (initialTabRef.current === null) {
+      initialTabRef.current = active;
+      return;
+    }
+    if (initialTabRef.current !== active) {
+      initialTabRef.current = active;
+      if (!isScrollingTabs.current) scrollToTab(active, scrollBehavior());
+    }
+  }, [active, scrollToTab]);
+
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const ids = tabIdsRef.current;
+    const position = ids.indexOf(active);
+    const next = Math.max(
+      0,
+      Math.min(
+        ids.length - 1,
+        event.key === "ArrowLeft"
+          ? position - 1
+          : event.key === "ArrowRight"
+            ? position + 1
+            : event.key === "Home"
+              ? 0
+              : ids.length - 1
+      )
+    );
+    scrollToTab(ids[next], scrollBehavior());
+    tabButtonsRef.current[next]?.focus();
+  };
 
   return (
-    <main className="pr-page">
+    <div className="pr-page">
       <div className="pr-header">
-        <div className="pr-header-top">
+        <div className="pr-identity">
           <button
             type="button"
             className="pr-back-btn"
@@ -633,13 +833,13 @@ export default function ProfileView({
                 alt={`${displayName}'s avatar`}
               />
             ) : (
-              <UserRound size={28} />
+              <UserRound size={30} />
             )}
           </div>
           <div className="pr-header-info">
             <h1 className="pr-name">
-              {displayName}
-              {profile?.profile?.isVerified && (
+              <span className="pr-name-text">{displayName}</span>
+              {isVerified && (
                 <BadgeCheck
                   className="pr-verified-badge"
                   size={18}
@@ -651,12 +851,22 @@ export default function ProfileView({
           </div>
         </div>
 
+        {(joinedLabel || accountTypeLabel) && (
+          <p className="pr-meta">
+            {joinedLabel && <span>Joined {joinedLabel}</span>}
+            {joinedLabel && accountTypeLabel && (
+              <span className="pr-meta-sep" aria-hidden="true">·</span>
+            )}
+            {accountTypeLabel && <span>{accountTypeLabel}</span>}
+          </p>
+        )}
+
         {about && <p className="pr-about">{about}</p>}
 
         <div className="pr-stats">
           <div className="pr-stat">
             <span className="pr-stat-value">{formatCount(stats?.iconsCount ?? 0)}</span>
-            <span className="pr-stat-label">Posts</span>
+            <span className="pr-stat-label">Icons</span>
           </div>
           <button
             type="button"
@@ -708,7 +918,7 @@ export default function ProfileView({
               </button>
               <button
                 type="button"
-                className="pr-btn pr-btn--primary"
+                className="pr-btn pr-btn--outline"
                 onClick={() => void handleMessageClick()}
                 disabled={messageOpening}
                 aria-label={`Message ${displayName}`}
@@ -802,48 +1012,56 @@ export default function ProfileView({
       </div>
 
       <div className="pr-content">
-        <div className="pr-tabs" role="tablist" aria-label="Content tabs" ref={tabsRef}>
-          {(
-            [
-              ["posts", "Posts", posts.length],
-              ["videos", "Videos", videos.length],
-              ["shorts", "Shorts", shorts.length],
-              ["pookies", "Pookies", pookies.length],
-            ] as const
-          ).map(([id, label, count], index) => (
+        <div
+          className="pr-tabs"
+          role="tablist"
+          aria-label="Profile content"
+          ref={tabsRef}
+          onKeyDown={handleTabKeyDown}
+        >
+          {tabs.map((tab, index) => (
             <button
-              key={id}
+              key={tab.id}
+              id={`profile-tab-${tab.id}`}
               type="button"
               role="tab"
-              aria-selected={activeTab === id}
-              className={`pr-tab ${activeTab === id ? "pr-tab--active" : ""}`}
-              onClick={() => scrollToTab(id as ProfileTab, "smooth")}
+              aria-selected={active === tab.id}
+              aria-controls={`profile-panel-${tab.id}`}
+              tabIndex={active === tab.id ? 0 : -1}
+              className={`pr-tab ${active === tab.id ? "pr-tab--active" : ""}`}
+              onClick={() => scrollToTab(tab.id, scrollBehavior())}
               ref={(el) => { tabButtonsRef.current[index] = el; }}
             >
-              {id === "posts" ? <ImageIcon size={15} /> : id === "videos" ? <Video size={15} /> : id === "shorts" ? <Film size={15} /> : <Heart size={15} />}
-              <span>{label}</span>
-              {count > 0 && <span className="pr-tab-count">{count}</span>}
+              <span className="pr-tab-label">{tab.label}</span>
+              {tab.count > 0 && <span className="pr-tab-count">{tab.count}</span>}
             </button>
           ))}
         </div>
 
-        <div className="pr-content-pages" ref={contentRef} role="tabpanel" aria-label="Profile content">
-          {tabOrder.map((tabId, pageIndex) => {
-            const content = tabId === "posts"
-              ? posts
-              : tabId === "videos"
-                ? videos
-                : tabId === "shorts"
-                  ? shorts
-                  : pookies;
-            const isLoadingTab = tabId === "pookies"
-              ? bookmarkedVideosQuery.isPending
-              : isOwner
-                ? videosQuery.isPending
-                : publicVideosQuery.isPending;
+        <div className="pr-content-pages" ref={contentRef}>
+          {tabs.map(tab => {
+            const content = itemsForTab(tab.id);
+            const isLoadingTab = loadingForTab(tab.id);
+            const copy = EMPTY_COPY[tab.id];
+            const emptyIcon =
+              tab.id === "posts" ? (
+                <ImageIcon size={32} />
+              ) : tab.id === "videos" ? (
+                <Video size={32} />
+              ) : tab.id === "shorts" ? (
+                <Film size={32} />
+              ) : (
+                <Bookmark size={32} />
+              );
 
             return (
-              <div key={tabId} className="pr-content-page" role="tabpanel" aria-labelledby={`tab-${tabId}`}>
+              <div
+                key={tab.id}
+                id={`profile-panel-${tab.id}`}
+                className="pr-content-page"
+                role="tabpanel"
+                aria-labelledby={`profile-tab-${tab.id}`}
+              >
                 {isLoadingTab ? (
                   <div className="pr-grid">
                     {Array.from({ length: 6 }).map((_, i) => (
@@ -853,88 +1071,21 @@ export default function ProfileView({
                 ) : content.length > 0 ? (
                   <div className="pr-grid">
                     {content.map(video => (
-                      <article
-                        className="pr-tile"
+                      <ProfileTile
                         key={video.id}
-                        onClick={() => {
-                          if (video.mediaType === "IMAGE" && onOpenPhoto) {
-                            onOpenPhoto(video);
-                          } else if (video.mediaType === "VIDEO" && video.kind === "SHORT" && onOpenShort) {
-                            onOpenShort(video.id);
-                          } else if (video.mediaType === "VIDEO" && onOpenVideo) {
-                            onOpenVideo(video);
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if ((e.key === "Enter" || e.key === " ") && video.mediaType === "IMAGE" && onOpenPhoto) {
-                            e.preventDefault();
-                            onOpenPhoto(video);
-                          } else if ((e.key === "Enter" || e.key === " ") && video.mediaType === "VIDEO" && video.kind === "SHORT" && onOpenShort) {
-                            e.preventDefault();
-                            onOpenShort(video.id);
-                          } else if ((e.key === "Enter" || e.key === " ") && video.mediaType === "VIDEO" && onOpenVideo) {
-                            e.preventDefault();
-                            onOpenVideo(video);
-                          }
-                        }}
-                      >
-                        {video.mediaType === "TEXT" ? (
-                          <div className="pr-tile-text">
-                            <span className="pr-tile-text-content">{video.title || video.description || ""}</span>
-                          </div>
-                        ) : video.mediaType === "IMAGE" ? (
-                          <img
-                            src={resolveMediaUrl(video.videoUrl) ?? video.videoUrl}
-                            className="pr-tile-img"
-                            alt={video.title || "Post"}
-                            loading="lazy"
-                          />
-                        ) : resolveMediaUrl(video.thumbnailUrl) ? (
-                          <img
-                            src={resolveMediaUrl(video.thumbnailUrl)}
-                            className="pr-tile-img"
-                            alt={video.title}
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div className="pr-tile-fallback">
-                            <Video size={22} />
-                          </div>
-                        )}
-                        {video.mediaType === "VIDEO" && (
-                          <span className="pr-tile-play">
-                            <Video size={13} />
-                          </span>
-                        )}
-                        {video.mediaType !== "TEXT" && (
-                          <div className="pr-tile-meta">
-                            <span className="pr-tile-title">{video.title}</span>
-                            <span className="pr-tile-views">{formatCount(video.viewCount)} views</span>
-                          </div>
-                        )}
-                      </article>
+                        video={video}
+                        onOpenPhoto={onOpenPhoto}
+                        onOpenShort={onOpenShort}
+                        onOpenVideo={onOpenVideo}
+                      />
                     ))}
                   </div>
                 ) : (
                   <div className="pr-empty">
-                    <div className="pr-empty-icon">
-                      {tabId === "posts" ? (
-                        <ImageIcon size={32} />
-                      ) : tabId === "videos" ? (
-                        <Video size={32} />
-                      ) : tabId === "shorts" ? (
-                        <Film size={32} />
-                      ) : (
-                        <Heart size={32} />
-                      )}
-                    </div>
-                    <p className="pr-empty-title">No {tabId} yet</p>
+                    <div className="pr-empty-icon">{emptyIcon}</div>
+                    <p className="pr-empty-title">{copy.title}</p>
                     <p className="pr-empty-desc">
-                      {isOwner
-                        ? `Share your first ${tabId === "posts" ? "photo" : tabId === "videos" ? "video" : tabId === "shorts" ? "short" : "pookied content"} with the community.`
-                        : `This user hasn't posted any ${tabId} yet.`}
+                      {isOwner ? copy.owner : copy.guest}
                     </p>
                   </div>
                 )}
@@ -976,6 +1127,6 @@ export default function ProfileView({
         onClose={() => setMessageComposeOpen(false)}
         onSent={handleMessageSent}
       />
-    </main>
+    </div>
   );
 }
