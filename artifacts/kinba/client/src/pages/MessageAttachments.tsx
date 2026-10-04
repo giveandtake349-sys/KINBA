@@ -35,7 +35,10 @@ export function AttachmentMenu({
             htmlFor={kind === "image" ? "dm-photo-input" : kind === "video" ? "dm-video-input" : "dm-document-input"}
             role="menuitem"
             className="attach-menu-item"
-            onClick={() => onPick(kind)}
+            onClick={(e) => {
+              e.preventDefault();
+              onPick(kind);
+            }}
           >
             <span className="attach-menu-icon" aria-hidden="true">
               <Icon size={20} strokeWidth={1.9} />

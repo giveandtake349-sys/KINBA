@@ -634,10 +634,6 @@
   border-bottom-left-radius: 4px;
 }
 
-.message-bubble.own .message-body.has-media {
-  background: var(--surface);
-}
-
 .message-media {
   border-radius: var(--radius-control);
   overflow: hidden;
