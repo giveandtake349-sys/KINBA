@@ -42,7 +42,6 @@ export function AttachmentMenu({
         <label
           htmlFor="dm-photo-input"
           className="attach-menu-item"
-          role="menuitem"
         >
           <input
             id="dm-photo-input"
@@ -61,7 +60,6 @@ export function AttachmentMenu({
         <label
           htmlFor="dm-video-input"
           className="attach-menu-item"
-          role="menuitem"
         >
           <input
             id="dm-video-input"
@@ -79,7 +77,6 @@ export function AttachmentMenu({
         <label
           htmlFor="dm-document-input"
           className="attach-menu-item"
-          role="menuitem"
         >
           <input
             id="dm-document-input"

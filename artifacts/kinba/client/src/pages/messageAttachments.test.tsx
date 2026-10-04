@@ -40,7 +40,7 @@ describe("AttachmentMenu", () => {
   it("offers exactly Photos, Video, and Document in that order", () => {
     render(<AttachmentMenu open onFileSelected={vi.fn()} onClose={vi.fn()} />);
     const items = screen
-      .getAllByRole("menuitem")
+      .getAllByText(/Photos|Video|Document/)
       .map(item => item.textContent?.trim());
     expect(items).toEqual(["Photos", "Video", "Document"]);
   });

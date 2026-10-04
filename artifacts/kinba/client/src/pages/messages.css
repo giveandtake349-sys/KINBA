@@ -621,8 +621,8 @@
 }
 
 .message-bubble.own .message-body {
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--surface);
+  color: var(--text);
   border-bottom-right-radius: 4px;
 }
 
@@ -635,6 +635,10 @@
   overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--border);
+}
+
+.message-bubble.own .message-body.has-media {
+  background: var(--surface);
 }
 
 .message-media img,
@@ -650,12 +654,6 @@
   line-height: 1.4;
   white-space: pre-wrap;
   word-wrap: break-word;
-}
-
-/* Outgoing message text — explicit full-opacity white */
-.message-bubble.own .message-body p {
-  color: var(--accent-ink);
-  opacity: 1;
 }
 
 .message-time {
