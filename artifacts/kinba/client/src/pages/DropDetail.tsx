@@ -215,13 +215,13 @@ export default function DropDetail({
     <div className="kinba-app drops-shell">
       <main className="drops-page section-shell">
         <button type="button" className="drops-back" onClick={backToList}>
-          <ArrowLeft size={15} />
+          <ArrowLeft size={16} />
           Back to drops
         </button>
 
         {!validId ? (
           <DetailState
-            icon={<Package size={22} />}
+            icon={<Package size={24} />}
             title="Drop not found."
             body="That drop link is not valid."
             action={
@@ -239,13 +239,13 @@ export default function DropDetail({
           </div>
         ) : unavailable ? (
           <DetailState
-            icon={<Package size={22} />}
+            icon={<Package size={24} />}
             title="Drops are unavailable right now."
             body="This feature is currently disabled on the server."
           />
         ) : notFound || (dropQuery.isSuccess && drop == null) ? (
           <DetailState
-            icon={<Package size={22} />}
+            icon={<Package size={24} />}
             title="Drop not found."
             body="This drop does not exist or is no longer available."
             action={
@@ -256,7 +256,7 @@ export default function DropDetail({
           />
         ) : dropQuery.isError ? (
           <DetailState
-            icon={<RefreshCw size={22} />}
+            icon={<RefreshCw size={24} />}
             title="Could not load this drop."
             body="Something went wrong while fetching the drop. Try again."
             action={
@@ -271,7 +271,7 @@ export default function DropDetail({
           />
         ) : drop == null ? (
           <DetailState
-            icon={<Package size={22} />}
+            icon={<Package size={24} />}
             title="Drop not found."
             body="This drop does not exist or is no longer available."
             action={
@@ -309,7 +309,7 @@ export default function DropDetail({
                 <dl className="drop-meta">
                   <div>
                     <dt>
-                      <Tag size={13} aria-hidden="true" />
+                      <Tag size={14} aria-hidden="true" />
                       <span className="sr-only">Availability</span>
                     </dt>
                     <dd>
@@ -321,7 +321,7 @@ export default function DropDetail({
                   {drop.startsAt ? (
                     <div>
                       <dt>
-                        <CalendarClock size={13} aria-hidden="true" />
+                        <CalendarClock size={14} aria-hidden="true" />
                         <span className="sr-only">Starts</span>
                       </dt>
                       <dd>Starts {formatDropTime(drop.startsAt)}</dd>
@@ -330,7 +330,7 @@ export default function DropDetail({
                   {drop.endsAt ? (
                     <div>
                       <dt>
-                        <CalendarClock size={13} aria-hidden="true" />
+                        <CalendarClock size={14} aria-hidden="true" />
                         <span className="sr-only">Ends</span>
                       </dt>
                       <dd>Ends {formatDropTime(drop.endsAt)}</dd>
@@ -345,7 +345,7 @@ export default function DropDetail({
                     className="drop-claim-badge"
                     aria-live="polite"
                   >
-                    <CheckCircle2 size={15} aria-hidden="true" />
+                    <CheckCircle2 size={16} aria-hidden="true" />
                     {claimStatusLabel(claim.status)}
                   </span>
                 ) : canClaim ? (
@@ -385,7 +385,7 @@ export default function DropDetail({
                     className="muted-btn report-action-btn"
                     onClick={openReport}
                   >
-                    <Flag size={13} aria-hidden="true" />
+                    <Flag size={14} aria-hidden="true" />
                     Report
                   </button>
                 ) : null}

@@ -403,7 +403,7 @@ function SpotlightHighlights({
                   alt=""
                 />
               ) : (
-                <UserRound size={13} />
+                <UserRound size={14} />
               )}
               {displayName(highlight.author.name, highlight.author.username)}
             </a>
@@ -648,7 +648,7 @@ function VoiceCommentComposer({
           onClick={recorder.stop}
           aria-label="Stop recording"
         >
-          <Square size={15} /> {formatAudioTime(recorder.elapsed)} / 1:00
+          <Square size={16} /> {formatAudioTime(recorder.elapsed)} / 1:00
         </button>
       ) : recorder.audioBlob && recorder.previewUrl ? (
         <div className="voice-comment-preview">
@@ -658,7 +658,7 @@ function VoiceCommentComposer({
             onClick={recorder.discard}
             aria-label="Delete and re-record"
           >
-            <Trash2 size={15} />
+            <Trash2 size={16} />
           </button>
         </div>
       ) : (
@@ -669,7 +669,7 @@ function VoiceCommentComposer({
           disabled={disabled || uploading}
           aria-label="Record voice comment"
         >
-          <Mic size={17} />
+          <Mic size={18} />
         </button>
       )}
       <button
@@ -680,9 +680,9 @@ function VoiceCommentComposer({
         }
       >
         {uploading ? (
-          <Loader2 className="spin" size={15} />
+          <Loader2 className="spin" size={16} />
         ) : (
-          <Send size={15} />
+          <Send size={16} />
         )}{" "}
         {uploading ? "Sending…" : "Send"}
       </button>
@@ -1206,7 +1206,7 @@ function InlineVideoPlayer({
               justifyContent: "center",
             }}
           >
-            <Play size={22} color="#fff" />
+            <Play size={24} color="#fff" />
           </div>
         </div>
       )}
@@ -1589,11 +1589,11 @@ function EngagementActions({
             {owner.photoUrl ? (
               <img src={resolveMediaUrl(owner.photoUrl, "avatars")} alt="" />
             ) : (
-              <UserRound size={19} />
+              <UserRound size={18} />
             )}
           </span>
           <span className="creator-follow-badge" aria-hidden="true">
-            {following ? <Check size={12} /> : <Plus size={13} />}
+            {following ? <Check size={14} /> : <Plus size={14} />}
           </span>
           <span>{following ? "Following" : "Follow"}</span>
         </button>
@@ -2240,7 +2240,7 @@ function CommentDrawer({
           <span aria-hidden="true" />
           <strong>Comments</strong>
           <button type="button" onClick={onClose} aria-label="Close comments">
-            <X size={19} />
+            <X size={18} />
           </button>
         </div>
         <div className="comment-drawer-list">
@@ -2588,7 +2588,7 @@ function PostManagementMenu({
         aria-label="Post options"
         onClick={toggleMenu}
       >
-        <MoreHorizontal size={19} />
+        <MoreHorizontal size={18} />
       </button>
       {menuContent}
     </div>
@@ -2694,7 +2694,7 @@ function VideoCard({
             >
               {ownerName}
               {video.owner.isVerified && (
-                <BadgeCheck size={13} className="verified-badge" aria-label="Verified profile" />
+                <BadgeCheck size={14} className="verified-badge" aria-label="Verified profile" />
               )}
             </a>
             <span className="k-post__meta-line">
@@ -2867,7 +2867,7 @@ function FeedRecovery() {
         className="primary-btn"
         onClick={() => window.location.reload()}
       >
-        <RotateCcw size={15} /> Reload feed
+        <RotateCcw size={16} /> Reload feed
       </button>
     </div>
   );
@@ -3027,7 +3027,7 @@ export function FeedPhotoLightbox({
         onClick={onClose}
         aria-label="Close photo viewer"
       >
-        <X size={22} />
+        <X size={24} />
       </button>
       <div className="feed-photo-lightbox-menu">
         <button
@@ -3041,7 +3041,7 @@ export function FeedPhotoLightbox({
             setMenuOpen(value => !value);
           }}
         >
-          <MoreHorizontal size={22} />
+          <MoreHorizontal size={24} />
         </button>
         {menuOpen ? (
           <div className="feed-photo-lightbox-menu-pop" role="menu">
@@ -3054,7 +3054,7 @@ export function FeedPhotoLightbox({
                 void downloadImage();
               }}
             >
-              <Download size={15} />
+              <Download size={16} />
               {downloading ? "Downloading…" : "Download image"}
             </button>
           </div>
@@ -3078,7 +3078,7 @@ export function FeedPhotoLightbox({
           }}
           aria-label="Previous photo"
         >
-          <ChevronLeft size={28} />
+          <ChevronLeft size={32} />
         </button>
       )}
       <img
@@ -3119,7 +3119,7 @@ export function FeedPhotoLightbox({
           }}
           aria-label="Next photo"
         >
-          <ChevronRight size={28} />
+          <ChevronRight size={32} />
         </button>
       )}
       {photoUrl && (
@@ -3171,7 +3171,7 @@ export function FeedPhotoLightbox({
           }}
           aria-label="Share photo as post"
         >
-          <Share2 size={15} />
+          <Share2 size={16} />
           {sharing ? "Sharing…" : "Share as post"}
         </button>
       )}
@@ -3390,7 +3390,7 @@ function ShortVideoCard({
                     {video.owner.isVerified && (
                       <BadgeCheck
                         className="verified-badge"
-                        size={12}
+                        size={14}
                         aria-label="Verified profile"
                       />
                     )}
@@ -3900,7 +3900,7 @@ function AnnouncementComments({
         }}
         aria-expanded={open}
       >
-        <MessageCircle size={15} />
+        <MessageCircle size={16} />
         Comment <strong>{formatCount(visibleCount)}</strong>
       </button>
       {open && (
@@ -4173,7 +4173,7 @@ function AnnouncementManagementMenu({
         aria-label="Announcement options"
         onClick={toggleMenu}
       >
-        <MoreHorizontal size={19} />
+        <MoreHorizontal size={18} />
       </button>
       {menuContent}
     </div>
@@ -4374,7 +4374,7 @@ export function CommunityAnnouncements() {
                       </span>
                       <BadgeCheck
                         className="verified-badge"
-                        size={13}
+                        size={14}
                         aria-label="Verified profile"
                       />
                     </strong>
@@ -4491,7 +4491,7 @@ export function SearchFeed({
     >
       <div className="search-bar-wrapper">
         <div className="search-bar">
-          <Search size={17} className="search-bar-icon" />
+          <Search size={18} className="search-bar-icon" />
           <input
             ref={inputRef}
             value={rawTerm}
@@ -4511,7 +4511,7 @@ export function SearchFeed({
               }}
               aria-label="Clear search"
             >
-              <X size={15} />
+              <X size={16} />
             </button>
           )}
         </div>
@@ -4520,7 +4520,7 @@ export function SearchFeed({
       <div className="search-results">
         {!hasQuery && (
           <div className="search-empty-state">
-            <Search size={28} strokeWidth={1.5} />
+            <Search size={32} strokeWidth={1.5} />
             <h3>Search JHILIK</h3>
             <p>Find creators, videos, and content.</p>
           </div>
@@ -4617,7 +4617,7 @@ function SearchUserRow({ user }: { user: SearchUserResult }) {
         <span className="search-user-name">
           {displayName(user.name, null)}
           {user.isVerified && (
-            <BadgeCheck size={13} className="verified-badge" />
+            <BadgeCheck size={14} className="verified-badge" />
           )}
         </span>
         {user.username && (
@@ -4686,13 +4686,13 @@ function SearchVideoCard({ video, onOpenVideo }: { video: VideoRecord; onOpenVid
                   loading="lazy"
                 />
               ) : (
-                <UserRound size={12} />
+                <UserRound size={14} />
               )}
             </div>
             <span className="search-video-author-name">
               {displayName(video.owner.name, video.owner.username)}
               {video.owner.isVerified && (
-                <BadgeCheck size={11} className="verified-badge" />
+                <BadgeCheck size={14} className="verified-badge" />
               )}
             </span>
           </a>

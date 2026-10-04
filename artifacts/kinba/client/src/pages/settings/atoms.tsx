@@ -114,7 +114,7 @@ export function SettingsRow({
         <div className="settings-row__static">
           {copy}
           <span className="settings-badge" title="Not backed by JHILIK yet">
-            <Lock size={11} aria-hidden="true" />
+            <Lock size={14} aria-hidden="true" />
             {badge ?? UNAVAILABLE_LABEL}
           </span>
         </div>
@@ -140,7 +140,7 @@ export function SettingsRow({
             <span className="settings-row__value">{value}</span>
           ) : null}
           {kind === "navigation" && !hideChevron ? (
-            <ChevronRight size={17} aria-hidden="true" />
+            <ChevronRight size={18} aria-hidden="true" />
           ) : null}
         </button>
       ) : (

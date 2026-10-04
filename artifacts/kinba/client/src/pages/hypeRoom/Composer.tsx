@@ -61,7 +61,7 @@ export function Composer({
             title="Cancel reply"
             onClick={onCancelReply}
           >
-            <X size={13} />
+            <X size={14} />
           </button>
         </div>
       ) : null}
@@ -80,7 +80,7 @@ export function Composer({
                   }`}
                   onClick={() => onToggleMention(id)}
                 >
-                  <X size={11} />
+                  <X size={14} />
                 </button>
               </span>
             );

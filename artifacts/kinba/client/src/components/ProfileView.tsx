@@ -577,7 +577,7 @@ function ProfileTile({
       )}
       {(variant === "video" || variant === "short") && (
         <span className="pr-tile-play" aria-hidden="true">
-          <Play size={11} />
+          <Play size={14} />
         </span>
       )}
       {hasOverlay && (
@@ -955,7 +955,7 @@ export default function ProfileView({
                 alt={`${displayName}'s avatar`}
               />
             ) : (
-              <UserRound size={30} />
+              <UserRound size={32} />
             )}
           </div>
           <div className="pr-header-info">
@@ -1021,7 +1021,7 @@ export default function ProfileView({
               className="pr-btn pr-btn--primary"
               onClick={() => setEditOpen(true)}
             >
-              <Pencil size={15} />
+              <Pencil size={16} />
               Edit Profile
             </button>
           ) : isAuthenticated && userId ? (
@@ -1046,9 +1046,9 @@ export default function ProfileView({
                 aria-label={`Message ${displayName}`}
               >
                 {messageOpening ? (
-                  <Loader2 size={15} className="pr-spin" />
+                  <Loader2 size={16} className="pr-spin" />
                 ) : (
-                  <MessageSquare size={15} />
+                  <MessageSquare size={16} />
                 )}
                 Message
               </button>
@@ -1060,7 +1060,7 @@ export default function ProfileView({
             onClick={handleShare}
             aria-label="Share profile"
           >
-            <Share2 size={17} />
+            <Share2 size={18} />
           </button>
           <div className="pr-menu-wrap" ref={menuRef}>
             <button
@@ -1070,7 +1070,7 @@ export default function ProfileView({
               aria-label="More options"
               aria-expanded={menuOpen}
             >
-              <MoreHorizontal size={17} />
+              <MoreHorizontal size={18} />
             </button>
             {menuOpen && (
               <div className="pr-dropdown" role="menu">
@@ -1081,7 +1081,7 @@ export default function ProfileView({
                     role="menuitem"
                     onClick={() => { setMenuOpen(false); setEditOpen(true); }}
                   >
-                    <Pencil size={15} />
+                    <Pencil size={16} />
                     Edit Profile
                   </button>
                 )}
@@ -1094,7 +1094,7 @@ export default function ProfileView({
                     handleShare();
                   }}
                 >
-                  <Share2 size={15} />
+                  <Share2 size={16} />
                   Share Profile
                 </button>
                 <button
@@ -1110,7 +1110,7 @@ export default function ProfileView({
                     toast.success("Link copied.");
                   }}
                 >
-                  <LinkIcon size={15} />
+                  <LinkIcon size={16} />
                   Copy Link
                 </button>
                 {!isOwner && isAuthenticated && userId ? (
@@ -1123,7 +1123,7 @@ export default function ProfileView({
                       setReportOpen(true);
                     }}
                   >
-                    <Flag size={15} />
+                    <Flag size={16} />
                     Report User
                   </button>
                 ) : null}
@@ -1191,7 +1191,7 @@ export default function ProfileView({
                 ) : hasError ? (
                   <div className="pr-empty pr-empty--error" role="alert">
                     <div className="pr-empty-icon">
-                      <AlertTriangle size={30} />
+                      <AlertTriangle size={32} />
                     </div>
                     <p className="pr-empty-title">
                       Couldn&apos;t load {tab.label.toLowerCase()}

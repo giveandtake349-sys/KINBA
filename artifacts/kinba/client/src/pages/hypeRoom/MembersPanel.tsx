@@ -49,7 +49,7 @@ export function MembersPanel({
     >
       <div className="hype-room-panel-header">
         <h2>
-          <Users size={15} aria-hidden="true" /> Members
+          <Users size={16} aria-hidden="true" /> Members
           {!loading && !error ? (
             <span className="hype-room-panel-count">{members.length}</span>
           ) : null}
@@ -152,7 +152,7 @@ export function MembersPanel({
       {isHostViewer && invitesReady ? (
         <div className="hype-room-invites-inline">
           <h3>
-            <Mail size={13} aria-hidden="true" /> Room invites ({invites.length})
+            <Mail size={14} aria-hidden="true" /> Room invites ({invites.length})
           </h3>
           {invites.length === 0 ? (
             <p className="hype-room-panel-empty">

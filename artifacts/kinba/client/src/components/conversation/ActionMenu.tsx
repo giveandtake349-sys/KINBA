@@ -53,7 +53,7 @@ export function ActionMenu({
           setOpen(value => !value);
         }}
       >
-        <MoreHorizontal size={15} />
+        <MoreHorizontal size={16} />
       </button>
       {open ? (
         <div className="conv-action-menu-panel" role="menu">

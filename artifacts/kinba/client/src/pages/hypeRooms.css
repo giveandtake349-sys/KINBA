@@ -118,7 +118,7 @@
 .hype-room-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius-surface);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -144,10 +144,8 @@
 
 .hype-room-card-cover {
   aspect-ratio: 16 / 9;
-  background:
-    radial-gradient(circle at 18% 20%, rgba(37, 216, 232, 0.18), transparent 42%),
-    radial-gradient(circle at 82% 12%, rgba(255, 94, 86, 0.16), transparent 40%),
-    linear-gradient(145deg, #121825 0%, #0b0f17 100%);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -233,7 +231,7 @@
 }
 
 .hype-room-chip--live .hype-room-chip-dot {
-  box-shadow: 0 0 0 0 rgba(255, 94, 86, 0.55);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
   animation: hype-room-pulse 1.6s ease-out infinite;
 }
 
@@ -271,7 +269,7 @@
   align-items: center;
   background: color-mix(in srgb, var(--page-bg) 70%, var(--surface));
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-component);
   display: flex;
   gap: 8px;
   min-width: 0;
@@ -299,7 +297,7 @@
   align-items: center;
   background: var(--surface);
   border: 1px dashed var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius-surface);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -390,7 +388,7 @@
 }
 
 .hype-room-detail-skeleton .hype-room-skeleton-cover {
-  border-radius: 18px;
+  border-radius: var(--radius-surface);
 }
 
 .hype-room-detail-grid {
@@ -401,7 +399,7 @@
 .hype-room-panel {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius-surface);
   display: flex;
   flex-direction: column;
   min-height: 180px;
@@ -455,6 +453,10 @@
   margin: 0;
 }
 
+.hype-room-panel-error {
+  color: var(--error);
+}
+
 .hype-room-panel-error-block {
   display: grid;
   gap: 8px;
@@ -474,7 +476,7 @@
   align-items: center;
   background: color-mix(in srgb, var(--page-bg) 70%, var(--surface));
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-component);
   display: flex;
   gap: 8px;
   justify-content: space-between;
@@ -510,7 +512,7 @@
   align-items: flex-start;
   background: var(--teal-soft);
   border: 1px solid color-mix(in srgb, var(--teal) 40%, transparent);
-  border-radius: 12px;
+  border-radius: var(--radius-component);
   color: var(--teal);
   display: flex;
   font-size: 0.8rem;
@@ -527,7 +529,7 @@
 .hype-room-message-list li {
   background: color-mix(in srgb, var(--page-bg) 70%, var(--surface));
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-component);
   padding: 10px 11px;
 }
 
@@ -573,7 +575,7 @@
 .hype-room-composer textarea {
   background: color-mix(in srgb, var(--page-bg) 70%, var(--surface));
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-component);
   color: var(--text);
   font: inherit;
   font-size: 0.86rem;
@@ -599,7 +601,7 @@
   align-items: center;
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   color: var(--muted);
   display: inline-flex;
   height: 28px;
@@ -630,13 +632,13 @@
 
 @keyframes hype-room-pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(255, 94, 86, 0.55);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
   }
   70% {
-    box-shadow: 0 0 0 8px rgba(255, 94, 86, 0);
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 55%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 94, 86, 0.55);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
   }
 }
 
@@ -663,7 +665,7 @@
 .hype-create-form {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius-surface);
   display: grid;
   gap: 14px;
   padding: 18px 16px;
@@ -683,7 +685,7 @@
 .hype-create-form textarea {
   background: color-mix(in srgb, var(--page-bg) 70%, var(--surface));
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-component);
   color: var(--text);
   font-family: inherit;
   font-size: 0.92rem;
@@ -719,15 +721,11 @@
 }
 
 .hype-create-field-error {
-  color: #ba4e45;
+  color: var(--error);
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: normal;
   text-transform: none;
-}
-
-.dark .hype-create-field-error {
-  color: #f3a196;
 }
 
 .hype-create-hint {
@@ -839,7 +837,7 @@
 .hype-room-message-parent {
   background: color-mix(in srgb, var(--page-bg) 55%, var(--surface));
   border-left: 2px solid var(--accent-border);
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
   display: grid;
   gap: 2px;
   margin: 0 0 6px;
@@ -927,7 +925,7 @@
   align-items: center;
   background: var(--accent-soft);
   border: 1px solid var(--accent-border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   color: var(--accent);
   display: flex;
   font-size: 0.78rem;
@@ -974,7 +972,7 @@
 .hype-room-mention-picker {
   background: color-mix(in srgb, var(--page-bg) 40%, var(--surface));
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-component);
   display: grid;
   gap: 4px;
   grid-column: 1 / -1;
@@ -987,7 +985,7 @@
   align-items: center;
   background: transparent;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   color: var(--text);
   cursor: pointer;
   display: flex;
@@ -1035,7 +1033,7 @@
   align-items: center;
   background: color-mix(in srgb, var(--page-bg) 70%, var(--surface));
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   display: flex;
   font-size: 0.82rem;
   gap: 8px;
@@ -1069,7 +1067,7 @@
 .hype-room-invite-inbox {
   background: var(--surface);
   border: 1px solid var(--accent-border);
-  border-radius: 18px;
+  border-radius: var(--radius-surface);
   display: grid;
   gap: 10px;
   padding: 14px;
@@ -1120,7 +1118,7 @@
   align-items: center;
   background: color-mix(in srgb, var(--page-bg) 70%, var(--surface));
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   display: flex;
   font-size: 0.84rem;
   gap: 8px;
@@ -1150,7 +1148,7 @@
 }
 
 .hype-room-topbar-close {
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   height: 34px;
   width: 34px;
 }
@@ -1176,14 +1174,14 @@
 .hype-room-overflow-trigger {
   height: 34px;
   width: 34px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
 }
 
 .hype-room-overflow-menu {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.22);
+  border-radius: var(--radius-component);
+  box-shadow: var(--shadow-pop);
   display: grid;
   gap: 2px;
   min-width: 208px;
@@ -1191,27 +1189,28 @@
   position: absolute;
   right: 0;
   top: calc(100% + 8px);
-  z-index: 40;
+  z-index: 30;
 }
 
 .hype-room-overflow-item {
   align-items: center;
   background: transparent;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   color: var(--text);
+  cursor: pointer;
   display: flex;
-  font-size: 0.86rem;
-  font-weight: 600;
-  gap: 10px;
-  padding: 11px 12px;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  gap: 8px;
+  padding: 8px 10px;
   text-align: left;
   width: 100%;
 }
 
 .hype-room-overflow-item:hover:not(:disabled) {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
 .hype-room-overflow-item:disabled {
@@ -1219,17 +1218,13 @@
 }
 
 .hype-room-overflow-item--danger {
-  color: #ba4e45;
-}
-
-.dark .hype-room-overflow-item--danger {
-  color: #f3a196;
+  color: var(--error);
 }
 
 .hype-room-hero {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius-surface);
   display: grid;
   gap: 8px;
   padding: 14px;
@@ -1280,9 +1275,9 @@
 }
 
 .hype-room-phase--ending {
-  background: color-mix(in srgb, #d97706 16%, transparent);
-  border-color: color-mix(in srgb, #d97706 45%, transparent);
-  color: #d97706;
+  background: var(--gold-soft);
+  border-color: var(--gold-border);
+  color: var(--gold);
 }
 
 .hype-room-phase--ending .hype-room-phase-dot {
@@ -1385,16 +1380,16 @@
 }
 
 .hype-room-fact--urgent {
-  background: color-mix(in srgb, #d97706 14%, transparent);
-  border-color: color-mix(in srgb, #d97706 40%, transparent);
-  color: #d97706;
+  background: var(--gold-soft);
+  border-color: var(--gold-border);
+  color: var(--gold);
 }
 
 .hype-room-terminal-note {
   align-items: center;
   background: color-mix(in srgb, var(--surface) 88%, var(--page-bg));
   border: 1px dashed var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-component);
   color: var(--muted);
   display: flex;
   font-size: 0.84rem;
@@ -1453,7 +1448,7 @@
   align-items: center;
   background: color-mix(in srgb, var(--surface) 88%, var(--page-bg));
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-component);
   display: flex;
   gap: 8px;
   min-width: 0;
@@ -1479,7 +1474,7 @@
 .hype-room-link-bar-icon {
   align-items: center;
   background: var(--teal-soft);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   color: var(--teal);
   display: inline-flex;
   flex-shrink: 0;
@@ -1503,7 +1498,7 @@
 .hype-room-host-note {
   background: var(--teal-soft);
   border: 1px solid color-mix(in srgb, var(--teal) 40%, transparent);
-  border-radius: 12px;
+  border-radius: var(--radius-component);
   display: grid;
   gap: 4px;
   padding: 8px 11px;
@@ -1542,7 +1537,7 @@
 
 /* Compact Members/Drop stack — sits below the conversation on every width. */
 .hype-room-side .hype-room-panel {
-  border-radius: 16px;
+  border-radius: var(--radius-surface);
 }
 
 .hype-room-side .hype-room-panel-header {
@@ -1555,14 +1550,14 @@
 }
 
 .hype-room-side .hype-room-member-list li {
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   padding: 7px 10px;
 }
 
 .hype-room-message-card {
   background: color-mix(in srgb, var(--page-bg) 70%, var(--surface));
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-component);
   padding: 10px 11px;
   position: relative;
 }
@@ -1662,7 +1657,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 999px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-pop);
   display: inline-flex;
   gap: 4px;
   margin-top: 8px;
@@ -1697,8 +1692,8 @@
 .hype-room-message-menu {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-component);
+  box-shadow: var(--shadow-pop);
   display: grid;
   gap: 2px;
   min-width: 180px;
@@ -1706,36 +1701,32 @@
   position: absolute;
   right: 8px;
   top: calc(100% - 6px);
-  z-index: 20;
+  z-index: 30;
 }
 
 .hype-room-message-menu-item {
   align-items: center;
   background: transparent;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   color: var(--text);
   cursor: pointer;
   display: flex;
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
   gap: 8px;
-  padding: 9px 10px;
+  padding: 8px 10px;
   text-align: left;
   width: 100%;
 }
 
 .hype-room-message-menu-item:hover:not(:disabled) {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
 .hype-room-message-menu-item--danger {
-  color: #ba4e45;
-}
-
-.dark .hype-room-message-menu-item--danger {
-  color: #f3a196;
+  color: var(--error);
 }
 
 .hype-room-message-mentions {
@@ -1757,7 +1748,7 @@
   align-items: center;
   background: color-mix(in srgb, var(--page-bg) 50%, var(--surface));
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   color: var(--muted);
   display: flex;
   gap: 6px;
@@ -1887,7 +1878,7 @@
   align-items: center;
   background: var(--accent-soft);
   border: 1px solid var(--accent-border);
-  border-radius: 12px;
+  border-radius: var(--radius-component);
   color: var(--accent);
   display: inline-flex;
   height: 40px;

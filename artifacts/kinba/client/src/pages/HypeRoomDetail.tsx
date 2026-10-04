@@ -75,10 +75,10 @@ function DetailTopBar({ onClose }: { onClose: () => void }) {
         aria-label="Back to rooms"
         onClick={onClose}
       >
-        <X size={17} aria-hidden="true" />
+        <X size={18} aria-hidden="true" />
       </button>
       <span className="hype-room-identity">
-        <Radio size={13} aria-hidden="true" />
+        <Radio size={14} aria-hidden="true" />
         HYPE ROOM
       </span>
       <span aria-hidden="true" />
@@ -737,7 +737,7 @@ export default function HypeRoomDetail({
 
         {!validId ? (
           <DetailState
-            icon={<Radio size={22} />}
+            icon={<Radio size={24} />}
             title="Room not found."
             body="That Hype Room link is not valid."
             action={
@@ -756,13 +756,13 @@ export default function HypeRoomDetail({
           </div>
         ) : unavailable ? (
           <DetailState
-            icon={<Radio size={22} />}
+            icon={<Radio size={24} />}
             title="Hype Rooms are unavailable right now."
             body="This feature is currently disabled on the server."
           />
         ) : roomQuery.isError ? (
           <DetailState
-            icon={<RefreshCw size={22} />}
+            icon={<RefreshCw size={24} />}
             title="Could not load this room."
             body="Something went wrong while fetching the room. Try again."
             action={
@@ -777,7 +777,7 @@ export default function HypeRoomDetail({
           />
         ) : room == null ? (
           <DetailState
-            icon={<Radio size={22} />}
+            icon={<Radio size={24} />}
             title="Room not found."
             body="This Hype Room does not exist or is no longer available."
             action={
@@ -845,7 +845,7 @@ export default function HypeRoomDetail({
               >
                 <div className="hype-room-panel-header">
                   <h2>
-                    <Flag size={15} aria-hidden="true" /> Conversation
+                    <Flag size={16} aria-hidden="true" /> Conversation
                     {messagesQuery.data ? (
                       <span className="hype-room-panel-count">
                         {messages.length}

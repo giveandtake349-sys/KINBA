@@ -515,7 +515,7 @@ export default function MessageDetail() {
       <div className="message-detail-shell">
         <header className="message-detail-header">
           <button type="button" className="back-btn" onClick={handleBack} aria-label="Back">
-            <ChevronLeft size={22} />
+            <ChevronLeft size={24} />
           </button>
           <div className="header-info">
             <h1>Messages</h1>
@@ -534,7 +534,7 @@ export default function MessageDetail() {
       <div className="message-detail-shell">
         <header className="message-detail-header">
           <button type="button" className="back-btn" onClick={handleBack} aria-label="Back">
-            <ChevronLeft size={22} />
+            <ChevronLeft size={24} />
           </button>
           <div className="header-info">
             <h1>Loading...</h1>
@@ -553,7 +553,7 @@ export default function MessageDetail() {
       <div className="message-detail-shell">
         <header className="message-detail-header">
           <button type="button" className="back-btn" onClick={handleBack} aria-label="Back">
-            <ChevronLeft size={22} />
+            <ChevronLeft size={24} />
           </button>
           <div className="header-info">
             <h1>Error</h1>
@@ -575,7 +575,7 @@ export default function MessageDetail() {
     <div className="message-detail-shell">
       <header className="message-detail-header">
         <button type="button" className="back-btn" onClick={handleBack} aria-label="Back">
-          <ChevronLeft size={22} />
+          <ChevronLeft size={24} />
         </button>
         <div className="header-info">
           <div className="partner-avatar" onClick={() => navigateLoc(`/profile/${partner?.id}`)}>
@@ -598,7 +598,7 @@ export default function MessageDetail() {
             onClick={handleMenuToggle}
             ref={menuRef}
           >
-            <MoreVertical size={22} />
+            <MoreVertical size={24} />
           </button>
           {showMenu && (
             <div className="header-menu" role="menu" aria-label="Conversation options">
@@ -754,7 +754,7 @@ export default function MessageDetail() {
                               onClick={() => handleRetryMessage(id)}
                               disabled={sending}
                             >
-                              <Loader2 size={12} className="spin" />
+                              <Loader2 size={14} className="spin" />
                               Retry
                             </button>
                             <button
@@ -768,7 +768,7 @@ export default function MessageDetail() {
                       </>
                     ) : (
                       <>
-                        <Loader2 size={12} className="spin" />
+                        <Loader2 size={14} className="spin" />
                         Sending...
                       </>
                     )}

@@ -62,7 +62,7 @@ export function RoomLinkBar({
           <Link2 size={14} />
         </span>
         <span className="hype-room-link-bar-label">{roomLinkLabel(href)}</span>
-        <ExternalLink size={13} aria-hidden="true" />
+        <ExternalLink size={14} aria-hidden="true" />
       </a>
       {canManage && onManage ? (
         <button
@@ -73,7 +73,7 @@ export function RoomLinkBar({
           disabled={busy}
           onClick={onManage}
         >
-          <Pencil size={13} />
+          <Pencil size={14} />
         </button>
       ) : null}
     </aside>

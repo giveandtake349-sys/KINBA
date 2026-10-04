@@ -92,7 +92,7 @@ export default function Settings() {
           aria-label={paneOpen && isMobile ? "Back to settings" : "Back to feed"}
           title={paneOpen && isMobile ? "Back to settings" : "Back to feed"}
         >
-          <ChevronLeft size={19} aria-hidden="true" />
+          <ChevronLeft size={18} aria-hidden="true" />
         </button>
         <div className="settings-header__copy">
           <p className="settings-header__eyebrow">Account Center</p>
@@ -103,7 +103,7 @@ export default function Settings() {
       {!loading && !signedIn ? (
         <main className="settings-signed-out">
           <span className="settings-signed-out__mark" aria-hidden="true">
-            <Lock size={22} />
+            <Lock size={24} />
           </span>
           <h2>Sign in to manage your account</h2>
           <p>
@@ -152,7 +152,7 @@ export default function Settings() {
                         onClick={() => openSection(item.id)}
                       >
                         <span className="settings-index__icon" aria-hidden="true">
-                          <Icon size={17} />
+                          <Icon size={18} />
                         </span>
                         <span className="settings-index__body">
                           <span className="settings-index__label">

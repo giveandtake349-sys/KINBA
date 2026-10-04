@@ -29,7 +29,7 @@
   pointer-events: auto;
   background: var(--surface, #121825);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.13));
-  border-radius: 18px;
+  border-radius: var(--radius-surface);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
 }
 
@@ -57,7 +57,7 @@
   color: var(--text, #f4f7ff);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: var(--radius-component);
   cursor: pointer;
   transition: transform 120ms var(--line, ease), background 120ms ease,
     border-color 120ms ease;
@@ -106,7 +106,7 @@
   color: var(--text, #f4f7ff);
   background: var(--surface-raised, #1b2536);
   border: 1px solid var(--border, rgba(255, 255, 255, 0.13));
-  border-radius: 12px;
+  border-radius: var(--radius-component);
   cursor: pointer;
 }
 
@@ -161,7 +161,7 @@
   color: var(--text, #f4f7ff);
   background: var(--accent-soft, rgba(255, 94, 86, 0.12));
   border: 1px solid var(--accent-border, rgba(255, 94, 86, 0.45));
-  border-radius: 12px;
+  border-radius: var(--radius-component);
 }
 
 .reaction-reactor-types {

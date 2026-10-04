@@ -174,14 +174,14 @@ function RoomInfoDialog({
           <dl className="hype-room-meta">
             <div>
               <dt>
-                <Users size={13} aria-hidden="true" />
+                <Users size={14} aria-hidden="true" />
                 <span className="sr-only">Host</span>
               </dt>
               <dd>{hostName ?? "Loading host…"}</dd>
             </div>
             <div>
               <dt>
-                <Users size={13} aria-hidden="true" />
+                <Users size={14} aria-hidden="true" />
                 <span className="sr-only">Participants</span>
               </dt>
               <dd>
@@ -192,28 +192,28 @@ function RoomInfoDialog({
             </div>
             <div>
               <dt>
-                <Clock3 size={13} aria-hidden="true" />
+                <Clock3 size={14} aria-hidden="true" />
                 <span className="sr-only">Duration</span>
               </dt>
               <dd>{room.durationHours}h window</dd>
             </div>
             <div>
               <dt>
-                <CalendarClock size={13} aria-hidden="true" />
+                <CalendarClock size={14} aria-hidden="true" />
                 <span className="sr-only">Starts</span>
               </dt>
               <dd>{new Date(room.startsAt).toLocaleString()}</dd>
             </div>
             <div>
               <dt>
-                <CalendarClock size={13} aria-hidden="true" />
+                <CalendarClock size={14} aria-hidden="true" />
                 <span className="sr-only">Ends</span>
               </dt>
               <dd>{new Date(room.endsAt).toLocaleString()}</dd>
             </div>
             <div>
               <dt>
-                <Eye size={13} aria-hidden="true" />
+                <Eye size={14} aria-hidden="true" />
                 <span className="sr-only">Visibility</span>
               </dt>
               <dd>{room.visibility === "public" ? "Public" : "Link only"}</dd>
@@ -293,19 +293,19 @@ export function RoomHeader({
     icon: ReactNode;
     danger?: boolean;
   }> = [
-    { id: "info", label: "Room information", icon: <Info size={15} /> },
+    { id: "info", label: "Room information", icon: <Info size={16} /> },
   ];
   if (canEditSettings) {
     overflowItems.push(
-      { id: "settings", label: "Settings", icon: <Settings size={15} /> },
-      { id: "invite", label: "Invite people", icon: <UserPlus size={15} /> }
+      { id: "settings", label: "Settings", icon: <Settings size={16} /> },
+      { id: "invite", label: "Invite people", icon: <UserPlus size={16} /> }
     );
   }
   if (!isHost && isActiveMember && !isEnded) {
     overflowItems.push({
       id: "leave",
       label: "Leave room",
-      icon: <X size={15} />,
+      icon: <X size={16} />,
       danger: true,
     });
   }
@@ -313,7 +313,7 @@ export function RoomHeader({
     overflowItems.push({
       id: "report",
       label: "Report room",
-      icon: <Flag size={15} />,
+      icon: <Flag size={16} />,
     });
   }
 
@@ -346,10 +346,10 @@ export function RoomHeader({
           aria-label="Back to rooms"
           onClick={onClose}
         >
-          <X size={17} aria-hidden="true" />
+          <X size={18} aria-hidden="true" />
         </button>
         <span className="hype-room-identity">
-          <Radio size={13} aria-hidden="true" />
+          <Radio size={14} aria-hidden="true" />
           HYPE ROOM
         </span>
         <OverflowMenu
@@ -402,7 +402,7 @@ export function RoomHeader({
 
         <div className="hype-room-hero-facts">
           <span className="hype-room-fact" title="Participants">
-            <Users size={13} aria-hidden="true" />
+            <Users size={14} aria-hidden="true" />
             {participantCount != null
               ? `${participantCount} here`
               : "Loading…"}
@@ -414,17 +414,17 @@ export function RoomHeader({
               }`}
               aria-live="polite"
             >
-              <Clock3 size={13} aria-hidden="true" />
+              <Clock3 size={14} aria-hidden="true" />
               {countdown.label} {countdown.remaining}
             </span>
           ) : (
             <span className="hype-room-fact">
-              <CalendarClock size={13} aria-hidden="true" />
+              <CalendarClock size={14} aria-hidden="true" />
               {room.durationHours}h window
             </span>
           )}
           <span className="hype-room-fact">
-            <Eye size={13} aria-hidden="true" />
+            <Eye size={14} aria-hidden="true" />
             {room.visibility === "public" ? "Public" : "Link only"}
           </span>
         </div>

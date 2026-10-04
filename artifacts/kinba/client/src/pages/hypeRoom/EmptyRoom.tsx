@@ -21,7 +21,7 @@ export function EmptyRoom({
   return (
     <div className="hype-room-empty" role="status">
       <span className="hype-room-empty-icon" aria-hidden="true">
-        <Radio size={22} />
+        <Radio size={24} />
       </span>
       <h3>
         {isLive ? "This room is live — say hello" : "Welcome to this Hype Room"}

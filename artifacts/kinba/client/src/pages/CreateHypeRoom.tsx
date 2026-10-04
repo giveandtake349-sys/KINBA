@@ -161,12 +161,12 @@ export default function CreateHypeRoom() {
       <div className="kinba-app hype-rooms-shell">
         <main className="hype-create-page section-shell">
           <button type="button" className="hype-rooms-back" onClick={goBack}>
-            <ArrowLeft size={15} />
+            <ArrowLeft size={16} />
             Back to rooms
           </button>
           <div className="hype-room-state" role="status">
             <span className="hype-room-state-icon" aria-hidden="true">
-              <Radio size={22} />
+              <Radio size={24} />
             </span>
             <h3>Sign in to create a room.</h3>
             <p>Creating a Hype Room requires an authenticated account.</p>
@@ -195,7 +195,7 @@ export default function CreateHypeRoom() {
     <div className="kinba-app hype-rooms-shell">
       <main className="hype-create-page section-shell">
         <button type="button" className="hype-rooms-back" onClick={goBack}>
-          <ArrowLeft size={15} />
+          <ArrowLeft size={16} />
           Back to rooms
         </button>
 

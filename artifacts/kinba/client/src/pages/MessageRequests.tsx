@@ -58,7 +58,7 @@ export default function MessageRequests() {
       <div className="messages-shell">
         <header className="messages-header">
           <button type="button" className="back-btn" onClick={handleBack} aria-label="Back">
-            <ChevronLeft size={22} />
+            <ChevronLeft size={24} />
           </button>
           <h1>Message Requests</h1>
         </header>
@@ -75,7 +75,7 @@ export default function MessageRequests() {
     <div className="messages-shell">
       <header className="messages-header">
         <button type="button" className="back-btn" onClick={handleBack} aria-label="Back">
-          <ChevronLeft size={22} />
+          <ChevronLeft size={24} />
         </button>
         <h1>Message Requests</h1>
       </header>

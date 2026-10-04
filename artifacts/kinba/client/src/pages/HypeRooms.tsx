@@ -169,7 +169,7 @@ function RoomCard({
         </div>
       ) : (
         <div className="hype-room-card-cover hype-room-card-cover--placeholder" aria-hidden="true">
-          <Radio size={28} strokeWidth={1.6} />
+          <Radio size={32} strokeWidth={1.6} />
         </div>
       )}
       <div className="hype-room-card-body">
@@ -188,14 +188,14 @@ function RoomCard({
         ) : null}
         {countdown ? (
           <p className="hype-room-countdown" aria-live="polite">
-            <Clock3 size={13} aria-hidden="true" />
+            <Clock3 size={14} aria-hidden="true" />
             {countdown.label} {countdown.remaining}
           </p>
         ) : null}
         <dl className="hype-room-meta">
           <div>
             <dt>
-              <Clock3 size={13} aria-hidden="true" />
+              <Clock3 size={14} aria-hidden="true" />
               <span className="sr-only">Duration</span>
             </dt>
             <dd>{room.durationHours}h window</dd>
@@ -203,7 +203,7 @@ function RoomCard({
           {typeof room.participantCount === "number" ? (
             <div>
               <dt>
-                <Users size={13} aria-hidden="true" />
+                <Users size={14} aria-hidden="true" />
                 <span className="sr-only">Participants</span>
               </dt>
               <dd>
@@ -214,14 +214,14 @@ function RoomCard({
           ) : null}
           <div>
             <dt>
-              <CalendarClock size={13} aria-hidden="true" />
+              <CalendarClock size={14} aria-hidden="true" />
               <span className="sr-only">Starts</span>
             </dt>
             <dd>Starts {formatRoomTime(room.startsAt)}</dd>
           </div>
           <div>
             <dt>
-              <Eye size={13} aria-hidden="true" />
+              <Eye size={14} aria-hidden="true" />
               <span className="sr-only">Visibility</span>
             </dt>
             <dd>{room.visibility === "public" ? "Public" : "Link only"}</dd>
@@ -348,7 +348,7 @@ export default function HypeRooms() {
     <div className="kinba-app hype-rooms-shell">
       <main className="hype-rooms-page section-shell">
         <button type="button" className="hype-rooms-back" onClick={goHome}>
-          <ArrowLeft size={15} />
+          <ArrowLeft size={16} />
           Back to feed
         </button>
 
@@ -367,7 +367,7 @@ export default function HypeRooms() {
             className="primary-btn hype-rooms-create-cta"
             onClick={() => navigate("/rooms/new")}
           >
-            <Plus size={15} aria-hidden="true" />
+            <Plus size={16} aria-hidden="true" />
             Create Hype Room
           </button>
         </header>
@@ -400,7 +400,7 @@ export default function HypeRooms() {
             aria-busy={invitesQuery.isPending || undefined}
           >
             <h2>
-              <Mail size={15} aria-hidden="true" /> Invites
+              <Mail size={16} aria-hidden="true" /> Invites
               <span className="hype-room-panel-count">{myInvites.length}</span>
             </h2>
             <ul className="hype-room-invite-list">
@@ -450,7 +450,7 @@ export default function HypeRooms() {
             </div>
           ) : unauthorized ? (
             <LobbyState
-              icon={<Lock size={22} />}
+              icon={<Lock size={24} />}
               title="Sign in to view your rooms."
               body="Mine shows Hype Rooms you host. Sign in to continue."
               action={
@@ -467,13 +467,13 @@ export default function HypeRooms() {
             />
           ) : unavailable ? (
             <LobbyState
-              icon={<Radio size={22} />}
+              icon={<Radio size={24} />}
               title="Hype Rooms are unavailable right now."
               body="This feature is currently disabled on the server."
             />
           ) : query.isError ? (
             <LobbyState
-              icon={<RefreshCw size={22} />}
+              icon={<RefreshCw size={24} />}
               title="Could not load Hype Rooms."
               body="Something went wrong while fetching the lobby. Try again."
               action={
@@ -484,7 +484,7 @@ export default function HypeRooms() {
             />
           ) : rooms.length === 0 ? (
             <LobbyState
-              icon={<Radio size={22} />}
+              icon={<Radio size={24} />}
               title={EMPTY_COPY[filter].title}
               body={EMPTY_COPY[filter].body}
               action={
@@ -493,7 +493,7 @@ export default function HypeRooms() {
                   className="primary-btn"
                   onClick={() => navigate("/rooms/new")}
                 >
-                  <Plus size={15} aria-hidden="true" />
+                  <Plus size={16} aria-hidden="true" />
                   Create Hype Room
                 </button>
               }

@@ -131,7 +131,7 @@
   height: 34px !important;
   border-radius: 50% !important;
   overflow: hidden !important;
-  background: rgba(255, 255, 255, 0.06) !important;
+  background: color-mix(in srgb, var(--text) 6%, transparent) !important;
 }
 
 .media-hub .feed-card-list .feed-post-avatar img,
@@ -665,7 +665,7 @@
   padding: 6px 6px !important;
   margin: 0 !important;
   border: 0 !important;
-  border-radius: 8px !important;
+  border-radius: var(--radius-control) !important;
   background: transparent !important;
   color: var(--feed-icon) !important;
   font-size: 0.72rem !important;
@@ -687,7 +687,7 @@
 .media-hub .unified-feed-list .feed-text-card .announcement-comment-toggle:hover,
 .media-hub .feed-video-list .feed-text-card .feed-post-actions > button:hover,
 .media-hub .feed-video-list .feed-text-card .announcement-comment-toggle:hover {
-  background: rgba(255, 255, 255, 0.06) !important;
+  background: color-mix(in srgb, var(--text) 6%, transparent) !important;
   color: var(--feed-text-primary) !important;
 }
 

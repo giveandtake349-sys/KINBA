@@ -181,7 +181,7 @@ function DropCard({
         </div>
       ) : (
         <div className="drop-card-cover drop-card-cover--placeholder" aria-hidden="true">
-          <Package size={28} strokeWidth={1.6} />
+          <Package size={32} strokeWidth={1.6} />
         </div>
       )}
       <div className="drop-card-body">
@@ -200,14 +200,14 @@ function DropCard({
         </p>
         {countdown ? (
           <p className="drop-countdown" aria-live="polite">
-            <Clock3 size={13} aria-hidden="true" />
+            <Clock3 size={14} aria-hidden="true" />
             {countdown.label} {countdown.remaining}
           </p>
         ) : null}
         <dl className="drop-meta">
           <div>
             <dt>
-              <Tag size={13} aria-hidden="true" />
+              <Tag size={14} aria-hidden="true" />
               <span className="sr-only">Availability</span>
             </dt>
             <dd>
@@ -219,7 +219,7 @@ function DropCard({
           {drop.endsAt ? (
             <div>
               <dt>
-                <CalendarClock size={13} aria-hidden="true" />
+                <CalendarClock size={14} aria-hidden="true" />
                 <span className="sr-only">Ends</span>
               </dt>
               <dd>Ends {formatDropTime(drop.endsAt)}</dd>
@@ -321,7 +321,7 @@ export default function Drops() {
     <div className="kinba-app drops-shell">
       <main className="drops-page section-shell">
         <button type="button" className="drops-back" onClick={goHome}>
-          <ArrowLeft size={15} />
+          <ArrowLeft size={16} />
           Back to feed
         </button>
 
@@ -378,7 +378,7 @@ export default function Drops() {
             </div>
           ) : unauthorized ? (
             <DropsState
-              icon={<Users size={22} />}
+              icon={<Users size={24} />}
               title="Sign in to view your drops."
               body="Mine shows drops you sell. Sign in to continue."
               action={
@@ -395,13 +395,13 @@ export default function Drops() {
             />
           ) : unavailable ? (
             <DropsState
-              icon={<Package size={22} />}
+              icon={<Package size={24} />}
               title="Drops are unavailable right now."
               body="This feature is currently disabled on the server."
             />
           ) : query.isError ? (
             <DropsState
-              icon={<RefreshCw size={22} />}
+              icon={<RefreshCw size={24} />}
               title="Could not load drops."
               body="Something went wrong while fetching the list. Try again."
               action={
@@ -416,7 +416,7 @@ export default function Drops() {
             />
           ) : drops.length === 0 ? (
             <DropsState
-              icon={<Package size={22} />}
+              icon={<Package size={24} />}
               title={EMPTY_COPY[filter].title}
               body={EMPTY_COPY[filter].body}
             />

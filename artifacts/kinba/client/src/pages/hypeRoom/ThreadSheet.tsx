@@ -176,7 +176,7 @@ export function ThreadSheet({
                   aria-label="Cancel reply"
                   onClick={onCancelReply}
                 >
-                  <X size={13} />
+                  <X size={14} />
                 </button>
               </div>
             ) : (

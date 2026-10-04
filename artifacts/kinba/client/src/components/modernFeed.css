@@ -9,10 +9,10 @@
   width: 100%;
   max-width: 100%;
   margin: 0 auto 20px;
-  background: rgba(18, 22, 30, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 14px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-component);
+  box-shadow: var(--shadow-pop);
   box-sizing: border-box;
 }
 
@@ -30,7 +30,7 @@
   height: 34px;
   border-radius: 50%;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
 }
 
 .k-post__avatar img {
@@ -52,7 +52,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text);
   font-size: 0.82rem;
   font-weight: 600;
   white-space: nowrap;
@@ -62,11 +62,11 @@
 }
 
 .k-post__name:hover {
-  color: #fff;
+  color: var(--text);
 }
 
 .k-post__meta-line {
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--muted);
   font-size: 0.68rem;
   white-space: nowrap;
   overflow: hidden;
@@ -98,7 +98,7 @@
 
 .k-post__caption {
   margin: 0 0 4px;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text);
   font-size: 0.82rem;
   line-height: 1.45;
   white-space: pre-wrap;
@@ -109,7 +109,7 @@
   padding: 4px 0 0;
   background: none;
   border: none;
-  color: var(--kinba-coral, #ff5e56);
+  color: var(--kinba-coral);
   font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
@@ -126,14 +126,14 @@
 
 .k-post__title {
   margin: 0 0 3px;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--text);
   font-size: 0.88rem;
   font-weight: 600;
   line-height: 1.3;
 }
 
 .k-post__stats {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--muted);
   font-size: 0.68rem;
   margin: 0;
 }
@@ -148,7 +148,7 @@
   display: flex;
   align-items: center;
   gap: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--border);
   padding: 2px 4px;
 }
 
@@ -161,9 +161,9 @@
   min-height: 40px;
   padding: 6px 4px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: transparent;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--muted);
   font-size: 0.75rem;
   font-family: inherit;
   cursor: pointer;
@@ -171,16 +171,16 @@
 }
 
 .k-post__actions button:hover {
-  color: rgba(255, 255, 255, 0.85);
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 6%, transparent);
 }
 
 .k-post__actions button.is-active {
-  color: var(--kinba-coral, #ff5e56);
+  color: var(--kinba-coral);
 }
 
 .k-post__actions button.is-active:hover {
-  background: var(--kinba-coral-soft, rgba(255, 94, 86, 0.1));
+  background: var(--kinba-coral-soft);
 }
 
 .k-post__actions button:disabled {
@@ -194,7 +194,7 @@
 }
 
 .caption-container {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text);
   font-size: 0.82rem;
   line-height: 1.45;
   white-space: pre-wrap;
@@ -205,7 +205,7 @@
   padding: 4px 0 0;
   background: none;
   border: none;
-  color: var(--kinba-coral, #ff5e56);
+  color: var(--kinba-coral);
   font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
@@ -224,52 +224,4 @@
     border-right: 0;
     margin-bottom: 10px;
   }
-}
-
-/* ---- LIGHT THEME ---- */
-:root[data-theme="light"] .k-post {
-  background: #fff;
-  border-color: rgba(0, 0, 0, 0.08);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
-}
-
-:root[data-theme="light"] .k-post__name {
-  color: rgba(0, 0, 0, 0.88);
-}
-
-:root[data-theme="light"] .k-post__meta-line {
-  color: rgba(0, 0, 0, 0.45);
-}
-
-:root[data-theme="light"] .k-post__caption {
-  color: rgba(0, 0, 0, 0.75);
-}
-
-:root[data-theme="light"] .k-post__stats {
-  color: rgba(0, 0, 0, 0.4);
-}
-
-:root[data-theme="light"] .k-post__avatar {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-:root[data-theme="light"] .k-post__media img {
-  background: #f0f0f0;
-}
-
-:root[data-theme="light"] .k-post__actions {
-  border-top-color: rgba(0, 0, 0, 0.08);
-}
-
-:root[data-theme="light"] .k-post__actions button {
-  color: rgba(0, 0, 0, 0.55);
-}
-
-:root[data-theme="light"] .k-post__actions button:hover {
-  color: rgba(0, 0, 0, 0.85);
-  background: rgba(0, 0, 0, 0.04);
-}
-
-:root[data-theme="light"] .k-post__actions button.is-active {
-  color: var(--kinba-coral, #ff5e56);
 }

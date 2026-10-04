@@ -2,21 +2,37 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @custom-variant dark (&:is(.dark *));
+/* Shared UI primitives (shadcn) read their whole vocabulary from the JHILIK
+   semantic tokens below — one namespace, no parallel palette. */
 @theme inline {
   --color-background: var(--page-bg);
   --color-foreground: var(--text);
   --color-card: var(--surface);
   --color-card-foreground: var(--text);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-ink);
+  --color-secondary: var(--surface-raised);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--surface-raised);
+  --color-muted-foreground: var(--muted);
+  --color-accent: var(--accent-soft);
+  --color-accent-foreground: var(--accent);
+  --color-destructive: var(--error);
+  --color-destructive-foreground: #ffffff;
+  --color-success: var(--success);
+  --color-gold: var(--gold);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--accent);
-  --color-primary: var(--accent);
-  --color-primary-foreground: var(--accent-ink);
-  --radius-lg: 1.25rem;
-  --radius-md: 0.9rem;
-  --radius-sm: 0.6rem;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
 }
 :root {
+  /* Foundation — warm neutral light */
   --page-bg: #f3efe7;
   --text: #1d2930;
   --muted: #65747a;
@@ -24,32 +40,58 @@
   --surface-raised: #ebe5da;
   --border: rgba(29, 41, 48, 0.14);
   --input: rgba(29, 41, 48, 0.1);
-  --accent: #e76654;
-  --accent-soft: rgba(231, 102, 84, 0.12);
-  --accent-border: rgba(190, 72, 58, 0.42);
-  --accent-ink: #fff8ef;
+  /* JHILIK product accent — restrained green (light) */
+  --accent: #0f7a52;
+  --accent-soft: rgba(15, 122, 82, 0.12);
+  --accent-border: rgba(15, 122, 82, 0.42);
+  --accent-ink: #f7fffb;
+  /* Champagne/gold — premium + identity emphasis only */
+  --gold: #8a6a24;
+  --gold-soft: rgba(138, 106, 36, 0.14);
+  --gold-border: rgba(138, 106, 36, 0.42);
+  /* Semantic status */
   --teal: #2f8580;
   --teal-soft: rgba(47, 133, 128, 0.12);
+  --error: #bf3b30;
+  --error-soft: rgba(191, 59, 48, 0.12);
+  --success: #1c7a4f;
+  --success-soft: rgba(28, 122, 79, 0.12);
   --line: cubic-bezier(0.23, 1, 0.32, 1);
+  /* Radius language: 8px control / 12px component / 16px surface */
+  --radius-control: 8px;
+  --radius-component: 12px;
+  --radius-surface: 16px;
+  /* One application header height for every surface (overridden at <=760px). */
+  --header-h: 68px;
+  /* One bottom-navigation height for every surface. */
+  --nav-h: 67px;
+  /* Stacking scale — content < tabs < chrome < nav < panels < scrim < drawer < modal < overlay < top */
+  --z-tabs: 110;
+  --z-chrome: 120;
+  --z-nav: 130;
+  --z-panel: 300;
+  --z-scrim: 400;
+  --z-drawer: 410;
+  --z-modal: 470;
+  --z-overlay: 1000;
+  --z-top: 2147483000;
+  /* One scrim for every full-screen modal/drawer backdrop. */
+  --scrim: rgba(0, 0, 0, 0.66);
+  /* One elevation shadow for floating panels: menus, dropdowns, popovers. */
+  --shadow-pop: 0 10px 28px rgba(29, 41, 48, 0.14);
+  /* One blur intensity per layer: chrome, floating panels, full-screen scrims. */
+  --blur-chrome: blur(8px);
+  --blur-overlay: blur(12px);
+  --blur-scrim: blur(6px);
   color-scheme: light;
 }
-:root[data-theme="light"] {
-  --page-bg: #f3efe7;
-  --text: #1d2930;
-  --muted: #65747a;
-  --surface: #fbf8f2;
-  --surface-raised: #ebe5da;
-  --border: rgba(29, 41, 48, 0.14);
-  --input: rgba(29, 41, 48, 0.1);
-  --accent: #e76654;
-  --accent-soft: rgba(231, 102, 84, 0.12);
-  --accent-border: rgba(190, 72, 58, 0.42);
-  --accent-ink: #fff8ef;
-  --teal: #2f8580;
-  --teal-soft: rgba(47, 133, 128, 0.12);
-  color-scheme: light;
+@media (max-width: 760px) {
+  :root {
+    --header-h: 60px;
+  }
 }
 :root[data-theme="dark"] {
+  /* Foundation — deep obsidian */
   --page-bg: #0b0f17;
   --text: #f4f7ff;
   --muted: #9aa8bf;
@@ -57,12 +99,23 @@
   --surface-raised: #1b2536;
   --border: rgba(190, 207, 235, 0.13);
   --input: rgba(255, 255, 255, 0.08);
-  --accent: #ff5e56;
-  --accent-soft: rgba(255, 94, 86, 0.12);
-  --accent-border: rgba(255, 94, 86, 0.45);
-  --accent-ink: #ffffff;
+  /* JHILIK product accent — restrained green (dark) */
+  --accent: #35c98a;
+  --accent-soft: rgba(53, 201, 138, 0.14);
+  --accent-border: rgba(53, 201, 138, 0.4);
+  --accent-ink: #04241a;
+  /* Champagne/gold — premium + identity emphasis only */
+  --gold: #d8b877;
+  --gold-soft: rgba(216, 184, 119, 0.14);
+  --gold-border: rgba(216, 184, 119, 0.42);
+  /* Semantic status */
   --teal: #25d8e8;
   --teal-soft: rgba(37, 216, 232, 0.13);
+  --error: #ef6a63;
+  --error-soft: rgba(239, 106, 99, 0.14);
+  --success: #4fd18b;
+  --success-soft: rgba(79, 209, 139, 0.14);
+  --shadow-pop: 0 14px 36px rgba(0, 0, 0, 0.55);
   color-scheme: dark;
 }
 @layer base {
@@ -101,15 +154,11 @@
   flex: 0 0 auto;
 }
 
+/* Obsidian/neutral canvas — deliberately flat, no decorative gradients. */
 .kinba-app {
   isolation: isolate;
-  background:
-    radial-gradient(
-      circle at 12% 0%,
-      rgba(62, 76, 165, 0.18),
-      transparent 34rem
-    ),
-    var(--page-bg);
+  position: relative;
+  background: var(--page-bg);
   min-height: 100vh;
   overflow: hidden;
   transition:
@@ -118,16 +167,16 @@
 }
 .topbar {
   align-items: center;
-  backdrop-filter: blur(18px);
+  backdrop-filter: var(--blur-chrome);
   background: color-mix(in srgb, var(--page-bg) 84%, transparent);
   border-bottom: 1px solid var(--border);
   display: flex;
-  height: 72px;
+  height: var(--header-h);
   justify-content: space-between;
   padding: 0 5vw;
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: var(--z-chrome);
 }
 .brand {
   align-items: center;
@@ -149,7 +198,7 @@
   align-items: center;
   background: var(--accent-soft);
   border: 1px solid var(--accent-border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   display: flex;
   height: 36px;
   justify-content: center;
@@ -190,7 +239,7 @@
   align-items: center;
   background: none;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   color: var(--muted);
   display: inline-flex;
   font-size: 11px;
@@ -228,35 +277,25 @@
 .eyebrow--bright {
   color: var(--accent);
 }
-h1,
-h2,
-h3 {
-  font-family: "Space Grotesk", sans-serif;
-  letter-spacing: -0.045em;
-}
+/* Headings resolve later in this file to the JHILIK editorial face (Fraunces). */
 .primary-btn {
   align-items: center;
   background: var(--accent);
   border: 1px solid transparent;
-  border-radius: 999px;
-  box-shadow: 0 0 26px rgba(245, 173, 36, 0.14);
+  border-radius: var(--radius-control);
   color: var(--accent-ink);
   display: inline-flex;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   gap: 8px;
   justify-content: center;
-  padding: 12px 17px;
-  transition:
-    box-shadow 0.2s var(--line),
-    transform 0.16s var(--line);
+  padding: 10px 16px;
 }
 .primary-btn:hover:not(:disabled) {
-  box-shadow: 0 0 30px rgba(245, 173, 36, 0.28);
-  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--accent) 88%, var(--text));
 }
 .primary-btn:active:not(:disabled) {
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
 .primary-btn:disabled {
   opacity: 0.55;
@@ -409,19 +448,19 @@ h3 {
 
 .modal-backdrop {
   align-items: center;
-  background: rgba(0, 0, 0, 0.66);
+  background: var(--scrim);
   display: flex;
   inset: 0;
   justify-content: center;
   padding: 18px;
   position: fixed;
-  z-index: 50;
+  z-index: var(--z-modal);
 }
 .request-modal {
   background: var(--surface-raised);
-  border: 1px solid var(--accent-border);
-  border-radius: 20px;
-  box-shadow: 0 22px 80px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.26);
   max-width: 470px;
   padding: 28px;
   position: relative;
@@ -464,7 +503,7 @@ h3 {
 .input-label input {
   background: var(--page-bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   color: var(--text);
   outline: 0;
   padding: 11px;
@@ -504,7 +543,7 @@ h3 {
   align-items: center;
   background: var(--page-bg);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   color: var(--text);
   display: flex;
   font-size: 13px;
@@ -613,11 +652,11 @@ h3 {
   width: 100%;
 }
 .drawer-backdrop {
-  background: rgba(0, 0, 0, 0.66);
+  background: var(--scrim);
   border: 0;
   inset: 0;
   position: fixed;
-  z-index: 80;
+  z-index: var(--z-scrim);
 }
 .mobile-drawer {
   background: var(--page-bg);
@@ -631,7 +670,7 @@ h3 {
   right: 0;
   top: 0;
   width: min(88vw, 390px);
-  z-index: 81;
+  z-index: var(--z-drawer);
   animation: drawer-in 0.22s var(--line);
 }
 .drawer-head {
@@ -653,7 +692,7 @@ h3 {
 .drawer-profile-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius-surface);
   padding: 20px;
 }
 .drawer-edit {
@@ -673,7 +712,7 @@ h3 {
 .drawer-stat {
   background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-component);
   display: grid;
   gap: 4px;
   padding: 13px 9px;
@@ -713,7 +752,7 @@ h3 {
   align-items: center;
   background: transparent;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-component);
   color: var(--text);
   display: flex;
   gap: 15px;
@@ -734,7 +773,7 @@ h3 {
 }
 .bottom-navigation {
   align-items: center;
-  background: color-mix(in srgb, var(--page-bg) 94%, transparent);
+  background: var(--page-bg);
   border-top: 1px solid var(--border);
   bottom: 0;
   display: grid;
@@ -743,8 +782,7 @@ h3 {
   padding: 4px 8px calc(4px + env(safe-area-inset-bottom));
   position: fixed;
   right: 0;
-  z-index: 60;
-  backdrop-filter: blur(16px);
+  z-index: var(--z-nav);
 }
 .bottom-navigation button {
   align-items: center;
@@ -765,7 +803,6 @@ h3 {
   background: var(--accent);
   border: 3px solid var(--page-bg);
   border-radius: 50%;
-  box-shadow: 0 5px 22px rgba(245, 173, 36, 0.28);
   color: var(--accent-ink);
   height: 46px;
   justify-self: center;
@@ -788,7 +825,7 @@ h3 {
     transform: translateX(0);
   }
 }
-@media (min-width: 821px) {
+@media (min-width: 761px) {
   .bottom-navigation,
   .mobile-drawer,
   .drawer-backdrop,
@@ -796,10 +833,10 @@ h3 {
     display: none;
   }
 }
-@media (max-width: 820px) {
+@media (max-width: 760px) {
   .topbar {
     gap: 4px;
-    height: 64px;
+    height: var(--header-h);
     padding: 0 12px;
   }
   .brand-name {
@@ -862,7 +899,7 @@ h3 {
   align-items: center;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-component);
   color: var(--muted);
   display: flex;
   gap: 10px;
@@ -886,7 +923,7 @@ h3 {
   align-items: center;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-component);
   display: grid;
   gap: 10px;
   grid-template-columns: auto 1fr auto;
@@ -925,13 +962,11 @@ h3 {
 .notification-read-btn {
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   color: var(--muted);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  padding: 4px 10px;
-  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 5px 10px;
   white-space: nowrap;
 }
 
@@ -946,7 +981,7 @@ h3 {
 .settings-list {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-component);
   display: grid;
   gap: 15px;
   padding: 16px;
@@ -973,7 +1008,7 @@ h3 {
   align-items: center;
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   color: var(--text);
   display: flex;
   font-size: 12px;
@@ -989,7 +1024,7 @@ h3 {
   align-items: center;
   background: transparent;
   border: 1px solid var(--accent-border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   color: var(--accent);
   display: flex;
   font-size: 12px;
@@ -1031,12 +1066,10 @@ h3 {
   overflow: hidden;
   margin: 0 0 1.25rem;
   padding: clamp(1.25rem, 3vw, 2rem);
-  border: 1px solid var(--accent-border);
-  border-radius: 1.25rem;
-  background:
-    radial-gradient(circle at 100% 0%, var(--accent-soft), transparent 36%),
-    var(--surface);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+  box-shadow: none;
 }
 .sponsor-bids-panel__header,
 .sponsor-bids-panel__meta {
@@ -1064,11 +1097,12 @@ h3 {
 .sponsor-bids-panel__badge {
   flex: 0 0 auto;
   max-width: 100%;
-  padding: 0.55rem 0.8rem;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-size: 0.82rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--gold-border);
+  border-radius: var(--radius-control);
+  background: var(--gold-soft);
+  color: var(--gold);
+  font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.04em;
   white-space: nowrap;
@@ -1142,7 +1176,7 @@ h3 {
   min-width: 0;
   padding: 1rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-surface);
   background: var(--surface-raised);
 }
 .sponsor-widget__heading {
@@ -1174,7 +1208,7 @@ h3 {
   min-width: 0;
   padding: 0.55rem;
   border: 1px solid var(--border);
-  border-radius: 0.75rem;
+  border-radius: var(--radius-component);
   color: var(--text);
   text-decoration: none;
   transition:
@@ -1188,7 +1222,7 @@ h3 {
 .sponsor-card img {
   width: 42px;
   height: 42px;
-  border-radius: 0.55rem;
+  border-radius: var(--radius-control);
   object-fit: cover;
   background: var(--surface);
 }
@@ -1230,7 +1264,7 @@ h3 {
   width: 100%;
   padding: 0.55rem 0.65rem;
   border: 1px solid var(--border);
-  border-radius: 0.55rem;
+  border-radius: var(--radius-control);
   background: var(--page-bg);
   color: var(--text);
 }
@@ -1302,7 +1336,7 @@ h3 {
   margin: 1rem 0 0;
   padding: 0.8rem 1rem;
   border: 1px solid var(--accent-border);
-  border-radius: 0.75rem;
+  border-radius: var(--radius-component);
   background: var(--accent-soft);
   color: var(--text);
   font-size: 0.85rem;
@@ -1356,15 +1390,15 @@ h3 {
   min-width: 0;
   padding: 0.9rem;
   border: 1px solid var(--border);
-  border-radius: 0.9rem;
+  border-radius: var(--radius-component);
   background: var(--surface-raised);
 }
 .winner-card--1 {
-  border-color: var(--accent);
-  box-shadow: 0 0 24px var(--accent-soft);
+  border-color: var(--gold-border);
+  box-shadow: none;
 }
 .winner-card__rank {
-  color: var(--accent);
+  color: var(--gold);
   font-family: "Space Grotesk", sans-serif;
   font-size: 1.5rem;
   font-weight: 800;
@@ -1378,7 +1412,7 @@ h3 {
   width: 42px;
   height: 42px;
   overflow: hidden;
-  border: 2px solid var(--accent-border);
+  border: 2px solid var(--gold-border);
   border-radius: 50%;
   color: var(--accent);
   background: var(--accent-soft);
@@ -1506,7 +1540,7 @@ h3 {
 .admin-card {
   padding: 1.25rem;
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-surface);
   background: var(--surface);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
@@ -1533,7 +1567,7 @@ h3 {
   min-height: 42px;
   padding: 0.6rem 0.7rem;
   border: 1px solid var(--border);
-  border-radius: 0.6rem;
+  border-radius: var(--radius-control);
   background: var(--page-bg);
   color: var(--text);
 }
@@ -1550,7 +1584,7 @@ h3 {
   align-items: center;
   padding: 0.75rem;
   border: 1px solid var(--border);
-  border-radius: 0.7rem;
+  border-radius: var(--radius-component);
 }
 .admin-session-row > div,
 .admin-sponsor-row > div:nth-child(2) {
@@ -1576,7 +1610,7 @@ h3 {
   gap: 0.45rem 0.65rem;
   padding: 1rem;
   border: 1px solid var(--border);
-  border-radius: 0.9rem;
+  border-radius: var(--radius-component);
   background: var(--surface-raised);
 }
 .admin-stat svg {
@@ -1595,7 +1629,7 @@ h3 {
   overflow-x: auto;
   margin-top: 1rem;
   border: 1px solid var(--border);
-  border-radius: 0.7rem;
+  border-radius: var(--radius-component);
 }
 .admin-table {
   width: 100%;
@@ -1620,10 +1654,10 @@ h3 {
   border-bottom: 0;
 }
 .ledger-credit {
-  color: #43c984;
+  color: var(--success);
 }
 .ledger-debit {
-  color: #ff8d8d;
+  color: var(--error);
 }
 .admin-sponsor-list {
   display: grid;
@@ -1633,13 +1667,13 @@ h3 {
   align-items: center;
   padding: 0.75rem;
   border: 1px solid var(--border);
-  border-radius: 0.75rem;
+  border-radius: var(--radius-component);
 }
 .admin-sponsor-row > img {
   width: 48px;
   height: 48px;
   flex: 0 0 auto;
-  border-radius: 0.6rem;
+  border-radius: var(--radius-control);
   object-fit: cover;
 }
 .admin-sponsor-row a {
@@ -1658,14 +1692,14 @@ h3 {
   gap: 0.4rem;
 }
 .status-chip--approved {
-  color: #43c984;
-  border-color: rgba(67, 201, 132, 0.4);
-  background: rgba(67, 201, 132, 0.1);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 45%, transparent);
+  background: var(--success-soft);
 }
 .status-chip--rejected {
-  color: #ff8d8d;
-  border-color: rgba(255, 141, 141, 0.4);
-  background: rgba(255, 141, 141, 0.1);
+  color: var(--error);
+  border-color: color-mix(in srgb, var(--error) 45%, transparent);
+  background: var(--error-soft);
 }
 /* Milestone A — Admin Feature Flags panel */
 .admin-flag-actions {
@@ -1697,7 +1731,7 @@ h3 {
   min-height: 38px;
   padding: 0.45rem 0.65rem;
   border: 1px solid var(--border);
-  border-radius: 0.6rem;
+  border-radius: var(--radius-control);
   background: var(--page-bg);
   color: var(--text);
   font-family: inherit;
@@ -1720,7 +1754,7 @@ h3 {
   gap: 0.65rem;
   padding: 0.85rem;
   border: 1px solid var(--border);
-  border-radius: 0.75rem;
+  border-radius: var(--radius-component);
   background: var(--page-bg);
 }
 .admin-report-meta {
@@ -1785,7 +1819,7 @@ h3 {
   min-height: 36px;
   padding: 0.45rem 0.65rem;
   border: 1px solid var(--border);
-  border-radius: 0.6rem;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
   font-family: inherit;
@@ -1803,20 +1837,28 @@ h3 {
   background: var(--accent-soft);
 }
 .status-chip--resolved {
-  color: #43c984;
-  border-color: rgba(67, 201, 132, 0.4);
-  background: rgba(67, 201, 132, 0.1);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 45%, transparent);
+  background: var(--success-soft);
 }
 .danger-btn {
-  border: 1px solid rgba(255, 141, 141, 0.4);
-  border-radius: 999px;
-  padding: 0.45rem 0.65rem;
-  color: #ff8d8d;
+  align-items: center;
   background: transparent;
+  border: 1px solid color-mix(in srgb, var(--error) 45%, transparent);
+  border-radius: var(--radius-control);
+  color: var(--error);
+  display: inline-flex;
   font-size: 0.72rem;
+  gap: 6px;
+  justify-content: center;
+  padding: 8px 12px;
 }
-.danger-btn:hover {
-  background: rgba(255, 141, 141, 0.1);
+.danger-btn:hover:not(:disabled) {
+  background: var(--error-soft);
+  border-color: var(--error);
+}
+.danger-btn:disabled {
+  opacity: 0.55;
 }
 @media (max-width: 760px) {
   .admin-session-form,
@@ -1852,8 +1894,8 @@ h3 {
   text-transform: uppercase;
 }
 .drawer-profile-card {
-  background: linear-gradient(135deg, var(--accent-soft), var(--surface));
-  border-color: var(--accent-border);
+  background: var(--surface);
+  border-color: var(--border);
   padding: 16px;
 }
 .drawer-nav {
@@ -1875,7 +1917,7 @@ h3 {
 }
 .drawer-group button {
   align-items: center;
-  border-radius: 14px;
+  border-radius: var(--radius-component);
   gap: 12px;
   padding: 11px 10px;
 }
@@ -1883,7 +1925,7 @@ h3 {
   align-items: center;
   background: var(--accent-soft);
   border: 1px solid var(--accent-border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   color: var(--accent);
   display: inline-flex;
   height: 36px;
@@ -1906,13 +1948,13 @@ h3 {
   align-items: center;
   border-top: 1px solid var(--border) !important;
   border-radius: 0 !important;
-  color: #fca5a5 !important;
+  color: var(--error) !important;
   gap: 12px !important;
   margin-top: 2px;
   padding: 18px 10px 4px !important;
 }
 .drawer-logout svg {
-  color: #fca5a5 !important;
+  color: var(--error) !important;
 }
 
 /* Strict viewport boundary for mobile deployments */
@@ -2013,23 +2055,12 @@ textarea:focus-visible,
 select:focus-visible,
 summary:focus-visible,
 a:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--accent) 42%, transparent);
-  outline-offset: 3px;
-}
-.kinba-app {
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, var(--teal) 5%, transparent) 1px,
-      transparent 1px
-    ),
-    linear-gradient(var(--page-bg), var(--page-bg));
-  background-size: 32px 32px;
-  position: relative;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .topbar {
   background: color-mix(in srgb, var(--page-bg) 92%, transparent);
-  height: 76px;
+  height: var(--header-h);
   padding-inline: clamp(18px, 5vw, 76px);
 }
 .brand {
@@ -2060,9 +2091,9 @@ a:focus-visible {
   margin-left: clamp(24px, 7vw, 110px);
 }
 .desktop-nav button {
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   font-size: 12px;
-  padding: 9px 13px;
+  padding: 8px 12px;
 }
 .desktop-nav button:hover,
 .desktop-nav button.active {
@@ -2102,15 +2133,6 @@ h2,
 h3 {
   font-family: "Fraunces", Georgia, serif;
   letter-spacing: -0.045em;
-}
-.primary-btn {
-  background: var(--accent);
-  border-radius: 8px;
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 16%, transparent);
-  padding: 11px 16px;
-}
-.primary-btn:hover:not(:disabled) {
-  box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 .landing-shell {
   background:
@@ -2156,11 +2178,11 @@ h3 {
 .verified-state,
 .admin-verification-panel {
   border-color: var(--border);
-  border-radius: 10px;
-  box-shadow: 0 12px 30px color-mix(in srgb, var(--text) 7%, transparent);
+  border-radius: var(--radius-component);
+  box-shadow: none;
 }
 .drawer-profile-card {
-  background: linear-gradient(135deg, var(--accent-soft), var(--surface));
+  background: var(--surface);
 }
 .profile-avatar {
   background: var(--teal-soft);
@@ -2188,10 +2210,7 @@ h3 {
   color: var(--teal);
 }
 .form-message--error {
-  color: #ba4e45;
-}
-.dark .form-message--error {
-  color: #f3a196;
+  color: var(--error);
 }
 @media (max-width: 820px) {
   .section-shell {
@@ -2241,8 +2260,8 @@ h3 {
 .admin-card {
   background: var(--surface);
   border-color: var(--border);
-  border-radius: 12px;
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--text) 7%, transparent);
+  border-radius: var(--radius-component);
+  box-shadow: none;
 }
 .admin-section-heading h2 {
   font-size: clamp(1.5rem, 3vw, 2.25rem);
@@ -2264,7 +2283,7 @@ h3 {
 .admin-stat {
   background: var(--surface);
   border-color: var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
 }
 .admin-stat svg {
   color: var(--teal);
@@ -2275,7 +2294,7 @@ h3 {
 }
 .admin-table-wrap {
   border-color: var(--border);
-  border-radius: 9px;
+  border-radius: var(--radius-control);
 }
 .admin-table {
   background: var(--surface);
@@ -2289,17 +2308,10 @@ h3 {
 .admin-sponsor-row {
   background: var(--surface);
   border-color: var(--border);
-  border-radius: 9px;
+  border-radius: var(--radius-control);
 }
 .admin-sponsor-row > img {
   border: 1px solid var(--border);
-}
-.danger-btn {
-  border-color: color-mix(in srgb, var(--accent) 46%, transparent);
-  color: var(--accent);
-}
-.danger-btn:hover {
-  background: var(--accent-soft);
 }
 .not-found-shell {
   align-items: center;
@@ -2309,10 +2321,9 @@ h3 {
   padding: 24px;
 }
 .not-found-card {
-  background:
-    linear-gradient(135deg, var(--accent-soft), transparent 55%), var(--surface);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-surface);
   box-shadow: 0 18px 48px color-mix(in srgb, var(--text) 10%, transparent);
   max-width: 470px;
   padding: clamp(28px, 6vw, 56px);
@@ -2371,6 +2382,7 @@ summary,
 .app-main-content.has-feed-tabs > .home-page { width: 100%; max-width: none; padding-left: 0 !important; padding-right: 0 !important; }
 /* Settings › Appearance — user override for reduced motion inside JHILIK.
    Independent of the OS-level `prefers-reduced-motion` media queries. */
+html[data-motion="reduced"],
 html[data-motion="reduced"] *,
 html[data-motion="reduced"] *::before,
 html[data-motion="reduced"] *::after {

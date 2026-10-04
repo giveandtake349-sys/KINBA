@@ -11,7 +11,7 @@
 
 .settings-header {
   align-items: center;
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(8px);
   background: color-mix(in srgb, var(--page-bg) 88%, transparent);
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -135,7 +135,7 @@
   align-items: center;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-component);
   color: var(--muted);
   display: inline-flex;
   flex: 0 0 auto;
@@ -164,7 +164,7 @@
 
 .settings-index__label {
   font-size: 0.94rem;
-  font-weight: 550;
+  font-weight: 500;
 }
 
 .settings-index__description {
@@ -340,7 +340,7 @@
 }
 
 .settings-row--danger .settings-row__label {
-  color: var(--error-color, #ef4444);
+  color: var(--error);
 }
 
 .settings-row--unavailable {
@@ -348,7 +348,7 @@
 }
 
 .settings-row--unavailable .settings-row__label {
-  font-weight: 450;
+  font-weight: 500;
 }
 
 .settings-row--disabled {
@@ -376,7 +376,7 @@
 .settings-note {
   background: var(--surface);
   border-left: 2px solid var(--border);
-  border-radius: 0 10px 10px 0;
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
   color: var(--muted);
   font-size: 0.8rem;
   line-height: 1.6;
@@ -412,8 +412,22 @@
   max-width: 44ch;
 }
 
+.settings-state--loading,
+.settings-state--empty {
+  color: var(--muted);
+}
+
 .settings-state--error {
-  color: var(--error-color, #ef4444);
+  color: var(--error);
+}
+
+.settings-btn--busy {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.settings-field--error .settings-field__label {
+  color: var(--error);
 }
 
 .settings-state__spinner {
@@ -430,11 +444,11 @@
 
 .settings-btn {
   align-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   border: 1px solid transparent;
   display: inline-flex;
   font-size: 0.85rem;
-  font-weight: 550;
+  font-weight: 500;
   gap: 0.45rem;
   justify-content: center;
   padding: 0.6rem 1.15rem;
@@ -465,12 +479,12 @@
 
 .settings-btn--danger {
   background: transparent;
-  border-color: color-mix(in srgb, #ef4444 45%, transparent);
-  color: var(--error-color, #ef4444);
+  border-color: color-mix(in srgb, var(--error) 45%, transparent);
+  color: var(--error);
 }
 
 .settings-btn--danger:hover:not(:disabled) {
-  background: color-mix(in srgb, #ef4444 12%, transparent);
+  background: var(--error-soft);
 }
 
 .settings-btn:disabled {
@@ -499,7 +513,7 @@
 }
 
 .settings-field__error {
-  color: var(--error-color, #ef4444);
+  color: var(--error);
   font-size: 0.76rem;
 }
 
@@ -507,7 +521,7 @@
 .settings-textarea {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   color: var(--text);
   font-size: 0.92rem;
   outline: none;
@@ -543,7 +557,7 @@
 }
 
 .settings-form-message--error {
-  color: var(--error-color, #ef4444);
+  color: var(--error);
 }
 
 /* --- Controls ------------------------------------------------------------- */
@@ -591,7 +605,7 @@
 .settings-segmented {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   display: inline-flex;
   gap: 2px;
   padding: 3px;
@@ -601,11 +615,11 @@
   align-items: center;
   background: transparent;
   border: 0;
-  border-radius: 999px;
+  border-radius: calc(var(--radius-control) - 2px);
   color: var(--muted);
   display: inline-flex;
   font-size: 0.76rem;
-  font-weight: 550;
+  font-weight: 500;
   gap: 0.3rem;
   padding: 0.35rem 0.7rem;
   transition:
@@ -664,7 +678,7 @@
 .settings-mini-list strong {
   display: block;
   font-size: 0.87rem;
-  font-weight: 550;
+  font-weight: 500;
 }
 
 .settings-mini-list span,
@@ -707,7 +721,7 @@
   align-items: center;
   background: var(--accent-soft);
   border: 1px solid var(--accent-border);
-  border-radius: 16px;
+  border-radius: var(--radius-surface);
   color: var(--accent);
   display: inline-flex;
   height: 52px;

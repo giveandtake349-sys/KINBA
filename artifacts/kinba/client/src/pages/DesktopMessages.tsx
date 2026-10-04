@@ -73,7 +73,7 @@ export function DesktopMessages() {
           <header className="messages-header">
             {showBackButton && (
               <button type="button" className="back-btn" onClick={handleBack} aria-label="Back">
-                <ArrowLeft size={22} />
+                <ArrowLeft size={24} />
               </button>
             )}
             <h1>Messages</h1>
@@ -150,7 +150,7 @@ export function DesktopMessages() {
         <header className="messages-header">
           {showBackButton && (
             <button type="button" className="back-btn" onClick={handleBack} aria-label="Back">
-              <ArrowLeft size={22} />
+              <ArrowLeft size={24} />
             </button>
           )}
           <h1>Messages</h1>
@@ -161,7 +161,7 @@ export function DesktopMessages() {
             aria-label={showRequests ? "Back to conversations" : "Message requests"}
           >
             {showRequests ? (
-              <ChevronLeft size={22} />
+              <ChevronLeft size={24} />
             ) : requestsUnread > 0 ? (
               <>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

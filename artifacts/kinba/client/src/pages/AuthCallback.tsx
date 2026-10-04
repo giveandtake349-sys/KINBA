@@ -68,7 +68,7 @@ export default function AuthCallback() {
 
   return (
     <div className="oauth-callback" role="status" aria-live="polite">
-      <Loader2 className="spin" size={26} />
+      <Loader2 className="spin" size={24} />
       <p>
         {status === "failed"
           ? "Returning you to JHILIK…"

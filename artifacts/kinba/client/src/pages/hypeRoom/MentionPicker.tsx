@@ -114,7 +114,7 @@ export function MentionPicker({
                   </span>
                 </span>
               </span>
-              {selected ? <Check size={13} aria-hidden="true" /> : null}
+              {selected ? <Check size={14} aria-hidden="true" /> : null}
             </button>
           );
         })

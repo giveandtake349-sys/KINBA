@@ -145,7 +145,7 @@ export function ReactionBar({
               setTrayOpen(false);
             }}
           >
-            <X size={13} />
+            <X size={14} />
           </button>
         </div>
       ) : null}

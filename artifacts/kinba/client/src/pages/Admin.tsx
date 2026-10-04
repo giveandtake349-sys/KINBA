@@ -217,12 +217,12 @@ export default function Admin() {
         className="admin-back-btn"
         onClick={() => navigate("/")}
       >
-        <ArrowLeft size={15} />
+        <ArrowLeft size={16} />
         Back to feed
       </button>
       <header className="admin-page__header">
         <div>
-          <p className="eyebrow eyebrow--bright"><ShieldCheck size={15} /> Restricted control center</p>
+          <p className="eyebrow eyebrow--bright"><ShieldCheck size={16} /> Restricted control center</p>
           <h1>TimeWheels Admin</h1>
           <p>Manage sessions, review wallet activity, and approve live sponsorships.</p>
         </div>
@@ -231,7 +231,7 @@ export default function Admin() {
       {notice && <p className="form-message" role="status">{notice}</p>}
 
       <section className="admin-card admin-session-control">
-        <div className="admin-section-heading"><div><p className="eyebrow">Session control</p><h2>Open a new TimeWheels entry window</h2></div><Clock3 size={22} /></div>
+        <div className="admin-section-heading"><div><p className="eyebrow">Session control</p><h2>Open a new TimeWheels entry window</h2></div><Clock3 size={24} /></div>
         <form className="admin-session-form" onSubmit={submitSession}>
           <label>Session title<input value={title} onChange={event => setTitle(event.target.value)} minLength={3} maxLength={180} required /></label>
           <label>Wheel start time<input type="datetime-local" value={startsAt} onChange={event => setStartsAt(event.target.value)} /></label>
@@ -269,7 +269,7 @@ export default function Admin() {
         <div className="admin-sponsor-list">
           {(data?.sponsors ?? []).map(row => <article className="admin-sponsor-row" key={row.sponsor.id}>
             <img src={row.sponsor.logoUrl} alt="Sponsor logo" />
-            <div><strong>{row.user.name || row.user.email || `User #${row.user.id}`}</strong><span>{row.session.title} · ৳{Number(row.sponsor.sponsoredAmount).toFixed(2)} · Expires {formatDate(row.sponsor.expiresAt)}</span><a href={row.sponsor.externalLink} target="_blank" rel="noreferrer">Open sponsor link <ExternalLink size={13} /></a></div>
+            <div><strong>{row.user.name || row.user.email || `User #${row.user.id}`}</strong><span>{row.session.title} · ৳{Number(row.sponsor.sponsoredAmount).toFixed(2)} · Expires {formatDate(row.sponsor.expiresAt)}</span><a href={row.sponsor.externalLink} target="_blank" rel="noreferrer">Open sponsor link <ExternalLink size={14} /></a></div>
             <div className="admin-sponsor-actions"><span className={`status-chip status-chip--${row.sponsor.status}`}>{row.sponsor.status}</span>{row.sponsor.status === "pending" && <><button className="muted-btn" type="button" onClick={() => updateSponsor(row.sponsor.id, "approved")} disabled={pendingSponsor === row.sponsor.id}>Approve</button><button className="danger-btn" type="button" onClick={() => updateSponsor(row.sponsor.id, "rejected")} disabled={pendingSponsor === row.sponsor.id}>Reject</button></>}</div>
           </article>)}
         </div>
@@ -281,7 +281,7 @@ export default function Admin() {
             <p className="eyebrow">Content reports</p>
             <h2>Reports</h2>
           </div>
-          <Flag size={22} />
+          <Flag size={24} />
         </div>
         <p className="admin-help">
           Raw report rows only — targetId is the backend target ID for the reported content.
@@ -458,7 +458,7 @@ export default function Admin() {
                           setResolveReportId(null);
                         }}
                       >
-                        <EyeOff size={13} aria-hidden="true" /> Hide message
+                        <EyeOff size={14} aria-hidden="true" /> Hide message
                       </button>
                     )
                   ) : null}
@@ -475,7 +475,7 @@ export default function Admin() {
             <p className="eyebrow">Feature flags</p>
             <h2>Runtime feature toggles</h2>
           </div>
-          <SlidersHorizontal size={22} />
+          <SlidersHorizontal size={24} />
         </div>
         <p className="admin-help">
           Server is authoritative. Changes apply immediately; unset flags stay

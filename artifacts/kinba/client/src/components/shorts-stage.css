@@ -578,8 +578,8 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   border-radius: 999px !important;
   color: #fff !important;
   background: rgba(12, 14, 22, 0.65) !important;
-  backdrop-filter: blur(16px) saturate(1.4) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(1.4) !important;
+  backdrop-filter: var(--blur-overlay) !important;
+  -webkit-backdrop-filter: var(--blur-overlay) !important;
   box-shadow:
     0 4px 16px rgba(0, 0, 0, 0.3),
     inset 0 0.5px 0 rgba(255, 255, 255, 0.08) !important;

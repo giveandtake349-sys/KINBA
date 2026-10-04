@@ -53,12 +53,12 @@ export default function AppearancePane() {
               onChange={setMode}
               disabled={!switchable}
               options={[
-                { value: "light", label: "Light", icon: <Sun size={13} /> },
-                { value: "dark", label: "Dark", icon: <Moon size={13} /> },
+                { value: "light", label: "Light", icon: <Sun size={14} /> },
+                { value: "dark", label: "Dark", icon: <Moon size={14} /> },
                 {
                   value: "system",
                   label: "System",
-                  icon: <Monitor size={13} />,
+                  icon: <Monitor size={14} />,
                 },
               ]}
             />

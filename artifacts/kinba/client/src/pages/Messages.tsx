@@ -99,14 +99,14 @@ export default function Messages() {
           aria-label={showRequests ? "Back to conversations" : "Message requests"}
         >
           {showRequests ? (
-            <ChevronLeft size={22} />
+            <ChevronLeft size={24} />
           ) : requestsUnread > 0 ? (
             <>
-              <UserPlus size={22} />
+              <UserPlus size={24} />
               <span className="request-badge">{requestsUnread}</span>
             </>
           ) : (
-            <UserPlus size={22} />
+            <UserPlus size={24} />
           )}
         </button>
       </header>

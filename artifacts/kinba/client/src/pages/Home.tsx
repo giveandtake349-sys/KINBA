@@ -142,7 +142,7 @@ function ThemeToggle() {
       aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
       title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
     >
-      {theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}
+      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
       <span>{theme === "dark" ? "White" : "Dark"}</span>
     </button>
   );
@@ -305,7 +305,7 @@ function GetVerifiedPanel() {
   return (
     <details className="verification-panel">
       <summary>
-        <BadgeCheck className="verified-badge" size={17} /> Get Verified
+        <BadgeCheck className="verified-badge" size={18} /> Get Verified
       </summary>
       <div className="verification-content">
         <p>
@@ -672,7 +672,7 @@ function MobileDrawer({
         <div className="drawer-head">
           <span>Menu</span>
           <button type="button" onClick={onClose} aria-label="Close menu">
-            <X size={21} />
+            <X size={20} />
           </button>
         </div>
         <div className="drawer-profile-card">
@@ -709,7 +709,7 @@ function MobileDrawer({
                     })}
                   >
                     <span className="drawer-item-icon">
-                      <Icon size={19} />
+                      <Icon size={18} />
                     </span>
                     <span className="drawer-item-copy">
                       <strong>{item.label}</strong>
@@ -721,7 +721,7 @@ function MobileDrawer({
             </section>
           ))}
           <button type="button" className="drawer-logout" onClick={safeClick(onLogout)}>
-            <LogOut size={19} />
+            <LogOut size={18} />
             <span>Log out</span>
           </button>
         </nav>
@@ -775,7 +775,7 @@ function AppHeader({
           aria-label="Create a video"
           title="Create a video"
         >
-          <Plus size={19} />
+          <Plus size={18} />
         </button>
         <button
           type="button"
@@ -807,7 +807,7 @@ function AppHeader({
           aria-label="Open profile menu"
         >
           <ProfileIdentity profile={profile} compact />
-          <Menu size={22} />
+          <Menu size={24} />
         </button>
         <button
           type="button"
@@ -820,7 +820,7 @@ function AppHeader({
         </button>
         <ThemeToggle />
         <button type="button" className="logout-btn" onClick={safeClick(onLogout)}>
-          <LogOut size={15} />
+          <LogOut size={16} />
           <span>Log out</span>
         </button>
       </div>
@@ -883,7 +883,7 @@ function BottomNavigation({
   const isHome = ["videos", "shorts", "spotlight"].includes(activePanel);
   return (
     <nav
-      className={`bottom-navigation fixed left-0 right-0 z-50 transition-transform duration-300 ease-in-out ${className ?? ""}`}
+      className={`bottom-navigation fixed left-0 right-0 z-[var(--z-nav)] transition-transform duration-300 ease-in-out ${className ?? ""}`}
       aria-label="Mobile navigation"
     >
       <button
@@ -892,7 +892,7 @@ function BottomNavigation({
         onClick={safeClick(onHome)}
         aria-current={isHome ? "page" : undefined}
       >
-        <HomeIcon size={23} />
+        <HomeIcon size={24} />
         <span>Home</span>
       </button>
       <button
@@ -902,7 +902,7 @@ function BottomNavigation({
         aria-label="Hype Rooms"
         title="Hype Rooms"
       >
-        <Radio size={23} />
+        <Radio size={24} />
         <span>Rooms</span>
       </button>
       <button
@@ -920,7 +920,7 @@ function BottomNavigation({
         onClick={safeClick(onMessages)}
         aria-current={activePanel === "messages" ? "page" : undefined}
       >
-        <MessageCircle size={23} />
+        <MessageCircle size={24} />
         <span>Messages</span>
         {dmUnreadCount > 0 && (
           <span className="bottom-nav-badge">{dmUnreadCount > 99 ? "99+" : dmUnreadCount}</span>
@@ -932,7 +932,7 @@ function BottomNavigation({
         onClick={safeClick(onMenu)}
         aria-expanded={menuOpen}
       >
-        <Menu size={23} />
+        <Menu size={24} />
         <span>Menu</span>
       </button>
     </nav>
@@ -1254,7 +1254,7 @@ function SettingsPanel({ onLogout }: { onLogout: () => void }) {
           </div>
           {google.linked ? (
             <span className="settings-connected">
-              <Check size={15} /> Connected
+              <Check size={16} /> Connected
             </span>
           ) : (
             <button
@@ -1264,16 +1264,16 @@ function SettingsPanel({ onLogout }: { onLogout: () => void }) {
               disabled={google.pending}
             >
               {google.pending ? (
-                <Loader2 className="spin" size={15} />
+                <Loader2 className="spin" size={16} />
               ) : (
-                <GoogleIcon size={15} />
+                <GoogleIcon size={16} />
               )}
               Connect
             </button>
           )}
         </div>
         <button type="button" className="settings-logout" onClick={safeClick(onLogout)}>
-          <LogOut size={17} /> Log out
+          <LogOut size={18} /> Log out
         </button>
       </div>
     </section>
@@ -1298,7 +1298,7 @@ function WalletPanel() {
           <p className="eyebrow">Assets</p>
           <h2 id="wallet-heading">Your JHILIK wallet.</h2>
         </div>
-        <Coins size={22} aria-hidden="true" />
+        <Coins size={24} aria-hidden="true" />
       </div>
       {wallet.isPending ? (
         <div className="wallet-balance-skeleton" aria-busy="true" />
@@ -1510,7 +1510,7 @@ function UploaderHistory({
           <p className="eyebrow">Your activity</p>
           <h3 id="uploader-history-heading">Recent upload History</h3>
         </div>
-        <Clock3 size={17} aria-hidden="true" />
+        <Clock3 size={18} aria-hidden="true" />
       </div>
       {items.length ? (
         <div className="uploader-history-grid">
@@ -1520,7 +1520,7 @@ function UploaderHistory({
                 <img src={item.imageUrl} alt="" />
               ) : (
                 <div className="uploader-history-placeholder" aria-hidden="true">
-                  {item.kind === "VIDEO" ? <Video size={22} /> : <FileText size={22} />}
+                  {item.kind === "VIDEO" ? <Video size={24} /> : <FileText size={24} />}
                 </div>
               )}
               <div>
@@ -1666,7 +1666,7 @@ function UploadVideoModal({
   return (
     <ActionModal title={modalTitle} open={open} onClose={close} className="upload-video-modal create-uploader-modal">
       <button type="button" className="create-uploader-close" onClick={safeClick(close)} aria-label="Close Create uploader">
-        <X size={25} />
+        <X size={24} />
       </button>
       {mode === "menu" ? (
         <>
@@ -1676,7 +1676,7 @@ function UploadVideoModal({
             <p>Choose a format and continue directly into its publishing workflow.</p>
           </div>
           <div className="create-uploader-wheel" aria-label="Create options">
-            <div className="create-uploader-wheel-core"><Plus size={25} /><span>Create</span></div>
+            <div className="create-uploader-wheel-core"><Plus size={24} /><span>Create</span></div>
             <button type="button" className="create-uploader-option create-uploader-option--image" onClick={safeClick(() => chooseMedia("photo"))}><ImagePlus size={20} /><span>Post Image</span></button>
             <button type="button" className="create-uploader-option create-uploader-option--video" onClick={safeClick(() => chooseMedia("video", "LONG"))}><Video size={20} /><span>Post Video</span></button>
             <button type="button" className="create-uploader-option create-uploader-option--shorts" onClick={safeClick(() => chooseMedia("video", "SHORT"))}><Film size={20} /><span>Upload Shorts</span></button>
@@ -1840,7 +1840,7 @@ function CreatorStudioModal({
           onCreate();
         }}
       >
-        <Plus size={17} /> Upload new video
+        <Plus size={18} /> Upload new video
       </button>
     </ActionModal>
   );
@@ -1881,7 +1881,7 @@ function QrPanel({ profile }: { profile?: ProfileSnapshot }) {
           <p className="eyebrow">Identity card</p>
           <h2 id="qr-heading">Share your JHILIK profile.</h2>
         </div>
-        <QrCode size={22} aria-hidden="true" />
+        <QrCode size={24} aria-hidden="true" />
       </div>
       <div className="qr-share-card">
         <div className="qr-mark">
@@ -1898,7 +1898,7 @@ function QrPanel({ profile }: { profile?: ProfileSnapshot }) {
           <span>{username ? `@${username}` : "Your public profile"}</span>
         </div>
         <button type="button" className="primary-btn" onClick={copyLink}>
-          {copied ? <Check size={15} /> : <Copy size={15} />}
+          {copied ? <Check size={16} /> : <Copy size={16} />}
           {copied ? "Link copied" : "Copy profile link"}
         </button>
       </div>
@@ -1925,7 +1925,7 @@ function OfflineVideosPanel({ onBrowse }: { onBrowse: () => void }) {
           <p className="eyebrow">Personal library</p>
           <h2 id="offline-heading">Saved.</h2>
         </div>
-        <Film size={22} aria-hidden="true" />
+        <Film size={24} aria-hidden="true" />
       </div>
       {saved.isPending ? (
         <div className="utility-loading" aria-busy="true">
@@ -1933,7 +1933,7 @@ function OfflineVideosPanel({ onBrowse }: { onBrowse: () => void }) {
         </div>
       ) : saved.isError ? (
         <div className="media-empty" role="alert">
-          <Film size={22} />
+          <Film size={24} />
           <h3>Your saved items are unavailable.</h3>
           <p>We could not reach your saved library. Try again.</p>
           <button
@@ -1975,7 +1975,7 @@ function OfflineVideosPanel({ onBrowse }: { onBrowse: () => void }) {
         </div>
       ) : (
         <div className="media-empty">
-          <Film size={22} />
+          <Film size={24} />
           <h3>Nothing saved yet.</h3>
           <p>Use Save on any post, photo, or video to keep it in this library.</p>
           <button type="button" className="primary-btn" onClick={onBrowse}>

@@ -77,7 +77,7 @@ function AttachmentChip({
           onClick={() => onRetry(item.id)}
           aria-label={`Retry uploading ${item.name}`}
         >
-          <RotateCcw size={11} />
+          <RotateCcw size={14} />
           Retry
         </button>
       </div>
@@ -90,7 +90,7 @@ function AttachmentChip({
       onClick={() => onRemove(item.id)}
       aria-label={removeLabel}
     >
-      <X size={13} strokeWidth={2.5} />
+      <X size={14} strokeWidth={2.5} />
     </button>
   );
 

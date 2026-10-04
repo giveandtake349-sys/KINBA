@@ -35,7 +35,7 @@ export function DropPanel({
       <section className="hype-room-panel hype-room-drop-panel" aria-label="Room drop" aria-busy>
         <div className="hype-room-panel-header">
           <h2>
-            <Package size={15} aria-hidden="true" /> Drop
+            <Package size={16} aria-hidden="true" /> Drop
           </h2>
         </div>
         <div className="hype-room-panel-body">
@@ -50,7 +50,7 @@ export function DropPanel({
       <section className="hype-room-panel hype-room-drop-panel" aria-label="Room drop">
         <div className="hype-room-panel-header">
           <h2>
-            <Package size={15} aria-hidden="true" /> Drop
+            <Package size={16} aria-hidden="true" /> Drop
           </h2>
         </div>
         <div className="hype-room-panel-body">
@@ -82,7 +82,7 @@ export function DropPanel({
     <section className="hype-room-panel hype-room-drop-panel" aria-label="Room drop">
       <div className="hype-room-panel-header">
         <h2>
-          <Package size={15} aria-hidden="true" /> Drop
+          <Package size={16} aria-hidden="true" /> Drop
           <span className={`hype-room-drop-status hype-room-drop-status--${drop.status}`}>
             {statusLabel}
           </span>
