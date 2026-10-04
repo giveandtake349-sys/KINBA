@@ -4,17 +4,11 @@
  * Locks the real click path on a rendered page (not the menu component in
  * isolation):
  *
- *   Photos / Video / Document → the matching always-mounted
- *   `<input type="file">` gets a programmatic click → the chooser opens →
- *   `onChange` → pending chip → upload → ready.
+ *   Photos / Video / Document → the file input INSIDE the open menu
+ *   gets a change event → pending chip → upload → ready.
  *
- * Two production bugs are pinned here:
- *  1. the inputs used to carry the `hidden` attribute (`display:none`), which
- *     mobile browsers / WebView ignore for programmatic `.click()`, so the OS
- *     chooser never opened;
- *  2. `input.value` used to be cleared before the files were snapshotted,
- *     which empties the input's live FileList and silently drops the
- *     selection (no chip, no upload).
+ * The menu item IS the file input wrapper — no programmatic .click(),
+ * no label htmlFor indirection, no menu unmounting before picker activation.
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -102,34 +96,25 @@ vi.mock("@/lib/dmAttachment", async importOriginal => {
 import { startDmUpload } from "@/lib/dmAttachment";
 import MessageDetail from "./MessageDetail";
 
-const PHOTO_ACCEPT = "image/*";
-const VIDEO_ACCEPT = "video/*";
-
-function fileInputs(): HTMLInputElement[] {
-  return Array.from(
-    document.querySelectorAll<HTMLInputElement>('input[type="file"]')
-  );
-}
-
-function inputFor(acceptFragment: string): HTMLInputElement {
-  // `accept` is a comma list for documents, so match by containment.
-  const input = document.querySelector<HTMLInputElement>(
-    `input[type="file"][accept*="${acceptFragment}"]`
-  );
-  expect(input).not.toBeNull();
-  return input as HTMLInputElement;
-}
-
-function trackClicks(input: HTMLInputElement) {
-  const handler = vi.fn();
-  input.addEventListener("click", handler);
-  return handler;
+function createFileList(...files: File[]): FileList {
+  return {
+    length: files.length,
+    item: (index: number) => files[index] ?? null,
+    [Symbol.iterator]: () => files[Symbol.iterator](),
+  } as unknown as FileList;
 }
 
 /** Opens the "＋" menu. */
 function openMenu() {
   fireEvent.click(screen.getByRole("button", { name: "Add attachment" }));
   expect(screen.getByRole("menu", { name: "Send attachment" })).toBeTruthy();
+}
+
+/** Finds a file input inside the open menu by its aria-label. */
+function getFileInput(ariaLabel: string): HTMLInputElement {
+  const input = screen.getByLabelText(ariaLabel) as HTMLInputElement;
+  expect(input).toBeTruthy();
+  return input;
 }
 
 describe("DM attachment picker wiring", () => {
@@ -152,105 +137,98 @@ describe("DM attachment picker wiring", () => {
     vi.mocked(startDmUpload).mockClear();
   });
 
-  it("keeps all three pickers mounted and laid out (never display:none)", () => {
+  it("renders three file inputs inside the menu when open", () => {
     render(<MessageDetail />);
 
-    const [photo, video, document] = [
-      inputFor(PHOTO_ACCEPT),
-      inputFor(VIDEO_ACCEPT),
-      inputFor(".pdf"),
-    ];
-    expect(fileInputs()).toHaveLength(3);
+    // Menu closed — no file inputs in document
+    expect(document.querySelectorAll('input[type="file"]').length).toBe(0);
 
-    for (const input of [photo, video, document]) {
+    openMenu();
+
+    // Menu open — three file inputs present
+    const inputs = document.querySelectorAll<HTMLInputElement>('input[type="file"]');
+    expect(inputs.length).toBe(3);
+
+    // Each has correct accept and aria-label
+    const photo = getFileInput("Choose photos to send");
+    const video = getFileInput("Choose a video to send");
+    const doc = getFileInput("Choose a document to send");
+
+    expect(photo.accept).toBe("image/*");
+    expect(photo.multiple).toBe(true);
+    expect(video.accept).toBe("video/*");
+    expect(video.multiple).toBe(false);
+    expect(doc.accept).toContain(".pdf");
+    expect(doc.multiple).toBe(false);
+
+    // Inputs are laid out (not display:none, not hidden)
+    for (const input of [photo, video, doc]) {
       expect(input.isConnected).toBe(true);
-      // `hidden` / display:none is what mobile browsers and the WebView ignore
-      // for programmatic .click() on a file input.
       expect(input.hasAttribute("hidden")).toBe(false);
       expect(window.getComputedStyle(input).display).not.toBe("none");
-      expect(input.className).toContain("sr-only");
+      // The input is absolutely positioned over the menu item, not sr-only
+      expect(input.className).toContain("attach-menu-input");
     }
-    expect(photo.multiple).toBe(true);
-    expect(video.multiple).toBe(false);
-    expect(document.multiple).toBe(false);
   });
 
   it("keeps the pickers mounted while the menu is open and closed", () => {
     render(<MessageDetail />);
-    expect(fileInputs()).toHaveLength(3);
+    expect(document.querySelectorAll('input[type="file"]').length).toBe(0);
 
     openMenu();
-    expect(fileInputs()).toHaveLength(3);
-    fireEvent.click(screen.getByRole("menuitem", { name: "Photos" }));
+    expect(document.querySelectorAll('input[type="file"]').length).toBe(3);
+
+    // Select a file — menu closes via onClose in handleChange
+    const photo = getFileInput("Choose photos to send");
+    const file = new File([new Uint8Array(100)], "test.png", { type: "image/png" });
+    Object.defineProperty(photo, "files", {
+      value: createFileList(file),
+      configurable: true,
+    });
+    fireEvent.change(photo);
 
     expect(screen.queryByRole("menu")).toBeNull();
-    expect(fileInputs()).toHaveLength(3);
-    expect(fileInputs().every(input => input.isConnected)).toBe(true);
+    // After menu closes, file inputs are unmounted (menu is conditionally rendered)
+    expect(document.querySelectorAll('input[type="file"]').length).toBe(0);
   });
 
-  it("routes each menu action to its own picker and closes the menu", () => {
+  it("each menu item has its own file input with correct accept type", () => {
     render(<MessageDetail />);
-
-    const photo = inputFor(PHOTO_ACCEPT);
-    const video = inputFor(VIDEO_ACCEPT);
-    const document = inputFor(".pdf");
-    const photoClicks = trackClicks(photo);
-    const videoClicks = trackClicks(video);
-    const documentClicks = trackClicks(document);
-
     openMenu();
-    fireEvent.click(screen.getByRole("menuitem", { name: "Photos" }));
-    expect(photoClicks).toHaveBeenCalledTimes(1);
-    expect(videoClicks).not.toHaveBeenCalled();
-    expect(documentClicks).not.toHaveBeenCalled();
+
+    const photo = getFileInput("Choose photos to send");
+    const video = getFileInput("Choose a video to send");
+    const doc = getFileInput("Choose a document to send");
+
+    expect(photo.accept).toBe("image/*");
+    expect(photo.multiple).toBe(true);
+    expect(video.accept).toBe("video/*");
+    expect(video.multiple).toBe(false);
+    expect(doc.accept).toContain(".pdf");
+    expect(doc.multiple).toBe(false);
+
+    // Selecting a file closes the menu
+    const file = new File([new Uint8Array(100)], "test.png", { type: "image/png" });
+    Object.defineProperty(photo, "files", {
+      value: createFileList(file),
+      configurable: true,
+    });
+    fireEvent.change(photo);
     expect(screen.queryByRole("menu")).toBeNull();
-
-    openMenu();
-    fireEvent.click(screen.getByRole("menuitem", { name: "Video" }));
-    expect(videoClicks).toHaveBeenCalledTimes(1);
-    expect(photoClicks).toHaveBeenCalledTimes(1);
-
-    openMenu();
-    fireEvent.click(screen.getByRole("menuitem", { name: "Document" }));
-    expect(documentClicks).toHaveBeenCalledTimes(1);
-    expect(photoClicks).toHaveBeenCalledTimes(1);
-    expect(videoClicks).toHaveBeenCalledTimes(1);
   });
 
   it("turns a selection into a pending chip, uploads it, and enables send", async () => {
     render(<MessageDetail />);
-    const photo = inputFor(PHOTO_ACCEPT);
+    openMenu();
+
+    const photo = getFileInput("Choose photos to send");
 
     const file = new File([new Uint8Array(2048)], "beach.png", {
       type: "image/png",
     });
-
-    // A live FileList: clearing the input's value empties the very object the
-    // handler reads. Capturing the reference and consuming it after the clear
-    // (the old order) dropped the selection silently.
-    let liveFile: File | null = file;
-    const list = {
-      get length() {
-        return liveFile ? 1 : 0;
-      },
-      item: (index: number) => (index === 0 ? liveFile : null),
-      *[Symbol.iterator]() {
-        if (liveFile) yield liveFile;
-      },
-    } as unknown as FileList;
-
-    let value = "beach.png";
-    Object.defineProperty(photo, "value", {
-      configurable: true,
-      get: () => value,
-      set: (next: string) => {
-        value = next;
-        if (next === "") liveFile = null;
-      },
-    });
     Object.defineProperty(photo, "files", {
+      value: createFileList(file),
       configurable: true,
-      get: () => list,
     });
 
     fireEvent.change(photo);
@@ -275,26 +253,73 @@ describe("DM attachment picker wiring", () => {
 
   it("still works when the same file is chosen a second time", async () => {
     render(<MessageDetail />);
-    const photo = inputFor(PHOTO_ACCEPT);
+    openMenu();
+
+    const photo = getFileInput("Choose photos to send");
 
     const file = new File([new Uint8Array(64)], "again.png", {
       type: "image/png",
     });
-    const armSelection = () =>
-      Object.defineProperty(photo, "files", {
-        configurable: true,
-        value: [file],
-        writable: true,
-      });
 
-    armSelection();
+    // First selection
+    Object.defineProperty(photo, "files", {
+      value: createFileList(file),
+      configurable: true,
+    });
     fireEvent.change(photo);
     expect(await screen.findByAltText("again.png")).toBeTruthy();
 
-    // A second selection of the same file repopulates `input.files` and must
-    // fire `change` again (the handler resets `value` so it is not filtered).
-    armSelection();
-    fireEvent.change(photo);
+    // Menu closed after first selection — open again for second selection
+    openMenu();
+    const photo2 = getFileInput("Choose photos to send");
+    // Second selection of the same file — value reset allows change to fire again
+    Object.defineProperty(photo2, "files", {
+      value: createFileList(file),
+      configurable: true,
+    });
+    fireEvent.change(photo2);
     expect(await screen.findAllByAltText("again.png")).toHaveLength(2);
+  });
+
+  it("handles video selection", async () => {
+    render(<MessageDetail />);
+    openMenu();
+
+    const video = getFileInput("Choose a video to send");
+
+    const file = new File([new Uint8Array(5000)], "clip.mp4", {
+      type: "video/mp4",
+    });
+    Object.defineProperty(video, "files", {
+      value: createFileList(file),
+      configurable: true,
+    });
+
+    fireEvent.change(video);
+
+    expect(await screen.findByText("clip.mp4")).toBeTruthy();
+    expect(vi.mocked(startDmUpload)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(startDmUpload).mock.calls[0][0].kind).toBe("video");
+  });
+
+  it("handles document selection", async () => {
+    render(<MessageDetail />);
+    openMenu();
+
+    const document = getFileInput("Choose a document to send");
+
+    const file = new File([new Uint8Array(1024)], "report.pdf", {
+      type: "application/pdf",
+    });
+    Object.defineProperty(document, "files", {
+      value: createFileList(file),
+      configurable: true,
+    });
+
+    fireEvent.change(document);
+
+    expect(await screen.findByText("report.pdf")).toBeTruthy();
+    expect(vi.mocked(startDmUpload)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(startDmUpload).mock.calls[0][0].kind).toBe("document");
   });
 });

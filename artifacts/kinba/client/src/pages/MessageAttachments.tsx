@@ -1,51 +1,89 @@
 import { FileText, Image as ImageIcon, RotateCcw, Video, X } from "lucide-react";
-import { dmDocumentLabel, formatDmFileSize } from "@shared/dmMedia";
+import { dmDocumentLabel, formatDmFileSize, DM_DOCUMENT_ACCEPT } from "@shared/dmMedia";
 import type { DmPendingAttachment } from "@/lib/dmAttachment";
 import "./messages.css";
+
+interface AttachmentMenuProps {
+  open: boolean;
+  onFileSelected: (kind: "image" | "video" | "document", files: FileList) => void;
+  onClose: () => void;
+}
 
 /**
  * Compact WhatsApp-style "＋" attachment picker.
  *
- * Exactly three actions (Photos / Video / Document). On mobile CSS turns it
- * into a bottom sheet, on desktop it stays a popover above the composer.
+ * Each menu item contains a native <input type="file"> that fills the entire
+ * touch target via absolute positioning. The user's tap directly activates
+ * the OS file picker — no programmatic .click(), no label htmlFor indirection,
+ * no menu unmounting before picker activation.
  */
-const MENU_ITEMS = [
-  { kind: "image", label: "Photos", Icon: ImageIcon },
-  { kind: "video", label: "Video", Icon: Video },
-  { kind: "document", label: "Document", Icon: FileText },
-] as const;
-
 export function AttachmentMenu({
   open,
-  onPick,
+  onFileSelected,
   onClose,
-}: {
-  open: boolean;
-  onPick: (kind: "image" | "video" | "document") => void;
-  onClose: () => void;
-}) {
+}: AttachmentMenuProps) {
   if (!open) return null;
+
+  const handleChange = (kind: "image" | "video" | "document", event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      onFileSelected(kind, files);
+      onClose();
+    }
+    // Reset value so the same file can be picked again
+    event.target.value = "";
+  };
+
   return (
     <>
       <div className="attach-backdrop" onClick={onClose} aria-hidden="true" />
       <div className="attach-menu" role="menu" aria-label="Send attachment">
-        {MENU_ITEMS.map(({ kind, label, Icon }) => (
-          <label
-            key={kind}
-            htmlFor={kind === "image" ? "dm-photo-input" : kind === "video" ? "dm-video-input" : "dm-document-input"}
-            role="menuitem"
-            className="attach-menu-item"
-            onClick={(e) => {
-              e.preventDefault();
-              onPick(kind);
-            }}
-          >
+        <div className="attach-menu-input-wrapper">
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="attach-menu-input"
+            onChange={(e) => handleChange("image", e)}
+            aria-label="Choose photos to send"
+          />
+          <span className="attach-menu-item" role="menuitem">
             <span className="attach-menu-icon" aria-hidden="true">
-              <Icon size={20} strokeWidth={1.9} />
+              <ImageIcon size={20} strokeWidth={1.9} />
             </span>
-            <span>{label}</span>
-          </label>
-        ))}
+            <span>Photos</span>
+          </span>
+        </div>
+        <div className="attach-menu-input-wrapper">
+          <input
+            type="file"
+            accept="video/*"
+            className="attach-menu-input"
+            onChange={(e) => handleChange("video", e)}
+            aria-label="Choose a video to send"
+          />
+          <span className="attach-menu-item" role="menuitem">
+            <span className="attach-menu-icon" aria-hidden="true">
+              <Video size={20} strokeWidth={1.9} />
+            </span>
+            <span>Video</span>
+          </span>
+        </div>
+        <div className="attach-menu-input-wrapper">
+          <input
+            type="file"
+            accept={DM_DOCUMENT_ACCEPT}
+            className="attach-menu-input"
+            onChange={(e) => handleChange("document", e)}
+            aria-label="Choose a document to send"
+          />
+          <span className="attach-menu-item" role="menuitem">
+            <span className="attach-menu-icon" aria-hidden="true">
+              <FileText size={20} strokeWidth={1.9} />
+            </span>
+            <span>Document</span>
+          </span>
+        </div>
       </div>
     </>
   );

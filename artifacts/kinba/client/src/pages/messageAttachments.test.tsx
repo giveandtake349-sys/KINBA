@@ -21,33 +21,52 @@ function pending(
   };
 }
 
+function createFileList(...files: File[]): FileList {
+  return {
+    length: files.length,
+    item: (index: number) => files[index] ?? null,
+    [Symbol.iterator]: () => files[Symbol.iterator](),
+  } as unknown as FileList;
+}
+
 describe("AttachmentMenu", () => {
   it("renders nothing while closed", () => {
     const { container } = render(
-      <AttachmentMenu open={false} onPick={vi.fn()} onClose={vi.fn()} />
+      <AttachmentMenu open={false} onFileSelected={vi.fn()} onClose={vi.fn()} />
     );
     expect(container.firstChild).toBeNull();
   });
 
   it("offers exactly Photos, Video, and Document in that order", () => {
-    render(<AttachmentMenu open onPick={vi.fn()} onClose={vi.fn()} />);
+    render(<AttachmentMenu open onFileSelected={vi.fn()} onClose={vi.fn()} />);
     const items = screen
       .getAllByRole("menuitem")
       .map(item => item.textContent?.trim());
     expect(items).toEqual(["Photos", "Video", "Document"]);
   });
 
-  it("reports the picked kind", () => {
-    const onPick = vi.fn();
-    render(<AttachmentMenu open onPick={onPick} onClose={vi.fn()} />);
-    fireEvent.click(screen.getByRole("menuitem", { name: "Video" }));
-    expect(onPick).toHaveBeenCalledTimes(1);
-    expect(onPick).toHaveBeenCalledWith("video");
+  it("reports the picked kind and files", () => {
+    const onFileSelected = vi.fn();
+    render(<AttachmentMenu open onFileSelected={onFileSelected} onClose={vi.fn()} />);
+
+    const videoInput = screen.getByLabelText("Choose a video to send") as HTMLInputElement;
+    const testFile = new File([new Uint8Array(10)], "video.mp4", { type: "video/mp4" });
+    Object.defineProperty(videoInput, "files", {
+      value: createFileList(testFile),
+      configurable: true,
+    });
+    fireEvent.change(videoInput);
+
+    expect(onFileSelected).toHaveBeenCalledTimes(1);
+    expect(onFileSelected).toHaveBeenCalledWith("video", expect.any(Object));
+    const calledFiles = onFileSelected.mock.calls[0][1] as FileList;
+    expect(calledFiles.length).toBe(1);
+    expect(calledFiles.item(0)?.name).toBe("video.mp4");
   });
 
   it("closes from the backdrop", () => {
     const onClose = vi.fn();
-    render(<AttachmentMenu open onPick={vi.fn()} onClose={onClose} />);
+    render(<AttachmentMenu open onFileSelected={vi.fn()} onClose={onClose} />);
     fireEvent.click(document.querySelector(".attach-backdrop")!);
     expect(onClose).toHaveBeenCalledTimes(1);
   });

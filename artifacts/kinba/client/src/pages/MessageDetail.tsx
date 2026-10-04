@@ -72,9 +72,6 @@ export default function MessageDetail() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
-  const photoInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
-  const documentInputRef = useRef<HTMLInputElement>(null);
 
   const attachmentsRef = useRef<DmPendingAttachment[]>([]);
   const uploadHandlesRef = useRef<Map<string, DmUploadHandle>>(new Map());
@@ -293,28 +290,15 @@ export default function MessageDetail() {
   );
 
   /**
-   * Opens the picker for the tapped action. The three file inputs are always
-   * mounted (never conditionally rendered with the menu), so the refs cannot be
-   * null here. The picker is triggered *first*, inside the same user gesture
-   * that tapped the menu item, and the menu is closed afterwards — closing
-   * first must never be able to tear down the control the picker runs on.
+   * Called when a file is selected via the native picker in AttachmentMenu.
+   * The menu item itself IS the file input, so this receives the files directly.
    */
-  const handlePickAttachment = useCallback((kind: DMAttachmentKind) => {
-    if (sending) return;
-    if (kind === "image") photoInputRef.current?.click();
-    else if (kind === "video") videoInputRef.current?.click();
-    else documentInputRef.current?.click();
-    setAttachmentMenuOpen(false);
-  }, [sending]);
-
-  const handleFileInputChange = useCallback(
-    (kind: DMAttachmentKind, event: React.ChangeEvent<HTMLInputElement>) => {
-      // Snapshot the files *before* clearing the value: clearing resets the
-      // input's live FileList, and consuming the reference afterwards would
-      // silently drop the selection (no chip, no upload).
-      const files = Array.from(event.target.files ?? []);
-      event.target.value = "";
-      handleFilesSelected(kind, files);
+  const handleFileSelected = useCallback(
+    (kind: DMAttachmentKind, files: FileList) => {
+      const fileArray = Array.from(files);
+      handleFilesSelected(kind, fileArray);
+      // Close menu after selection; the input stays mounted inside the menu
+      setAttachmentMenuOpen(false);
     },
     [handleFilesSelected]
   );
@@ -804,7 +788,7 @@ export default function MessageDetail() {
             </button>
             <AttachmentMenu
               open={attachmentMenuOpen}
-              onPick={handlePickAttachment}
+              onFileSelected={handleFileSelected}
               onClose={() => setAttachmentMenuOpen(false)}
             />
           </div>
@@ -829,41 +813,6 @@ export default function MessageDetail() {
             {sending ? <Loader2 size={20} className="spin" /> : <Send size={20} />}
           </button>
         </form>
-        {/*
-          Always mounted, never `hidden`: `hidden`/`display:none` takes the
-          input out of layout and mobile browsers/WebView ignore a
-          programmatic .click() on a non-rendered file input, so the picker
-          never opens. `.sr-only` keeps it laid out (1×1, clipped) while
-          invisible — the same pattern the app's other working pickers use.
-        */}
-        <input
-          ref={photoInputRef}
-          id="dm-photo-input"
-          type="file"
-          className="sr-only"
-          accept="image/*"
-          multiple
-          onChange={event => handleFileInputChange("image", event)}
-          aria-label="Choose photos to send"
-        />
-        <input
-          ref={videoInputRef}
-          id="dm-video-input"
-          type="file"
-          className="sr-only"
-          accept="video/*"
-          onChange={event => handleFileInputChange("video", event)}
-          aria-label="Choose a video to send"
-        />
-        <input
-          ref={documentInputRef}
-          id="dm-document-input"
-          type="file"
-          className="sr-only"
-          accept={DM_DOCUMENT_ACCEPT}
-          onChange={event => handleFileInputChange("document", event)}
-          aria-label="Choose a document to send"
-        />
       </div>
 
       {lightboxUrl && (
