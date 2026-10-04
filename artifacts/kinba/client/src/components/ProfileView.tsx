@@ -8,11 +8,13 @@ import {
   type FormEvent,
 } from "react";
 import {
+  AlertTriangle,
   BadgeCheck,
   ArrowLeft,
   Bookmark,
   Flag,
   MoreHorizontal,
+  Play,
   Share2,
   UserRound,
   Video,
@@ -23,6 +25,7 @@ import {
   X,
   Link as LinkIcon,
   MessageSquare,
+  RotateCcw,
   Send,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -104,6 +107,61 @@ function formatCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return String(n);
+}
+
+type TileVariant = "post" | "text" | "video" | "short";
+
+/** How one record is presented: photos and text are posts, video splits by kind. */
+function tileVariant(video: VideoRecord): TileVariant {
+  if (video.mediaType === "TEXT") return "text";
+  if (video.mediaType === "IMAGE") return "post";
+  return video.kind === "SHORT" ? "short" : "video";
+}
+
+/**
+ * The geometry of a tile. Real width/height wins so a portrait photo stays
+ * portrait and a 4:3 video is never cropped into a 16:9 box; video without
+ * stored dimensions falls back to the ratio its kind implies, and media with
+ * no reliable dimensions sizes itself instead of guessing.
+ */
+function tileAspectRatio(video: VideoRecord): string | null {
+  const variant = tileVariant(video);
+  if (variant === "text") return null;
+  const width = Number(video.width) || 0;
+  const height = Number(video.height) || 0;
+  if (width > 0 && height > 0) return `${width} / ${height}`;
+  if (variant === "short") return "9 / 16";
+  if (variant === "video") return "16 / 9";
+  return null;
+}
+
+/**
+ * Server listings already filter to READY, but a row that is still encoding
+ * must never reach a playable shelf, so keep the guard next to the presentation.
+ */
+function isPlayable(video: VideoRecord): boolean {
+  if (video.mediaType !== "VIDEO") return true;
+  const status = video.processingStatus;
+  return !status || status === "READY";
+}
+
+function formatDuration(seconds: number): string | null {
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  const total = Math.round(seconds);
+  const minutes = Math.floor(total / 60);
+  const remainder = total % 60;
+  return minutes ? `${minutes}:${String(remainder).padStart(2, "0")}` : `${total}s`;
+}
+
+/** Compact "3:24 · 2.4K views" line used under and over profile media. */
+function tileStatLine(video: VideoRecord, variant: TileVariant): string {
+  const parts: string[] = [];
+  if (variant === "video" || variant === "short") {
+    const duration = formatDuration(video.durationSeconds);
+    if (duration) parts.push(duration);
+  }
+  parts.push(`${formatCount(video.viewCount)} views`);
+  return parts.join(" · ");
 }
 
 function formatJoinedLabel(value?: string | Date | null): string | null {
@@ -466,8 +524,11 @@ export function ProfileEditModal({
 }
 
 /**
- * One grid cell. Presentation lives here so the profile content surface can be
- * restyled or extended without touching the header, stats, or tab wiring.
+ * One content cell. Presentation lives here so the profile content surface can
+ * be restyled or extended without touching the header, stats, or tab wiring.
+ *
+ * Geometry comes from the record itself: photos keep their real ratio, Shorts
+ * stay 9:16, and long videos keep the ratio they were published at.
  */
 function ProfileTile({
   video,
@@ -480,63 +541,115 @@ function ProfileTile({
   onOpenShort?: (videoId: number) => void;
   onOpenVideo?: (video: VideoRecord) => void;
 }) {
-  const open = () => {
-    if (video.mediaType === "IMAGE" && onOpenPhoto) {
-      onOpenPhoto(video);
-    } else if (video.mediaType === "VIDEO" && video.kind === "SHORT" && onOpenShort) {
-      onOpenShort(video.id);
-    } else if (video.mediaType === "VIDEO" && onOpenVideo) {
-      onOpenVideo(video);
-    }
-  };
+  const variant = tileVariant(video);
+  const aspectRatio = tileAspectRatio(video);
+  const isMedia = variant !== "text";
+  const hasOverlay = variant === "post" || variant === "short";
+  const stat = isMedia ? tileStatLine(video, variant) : "";
+
+  // A tile only advertises itself as actionable when it can actually open
+  // something: text posts have no detail view, so they stay plain articles.
+  const open =
+    variant === "post" && onOpenPhoto
+      ? () => onOpenPhoto(video)
+      : variant === "short" && onOpenShort
+        ? () => onOpenShort(video.id)
+        : variant === "video" && onOpenVideo
+          ? () => onOpenVideo(video)
+          : null;
+  const openLabel =
+    variant === "post" ? "photo" : variant === "short" ? "short" : "video";
+
+  const mediaSrc =
+    variant === "post"
+      ? resolveMediaUrl(video.videoUrl) ?? (video.videoUrl.trim() || undefined)
+      : resolveMediaUrl(video.thumbnailUrl);
+  const mediaAlt = video.title || (variant === "post" ? "Post" : "Video thumbnail");
+
+  const media = isMedia ? (
+    <div className="pr-tile-media" style={aspectRatio ? { aspectRatio } : undefined}>
+      {mediaSrc ? (
+        <img src={mediaSrc} className="pr-tile-img" alt={mediaAlt} loading="lazy" />
+      ) : (
+        <div className="pr-tile-fallback">
+          {variant === "post" ? <ImageIcon size={20} /> : <Video size={20} />}
+        </div>
+      )}
+      {(variant === "video" || variant === "short") && (
+        <span className="pr-tile-play" aria-hidden="true">
+          <Play size={11} />
+        </span>
+      )}
+      {hasOverlay && (
+        <div className="pr-tile-overlay">
+          {video.title && <span className="pr-tile-title">{video.title}</span>}
+          <span className="pr-tile-stat">{stat}</span>
+        </div>
+      )}
+    </div>
+  ) : (
+    <div className="pr-tile-text">
+      <span className="pr-tile-text-content">{video.title || video.description || ""}</span>
+    </div>
+  );
+
+  const body =
+    variant === "video" ? (
+      <div className="pr-tile-body">
+        {video.title && <span className="pr-tile-title">{video.title}</span>}
+        <span className="pr-tile-stat">{stat}</span>
+      </div>
+    ) : null;
+
+  const className = `pr-tile pr-tile--${variant}${open ? "" : " pr-tile--static"}`;
+  const content = (
+    <>
+      {media}
+      {body}
+    </>
+  );
+
+  if (!open) return <article className={className}>{content}</article>;
 
   return (
     <article
-      className="pr-tile"
+      className={className}
       onClick={open}
       role="button"
       tabIndex={0}
+      aria-label={
+        video.title ? `Open ${openLabel}: ${video.title}` : `Open ${openLabel}`
+      }
       onKeyDown={event => {
         if (event.key !== "Enter" && event.key !== " ") return;
         event.preventDefault();
         open();
       }}
     >
-      {video.mediaType === "TEXT" ? (
-        <div className="pr-tile-text">
-          <span className="pr-tile-text-content">{video.title || video.description || ""}</span>
-        </div>
-      ) : video.mediaType === "IMAGE" ? (
-        <img
-          src={resolveMediaUrl(video.videoUrl) ?? video.videoUrl}
-          className="pr-tile-img"
-          alt={video.title || "Post"}
-          loading="lazy"
-        />
-      ) : resolveMediaUrl(video.thumbnailUrl) ? (
-        <img
-          src={resolveMediaUrl(video.thumbnailUrl)}
-          className="pr-tile-img"
-          alt={video.title}
-          loading="lazy"
-        />
-      ) : (
-        <div className="pr-tile-fallback">
-          <Video size={22} />
-        </div>
-      )}
-      {video.mediaType === "VIDEO" && (
-        <span className="pr-tile-play">
-          <Video size={13} />
-        </span>
-      )}
-      {video.mediaType !== "TEXT" && (
-        <div className="pr-tile-meta">
-          <span className="pr-tile-title">{video.title}</span>
-          <span className="pr-tile-views">{formatCount(video.viewCount)} views</span>
-        </div>
-      )}
+      {content}
     </article>
+  );
+}
+
+/** One shelf, one rhythm: masonry for mixed media, catalog grids for the rest. */
+const GRID_CLASS: Record<ProfileTab, string> = {
+  posts: "pr-grid--posts",
+  videos: "pr-grid--videos",
+  shorts: "pr-grid--shorts",
+  saved: "pr-grid--saved",
+};
+
+/** Loading placeholder shaped like the shelf it stands in for. */
+function ContentSkeleton({ tab }: { tab: ProfileTab }) {
+  const shape =
+    tab === "shorts" ? " pr-skeleton-tile--tall" : tab === "videos" ? " pr-skeleton-tile--wide" : "";
+  const count = tab === "videos" ? 4 : 6;
+  return (
+    <div className={`pr-grid ${GRID_CLASS[tab]}`} aria-hidden="true">
+      {Array.from({ length: count }).map((_, i) => (
+        <SkeletonBlock className={`pr-skeleton-tile${shape}`} key={i} />
+      ))}
+    </div>
   );
 }
 
@@ -603,18 +716,30 @@ export default function ProfileView({
     refetchOnWindowFocus: false,
   });
 
-  const allVideos = (
-    (userId ? publicVideosQuery.data : videosQuery.data) ?? []
-  );
+  // One source per shelf: the same query supplies the items, the loading
+  // state, and the error state, so a tab can never show one while claiming
+  // another. Saved is always the owner's own bookmark shelf.
+  const shelfQuery = (tab: ProfileTab) =>
+    tab === "saved"
+      ? bookmarkedVideosQuery
+      : userId
+        ? publicVideosQuery
+        : videosQuery;
 
-  const posts = allVideos.filter(v => v.mediaType === "IMAGE" || v.mediaType === "TEXT");
+  const allVideos = shelfQuery("posts").data ?? [];
+
+  const posts = allVideos.filter(
+    v => (v.mediaType === "IMAGE" || v.mediaType === "TEXT") && isPlayable(v)
+  );
   const videos = allVideos.filter(
-    v => v.mediaType === "VIDEO" && v.kind !== "SHORT"
+    v => v.mediaType === "VIDEO" && v.kind !== "SHORT" && isPlayable(v)
   );
   const shorts = allVideos.filter(
-    v => v.mediaType === "VIDEO" && v.kind === "SHORT"
+    v => v.mediaType === "VIDEO" && v.kind === "SHORT" && isPlayable(v)
   );
-  const saved = (isOwner ? bookmarkedVideosQuery.data : []) ?? [];
+  const saved = ((isOwner ? bookmarkedVideosQuery.data : []) ?? []).filter(
+    isPlayable
+  );
 
   const itemsForTab = (tab: ProfileTab): VideoRecord[] =>
     tab === "posts"
@@ -625,12 +750,9 @@ export default function ProfileView({
           ? shorts
           : saved;
 
-  const loadingForTab = (tab: ProfileTab): boolean =>
-    tab === "saved"
-      ? bookmarkedVideosQuery.isPending
-      : isOwner
-        ? videosQuery.isPending
-        : publicVideosQuery.isPending;
+  const loadingForTab = (tab: ProfileTab): boolean => shelfQuery(tab).isPending;
+  const errorForTab = (tab: ProfileTab): boolean => shelfQuery(tab).isError;
+  const retryForTab = (tab: ProfileTab): void => void shelfQuery(tab).refetch();
 
   // Saved is the owner's private shelf: visitors never see the tab, so the
   // strip never advertises content it cannot load for them.
@@ -1042,6 +1164,7 @@ export default function ProfileView({
           {tabs.map(tab => {
             const content = itemsForTab(tab.id);
             const isLoadingTab = loadingForTab(tab.id);
+            const hasError = errorForTab(tab.id);
             const copy = EMPTY_COPY[tab.id];
             const emptyIcon =
               tab.id === "posts" ? (
@@ -1061,15 +1184,32 @@ export default function ProfileView({
                 className="pr-content-page"
                 role="tabpanel"
                 aria-labelledby={`profile-tab-${tab.id}`}
+                aria-busy={isLoadingTab}
               >
                 {isLoadingTab ? (
-                  <div className="pr-grid">
-                    {Array.from({ length: 6 }).map((_, i) => (
-                      <SkeletonBlock className="pr-skeleton-tile" key={i} />
-                    ))}
+                  <ContentSkeleton tab={tab.id} />
+                ) : hasError ? (
+                  <div className="pr-empty pr-empty--error" role="alert">
+                    <div className="pr-empty-icon">
+                      <AlertTriangle size={30} />
+                    </div>
+                    <p className="pr-empty-title">
+                      Couldn&apos;t load {tab.label.toLowerCase()}
+                    </p>
+                    <p className="pr-empty-desc">
+                      This shelf didn&apos;t load. Check your connection and try again.
+                    </p>
+                    <button
+                      type="button"
+                      className="pr-btn pr-btn--outline pr-empty-action"
+                      onClick={() => retryForTab(tab.id)}
+                    >
+                      <RotateCcw size={14} />
+                      Try again
+                    </button>
                   </div>
                 ) : content.length > 0 ? (
-                  <div className="pr-grid">
+                  <div className={`pr-grid ${GRID_CLASS[tab.id]}`}>
                     {content.map(video => (
                       <ProfileTile
                         key={video.id}

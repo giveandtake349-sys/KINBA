@@ -3,12 +3,15 @@
  * data, expose every preserved action, and never advertise a section it
  * cannot load (Saved is owner-only). Every trpc call is stubbed.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
 
 const state = vi.hoisted(() => ({
   data: {} as Record<string, unknown>,
+  pending: {} as Record<string, boolean>,
+  errors: {} as Record<string, boolean>,
+  refetched: [] as string[],
 }));
 
 vi.mock("@/lib/trpc", () => {
@@ -21,13 +24,21 @@ vi.mock("@/lib/trpc", () => {
           const key = prop === "useQuery" ? path.join(".") : [...path, prop].join(".");
           if (prop === "useQuery") {
             return () => ({
-              data: state.data[key],
-              isPending: false,
-              isLoading: false,
-              isSuccess: state.data[key] !== undefined,
-              isError: false,
-              error: null,
-              refetch: () => {},
+              data:
+                state.pending[key] || state.errors[key]
+                  ? undefined
+                  : state.data[key],
+              isPending: Boolean(state.pending[key]),
+              isLoading: Boolean(state.pending[key]),
+              isSuccess:
+                !state.pending[key] &&
+                !state.errors[key] &&
+                state.data[key] !== undefined,
+              isError: Boolean(state.errors[key]),
+              error: state.errors[key] ? new Error("shelf failed") : null,
+              refetch: () => {
+                state.refetched.push(key);
+              },
             });
           }
           if (prop === "useMutation") {
@@ -119,6 +130,7 @@ function video(overrides: Partial<Record<string, unknown>> = {}) {
     thumbnailUrl: "/media/11.jpg",
     mediaType: "IMAGE",
     kind: "LONG",
+    processingStatus: "READY",
     durationSeconds: 0,
     width: 1080,
     height: 1080,
@@ -176,6 +188,9 @@ beforeAll(() => {
 afterEach(() => {
   cleanup();
   state.data = {};
+  state.pending = {};
+  state.errors = {};
+  state.refetched = [];
 });
 
 describe("ProfileView", () => {
@@ -270,6 +285,14 @@ describe("ProfileView", () => {
       expect(panel?.getAttribute("aria-labelledby")).toBe(tab.id);
       expect(controlled).toBe(`profile-panel-${tab.id.replace(/^profile-tab-/, "")}`);
     }
+
+    // Roving tabindex: exactly one tab sits in the tab order, the selected one.
+    const focusable = tabs.filter(tab => tab.getAttribute("tabindex") === "0");
+    expect(focusable).toHaveLength(1);
+    expect(focusable[0]).toBe(selected[0]);
+    expect(
+      tabs.filter(tab => tab.getAttribute("tabindex") === "-1")
+    ).toHaveLength(tabs.length - 1);
   });
 
   it("never claims content the viewer cannot see", () => {
@@ -290,5 +313,175 @@ describe("ProfileView", () => {
     const tiles = container.querySelectorAll(".pr-tile");
     expect(tiles).toHaveLength(1);
     expect(tiles[0].textContent).toContain("Rooftop light study");
+  });
+
+  it("keeps a post at its real aspect ratio instead of forcing a square", () => {
+    state.data = {
+      "profile.videos": [video({ width: 1200, height: 1600, title: "Portrait study" })],
+      "videos.bookmarked": [],
+    };
+    const { container } = renderProfile();
+
+    const posts = container.querySelector("#profile-panel-posts");
+    expect(posts?.querySelector(".pr-tile")?.classList.contains("pr-tile--post")).toBe(true);
+    const media = posts?.querySelector(".pr-tile-media");
+    expect(media?.getAttribute("style")).toContain("aspect-ratio: 1200 / 1600");
+    // The photo keeps its own frame; nothing rewrites it to 1:1.
+    expect(posts?.querySelector(".pr-tile-media")?.getAttribute("style")).not.toContain("1 / 1");
+  });
+
+  it("shows only eligible READY videos in the Videos shelf", () => {
+    state.data = {
+      "profile.videos": [
+        video({
+          id: 21,
+          mediaType: "VIDEO",
+          kind: "LONG",
+          processingStatus: "READY",
+          title: "Ready clip",
+          width: 1920,
+          height: 1080,
+        }),
+        video({
+          id: 22,
+          mediaType: "VIDEO",
+          kind: "LONG",
+          processingStatus: "PROCESSING",
+          title: "Still encoding",
+        }),
+        video({
+          id: 23,
+          mediaType: "VIDEO",
+          kind: "LONG",
+          processingStatus: "FAILED",
+          title: "Broken upload",
+        }),
+      ],
+      "videos.bookmarked": [],
+    };
+    const { container } = renderProfile();
+
+    const videos = container.querySelector("#profile-panel-videos");
+    expect(videos?.querySelectorAll(".pr-tile")).toHaveLength(1);
+    expect(videos?.textContent).toContain("Ready clip");
+    // Processing or failed media never appears as playable content anywhere.
+    expect(container.textContent).not.toContain("Still encoding");
+    expect(container.textContent).not.toContain("Broken upload");
+  });
+
+  it("keeps Shorts on their own shelf without repeating them", () => {
+    state.data = {
+      "profile.videos": [
+        video({
+          id: 31,
+          mediaType: "VIDEO",
+          kind: "SHORT",
+          processingStatus: "READY",
+          title: "Short one",
+          width: 1080,
+          height: 1920,
+        }),
+        video({
+          id: 32,
+          mediaType: "VIDEO",
+          kind: "SHORT",
+          processingStatus: "READY",
+          title: "Short two",
+          width: 1080,
+          height: 1920,
+        }),
+        video({
+          id: 33,
+          mediaType: "VIDEO",
+          kind: "LONG",
+          processingStatus: "READY",
+          title: "Long one",
+          width: 1920,
+          height: 1080,
+        }),
+        video({ id: 34, mediaType: "IMAGE", title: "Photo one", width: 1000, height: 750 }),
+      ],
+      "videos.bookmarked": [],
+    };
+    // Home always hands the shelf its openers; without them a tile stays static.
+    const { container } = renderProfile({
+      onOpenPhoto: vi.fn(),
+      onOpenVideo: vi.fn(),
+      onOpenShort: vi.fn(),
+    });
+
+    const shorts = container.querySelector("#profile-panel-shorts");
+    const shortTiles = shorts ? [...shorts.querySelectorAll(".pr-tile")] : [];
+    expect(shortTiles).toHaveLength(2);
+    expect(new Set(shortTiles.map(tile => tile.getAttribute("aria-label"))).size).toBe(2);
+    // Every Short keeps its 9:16 frame and its own variant class.
+    for (const tile of shortTiles) {
+      expect(tile.classList.contains("pr-tile--short")).toBe(true);
+      const style = tile.querySelector(".pr-tile-media")?.getAttribute("style") ?? "";
+      expect(style).toContain("1080 / 1920");
+    }
+
+    const videos = container.querySelector("#profile-panel-videos");
+    expect(videos?.querySelectorAll(".pr-tile")).toHaveLength(1);
+    expect(videos?.textContent).toContain("Long one");
+    expect(videos?.textContent).not.toContain("Short one");
+
+    const posts = container.querySelector("#profile-panel-posts");
+    expect(posts?.querySelectorAll(".pr-tile")).toHaveLength(1);
+    expect(posts?.textContent).toContain("Photo one");
+  });
+
+  it("never exposes the owner's Saved shelf to a visitor", () => {
+    state.data = {
+      "profile.videosById": [],
+      "profile.followState": { following: false },
+      "videos.bookmarked": [video({ id: 41, title: "Private bookmark" })],
+    };
+    renderProfile({ isOwner: false, userId: 42 });
+
+    expect(document.getElementById("profile-panel-saved")).toBeNull();
+    expect(screen.queryByText("Private bookmark")).toBeNull();
+    expect(
+      screen.getAllByRole("tab").map(tab => tab.textContent)
+    ).not.toContain("Saved");
+  });
+
+  it("keeps every empty shelf honest and free of invented content", () => {
+    state.data = { "profile.videos": [], "videos.bookmarked": [] };
+    const { container } = renderProfile();
+
+    expect(container.querySelectorAll(".pr-tile")).toHaveLength(0);
+    for (const title of ["No posts yet", "No videos yet", "No shorts yet", "Nothing saved yet"]) {
+      expect(screen.getAllByText(title).length).toBeGreaterThan(0);
+    }
+    const text = container.textContent ?? "";
+    expect(text).not.toMatch(/lorem ipsum|placeholder|sample post|coming soon/i);
+  });
+
+  it("shapes the loading state like the shelf it stands in for", () => {
+    state.pending = { "profile.videos": true };
+    state.data = { "videos.bookmarked": [] };
+    const { container } = renderProfile();
+
+    const posts = container.querySelector("#profile-panel-posts");
+    expect(posts?.getAttribute("aria-busy")).toBe("true");
+    expect((posts?.querySelectorAll(".pr-skeleton-tile") ?? []).length).toBeGreaterThan(0);
+    expect(container.querySelector("#profile-panel-shorts")?.getAttribute("aria-busy")).toBe("true");
+    // Saved resolves from its own query, so it is already showing real state.
+    expect(container.querySelector("#profile-panel-saved")?.getAttribute("aria-busy")).toBe("false");
+  });
+
+  it("offers a real retry when a shelf fails to load", () => {
+    state.errors = { "profile.videos": true };
+    state.data = { "videos.bookmarked": [] };
+    const { container } = renderProfile();
+
+    expect(container.querySelector(".pr-grid--posts")).toBeNull();
+    const alerts = screen.getAllByRole("alert");
+    expect(alerts.length).toBeGreaterThan(0);
+    expect(alerts[0].textContent).toMatch(/try again/i);
+
+    fireEvent.click(screen.getAllByRole("button", { name: /try again/i })[0]);
+    expect(state.refetched).toContain("profile.videos");
   });
 });

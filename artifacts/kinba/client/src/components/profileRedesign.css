@@ -8,6 +8,7 @@
    tall at both breakpoints, so the value is owned here. */
 :root {
   --pr-chrome-h: 68px;
+  --pr-shelf-gap: 8px;
 }
 @media (max-width: 760px) {
   :root {
@@ -430,92 +431,177 @@
   box-sizing: border-box;
 }
 
-/* --- Content Grid --- */
+/* --- Content shelves: one system, three rhythms ----------------------
+   Posts and Saved flow as a gapless masonry so a portrait frame keeps
+   its own proportions; Videos and Shorts use fixed catalog grids
+   because their ratios are known up front. */
 .pr-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--pr-shelf-gap);
+  align-items: start;
 }
+.pr-grid--posts,
+.pr-grid--saved {
+  display: block;
+  column-count: 2;
+  column-gap: var(--pr-shelf-gap);
+}
+.pr-grid--posts > *,
+.pr-grid--saved > * {
+  break-inside: avoid;
+  margin-bottom: var(--pr-shelf-gap);
+}
+.pr-grid--videos {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.pr-grid--shorts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .pr-tile {
   position: relative;
-  aspect-ratio: 1;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 8px;
   overflow: hidden;
-  border-radius: 4px;
-  background: var(--surface, rgba(255,255,255,0.04));
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.16s var(--line);
+}
+.pr-tile:hover {
+  border-color: color-mix(in srgb, var(--text) 26%, transparent);
+}
+.pr-tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Text posts have no detail view, so they never pretend to be actionable. */
+.pr-tile--static {
   cursor: default;
 }
+.pr-tile--static:hover {
+  border-color: var(--border);
+}
+
+.pr-tile-media {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: var(--surface-raised);
+}
 .pr-tile-img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
 }
 .pr-tile-fallback {
-  width: 100%;
-  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 96px;
   color: var(--muted);
-  background: var(--surface, rgba(255,255,255,0.04));
+  background: var(--surface-raised);
 }
 .pr-tile-play {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 6px;
+  right: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  background: rgba(0,0,0,0.55);
-  border-radius: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
   color: #fff;
-  backdrop-filter: blur(4px);
+  pointer-events: none;
 }
-.pr-tile-meta {
+.pr-tile-play svg {
+  fill: currentColor;
+  margin-left: 1px;
+}
+
+/* Photos and Shorts carry their caption inside the frame; long videos keep a
+   hairline-separated caption block underneath so the title stays readable. */
+.pr-tile-overlay {
   position: absolute;
-  bottom: 0;
   left: 0;
   right: 0;
-  padding: 24px 8px 6px;
-  background: linear-gradient(transparent, rgba(0,0,0,0.65));
+  bottom: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
+  padding: 24px 8px 7px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.78), rgba(0, 0, 0, 0) 100%);
+  pointer-events: none;
+}
+.pr-tile-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 9px 9px;
+  border-top: 1px solid var(--border);
 }
 .pr-tile-title {
-  font-size: 11px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
   font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.pr-tile-overlay .pr-tile-title {
+  -webkit-line-clamp: 1;
   color: #fff;
+  font-size: 11.5px;
+}
+.pr-tile-stat {
+  font-family: "DM Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
-.pr-tile-views {
-  font-size: 10px;
-  color: rgba(255,255,255,0.75);
+.pr-tile-overlay .pr-tile-stat {
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.76);
 }
 .pr-tile-text {
-  width: 100%;
-  height: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px;
-  background: var(--surface, rgba(255,255,255,0.04));
-  box-sizing: border-box;
+  align-items: flex-start;
+  min-height: 124px;
+  padding: 13px 13px 15px;
+  background: var(--surface);
 }
 .pr-tile-text-content {
-  font-size: 11px;
-  line-height: 1.4;
-  color: var(--text);
-  text-align: center;
-  overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 5;
+  -webkit-line-clamp: 6;
   -webkit-box-orient: vertical;
-  word-break: break-word;
+  overflow: hidden;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 14.5px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  overflow-wrap: anywhere;
 }
 
 /* --- Empty State --- */
@@ -544,6 +630,15 @@
   margin: 0;
   max-width: 280px;
   line-height: 1.55;
+}
+
+/* A shelf that failed to load says so plainly and offers the way back. */
+.pr-empty--error .pr-empty-icon {
+  color: #e5484d;
+  opacity: 0.9;
+}
+.pr-empty-action {
+  margin-top: 6px;
 }
 
 /* --- Owner Tools --- */
@@ -805,7 +900,13 @@
 }
 .pr-skeleton-tile {
   aspect-ratio: 1;
-  border-radius: 4px;
+  border-radius: 8px;
+}
+.pr-skeleton-tile--wide {
+  aspect-ratio: 16 / 9;
+}
+.pr-skeleton-tile--tall {
+  aspect-ratio: 9 / 16;
 }
 
 .pr-spin {
@@ -869,6 +970,20 @@
     border-radius: 20px;
     margin-bottom: 20px;
     max-height: 80vh;
+  }
+}
+
+/* --- Content shelves widen once there is room for more columns --- */
+@media (min-width: 561px) {
+  .pr-grid--posts,
+  .pr-grid--saved {
+    column-count: 3;
+  }
+  .pr-grid--videos {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .pr-grid--shorts {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
