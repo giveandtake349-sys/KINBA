@@ -12,10 +12,11 @@ interface AttachmentMenuProps {
 /**
  * Compact WhatsApp-style "＋" attachment picker.
  *
- * Each menu item contains a native <input type="file"> that fills the entire
- * touch target via absolute positioning. The user's tap directly activates
- * the OS file picker — no programmatic .click(), no label htmlFor indirection,
- * no menu unmounting before picker activation.
+ * Each menu item IS a <label> with htmlFor pointing to a native
+ * <input type="file"> that exactly covers the label (absolute, inset:0,
+ * opacity:0, full size, NOT clipped). The user's tap on the label
+ * activates the OS file picker natively. The input stays mounted while
+ * the menu is open (conditionally rendered with it).
  */
 export function AttachmentMenu({
   open,
@@ -38,8 +39,13 @@ export function AttachmentMenu({
     <>
       <div className="attach-backdrop" onClick={onClose} aria-hidden="true" />
       <div className="attach-menu" role="menu" aria-label="Send attachment">
-        <div className="attach-menu-input-wrapper">
+        <label
+          htmlFor="dm-photo-input"
+          className="attach-menu-item"
+          role="menuitem"
+        >
           <input
+            id="dm-photo-input"
             type="file"
             accept="image/*"
             multiple
@@ -47,43 +53,47 @@ export function AttachmentMenu({
             onChange={(e) => handleChange("image", e)}
             aria-label="Choose photos to send"
           />
-          <span className="attach-menu-item" role="menuitem">
-            <span className="attach-menu-icon" aria-hidden="true">
-              <ImageIcon size={20} strokeWidth={1.9} />
-            </span>
-            <span>Photos</span>
+          <span className="attach-menu-icon" aria-hidden="true">
+            <ImageIcon size={20} strokeWidth={1.9} />
           </span>
-        </div>
-        <div className="attach-menu-input-wrapper">
+          <span>Photos</span>
+        </label>
+        <label
+          htmlFor="dm-video-input"
+          className="attach-menu-item"
+          role="menuitem"
+        >
           <input
+            id="dm-video-input"
             type="file"
             accept="video/*"
             className="attach-menu-input"
             onChange={(e) => handleChange("video", e)}
             aria-label="Choose a video to send"
           />
-          <span className="attach-menu-item" role="menuitem">
-            <span className="attach-menu-icon" aria-hidden="true">
-              <Video size={20} strokeWidth={1.9} />
-            </span>
-            <span>Video</span>
+          <span className="attach-menu-icon" aria-hidden="true">
+            <Video size={20} strokeWidth={1.9} />
           </span>
-        </div>
-        <div className="attach-menu-input-wrapper">
+          <span>Video</span>
+        </label>
+        <label
+          htmlFor="dm-document-input"
+          className="attach-menu-item"
+          role="menuitem"
+        >
           <input
+            id="dm-document-input"
             type="file"
             accept={DM_DOCUMENT_ACCEPT}
             className="attach-menu-input"
             onChange={(e) => handleChange("document", e)}
             aria-label="Choose a document to send"
           />
-          <span className="attach-menu-item" role="menuitem">
-            <span className="attach-menu-icon" aria-hidden="true">
-              <FileText size={20} strokeWidth={1.9} />
-            </span>
-            <span>Document</span>
+          <span className="attach-menu-icon" aria-hidden="true">
+            <FileText size={20} strokeWidth={1.9} />
           </span>
-        </div>
+          <span>Document</span>
+        </label>
       </div>
     </>
   );

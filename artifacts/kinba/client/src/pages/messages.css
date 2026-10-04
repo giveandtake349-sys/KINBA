@@ -597,10 +597,6 @@
   align-items: flex-start;
 }
 
-.message-bubble.optimistic {
-  opacity: 0.7;
-}
-
 .message-content {
   display: flex;
   flex-direction: column;
@@ -654,6 +650,12 @@
   line-height: 1.4;
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+
+/* Outgoing message text — explicit full-opacity white */
+.message-bubble.own .message-body p {
+  color: var(--accent-ink);
+  opacity: 1;
 }
 
 .message-time {
@@ -998,7 +1000,7 @@
   position: absolute;
   bottom: calc(100% + 8px);
   left: 0;
-  z-index: 30;
+  z-index: 50;
   min-width: 210px;
   padding: 6px;
   display: grid;
@@ -1046,9 +1048,13 @@
   color: var(--accent);
 }
 
-.attach-menu-input-wrapper {
+/* Each menu item is a <label> containing the visible content and a
+ * native <input type="file"> that exactly covers it. The input is
+ * fully laid out (not clipped, not 1px, not display:none) so mobile
+ * browsers/WebView can hit-test it. opacity:0 makes it invisible
+ * while preserving pointer-events. */
+.attach-menu-item {
   position: relative;
-  width: 100%;
 }
 
 .attach-menu-input {
@@ -1069,6 +1075,7 @@
     bottom: 0;
     top: auto;
     min-width: 0;
+    z-index: 50;
     padding: 0.5rem 0.5rem calc(0.5rem + env(safe-area-inset-bottom, 0px));
     border: none;
     border-radius: var(--radius-surface) var(--radius-surface) 0 0;
