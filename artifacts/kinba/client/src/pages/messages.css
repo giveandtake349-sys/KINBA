@@ -634,8 +634,7 @@
   border-bottom-left-radius: 4px;
 }
 
-.message-body.has-media {
-  padding-bottom: 0.375rem;
+.message-bubble.own .message-body.has-media {
   background: var(--surface);
 }
 

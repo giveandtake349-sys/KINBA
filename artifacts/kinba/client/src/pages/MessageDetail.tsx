@@ -838,6 +838,7 @@ export default function MessageDetail() {
           id="dm-photo-input"
           type="file"
           className="sr-only"
+          style={{ opacity: 0, width: 28, height: 28 }}
           accept="image/*"
           multiple
           onChange={event => handleFileInputChange("image", event)}
@@ -848,6 +849,7 @@ export default function MessageDetail() {
           id="dm-video-input"
           type="file"
           className="sr-only"
+          style={{ opacity: 0, width: 28, height: 28 }}
           accept="video/*"
           onChange={event => handleFileInputChange("video", event)}
           aria-label="Choose a video to send"
@@ -857,6 +859,7 @@ export default function MessageDetail() {
           id="dm-document-input"
           type="file"
           className="sr-only"
+          style={{ opacity: 0, width: 28, height: 28 }}
           accept={DM_DOCUMENT_ACCEPT}
           onChange={event => handleFileInputChange("document", event)}
           aria-label="Choose a document to send"
