@@ -641,6 +641,7 @@
 .message-media {
   border-radius: var(--radius-control);
   overflow: hidden;
+  background: var(--surface);
 }
 
 .message-media img,
