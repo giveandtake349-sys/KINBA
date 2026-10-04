@@ -300,11 +300,12 @@ export default function MessageDetail() {
    * first must never be able to tear down the control the picker runs on.
    */
   const handlePickAttachment = useCallback((kind: DMAttachmentKind) => {
+    if (sending) return;
     if (kind === "image") photoInputRef.current?.click();
     else if (kind === "video") videoInputRef.current?.click();
     else documentInputRef.current?.click();
     setAttachmentMenuOpen(false);
-  }, []);
+  }, [sending]);
 
   const handleFileInputChange = useCallback(
     (kind: DMAttachmentKind, event: React.ChangeEvent<HTMLInputElement>) => {
