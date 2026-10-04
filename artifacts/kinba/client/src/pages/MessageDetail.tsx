@@ -301,9 +301,6 @@ export default function MessageDetail() {
    */
   const handlePickAttachment = useCallback((kind: DMAttachmentKind) => {
     if (sending) return;
-    if (kind === "image") photoInputRef.current?.click();
-    else if (kind === "video") videoInputRef.current?.click();
-    else documentInputRef.current?.click();
     setAttachmentMenuOpen(false);
   }, [sending]);
 
@@ -838,6 +835,7 @@ export default function MessageDetail() {
         */}
         <input
           ref={photoInputRef}
+          id="dm-photo-input"
           type="file"
           className="sr-only"
           accept="image/*"
@@ -847,6 +845,7 @@ export default function MessageDetail() {
         />
         <input
           ref={videoInputRef}
+          id="dm-video-input"
           type="file"
           className="sr-only"
           accept="video/*"
@@ -855,6 +854,7 @@ export default function MessageDetail() {
         />
         <input
           ref={documentInputRef}
+          id="dm-document-input"
           type="file"
           className="sr-only"
           accept={DM_DOCUMENT_ACCEPT}

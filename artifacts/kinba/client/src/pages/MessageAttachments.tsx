@@ -30,9 +30,9 @@ export function AttachmentMenu({
       <div className="attach-backdrop" onClick={onClose} aria-hidden="true" />
       <div className="attach-menu" role="menu" aria-label="Send attachment">
         {MENU_ITEMS.map(({ kind, label, Icon }) => (
-          <button
+          <label
             key={kind}
-            type="button"
+            htmlFor={kind === "image" ? "dm-photo-input" : kind === "video" ? "dm-video-input" : "dm-document-input"}
             role="menuitem"
             className="attach-menu-item"
             onClick={() => onPick(kind)}
@@ -41,7 +41,7 @@ export function AttachmentMenu({
               <Icon size={20} strokeWidth={1.9} />
             </span>
             <span>{label}</span>
-          </button>
+          </label>
         ))}
       </div>
     </>

@@ -636,6 +636,7 @@
 
 .message-body.has-media {
   padding-bottom: 0.375rem;
+  background: var(--surface);
 }
 
 .message-media {
