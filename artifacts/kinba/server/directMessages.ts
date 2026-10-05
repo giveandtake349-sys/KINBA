@@ -44,6 +44,10 @@ export type DMMessageRequestWithRequester = DMMessageRequestRow & {
   requester: { id: number; name: string | null; username: string | null; photoUrl: string | null };
 };
 
+export type SendMessageRequestResult = DMMessageRequestRow & {
+  conversationId?: number;
+};
+
 const DM_MESSAGE_MAX_LENGTH = 4000;
 const DM_MEDIA_MAX_SIZE = 10 * 1024 * 1024;
 const LIST_DEFAULT_LIMIT = 50;
@@ -104,7 +108,16 @@ async function ensureConversationExists(
     )
     .limit(1);
 
-  if (existing) return existing;
+  if (existing) {
+    await db
+      .insert(dmConversationReads)
+      .values([
+        { conversationId: existing.id, userId: userAId, unreadCount: 0 },
+        { conversationId: existing.id, userId: userBId, unreadCount: 0 },
+      ])
+      .onConflictDoNothing();
+    return existing;
+  }
 
   const [created] = await db
     .insert(dmConversations)
@@ -382,7 +395,7 @@ export async function sendMessageRequest(
   body: string,
   idempotencyKey: string,
   media?: DmMessageMedia
-): Promise<DMMessageRequestRow> {
+): Promise<SendMessageRequestResult> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
@@ -418,7 +431,8 @@ export async function sendMessageRequest(
       createdAt: new Date(),
       updatedAt: new Date(),
       respondedAt: new Date(),
-    } as DMMessageRequestRow;
+      conversationId: conversation.id,
+    } as SendMessageRequestResult;
   }
   if (!trimmedBody && !attachment?.mediaUrl) {
     throw new Error("Message body or media is required.");
@@ -438,7 +452,7 @@ export async function sendMessageRequest(
       )
     )
     .limit(1);
-  if (existing) return existing;
+  if (existing) return { ...existing, conversationId: undefined } as SendMessageRequestResult;
 
   const now = new Date();
   const [request] = await db
@@ -484,7 +498,7 @@ export async function sendMessageRequest(
     console.warn("[DM] Request notification insert failed:", error);
   }
 
-  return request;
+  return { ...request, conversationId: undefined } as SendMessageRequestResult;
 }
 
 export async function listMessageRequests(

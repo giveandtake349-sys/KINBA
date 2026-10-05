@@ -33,23 +33,22 @@ export function DesktopMessages() {
     navigate("/");
   };
 
-  // Hooks must run unconditionally: the auth session resolves after mount, so
-  // declaring queries behind the unauthenticated early return changes the hook
-  // order between renders. Queries stay disabled until the session exists, and
-  // until the conversation list is actually visible (mobile conversation view
-  // hides the sidebar, so it must not pay for inbox polling).
-  const listEnabled = isAuthenticated && (!showConversation || isDesktop);
+  // Keep queries enabled when authenticated so invalidation from mutations
+  // (sendMessage, sendMessageRequest, accept/decline requests) can trigger
+  // a refetch. Disable background polling on mobile while inside a conversation
+  // thread (showConversation && !isDesktop) to avoid unnecessary server load.
+  const listRefetchInterval = showConversation && !isDesktop ? false : 30000;
   const conversationsQuery = trpc.directMessages.listConversations.useQuery(
     { limit: 50 },
-    { enabled: listEnabled, refetchInterval: 30000 }
+    { enabled: isAuthenticated, refetchInterval: listRefetchInterval }
   );
   const requestsQuery = trpc.directMessages.listMessageRequests.useQuery(
     { limit: 50 },
-    { enabled: listEnabled, refetchInterval: 30000 }
+    { enabled: isAuthenticated, refetchInterval: listRefetchInterval }
   );
   const unreadCountQuery = trpc.directMessages.getUnreadMessageCount.useQuery(
     undefined,
-    { enabled: isAuthenticated, refetchInterval: 30000 }
+    { enabled: isAuthenticated, refetchInterval: listRefetchInterval }
   );
 
   const acceptRequestMut = trpc.directMessages.acceptMessageRequest.useMutation({

@@ -250,7 +250,12 @@ function MessageComposeModal({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const utils = trpc.useUtils();
-  const sendRequestMut = trpc.directMessages.sendMessageRequest.useMutation();
+  const sendRequestMut = trpc.directMessages.sendMessageRequest.useMutation({
+    onSuccess: () => {
+      utils.directMessages.listConversations.invalidate();
+      utils.directMessages.getUnreadMessageCount.invalidate();
+    },
+  });
 
   const handleSend = async () => {
     const trimmed = messageText.trim();
@@ -269,19 +274,8 @@ function MessageComposeModal({
         onClose();
         return;
       }
-      // The request was accepted, so the server created or reused the
-      // conversation. Read it back from the inbox instead of forcing one open.
-      let conversationId = 0;
-      try {
-        const conversations = await utils.directMessages.listConversations.fetch({
-          limit: 50,
-        });
-        conversationId =
-          conversations.find((conversation) => conversation.partner.id === recipientId)
-            ?.id ?? 0;
-      } catch {
-        conversationId = 0;
-      }
+      // Use conversationId returned by the server when available
+      const conversationId = (result as { conversationId?: number }).conversationId ?? 0;
       onSent(conversationId, "accepted");
       onClose();
     } catch (err) {

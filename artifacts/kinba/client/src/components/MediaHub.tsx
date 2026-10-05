@@ -1524,6 +1524,7 @@ function EngagementActions({
   bookmarked = false,
   onBookmark,
   owner,
+  shorts = false,
 }: {
   engagement: Engagement;
   videoId?: number;
@@ -1537,6 +1538,7 @@ function EngagementActions({
   bookmarked?: boolean;
   onBookmark?: () => void;
   owner?: VideoRecord["owner"];
+  shorts?: boolean;
 }) {
   const auth = useAuth();
   const utils = trpc.useUtils();
@@ -1572,7 +1574,7 @@ function EngagementActions({
     <div
       className={`media-engagement-actions${overlay ? " media-engagement-actions--overlay absolute right-3 bottom-16 z-20 flex flex-col items-center gap-4" : ""}${feedStyle ? " feed-action-bar flex flex-row justify-around mt-3 pb-3" : ""}`}
     >
-      {overlay && owner && !isOwnVideo && (
+      {overlay && !shorts && owner && !isOwnVideo && (
         <button
           type="button"
           className={`creator-follow-action${following ? " is-following" : ""}`}
@@ -3429,6 +3431,7 @@ function ShortVideoCard({
             bookmarked={bookmarked}
             onBookmark={toggleBookmark}
             owner={video.owner}
+            shorts={true}
           />
           <button
             type="button"
