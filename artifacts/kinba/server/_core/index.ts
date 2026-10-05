@@ -14,6 +14,25 @@ import { listSpotlightHighlights } from "../db";
 import { rateLimit } from "../rateLimiter";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
+import { execSync } from "node:child_process";
+
+function getBuildId(): string {
+  try {
+    const sha = execSync("git rev-parse --short HEAD", { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    if (sha) return sha;
+  } catch {
+    // git not available or not a repo
+  }
+  try {
+    const sha = execSync("git rev-parse HEAD", { encoding: "utf-8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    if (sha) return sha.slice(0, 12);
+  } catch {
+    // git not available
+  }
+  return "unknown";
+}
+
+const BUILD_ID = getBuildId();
 
 async function startServer() {
   const app = express();
@@ -80,6 +99,12 @@ async function startServer() {
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     if (req.method === "OPTIONS") return res.status(204).end();
     return next();
+  });
+
+  // Build identification header for all responses
+  app.use((_req, res, next) => {
+    res.setHeader("X-Build-Id", BUILD_ID);
+    next();
   });
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));

@@ -73,12 +73,21 @@ export function serveStatic(app: Express) {
     try {
       const template = await fs.promises.readFile(indexPath, "utf-8");
       const html = template.replace("</head>", `${runtimeConfigScript()}</head>`);
+      res.set("Cache-Control", "no-cache, must-revalidate");
       res.status(200).type("html").send(html);
     } catch (error) {
       console.error("[Static] Could not serve the KINBA client:", error);
       res.status(500).send("JHILIK client is unavailable.");
     }
   };
+
+  // Immutable caching for content-hashed assets under /assets/*
+  app.use("/assets", (req, res, next) => {
+    if (req.method === "GET" || req.method === "HEAD") {
+      res.set("Cache-Control", "public, max-age=31536000, immutable");
+    }
+    next();
+  });
 
   // Serve the index through the injector even when the browser requests "/".
   app.get(["/", "/index.html"], sendIndex);
