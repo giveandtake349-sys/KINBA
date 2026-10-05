@@ -37,7 +37,7 @@
 
 .hype-rooms-back:hover {
   border-color: var(--accent-border);
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .hype-rooms-header {
@@ -105,7 +105,7 @@
 
 .hype-room-filters button.active {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--blue);
   box-shadow: inset 0 0 0 1px var(--accent-border);
 }
 
@@ -139,7 +139,7 @@
 }
 
 .hype-room-card--interactive:focus-visible {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 35%, transparent);
 }
 
 .hype-room-card-cover {
@@ -353,7 +353,7 @@
 
 .hype-room-countdown {
   align-items: center;
-  color: var(--accent);
+  color: var(--blue);
   display: inline-flex;
   font-family: "DM Mono", monospace;
   font-size: 0.74rem;
@@ -429,7 +429,7 @@
   background: var(--accent-soft);
   border: 1px solid var(--accent-border);
   border-radius: 999px;
-  color: var(--accent);
+  color: var(--blue);
   font-size: 0.68rem;
   margin-left: 4px;
   padding: 0.15rem 0.45rem;
@@ -504,7 +504,7 @@
 }
 
 .hype-room-member-profile-link:hover {
-  color: var(--accent);
+  color: var(--blue);
   text-decoration: underline;
 }
 
@@ -612,7 +612,7 @@
 
 .hype-room-icon-btn:hover:not(:disabled) {
   border-color: var(--accent-border);
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .hype-room-icon-btn:disabled {
@@ -831,7 +831,7 @@
 .hype-room-role--speaker {
   background: var(--accent-soft);
   border-color: var(--accent-border);
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .hype-room-message-parent {
@@ -890,7 +890,7 @@
 
 .hype-room-reaction:hover:not(:disabled) {
   border-color: var(--accent-border);
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .hype-room-reaction:disabled {
@@ -901,7 +901,7 @@
 .hype-room-reaction--on {
   background: var(--accent-soft);
   border-color: var(--accent-border);
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .hype-room-reaction-count {
@@ -918,7 +918,7 @@
 
 .hype-room-icon-btn--on {
   border-color: var(--accent-border);
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .hype-room-reply-banner {
@@ -926,7 +926,7 @@
   background: var(--accent-soft);
   border: 1px solid var(--accent-border);
   border-radius: var(--radius-control);
-  color: var(--accent);
+  color: var(--blue);
   display: flex;
   font-size: 0.78rem;
   gap: 8px;
@@ -999,7 +999,7 @@
 .hype-room-mention-option:hover,
 .hype-room-mention-option--on {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .hype-room-invites-inline {
@@ -1055,7 +1055,7 @@
 .hype-room-invite-status--pending {
   background: var(--accent-soft);
   border-color: var(--accent-border);
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .hype-room-invite-status--accepted {
@@ -1277,7 +1277,7 @@
 .hype-room-phase--ending {
   background: var(--accent-soft);
   border-color: var(--accent-border);
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .hype-room-phase--ending .hype-room-phase-dot {
@@ -1375,14 +1375,14 @@
 }
 
 .hype-room-fact--countdown {
-  color: var(--accent);
+  color: var(--blue);
   font-family: "DM Mono", monospace;
 }
 
 .hype-room-fact--urgent {
   background: var(--accent-soft);
   border-color: var(--accent-border);
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .hype-room-terminal-note {
@@ -1468,7 +1468,7 @@
 }
 
 .hype-room-link-bar-anchor:hover {
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .hype-room-link-bar-icon {
@@ -1645,7 +1645,7 @@
 .hype-room-reply-count {
   background: transparent;
   border: 0;
-  color: var(--accent);
+  color: var(--blue);
   cursor: pointer;
   font-size: 0.74rem;
   font-weight: 700;
@@ -1832,7 +1832,7 @@
   background: var(--accent-soft);
   border: 1px solid var(--accent-border);
   border-radius: 999px;
-  color: var(--accent);
+  color: var(--blue);
   font-size: 0.62rem;
   letter-spacing: 0.05em;
   padding: 0.15rem 0.45rem;

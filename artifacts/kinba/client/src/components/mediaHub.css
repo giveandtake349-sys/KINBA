@@ -909,7 +909,7 @@
   background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: 999px;
-  caret-color: var(--accent);
+  caret-color: var(--blue);
   color: var(--text);
   color-scheme: dark;
   font-size: 0.85rem;
@@ -1145,7 +1145,7 @@
 .announcement-comment-toggle.is-active {
   border-color: var(--accent-border);
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--blue);
 }
 .announcement-comment-toggle strong {
   color: inherit;
@@ -1381,7 +1381,7 @@
 }
 .media-hub .media-engagement-actions--overlay button:hover,
 .media-hub .media-engagement-actions--overlay button.is-active {
-  background: var(--accent);
+  background: var(--blue);
   color: var(--accent-ink);
 }
 .media-hub .video-card-details {
@@ -1404,7 +1404,7 @@
 .media-hub .media-engagement-actions button.is-active {
   background: var(--accent-soft);
   border-color: var(--accent-border);
-  color: var(--accent);
+  color: var(--blue);
 }
 .media-meta-line {
   align-items: center;
@@ -1600,7 +1600,7 @@
 .media-publish-form textarea:focus,
 .announcement-composer textarea:focus,
 .sponsor-widget__form input:focus {
-  border-color: var(--accent);
+  border-color: var(--blue);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .sponsor-bids-panel,
@@ -2051,7 +2051,7 @@
   white-space: nowrap;
 }
 .media-hub .home-feed-tabs button.active {
-  background: var(--accent);
+  background: var(--blue);
   color: var(--accent-ink);
 }
 .media-hub .media-tab-panel,

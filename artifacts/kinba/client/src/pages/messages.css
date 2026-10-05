@@ -362,7 +362,7 @@
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
-  background: var(--accent);
+  background: var(--blue);
   color: var(--accent-ink);
   border-radius: 999px;
   font-size: 0.75rem;
@@ -468,7 +468,7 @@
 }
 
 .btn-accept {
-  background: var(--accent);
+  background: var(--blue);
   color: var(--accent-ink);
 }
 
@@ -674,7 +674,7 @@
 }
 
 .read-receipt {
-  color: var(--accent);
+  color: var(--blue);
   flex-shrink: 0;
 }
 
@@ -750,7 +750,7 @@
   width: 44px;
   height: 44px;
   border: none;
-  background: var(--accent);
+  background: var(--blue);
   color: var(--accent-ink);
   border-radius: 50%;
   cursor: pointer;
@@ -790,7 +790,7 @@
   gap: 0.25rem;
   padding: 0.125rem 0.5rem;
   border: none;
-  background: var(--accent);
+  background: var(--blue);
   color: var(--accent-ink);
   border-radius: 999px;
   font-size: 0.6875rem;
@@ -1229,7 +1229,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--accent);
+  background: var(--blue);
   transition: width 0.2s ease;
 }
 
@@ -1263,7 +1263,7 @@
   padding: 0.125rem 0.375rem;
   border: none;
   border-radius: 999px;
-  background: var(--accent);
+  background: var(--blue);
   color: var(--accent-ink);
   font-size: 0.625rem;
   font-weight: 600;

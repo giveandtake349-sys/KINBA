@@ -128,7 +128,7 @@ function OfficialLogo() {
   );
 }
 
-function ThemeToggle() {
+function ThemeToggle({ onClose }: { onClose?: () => void }) {
   const { theme, toggleTheme } = useTheme();
   return (
     <button
@@ -138,12 +138,13 @@ function ThemeToggle() {
         event.preventDefault();
         event.stopPropagation();
         toggleTheme();
+        onClose?.();
       }}
       aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
       title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
     >
       {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-      <span>{theme === "dark" ? "White" : "Dark"}</span>
+      <span>{theme === "dark" ? "Light" : "Dark"}</span>
     </button>
   );
 }
@@ -720,6 +721,10 @@ function MobileDrawer({
               })}
             </section>
           ))}
+          <section className="drawer-group" aria-labelledby="drawer-group-appearance">
+            <h2 id="drawer-group-appearance">Appearance</h2>
+            <ThemeToggle onClose={onClose} />
+          </section>
           <button type="button" className="drawer-logout" onClick={safeClick(onLogout)}>
             <LogOut size={18} />
             <span>Log out</span>

@@ -128,7 +128,7 @@
 }
 
 .settings-index__button:hover .settings-index__label {
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .settings-index__icon {
@@ -151,7 +151,7 @@
 .settings-index__button[aria-current="page"] .settings-index__icon {
   background: var(--accent-soft);
   border-color: var(--accent-border);
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .settings-index__body {
@@ -336,7 +336,7 @@
 
 .settings-row--interactive .settings-row__button:hover .settings-row__label,
 .settings-row--interactive .settings-row__static:hover .settings-row__label {
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .settings-row--danger .settings-row__label {
@@ -389,7 +389,7 @@
 }
 
 .settings-note--warning {
-  border-left-color: var(--accent);
+  border-left-color: var(--blue);
 }
 
 /* --- States --------------------------------------------------------------- */
@@ -459,7 +459,7 @@
 }
 
 .settings-btn--primary {
-  background: var(--accent);
+  background: var(--blue);
   color: var(--accent-ink);
 }
 
@@ -538,7 +538,7 @@
 
 .settings-input:focus,
 .settings-textarea:focus {
-  border-color: var(--accent);
+  border-color: var(--blue);
 }
 
 .settings-input:disabled,
@@ -594,7 +594,7 @@
 }
 
 .settings-switch--on .settings-switch__thumb {
-  background: var(--accent);
+  background: var(--blue);
   transform: translateX(20px);
 }
 

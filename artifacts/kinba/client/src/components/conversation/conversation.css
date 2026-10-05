@@ -26,7 +26,7 @@
 }
 
 .conv-reaction:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
   color: var(--text);
 }
 
@@ -36,9 +36,9 @@
 }
 
 .conv-reaction--on {
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  color: var(--accent);
+  background: color-mix(in srgb, var(--blue) 18%, transparent);
+  border-color: color-mix(in srgb, var(--blue) 45%, transparent);
+  color: var(--blue);
 }
 
 .conv-reaction--add {
@@ -80,7 +80,7 @@
 }
 
 .conv-reaction-tray > button:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  background: color-mix(in srgb, var(--blue) 16%, transparent);
 }
 
 .conv-reaction-tray-close {
@@ -108,7 +108,7 @@
 
 .conv-action-menu-trigger:hover:not(:disabled),
 .conv-action-menu-trigger[aria-expanded="true"] {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
   color: var(--text);
 }
 
@@ -165,8 +165,8 @@
   justify-content: space-between;
   padding: 6px 8px;
   border-radius: var(--radius-control);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
+  color: var(--blue);
   font-size: 11px;
 }
 
@@ -246,12 +246,12 @@
 }
 
 .conv-mention-picker-list button:hover {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
 }
 
 .conv-mention-avatar {
   align-items: center;
-  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  background: color-mix(in srgb, var(--blue) 20%, transparent);
   border-radius: 999px;
   color: var(--text);
   display: inline-flex;
@@ -291,7 +291,7 @@
 }
 
 .conv-mention-check {
-  color: var(--accent);
+  color: var(--blue);
   margin-left: auto;
   opacity: 0.7;
 }
@@ -342,7 +342,7 @@
 }
 
 .conv-comment-body .conv-mention-token {
-  color: var(--accent);
+  color: var(--blue);
   font-weight: 600;
 }
 
@@ -364,13 +364,13 @@
 }
 
 .conv-comment-reply-count:hover {
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .conv-comment-reply-count.conv-comment-reply-toggle {
   background: transparent;
   border: 0;
-  color: var(--accent);
+  color: var(--blue);
   cursor: pointer;
   font-size: 0.74rem;
   font-weight: 700;
@@ -395,11 +395,11 @@
   justify-items: stretch;
   margin-left: 14px;
   padding-left: 12px;
-  border-left: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-left: 2px solid color-mix(in srgb, var(--blue) 35%, transparent);
 }
 
 .conv-comment-reply-toggle.is-open {
-  color: var(--accent);
+  color: var(--blue);
 }
 
 .conv-comment-reply-status {
@@ -412,7 +412,7 @@
   justify-self: start;
   background: transparent;
   border: 0;
-  color: var(--accent);
+  color: var(--blue);
   cursor: pointer;
   font-size: 11px;
   font-weight: 600;
@@ -483,9 +483,9 @@
 
 .conv-mention-toggle:hover:not(:disabled),
 .conv-mention-toggle--on {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  color: var(--accent);
+  background: color-mix(in srgb, var(--blue) 16%, transparent);
+  border-color: color-mix(in srgb, var(--blue) 45%, transparent);
+  color: var(--blue);
 }
 
 .conv-mention-toggle:disabled {
@@ -528,9 +528,9 @@
 }
 
 .conv-mention-toggle--on {
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-  color: var(--accent);
+  background: color-mix(in srgb, var(--blue) 16%, transparent);
+  border-color: color-mix(in srgb, var(--blue) 45%, transparent);
+  color: var(--blue);
 }
 
 @media (max-width: 560px) {
