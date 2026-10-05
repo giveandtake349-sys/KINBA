@@ -41,10 +41,10 @@
   --surface-elevated: #eaeaea;
   --border: #d4d4d4;
   --input: #d4d4d4;
-  /* Blue — restrained functional/semantic accent */
-  --blue: #4a90e2;
-  --blue-soft: rgba(74, 144, 226, 0.12);
-  --blue-border: rgba(74, 144, 226, 0.42);
+  /* Blue — premium royal/bright functional accent */
+  --blue: #2563eb;
+  --blue-soft: rgba(37, 99, 235, 0.12);
+  --blue-border: rgba(37, 99, 235, 0.42);
   --blue-ink: #ffffff;
   /* Champagne/gold — premium brand identity only */
   --gold: #d4af37;
@@ -99,10 +99,10 @@
   --surface-elevated: #2d3135;
   --border: #34383b;
   --input: #3a3f44;
-  /* Blue — restrained functional/semantic accent */
-  --blue: #5a9ef5;
-  --blue-soft: rgba(90, 158, 245, 0.14);
-  --blue-border: rgba(90, 158, 245, 0.42);
+  /* Blue — premium royal/bright functional accent */
+  --blue: #3b82f6;
+  --blue-soft: rgba(59, 130, 246, 0.14);
+  --blue-border: rgba(59, 130, 246, 0.42);
   --blue-ink: #0b0f17;
   /* Champagne/gold — premium brand identity only */
   --gold: #d8b877;
