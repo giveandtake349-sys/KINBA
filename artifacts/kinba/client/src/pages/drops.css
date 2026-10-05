@@ -221,13 +221,13 @@
 }
 
 .drop-chip--live {
-  background: var(--accent-soft);
-  border-color: var(--accent-border);
-  color: var(--accent);
+  background: var(--teal-soft);
+  border-color: color-mix(in srgb, var(--teal) 45%, transparent);
+  color: var(--teal);
 }
 
 .drop-chip--live .drop-chip-dot {
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--teal) 55%, transparent);
   animation: drop-pulse 1.6s ease-out infinite;
 }
 
@@ -280,7 +280,7 @@
 }
 
 .drop-meta dt {
-  color: var(--accent);
+  color: var(--muted);
   display: grid;
   margin: 0;
   place-items: center;
@@ -312,10 +312,10 @@
 
 .drop-state-icon {
   align-items: center;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-border);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
   border-radius: 50%;
-  color: var(--accent);
+  color: var(--text);
   display: grid;
   height: 52px;
   place-items: center;
@@ -455,13 +455,13 @@
 
 @keyframes drop-pulse {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--teal) 55%, transparent);
   }
   70% {
-    box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 55%, transparent);
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--teal) 55%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--teal) 55%, transparent);
   }
 }
 

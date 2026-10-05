@@ -196,8 +196,8 @@
 }
 .official-logo {
   align-items: center;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-border);
+  background: var(--surface-raised);
+  border: 1px solid var(--gold-border);
   border-radius: var(--radius-control);
   display: flex;
   height: 36px;
@@ -207,7 +207,7 @@
   width: 42px;
 }
 .logo-fallback {
-  color: var(--accent);
+  color: var(--gold);
   font-family: "Space Grotesk", sans-serif;
   font-size: 9px;
   font-weight: 700;
@@ -253,8 +253,8 @@
 }
 .theme-toggle:hover,
 .logout-btn:hover {
-  background: var(--accent-soft);
-  border-color: var(--accent-border);
+  background: var(--surface-raised);
+  border-color: var(--border);
   color: var(--text);
 }
 .theme-toggle:active,
@@ -275,7 +275,7 @@
   text-transform: uppercase;
 }
 .eyebrow--bright {
-  color: var(--accent);
+  color: var(--gold);
 }
 /* Headings resolve later in this file to the JHILIK editorial face (Fraunces). */
 .primary-btn {
@@ -357,7 +357,7 @@
   margin: 8px 0 22px;
 }
 .landing-copy h1 em {
-  color: var(--accent);
+  color: var(--gold);
   font-style: normal;
 }
 .landing-copy > p:not(.eyebrow) {
@@ -378,7 +378,7 @@
   text-transform: uppercase;
 }
 .landing-orb {
-  border: 1px solid var(--accent-border);
+  border: 1px solid var(--gold-border);
   border-radius: 50%;
   height: 230px;
   opacity: 0.45;
@@ -635,10 +635,10 @@
 }
 .profile-avatar {
   align-items: center;
-  background: var(--accent-soft);
-  border: 2px solid var(--accent-border);
+  background: var(--surface-raised);
+  border: 2px solid var(--border);
   border-radius: 50%;
-  color: var(--accent);
+  color: var(--text);
   display: flex;
   flex: 0 0 auto;
   height: 40px;
@@ -769,7 +769,7 @@
   transform: scale(0.98);
 }
 .drawer-nav svg {
-  color: var(--accent);
+  color: var(--muted);
 }
 .bottom-navigation {
   align-items: center;
@@ -930,7 +930,7 @@
   padding: 13px 14px;
 }
 .notification-item svg {
-  color: var(--accent);
+  color: var(--teal);
 }
 .notification-item p {
   color: var(--muted);
@@ -1041,7 +1041,7 @@
 }
 .settings-connected {
   align-items: center;
-  color: var(--accent);
+  color: var(--teal);
   display: flex;
   font-size: 12px;
   gap: 6px;
@@ -1118,7 +1118,7 @@
   display: flex;
   align-items: center;
   gap: 0.7rem;
-  color: var(--accent);
+  color: var(--gold);
 }
 .sponsor-bids-countdown span {
   display: block;
@@ -1193,7 +1193,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  color: var(--accent);
+  color: var(--gold);
   white-space: nowrap;
 }
 .sponsor-widget__list {
@@ -1216,7 +1216,7 @@
     transform 0.18s var(--line);
 }
 .sponsor-card:hover {
-  border-color: var(--accent-border);
+  border-color: var(--gold-border);
   transform: translateY(-1px);
 }
 .sponsor-card img {
@@ -1269,7 +1269,7 @@
   color: var(--text);
 }
 .sponsor-widget__form small {
-  color: var(--accent);
+  color: var(--gold);
 }
 .sponsor-widget__form .primary-btn {
   width: 100%;
@@ -1287,14 +1287,14 @@
   flex: 0 0 auto;
   width: 76px;
   height: 76px;
-  border: 5px solid var(--accent);
+  border: 5px solid var(--gold);
   border-radius: 50%;
   background: conic-gradient(
-    var(--accent) 0 33%,
+    var(--gold) 0 33%,
     var(--surface-raised) 33% 66%,
-    var(--accent) 66% 100%
+    var(--gold) 66% 100%
   );
-  box-shadow: 0 0 0 7px var(--accent-soft);
+  box-shadow: 0 0 0 7px var(--gold-soft);
 }
 .sponsor-wheel::after {
   content: "";
@@ -1302,7 +1302,7 @@
   height: 17px;
   border: 3px solid var(--surface);
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--gold);
   z-index: 2;
 }
 .sponsor-wheel span {
@@ -1335,9 +1335,9 @@
 .sponsor-bids-announcement {
   margin: 1rem 0 0;
   padding: 0.8rem 1rem;
-  border: 1px solid var(--accent-border);
+  border: 1px solid var(--gold-border);
   border-radius: var(--radius-component);
-  background: var(--accent-soft);
+  background: var(--gold-soft);
   color: var(--text);
   font-size: 0.85rem;
   animation: sponsor-announcement-in 0.28s var(--line);
@@ -1414,8 +1414,8 @@
   overflow: hidden;
   border: 2px solid var(--gold-border);
   border-radius: 50%;
-  color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--gold);
+  background: var(--gold-soft);
 }
 .winner-card__avatar img {
   width: 100%;
@@ -1459,7 +1459,7 @@
   font-size: 0.75rem;
 }
 .showcase-sponsors__list a:hover {
-  border-color: var(--accent-border);
+  border-color: var(--gold-border);
 }
 .showcase-sponsors__list img {
   width: 24px;
@@ -1528,11 +1528,11 @@
 .status-chip {
   display: inline-flex;
   align-items: center;
-  border: 1px solid var(--accent-border);
+  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.38rem 0.65rem;
-  color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--muted);
+  background: var(--surface-raised);
   font-size: 0.72rem;
   font-weight: 700;
   white-space: nowrap;
@@ -1681,7 +1681,7 @@
   align-items: center;
   gap: 0.25rem;
   width: fit-content;
-  color: var(--accent);
+  color: var(--gold);
   text-decoration: none;
 }
 .admin-sponsor-actions {
@@ -1832,9 +1832,9 @@
   white-space: nowrap;
 }
 .status-chip--open {
-  color: var(--accent);
-  border-color: var(--accent-border);
-  background: var(--accent-soft);
+  color: var(--teal);
+  border-color: color-mix(in srgb, var(--teal) 45%, transparent);
+  background: var(--teal-soft);
 }
 .status-chip--resolved {
   color: var(--success);
@@ -1879,7 +1879,7 @@
 /* TikTok-inspired KINBA menu drawer; bottom navigation remains unchanged */
 .mobile-drawer {
   background: color-mix(in srgb, var(--page-bg) 96%, #111827);
-  border-left: 1px solid var(--accent-border);
+  border-left: 1px solid var(--border);
   padding: 20px 16px calc(28px + env(safe-area-inset-bottom));
 }
 .drawer-head {
@@ -1923,10 +1923,10 @@
 }
 .drawer-item-icon {
   align-items: center;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-border);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  color: var(--accent);
+  color: var(--text);
   display: inline-flex;
   height: 36px;
   justify-content: center;
@@ -2097,8 +2097,8 @@ a:focus-visible {
 }
 .desktop-nav button:hover,
 .desktop-nav button.active {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--gold-soft);
+  color: var(--gold);
 }
 .topbar-actions {
   gap: 8px;
@@ -2112,8 +2112,8 @@ a:focus-visible {
 .theme-toggle:hover,
 .logout-btn:hover {
   background: var(--surface);
-  border-color: var(--accent-border);
-  color: var(--accent);
+  border-color: var(--gold-border);
+  color: var(--gold);
 }
 .section-shell {
   max-width: 1180px;
@@ -2126,7 +2126,7 @@ a:focus-visible {
   letter-spacing: 0.16em;
 }
 .eyebrow--bright {
-  color: var(--accent);
+  color: var(--gold);
 }
 h1,
 h2,
@@ -2136,7 +2136,7 @@ h3 {
 }
 .landing-shell {
   background:
-    radial-gradient(circle at 76% 22%, var(--accent-soft), transparent 23rem),
+    radial-gradient(circle at 76% 22%, var(--gold-soft), transparent 23rem),
     radial-gradient(circle at 18% 72%, var(--teal-soft), transparent 22rem);
   min-height: 100dvh;
 }
@@ -2148,7 +2148,7 @@ h3 {
   line-height: 0.86;
 }
 .landing-copy h1 em {
-  color: var(--accent);
+  color: var(--gold);
   font-family: "Fraunces", Georgia, serif;
 }
 .landing-copy > p:not(.eyebrow) {
@@ -2163,7 +2163,7 @@ h3 {
   padding-top: 14px;
 }
 .landing-orb {
-  border-color: var(--accent-border);
+  border-color: var(--gold-border);
   border-radius: 4px;
   transform: rotate(17deg);
 }
@@ -2330,7 +2330,7 @@ h3 {
   width: 100%;
 }
 .not-found-card > svg {
-  color: var(--accent);
+  color: var(--muted);
   height: 38px;
   margin-bottom: 28px;
   width: 38px;

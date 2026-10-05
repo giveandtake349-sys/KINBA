@@ -154,7 +154,7 @@ body {
 }
 
 .topbar-actions .topbar-icon-button:first-child {
-  color: var(--accent-ink) !important;
+  color: var(--text) !important;
   background: var(--accent) !important;
   border-color: transparent !important;
   box-shadow: none !important;
@@ -496,10 +496,10 @@ body {
   place-items: center;
   width: 21px;
   height: 21px;
-  color: var(--accent-ink);
+  color: var(--text);
   border: 2px solid var(--page-bg);
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--teal);
   box-shadow: none;
 }
 
@@ -1856,7 +1856,7 @@ body {
 .voice-send-button { display: inline-flex; align-items: center; gap: 5px; }
 .comment-audio-player { display: flex; align-items: center; gap: 8px; width: min(100%, 330px); padding: 7px 9px; border: 1px solid var(--kinba-line-modern); border-radius: var(--radius-control); background: color-mix(in srgb, var(--text) 5%, transparent); }
 .comment-audio-player audio { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-.comment-audio-player > button { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 28px; border-radius: 999px; color: var(--accent-ink); background: var(--accent); }
+.comment-audio-player > button { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 28px; border-radius: 999px; color: var(--text); background: var(--teal); }
 .comment-audio-wave { position: relative; height: 6px; flex: 1; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--muted) 45%, transparent); }
 .comment-audio-wave span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--kinba-cyan), #b9f5ff); }
 .comment-audio-player > span { color: var(--kinba-muted-modern); font-size: 10px; white-space: nowrap; }

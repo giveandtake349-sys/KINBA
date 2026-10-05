@@ -307,8 +307,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--accent);
-  color: var(--accent-ink);
+  background: var(--surface-raised);
+  color: var(--text);
   font-weight: 600;
   font-size: 1.125rem;
 }
@@ -433,8 +433,8 @@
 .request-media-badge {
   display: inline-block;
   font-size: 0.75rem;
-  color: var(--accent);
-  background: var(--accent-soft);
+  color: var(--teal);
+  background: var(--teal-soft);
   padding: 0.125rem 0.5rem;
   border-radius: 999px;
   margin-bottom: 0.25rem;
@@ -1042,8 +1042,8 @@
   height: 36px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--surface-raised);
+  color: var(--text);
 }
 
 /* Each menu item is a <label> containing the visible content and a
@@ -1338,7 +1338,7 @@
 
 .message-bubble:not(.own) .dm-doc-icon {
   background: color-mix(in srgb, var(--text) 6%, transparent);
-  color: var(--accent);
+  color: var(--teal);
 }
 
 .dm-doc-text {

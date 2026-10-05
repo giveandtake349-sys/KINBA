@@ -1422,7 +1422,7 @@
   color: var(--muted);
 }
 .media-meta-line span + span::before {
-  color: var(--accent);
+  color: var(--muted);
   content: "·";
   margin-right: 10px;
 }
@@ -1584,7 +1584,7 @@
   padding: 17px;
 }
 .media-publish-panel summary {
-  color: var(--accent);
+  color: var(--muted);
   font-family: "DM Mono", monospace;
   font-size: 10px;
   letter-spacing: 0.03em;
@@ -1613,13 +1613,13 @@
   box-shadow: 0 14px 36px color-mix(in srgb, var(--text) 8%, transparent);
 }
 .sponsor-bids-panel__badge {
-  background: var(--accent);
+  background: var(--gold);
   border-radius: var(--radius-control);
 }
 .sponsor-wheel {
   border-color: var(--teal);
   background: conic-gradient(
-    var(--accent) 0 33%,
+    var(--gold) 0 33%,
     var(--surface-raised) 33% 66%,
     var(--teal) 66% 100%
   );

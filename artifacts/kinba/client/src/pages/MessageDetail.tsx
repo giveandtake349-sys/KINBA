@@ -292,13 +292,14 @@ export default function MessageDetail() {
   /**
    * Called when a file is selected via the native picker in AttachmentMenu.
    * The menu item itself IS the file input, so this receives the files directly.
+   * We do NOT close the menu here — AttachmentMenu.handleChange defers closing
+   * to allow the native picker to complete on mobile/WebView. The menu closes
+   * via onClose callback after files are processed.
    */
   const handleFileSelected = useCallback(
     (kind: DMAttachmentKind, files: FileList) => {
       const fileArray = Array.from(files);
       handleFilesSelected(kind, fileArray);
-      // Close menu after selection; the input stays mounted inside the menu
-      setAttachmentMenuOpen(false);
     },
     [handleFilesSelected]
   );

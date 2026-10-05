@@ -225,13 +225,13 @@
 }
 
 .hype-room-chip--live {
-  background: var(--accent-soft);
-  border-color: var(--accent-border);
-  color: var(--accent);
+  background: var(--teal-soft);
+  border-color: color-mix(in srgb, var(--teal) 45%, transparent);
+  color: var(--teal);
 }
 
 .hype-room-chip--live .hype-room-chip-dot {
-  box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--teal) 55%, transparent);
   animation: hype-room-pulse 1.6s ease-out infinite;
 }
 
@@ -277,7 +277,7 @@
 }
 
 .hype-room-meta dt {
-  color: var(--accent);
+  color: var(--muted);
   display: grid;
   place-items: center;
   margin: 0;
@@ -309,10 +309,10 @@
 
 .hype-room-state-icon {
   align-items: center;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-border);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
   border-radius: 50%;
-  color: var(--accent);
+  color: var(--text);
   display: grid;
   height: 52px;
   place-items: center;
@@ -585,7 +585,7 @@
 }
 
 .hype-room-composer textarea:focus-visible {
-  border-color: var(--accent-border);
+  border-color: var(--gold-border);
   outline: none;
 }
 
@@ -632,13 +632,13 @@
 
 @keyframes hype-room-pulse {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--teal) 55%, transparent);
   }
   70% {
-    box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 55%, transparent);
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--teal) 55%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--teal) 55%, transparent);
   }
 }
 
@@ -705,7 +705,7 @@
 .hype-create-form input:focus-visible,
 .hype-create-form select:focus-visible,
 .hype-create-form textarea:focus-visible {
-  border-color: var(--accent-border);
+  border-color: var(--gold-border);
   outline: none;
 }
 
@@ -836,7 +836,7 @@
 
 .hype-room-message-parent {
   background: color-mix(in srgb, var(--page-bg) 55%, var(--surface));
-  border-left: 2px solid var(--accent-border);
+  border-left: 2px solid var(--border);
   border-radius: 0 var(--radius-control) var(--radius-control) 0;
   display: grid;
   gap: 2px;
@@ -1066,7 +1066,7 @@
 
 .hype-room-invite-inbox {
   background: var(--surface);
-  border: 1px solid var(--accent-border);
+  border: 1px solid var(--border);
   border-radius: var(--radius-surface);
   display: grid;
   gap: 10px;
@@ -1259,9 +1259,9 @@
 }
 
 .hype-room-phase--live {
-  background: var(--accent-soft);
-  border-color: var(--accent-border);
-  color: var(--accent);
+  background: var(--teal-soft);
+  border-color: color-mix(in srgb, var(--teal) 45%, transparent);
+  color: var(--teal);
 }
 
 .hype-room-phase--live .hype-room-phase-dot {
@@ -1275,9 +1275,9 @@
 }
 
 .hype-room-phase--ending {
-  background: var(--gold-soft);
-  border-color: var(--gold-border);
-  color: var(--gold);
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
 }
 
 .hype-room-phase--ending .hype-room-phase-dot {
@@ -1380,9 +1380,9 @@
 }
 
 .hype-room-fact--urgent {
-  background: var(--gold-soft);
-  border-color: var(--gold-border);
-  color: var(--gold);
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--accent);
 }
 
 .hype-room-terminal-note {
@@ -1567,8 +1567,8 @@
 }
 
 .hype-room-message-card--selected {
-  border-color: var(--accent-border);
-  box-shadow: 0 0 0 1px var(--accent-border);
+  border-color: var(--gold-border);
+  box-shadow: 0 0 0 1px var(--gold-border);
 }
 
 .hype-room-message-head {
@@ -1677,7 +1677,7 @@
 }
 
 .hype-room-reaction-tray button:hover:not(:disabled) {
-  background: var(--accent-soft);
+  background: var(--gold-soft);
 }
 
 .hype-room-reaction-tray button:disabled {
@@ -1876,10 +1876,10 @@
 
 .hype-room-empty-icon {
   align-items: center;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-border);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
   border-radius: var(--radius-component);
-  color: var(--accent);
+  color: var(--muted);
   display: inline-flex;
   height: 40px;
   justify-content: center;
@@ -1982,7 +1982,7 @@
 
 .hype-room-message-card--reply {
   margin-left: 14px;
-  border-left: 2px solid var(--accent-border);
+  border-left: 2px solid var(--gold-border);
 }
 
 @media (max-width: 560px) {

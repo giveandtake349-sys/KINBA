@@ -719,10 +719,10 @@
 
 .settings-signed-out__mark {
   align-items: center;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent-border);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
   border-radius: var(--radius-surface);
-  color: var(--accent);
+  color: var(--muted);
   display: inline-flex;
   height: 52px;
   justify-content: center;
