@@ -37,6 +37,13 @@ import { isReducedMotion } from "@/contexts/motionPreference";
 import AvatarCropModal from "./AvatarCropModal";
 import FollowListModal, { type FollowListMode } from "./FollowListModal";
 import { ReportDialog } from "./ReportDialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import "./profileRedesign.css";
 
 export type ProfileSnapshot = {
@@ -672,12 +679,10 @@ export default function ProfileView({
 }) {
   const [activeTab, setActiveTab] = useState<ProfileTab>("posts");
   const [editOpen, setEditOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [followList, setFollowList] = useState<FollowListMode | null>(null);
   const [messageComposeOpen, setMessageComposeOpen] = useState(false);
   const [messageOpening, setMessageOpening] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const tabButtonsRef = useRef<(HTMLButtonElement | null)[]>([]);
@@ -830,17 +835,6 @@ export default function ProfileView({
       setMessageOpening(false);
     }
   }, [userId, utils, navigate]);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [menuOpen]);
 
   // Keep the id list readable from callbacks without re-creating them.
   const tabIdsRef = useRef<ProfileTab[]>(["posts", "videos", "shorts"]);
@@ -1056,74 +1050,60 @@ export default function ProfileView({
           >
             <Share2 size={18} />
           </button>
-          <div className="pr-menu-wrap" ref={menuRef}>
-            <button
-              type="button"
-              className="pr-btn pr-btn--icon"
-              onClick={() => setMenuOpen(v => !v)}
-              aria-label="More options"
-              aria-expanded={menuOpen}
-            >
-              <MoreHorizontal size={18} />
-            </button>
-            {menuOpen && (
-              <div className="pr-dropdown" role="menu">
-                {isOwner && (
-                  <button
-                    type="button"
-                    className="pr-dropdown-item"
-                    role="menuitem"
-                    onClick={() => { setMenuOpen(false); setEditOpen(true); }}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="pr-btn pr-btn--icon"
+                aria-label="More options"
+              >
+                <MoreHorizontal size={18} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" sideOffset={8}>
+              {isOwner && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => { setEditOpen(true); }}
+                    className="flex items-center gap-2"
                   >
                     <Pencil size={16} />
                     Edit Profile
-                  </button>
-                )}
-                <button
-                  type="button"
-                  className="pr-dropdown-item"
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    handleShare();
-                  }}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              <DropdownMenuItem
+                onClick={() => { handleShare(); }}
+                className="flex items-center gap-2"
+              >
+                <Share2 size={16} />
+                Share Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  const url = userId
+                    ? `${window.location.origin}/profile/${userId}`
+                    : `${window.location.origin}/profile`;
+                  void navigator.clipboard.writeText(url);
+                  toast.success("Link copied.");
+                }}
+                className="flex items-center gap-2"
+              >
+                <LinkIcon size={16} />
+                Copy Link
+              </DropdownMenuItem>
+              {!isOwner && isAuthenticated && userId && (
+                <DropdownMenuItem
+                  onClick={() => { setReportOpen(true); }}
+                  className="flex items-center gap-2"
                 >
-                  <Share2 size={16} />
-                  Share Profile
-                </button>
-                <button
-                  type="button"
-                  className="pr-dropdown-item"
-                  role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    const url = userId
-                      ? `${window.location.origin}/profile/${userId}`
-                      : `${window.location.origin}/profile`;
-                    void navigator.clipboard.writeText(url);
-                    toast.success("Link copied.");
-                  }}
-                >
-                  <LinkIcon size={16} />
-                  Copy Link
-                </button>
-                {!isOwner && isAuthenticated && userId ? (
-                  <button
-                    type="button"
-                    className="pr-dropdown-item"
-                    role="menuitem"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setReportOpen(true);
-                    }}
-                  >
-                    <Flag size={16} />
-                    Report User
-                  </button>
-                ) : null}
-              </div>
-            )}
-          </div>
+                  <Flag size={16} />
+                  Report User
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

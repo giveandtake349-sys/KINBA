@@ -104,7 +104,7 @@ function isTransientConnectionError(error: unknown): boolean {
 async function createPoolWithRetry(
   connectionString: string,
   attempt: number
-): Promise<ReturnType<typeof drizzle> | null> {
+): Promise<ReturnType<typeof drizzle>> {
   try {
     const pool = new Pool({
       connectionString,
@@ -127,7 +127,7 @@ async function createPoolWithRetry(
       return createPoolWithRetry(connectionString, attempt + 1);
     }
     console.warn("[Database] Failed to connect after retries:", error);
-    return null;
+    throw error;
   }
 }
 
@@ -162,20 +162,28 @@ export async function getDb() {
     console.error(
       "[Database] PostgreSQL is not configured. Set SUPABASE_DATABASE_URL or a PostgreSQL DATABASE_URL."
     );
-    return null;
+    throw new Error("PostgreSQL is not configured. Set SUPABASE_DATABASE_URL or a PostgreSQL DATABASE_URL.");
   }
   _db = await createPoolWithRetry(connectionString, 0);
-  if (_db) {
-    _pool = (_db as { $client: Pool }).$client;
-  }
+  _pool = (_db as { $client: Pool }).$client;
   return _db;
 }
 
 export async function withDb<T>(
   fn: (db: ReturnType<typeof drizzle>) => Promise<T>
 ): Promise<T> {
-  const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  let db: ReturnType<typeof drizzle>;
+  try {
+    db = await getDb();
+  } catch (error) {
+    if (isTransientConnectionError(error)) {
+      console.warn("[Database] Transient error getting connection, will retry:", error);
+      invalidateDbPool();
+      db = await getDb();
+    } else {
+      throw error;
+    }
+  }
   try {
     return await fn(db);
   } catch (error) {
@@ -183,7 +191,6 @@ export async function withDb<T>(
       console.warn("[Database] Transient error during query, invalidating pool and retrying once:", error);
       invalidateDbPool();
       const retryDb = await getDb();
-      if (!retryDb) throw new Error("Database unavailable after retry");
       return await fn(retryDb);
     }
     throw error;
