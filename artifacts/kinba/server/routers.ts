@@ -153,6 +153,7 @@ import {
   listMessageRequests,
   listMessages,
   markConversationRead,
+  replyToMessageRequest,
   sendMessage,
   sendMessageRequest,
 } from "./directMessages";
@@ -1899,6 +1900,36 @@ export const appRouter = router({
           return await blockConversation(input.conversationId, ctx.user.id);
         } catch (error) {
           throw mapDMError(error, "blockConversation");
+        }
+      }),
+    replyToMessageRequest: protectedProcedure
+      .input(
+        z.object({
+          requestId: z.number().int().positive(),
+          body: z.string().trim().max(4000).optional(),
+          idempotencyKey: z.string().trim().min(1).max(160),
+          media: z
+            .object({
+              mediaUrl: z.string().url().max(1024),
+              mediaType: z.string().max(16),
+              mediaWidth: z.number().int().positive().nullable().optional(),
+              mediaHeight: z.number().int().positive().nullable().optional(),
+              mediaDuration: z.number().int().positive().nullable().optional(),
+            })
+            .optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await replyToMessageRequest(
+            input.requestId,
+            ctx.user.id,
+            input.body ?? "",
+            input.idempotencyKey,
+            input.media
+          );
+        } catch (error) {
+          throw mapDMError(error, "replyToMessageRequest");
         }
       }),
   }),

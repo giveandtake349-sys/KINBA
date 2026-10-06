@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useLocation, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { MessageCircle, Bell, Search, UserPlus, ChevronLeft, MoreVertical, X, Check, Loader2 } from "lucide-react";
+import { MessageCircle, Bell, Search, UserPlus, ChevronLeft, MoreVertical, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { dmConversationPreview } from "@shared/dmMedia";
 import "./messages.css";
@@ -27,19 +27,6 @@ export default function Messages() {
     { enabled: isAuthenticated && showRequests, refetchInterval: 30000 }
   );
 
-  const acceptRequestMut = trpc.directMessages.acceptMessageRequest.useMutation({
-    onSuccess: () => {
-      utils.directMessages.listConversations.invalidate();
-      utils.directMessages.listMessageRequests.invalidate();
-      utils.directMessages.getUnreadMessageCount.invalidate();
-    },
-  });
-  const declineRequestMut = trpc.directMessages.declineMessageRequest.useMutation({
-    onSuccess: () => {
-      utils.directMessages.listMessageRequests.invalidate();
-    },
-  });
-
   const conversations = conversationsQuery.data ?? [];
   const requests = requestsQuery.data ?? [];
   const totalUnread = unreadCountQuery.data ?? 0;
@@ -50,21 +37,13 @@ export default function Messages() {
     c.partner.username?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleAcceptRequest = useCallback(async (requestId: number) => {
-    try {
-      await acceptRequestMut.mutateAsync({ requestId });
-    } catch (error) {
-      console.error("Failed to accept request:", error);
+  const handleRequestClick = useCallback((requestId: number, conversationId?: number) => {
+    if (conversationId) {
+      navigateLoc(`/messages/${conversationId}`);
+    } else {
+      navigateLoc(`/messages/requests/${requestId}`);
     }
-  }, [acceptRequestMut]);
-
-  const handleDeclineRequest = useCallback(async (requestId: number) => {
-    try {
-      await declineRequestMut.mutateAsync({ requestId });
-    } catch (error) {
-      console.error("Failed to decline request:", error);
-    }
-  }, [declineRequestMut]);
+  }, [navigateLoc]);
 
   const handleConversationClick = useCallback((conversationId: number) => {
     navigateLoc(`/messages/${conversationId}`);
@@ -141,6 +120,14 @@ export default function Messages() {
                 key={request.id}
                 className="request-item"
                 role="listitem"
+                onClick={() => handleRequestClick(request.id, request.conversationId)}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleRequestClick(request.id, request.conversationId);
+                  }
+                }}
               >
                 <div className="request-avatar">
                   {request.requester.photoUrl ? (
@@ -162,32 +149,6 @@ export default function Messages() {
                   {request.mediaUrl && (
                     <span className="request-media-badge">Media attached</span>
                   )}
-                </div>
-                <div className="request-actions">
-                  <button
-                    type="button"
-                    className="btn-accept"
-                    onClick={() => handleAcceptRequest(request.id)}
-                    disabled={acceptRequestMut.isPending}
-                    aria-label={`Accept request from ${request.requester.name}`}
-                  >
-                    {acceptRequestMut.isPending ? (
-                      <Loader2 size={16} className="spin" />
-                    ) : (
-                      <Check size={16} />
-                    )}
-                    <span>Accept</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-decline"
-                    onClick={() => handleDeclineRequest(request.id)}
-                    disabled={declineRequestMut.isPending}
-                    aria-label={`Decline request from ${request.requester.name}`}
-                  >
-                    <X size={16} />
-                    <span>Decline</span>
-                  </button>
                 </div>
               </article>
             ))

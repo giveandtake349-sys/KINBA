@@ -51,19 +51,6 @@ export function DesktopMessages() {
     { enabled: isAuthenticated, refetchInterval: listRefetchInterval }
   );
 
-  const acceptRequestMut = trpc.directMessages.acceptMessageRequest.useMutation({
-    onSuccess: () => {
-      utils.directMessages.listConversations.invalidate();
-      utils.directMessages.listMessageRequests.invalidate();
-      utils.directMessages.getUnreadMessageCount.invalidate();
-    },
-  });
-  const declineRequestMut = trpc.directMessages.declineMessageRequest.useMutation({
-    onSuccess: () => {
-      utils.directMessages.listMessageRequests.invalidate();
-    },
-  });
-
   if (!isAuthenticated) {
     return (
       <div className="messages-shell desktop-messages-shell">
@@ -113,19 +100,11 @@ export function DesktopMessages() {
   const totalUnread = unreadCountQuery.data ?? 0;
   const requestsUnread = requests.length;
 
-  const handleAcceptRequest = async (requestId: number) => {
-    try {
-      await acceptRequestMut.mutateAsync({ requestId });
-    } catch (error) {
-      console.error("Failed to accept request:", error);
-    }
-  };
-
-  const handleDeclineRequest = async (requestId: number) => {
-    try {
-      await declineRequestMut.mutateAsync({ requestId });
-    } catch (error) {
-      console.error("Failed to decline request:", error);
+  const handleRequestClick = (requestId: number, conversationId?: number) => {
+    if (conversationId) {
+      navigate(`/messages/${conversationId}`);
+    } else {
+      navigate(`/messages/requests/${requestId}`);
     }
   };
 
@@ -227,7 +206,19 @@ export function DesktopMessages() {
               </div>
             ) : (
               requests.map((request) => (
-                <article key={request.id} className="request-item" role="listitem">
+                <article
+                  key={request.id}
+                  className="request-item"
+                  role="listitem"
+                  onClick={() => handleRequestClick(request.id, request.conversationId)}
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleRequestClick(request.id, request.conversationId);
+                    }
+                  }}
+                >
                   <div className="request-avatar">
                     {request.requester.photoUrl ? (
                       <img src={request.requester.photoUrl} alt="" />
@@ -248,38 +239,11 @@ export function DesktopMessages() {
                     {request.mediaUrl && (
                       <span className="request-media-badge">Media attached</span>
                     )}
-                    <p className="request-note">This person doesn't follow you. Accept to start chatting.</p>
-                  </div>
-                  <div className="request-actions">
-                    <button
-                      type="button"
-                      className="btn-accept"
-                      onClick={() => handleAcceptRequest(request.id)}
-                      disabled={acceptRequestMut.isPending}
-                      aria-label={`Accept request from ${request.requester.name}`}
-                    >
-                      {acceptRequestMut.isPending ? (
-                        <Loader2 size={16} className="spin" />
-                      ) : (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                      <span>Accept</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-decline"
-                      onClick={() => handleDeclineRequest(request.id)}
-                      disabled={declineRequestMut.isPending}
-                      aria-label={`Decline request from ${request.requester.name}`}
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                      <span>Decline</span>
-                    </button>
+                    <p className="request-note">
+                      {request.conversationId
+                        ? "Tap to open conversation"
+                        : "This person doesn't follow you. Reply to accept."}
+                    </p>
                   </div>
                 </article>
               ))

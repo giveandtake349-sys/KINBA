@@ -68,6 +68,61 @@ function narrowReaction(value: string | null | undefined): ReactionType | null {
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: Pool | null = null;
 
+const GET_DB_MAX_RETRIES = 3;
+const GET_DB_BASE_DELAY_MS = 100;
+
+function isTransientConnectionError(error: unknown): boolean {
+  if (!error) return false;
+  const code = (error as { code?: unknown }).code;
+  const errno = (error as { errno?: unknown }).errno;
+  return (
+    code === "ECONNREFUSED" ||
+    code === "ETIMEDOUT" ||
+    code === "ENOTFOUND" ||
+    code === "EHOSTUNREACH" ||
+    code === "ENETUNREACH" ||
+    code === "ECONNRESET" ||
+    code === "EPIPE" ||
+    errno === "ECONNREFUSED" ||
+    errno === "ETIMEDOUT" ||
+    errno === "ENOTFOUND" ||
+    errno === "EHOSTUNREACH" ||
+    errno === "ENETUNREACH" ||
+    errno === "ECONNRESET" ||
+    errno === "EPIPE"
+  );
+}
+
+async function createPoolWithRetry(
+  connectionString: string,
+  attempt: number
+): Promise<ReturnType<typeof drizzle> | null> {
+  try {
+    const pool = new Pool({
+      connectionString,
+      ssl: { rejectUnauthorized: false },
+      max: 5,
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 10_000,
+    });
+    const db = drizzle({ client: pool });
+    await pool.query("SELECT 1");
+    return db;
+  } catch (error) {
+    if (attempt < GET_DB_MAX_RETRIES && isTransientConnectionError(error)) {
+      const delay = GET_DB_BASE_DELAY_MS * 2 ** attempt;
+      console.warn(
+        `[Database] Connection attempt ${attempt + 1} failed (transient), retrying in ${delay}ms:`,
+        error instanceof Error ? error.message : String(error)
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return createPoolWithRetry(connectionString, attempt + 1);
+    }
+    console.warn("[Database] Failed to connect after retries:", error);
+    return null;
+  }
+}
+
 export async function getDb() {
   if (!_db) {
     const connectionString = resolvePostgresDatabaseUrl();
@@ -77,19 +132,9 @@ export async function getDb() {
       );
       return null;
     }
-    try {
-      _pool = new Pool({
-        connectionString,
-        ssl: { rejectUnauthorized: false },
-        max: 5,
-        idleTimeoutMillis: 30_000,
-        connectionTimeoutMillis: 10_000,
-      });
-      _db = drizzle({ client: _pool });
-    } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
-      _db = null;
-      _pool = null;
+    _db = await createPoolWithRetry(connectionString, 0);
+    if (_db) {
+      _pool = (_db as { $client: Pool }).$client;
     }
   }
   return _db;
