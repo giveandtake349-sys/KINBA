@@ -83,6 +83,14 @@ function isTransientConnectionError(error: unknown): boolean {
     code === "ENETUNREACH" ||
     code === "ECONNRESET" ||
     code === "EPIPE" ||
+    code === "08006" ||
+    code === "08001" ||
+    code === "08003" ||
+    code === "08007" ||
+    code === "53300" ||
+    code === "57P01" ||
+    code === "57P02" ||
+    code === "57P03" ||
     errno === "ECONNREFUSED" ||
     errno === "ETIMEDOUT" ||
     errno === "ENOTFOUND" ||

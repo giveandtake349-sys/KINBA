@@ -315,7 +315,7 @@
   top: calc(100% + 8px);
   right: 0;
   min-width: 196px;
-  max-width: calc(100vw - 16px);
+  max-width: calc(100vw - 32px);
   background: var(--surface, #1a1a1a);
   border: 1px solid var(--border, rgba(255,255,255,0.1));
   border-radius: var(--radius-component);
@@ -323,14 +323,21 @@
   z-index: 30;
   box-shadow: var(--shadow-pop);
 }
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   .pr-dropdown {
     right: auto;
     left: 50%;
     transform: translateX(-50%);
     min-width: 0;
-    max-width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
     width: max-content;
+  }
+}
+@media (max-width: 380px) {
+  .pr-dropdown {
+    left: 16px;
+    transform: none;
+    max-width: calc(100vw - 32px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
   }
 }
 .pr-dropdown-item {
