@@ -142,157 +142,14 @@ async function checkFollows(db: DbLike, followerId: number, followedId: number):
   return !!row;
 }
 
-export async function listConversations(
-  userId: number,
-  limit: number = LIST_DEFAULT_LIMIT
-): Promise<DMConversationWithPartner[]> {
-  const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
-  const safeLimit = Math.min(Math.max(limit, 1), LIST_MAX_LIMIT);
-
-  const conversations = await db
-    .select()
-    .from(dmConversations)
-    .where(
-      and(
-        or(eq(dmConversations.userAId, userId), eq(dmConversations.userBId, userId)),
-        eq(dmConversations.status, "active")
-      )
-    )
-    .orderBy(desc(dmConversations.lastMessageAt))
-    .limit(safeLimit);
-
-  const reads = await db
-    .select()
-    .from(dmConversationReads)
-    .where(
-      and(
-        eq(dmConversationReads.userId, userId),
-        inArray(
-          dmConversationReads.conversationId,
-          conversations.map((c) => c.id)
-        )
-      )
-    );
-
-  const readMap = new Map(reads.map((r) => [r.conversationId, r.unreadCount]));
-
-  const partnerIds = conversations.map((c) =>
-    c.userAId === userId ? c.userBId : c.userAId
-  );
-  const partners = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      username: profiles.username,
-      photoUrl: profiles.photoUrl,
-    })
-    .from(users)
-    .leftJoin(profiles, eq(profiles.userId, users.id))
-    .where(inArray(users.id, partnerIds));
-
-  const partnerMap = new Map(partners.map((p) => [p.id, p]));
-
-  const lastMessageConversationIds = conversations
-    .filter((c) => c.lastMessageAt)
-    .map((c) => c.id);
-  let lastMessages: DMMessageRow[] = [];
-  if (lastMessageConversationIds.length > 0) {
-    // Latest message per conversation (preview must survive read receipts —
-    // the previous readAt-filtered query dropped previews once messages were
-    // opened, which also hid sent attachments from the inbox).
-    const latest = await db
-      .select({
-        id: sql<number>`max(${dmMessages.id})`,
-        conversationId: dmMessages.conversationId,
-      })
-      .from(dmMessages)
-      .where(inArray(dmMessages.conversationId, lastMessageConversationIds))
-      .groupBy(dmMessages.conversationId);
-    const latestIds = latest
-      .map((row) => Number(row.id))
-      .filter((id) => Number.isSafeInteger(id) && id > 0);
-    if (latestIds.length > 0) {
-      lastMessages = await db
-        .select()
-        .from(dmMessages)
-        .where(inArray(dmMessages.id, latestIds));
-    }
-  }
-  const lastMessageMap = new Map(lastMessages.map((m) => [m.conversationId, m]));
-
-  return conversations.map((c) => ({
-    ...c,
-    partner: partnerMap.get(c.userAId === userId ? c.userBId : c.userAId)!,
-    unreadCount: readMap.get(c.id) ?? 0,
-    lastMessage: lastMessageMap.get(c.id) ?? null,
-  }));
-}
-
-export async function listMessages(
-  conversationId: number,
-  userId: number,
-  opts: { limit?: number; beforeId?: number } = {}
-): Promise<DMMessageWithSender[]> {
-  const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
-  await getConversationOrThrow(db, conversationId, userId);
-
-  const safeLimit = Math.min(Math.max(opts.limit ?? LIST_DEFAULT_LIMIT, 1), LIST_MAX_LIMIT);
-  const conditions = [eq(dmMessages.conversationId, conversationId)];
-  if (opts.beforeId != null) {
-    conditions.push(lt(dmMessages.id, opts.beforeId));
-  }
-
-  const messages = await db
-    .select()
-    .from(dmMessages)
-    .where(and(...conditions))
-    .orderBy(desc(dmMessages.id))
-    .limit(safeLimit);
-
-  const senderIds = [...new Set(messages.map((m) => m.senderId))];
-  const senders = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      username: profiles.username,
-      photoUrl: profiles.photoUrl,
-    })
-    .from(users)
-    .leftJoin(profiles, eq(profiles.userId, users.id))
-    .where(inArray(users.id, senderIds));
-  const senderMap = new Map(senders.map((s) => [s.id, s]));
-
-  const ordered = messages.reverse();
-  // Members only: object keys become short-lived signed read URLs here, after
-  // getConversationOrThrow() has already proven the caller belongs to the
-  // conversation. Keys are never handed out through any other endpoint.
-  return Promise.all(
-    ordered.map(async (message) => {
-      let mediaUrl = message.mediaUrl;
-      if (mediaUrl?.startsWith("dm/")) {
-        try {
-          mediaUrl = await signDmMessageMediaUrl(mediaUrl);
-        } catch (error) {
-          console.warn("[DM] Media presign failed:", error);
-        }
-      }
-      return { ...message, mediaUrl, sender: senderMap.get(message.senderId)! };
-    })
-  );
-}
-
-export async function sendMessage(
+async function insertMessage(
+  db: DbLike,
   conversationId: number,
   senderId: number,
   body: string,
   idempotencyKey: string,
   media?: DmMessageMedia
 ): Promise<DMMessageRow> {
-  const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
-
   const conversation = await getConversationOrThrow(db, conversationId, senderId);
   const partnerId = await getPartnerId(conversation, senderId);
 
@@ -303,7 +160,6 @@ export async function sendMessage(
   if (trimmedBody.length > DM_MESSAGE_MAX_LENGTH) {
     throw new Error(`Message must be at most ${DM_MESSAGE_MAX_LENGTH} characters.`);
   }
-  // Attachment ownership / type / size enforcement (throws "Attachment …").
   const attachment = media ? resolveOwnedDmMedia(senderId, media) : undefined;
 
   const [existing] = await db
@@ -389,6 +245,182 @@ export async function sendMessage(
   return message;
 }
 
+export async function listConversations(
+  userId: number,
+  limit: number = LIST_DEFAULT_LIMIT
+): Promise<DMConversationWithPartner[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const safeLimit = Math.min(Math.max(limit, 1), LIST_MAX_LIMIT);
+
+  const conversations = await db
+    .select()
+    .from(dmConversations)
+    .where(
+      and(
+        or(eq(dmConversations.userAId, userId), eq(dmConversations.userBId, userId)),
+        eq(dmConversations.status, "active")
+      )
+    )
+    .orderBy(desc(dmConversations.lastMessageAt))
+    .limit(safeLimit);
+
+  // Find conversations that have a pending request where the current user is the recipient
+  // These should be hidden from the normal inbox for the recipient
+  const conversationIds = conversations.map((c) => c.id);
+  let pendingRequestConversationIds = new Set<number>();
+  if (conversationIds.length > 0) {
+    const pendingRequests = await db
+      .select({ conversationId: dmMessageRequests.conversationId })
+      .from(dmMessageRequests)
+      .where(
+        and(
+          eq(dmMessageRequests.recipientId, userId),
+          eq(dmMessageRequests.status, "pending"),
+          inArray(dmMessageRequests.conversationId, conversationIds)
+        )
+      );
+    pendingRequestConversationIds = new Set(pendingRequests.map((r) => r.conversationId));
+  }
+
+  // Filter out conversations with pending requests for this recipient
+  const filteredConversations = conversations.filter(
+    (c) => !pendingRequestConversationIds.has(c.id)
+  );
+
+  const reads = await db
+    .select()
+    .from(dmConversationReads)
+    .where(
+      and(
+        eq(dmConversationReads.userId, userId),
+        inArray(
+          dmConversationReads.conversationId,
+          filteredConversations.map((c) => c.id)
+        )
+      )
+    );
+
+  const readMap = new Map(reads.map((r) => [r.conversationId, r.unreadCount]));
+
+  const partnerIds = filteredConversations.map((c) =>
+    c.userAId === userId ? c.userBId : c.userAId
+  );
+  const partners = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      username: profiles.username,
+      photoUrl: profiles.photoUrl,
+    })
+    .from(users)
+    .leftJoin(profiles, eq(profiles.userId, users.id))
+    .where(inArray(users.id, partnerIds));
+
+  const partnerMap = new Map(partners.map((p) => [p.id, p]));
+
+  const lastMessageConversationIds = filteredConversations
+    .filter((c) => c.lastMessageAt)
+    .map((c) => c.id);
+  let lastMessages: DMMessageRow[] = [];
+  if (lastMessageConversationIds.length > 0) {
+    // Latest message per conversation (preview must survive read receipts —
+    // the previous readAt-filtered query dropped previews once messages were
+    // opened, which also hid sent attachments from the inbox).
+    const latest = await db
+      .select({
+        id: sql<number>`max(${dmMessages.id})`,
+        conversationId: dmMessages.conversationId,
+      })
+      .from(dmMessages)
+      .where(inArray(dmMessages.conversationId, lastMessageConversationIds))
+      .groupBy(dmMessages.conversationId);
+    const latestIds = latest
+      .map((row) => Number(row.id))
+      .filter((id) => Number.isSafeInteger(id) && id > 0);
+    if (latestIds.length > 0) {
+      lastMessages = await db
+        .select()
+        .from(dmMessages)
+        .where(inArray(dmMessages.id, latestIds));
+    }
+  }
+  const lastMessageMap = new Map(lastMessages.map((m) => [m.conversationId, m]));
+
+  return filteredConversations.map((c) => ({
+    ...c,
+    partner: partnerMap.get(c.userAId === userId ? c.userBId : c.userAId)!,
+    unreadCount: readMap.get(c.id) ?? 0,
+    lastMessage: lastMessageMap.get(c.id) ?? null,
+  }));
+}
+
+export async function listMessages(
+  conversationId: number,
+  userId: number,
+  opts: { limit?: number; beforeId?: number } = {}
+): Promise<DMMessageWithSender[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await getConversationOrThrow(db, conversationId, userId);
+
+  const safeLimit = Math.min(Math.max(opts.limit ?? LIST_DEFAULT_LIMIT, 1), LIST_MAX_LIMIT);
+  const conditions = [eq(dmMessages.conversationId, conversationId)];
+  if (opts.beforeId != null) {
+    conditions.push(lt(dmMessages.id, opts.beforeId));
+  }
+
+  const messages = await db
+    .select()
+    .from(dmMessages)
+    .where(and(...conditions))
+    .orderBy(desc(dmMessages.id))
+    .limit(safeLimit);
+
+  const senderIds = [...new Set(messages.map((m) => m.senderId))];
+  const senders = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      username: profiles.username,
+      photoUrl: profiles.photoUrl,
+    })
+    .from(users)
+    .leftJoin(profiles, eq(profiles.userId, users.id))
+    .where(inArray(users.id, senderIds));
+  const senderMap = new Map(senders.map((s) => [s.id, s]));
+
+  const ordered = messages.reverse();
+  // Members only: object keys become short-lived signed read URLs here, after
+  // getConversationOrThrow() has already proven the caller belongs to the
+  // conversation. Keys are never handed out through any other endpoint.
+  return Promise.all(
+    ordered.map(async (message) => {
+      let mediaUrl = message.mediaUrl;
+      if (mediaUrl?.startsWith("dm/")) {
+        try {
+          mediaUrl = await signDmMessageMediaUrl(mediaUrl);
+        } catch (error) {
+          console.warn("[DM] Media presign failed:", error);
+        }
+      }
+      return { ...message, mediaUrl, sender: senderMap.get(message.senderId)! };
+    })
+  );
+}
+
+export async function sendMessage(
+  conversationId: number,
+  senderId: number,
+  body: string,
+  idempotencyKey: string,
+  media?: DmMessageMedia
+): Promise<DMMessageRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return insertMessage(db, conversationId, senderId, body, idempotencyKey, media);
+}
+
 export async function sendMessageRequest(
   requesterId: number,
   recipientId: number,
@@ -403,10 +435,16 @@ export async function sendMessageRequest(
 
   const trimmedBody = body?.trim() ?? "";
   // Same ownership/type/size rules as a normal message, enforced once here so
-  // both the "already follows back" and the pending-request branches are safe.
+  // both branches are safe.
   const attachment = media ? resolveOwnedDmMedia(requesterId, media) : undefined;
-  const followsRecipient = await checkFollows(db, recipientId, requesterId);
-  if (followsRecipient) {
+
+  // Check MUTUAL follow: requester follows recipient AND recipient follows requester
+  const requesterFollowsRecipient = await checkFollows(db, requesterId, recipientId);
+  const recipientFollowsRequester = await checkFollows(db, recipientId, requesterId);
+  const isMutualFollow = requesterFollowsRecipient && recipientFollowsRequester;
+
+  if (isMutualFollow) {
+    // Mutual follow -> normal direct message for both
     const conversation = await ensureConversationExists(db, requesterId, recipientId);
 
     await sendMessage(
@@ -434,6 +472,8 @@ export async function sendMessageRequest(
       conversationId: conversation.id,
     } as SendMessageRequestResult;
   }
+
+  // NOT mutual follow -> sender gets conversation immediately, recipient gets request
   if (!trimmedBody && !attachment?.mediaUrl) {
     throw new Error("Message body or media is required.");
   }
@@ -441,7 +481,8 @@ export async function sendMessageRequest(
     throw new Error(`Message must be at most ${DM_MESSAGE_MAX_LENGTH} characters.`);
   }
 
-  const [existing] = await db
+  // Check for existing request with same idempotency key
+  const [existingRequest] = await db
     .select()
     .from(dmMessageRequests)
     .where(
@@ -452,53 +493,71 @@ export async function sendMessageRequest(
       )
     )
     .limit(1);
-  if (existing) return { ...existing, conversationId: undefined } as SendMessageRequestResult;
+  if (existingRequest) return existingRequest as SendMessageRequestResult;
 
-  const now = new Date();
-  const [request] = await db
-    .insert(dmMessageRequests)
-    .values({
+  // Use a transaction to ensure atomicity of conversation creation, message insertion, and request creation
+  return await db.transaction(async (tx) => {
+    // Create/get conversation so sender can see their message immediately
+    const conversation = await ensureConversationExists(tx, requesterId, recipientId);
+
+    // Insert sender's message into the conversation (idempotent) using tx for atomicity
+    await insertMessage(
+      tx,
+      conversation.id,
       requesterId,
-      recipientId,
-      body: trimmedBody,
-      mediaUrl: attachment?.mediaUrl ?? null,
-      mediaType: attachment?.mediaType ?? null,
-      mediaWidth: attachment?.mediaWidth ?? null,
-      mediaHeight: attachment?.mediaHeight ?? null,
-      mediaDuration: attachment?.mediaDuration ?? null,
+      body,
       idempotencyKey,
-      status: "pending",
-      createdAt: now,
-      updatedAt: now,
-    })
-    .returning();
-  if (!request) throw new Error("Failed to send message request.");
+      attachment
+    );
 
-  try {
-    const [requester] = await db
-      .select({ name: users.name })
-      .from(users)
-      .where(eq(users.id, requesterId))
-      .limit(1);
-    if (requester) {
-      await insertNotification(
-        {
-          userId: recipientId,
-          type: NOTIFICATION_TYPES.dmRequest,
-          title: "Message request",
-          body: `${requester.name?.trim() || "Someone"} wants to message you.`,
-          entityType: "dm_message_request",
-          entityId: request.id,
-          link: `/messages/requests`,
-        },
-        db
-      );
+    // Create the pending request row for the recipient
+    const now = new Date();
+    const [request] = await tx
+      .insert(dmMessageRequests)
+      .values({
+        requesterId,
+        recipientId,
+        body: trimmedBody,
+        mediaUrl: attachment?.mediaUrl ?? null,
+        mediaType: attachment?.mediaType ?? null,
+        mediaWidth: attachment?.mediaWidth ?? null,
+        mediaHeight: attachment?.mediaHeight ?? null,
+        mediaDuration: attachment?.mediaDuration ?? null,
+        idempotencyKey,
+        status: "pending",
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    if (!request) throw new Error("Failed to send message request.");
+
+    // Notification is sent outside the transaction (non-critical)
+    try {
+      const [requester] = await tx
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, requesterId))
+        .limit(1);
+      if (requester) {
+        await insertNotification(
+          {
+            userId: recipientId,
+            type: NOTIFICATION_TYPES.dmRequest,
+            title: "Message request",
+            body: `${requester.name?.trim() || "Someone"} wants to message you.`,
+            entityType: "dm_message_request",
+            entityId: request.id,
+            link: `/messages/requests`,
+          },
+          tx
+        );
+      }
+    } catch (error) {
+      console.warn("[DM] Request notification insert failed:", error);
     }
-  } catch (error) {
-    console.warn("[DM] Request notification insert failed:", error);
-  }
 
-  return { ...request, conversationId: undefined } as SendMessageRequestResult;
+    return { ...request, conversationId: conversation.id } as SendMessageRequestResult;
+  });
 }
 
 export async function listMessageRequests(
@@ -641,6 +700,133 @@ export async function declineMessageRequest(
     );
 }
 
+export async function replyToMessageRequest(
+  requestId: number,
+  userId: number,
+  body: string,
+  idempotencyKey: string,
+  media?: DmMessageMedia
+): Promise<{ conversation: DMConversationRow; message: DMMessageRow }> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  // Fetch the request and verify the caller is the recipient
+  const [request] = await db
+    .select()
+    .from(dmMessageRequests)
+    .where(
+      and(
+        eq(dmMessageRequests.id, requestId),
+        eq(dmMessageRequests.recipientId, userId),
+        eq(dmMessageRequests.status, "pending")
+      )
+    )
+    .limit(1);
+  if (!request) throw new Error("Message request not found or already handled.");
+
+  // Ensure conversation exists (should already exist from sendMessageRequest)
+  const conversation = await ensureConversationExists(
+    db,
+    request.requesterId,
+    request.recipientId
+  );
+
+  // Check if the original request message already exists in the conversation
+  // (it should have been inserted by sendMessageRequest, but verify to avoid duplicates)
+  const [existingOriginalMessage] = await db
+    .select()
+    .from(dmMessages)
+    .where(
+      and(
+        eq(dmMessages.conversationId, conversation.id),
+        eq(dmMessages.senderId, request.requesterId),
+        eq(dmMessages.idempotencyKey, request.idempotencyKey)
+      )
+    )
+    .limit(1);
+
+  let originalMessage: DMMessageRow;
+  if (existingOriginalMessage) {
+    originalMessage = existingOriginalMessage;
+  } else {
+    // Insert the original request message if it doesn't exist yet
+    const attachment = request.mediaUrl
+      ? {
+          mediaUrl: request.mediaUrl,
+          mediaType: request.mediaType ?? "",
+          mediaWidth: request.mediaWidth ?? undefined,
+          mediaHeight: request.mediaHeight ?? undefined,
+          mediaDuration: request.mediaDuration ?? undefined,
+        }
+      : undefined;
+    const [msg] = await db
+      .insert(dmMessages)
+      .values({
+        conversationId: conversation.id,
+        senderId: request.requesterId,
+        body: request.body,
+        mediaUrl: attachment?.mediaUrl ?? null,
+        mediaType: attachment?.mediaType ?? null,
+        mediaWidth: attachment?.mediaWidth ?? null,
+        mediaHeight: attachment?.mediaHeight ?? null,
+        mediaDuration: attachment?.mediaDuration ?? null,
+        idempotencyKey: request.idempotencyKey,
+        createdAt: request.createdAt,
+        readAt: null,
+      })
+      .returning();
+    if (!msg) throw new Error("Failed to insert original request message.");
+    originalMessage = msg;
+  }
+
+  // Insert the recipient's reply
+  const attachment = media ? resolveOwnedDmMedia(userId, media) : undefined;
+  const replyMessage = await sendMessage(
+    conversation.id,
+    userId,
+    body,
+    idempotencyKey,
+    attachment
+  );
+
+  // Update request status to "accepted" (promoted by reply)
+  await db
+    .update(dmMessageRequests)
+    .set({
+      status: "accepted",
+      respondedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(dmMessageRequests.id, requestId));
+
+  // Notify the requester that their request was replied to (promoted)
+  try {
+    const [recipient] = await db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    if (recipient) {
+      await insertNotification(
+        {
+          userId: request.requesterId,
+          type: NOTIFICATION_TYPES.dmRequestAccepted,
+          title: "Request accepted",
+          body: `${recipient.name?.trim() || "Someone"} replied to your message request.`,
+          entityType: "dm_conversation",
+          entityId: conversation.id,
+          link: `/messages/${conversation.id}`,
+        },
+        db
+      );
+    }
+  } catch (error) {
+    console.warn("[DM] Reply notification insert failed:", error);
+  }
+
+  return { conversation, message: replyMessage };
+}
+
 export async function markConversationRead(
   conversationId: number,
   userId: number
@@ -703,6 +889,36 @@ export async function getOrCreateConversation(
 ): Promise<DMConversationRow> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
+
+  // First check if a conversation already exists between these users
+  const [userAId, userBId] = sortUserPair(userId, otherUserId);
+  const [existing] = await db
+    .select()
+    .from(dmConversations)
+    .where(
+      and(
+        eq(dmConversations.userAId, userAId),
+        eq(dmConversations.userBId, userBId),
+        eq(dmConversations.status, "active")
+      )
+    )
+    .limit(1);
+
+  if (existing) {
+    // Conversation already exists - allow access regardless of current follow state
+    // (don't retroactively disable existing conversations)
+    return existing;
+  }
+
+  // No existing conversation - enforce mutual follow for new conversations
+  const requesterFollowsRecipient = await checkFollows(db, userId, otherUserId);
+  const recipientFollowsRequester = await checkFollows(db, otherUserId, userId);
+  const isMutualFollow = requesterFollowsRecipient && recipientFollowsRequester;
+
+  if (!isMutualFollow) {
+    throw new Error("Cannot create conversation: users must mutually follow each other.");
+  }
+
   return ensureConversationExists(db, userId, otherUserId);
 }
 
