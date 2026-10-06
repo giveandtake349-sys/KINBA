@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useLocation, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { MessageCircle, Bell, Search, UserPlus, ChevronLeft, MoreVertical, Loader2 } from "lucide-react";
+import { MessageCircle, Bell, Search, UserPlus, ChevronLeft, MoreVertical, Loader2, AlertCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { dmConversationPreview } from "@shared/dmMedia";
 import "./messages.css";
@@ -160,6 +160,19 @@ export default function Messages() {
             <div className="messages-loading">
               <Loader2 size={24} className="spin" />
               <span>Loading conversations...</span>
+            </div>
+          ) : conversationsQuery.isError ? (
+            <div className="messages-empty">
+              <AlertCircle size={48} />
+              <h2>Couldn't load conversations</h2>
+              <p>The server may be waking up. Check your connection and try again.</p>
+              <button
+                type="button"
+                className="primary-btn"
+                onClick={() => void conversationsQuery.refetch()}
+              >
+                Try again
+              </button>
             </div>
           ) : filteredConversations.length === 0 ? (
             <div className="messages-empty">

@@ -123,21 +123,63 @@ async function createPoolWithRetry(
   }
 }
 
+async function validatePool(db: ReturnType<typeof drizzle>): Promise<boolean> {
+  try {
+    const pool = (db as { $client: Pool }).$client;
+    await pool.query("SELECT 1");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function invalidateDbPool(): void {
+  if (_pool) {
+    _pool.end().catch(() => {});
+    _pool = null;
+  }
+  _db = null;
+}
+
 export async function getDb() {
-  if (!_db) {
-    const connectionString = resolvePostgresDatabaseUrl();
-    if (!connectionString) {
-      console.error(
-        "[Database] PostgreSQL is not configured. Set SUPABASE_DATABASE_URL or a PostgreSQL DATABASE_URL."
-      );
-      return null;
-    }
-    _db = await createPoolWithRetry(connectionString, 0);
-    if (_db) {
-      _pool = (_db as { $client: Pool }).$client;
-    }
+  if (_db) {
+    const isValid = await validatePool(_db);
+    if (isValid) return _db;
+    console.warn("[Database] Cached pool failed health check, recreating...");
+    invalidateDbPool();
+  }
+
+  const connectionString = resolvePostgresDatabaseUrl();
+  if (!connectionString) {
+    console.error(
+      "[Database] PostgreSQL is not configured. Set SUPABASE_DATABASE_URL or a PostgreSQL DATABASE_URL."
+    );
+    return null;
+  }
+  _db = await createPoolWithRetry(connectionString, 0);
+  if (_db) {
+    _pool = (_db as { $client: Pool }).$client;
   }
   return _db;
+}
+
+export async function withDb<T>(
+  fn: (db: ReturnType<typeof drizzle>) => Promise<T>
+): Promise<T> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  try {
+    return await fn(db);
+  } catch (error) {
+    if (isTransientConnectionError(error)) {
+      console.warn("[Database] Transient error during query, invalidating pool and retrying once:", error);
+      invalidateDbPool();
+      const retryDb = await getDb();
+      if (!retryDb) throw new Error("Database unavailable after retry");
+      return await fn(retryDb);
+    }
+    throw error;
+  }
 }
 
 export async function upsertUser(user: InsertUser): Promise<void> {

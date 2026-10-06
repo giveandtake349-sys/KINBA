@@ -20,6 +20,7 @@ import type { DMMessageRow, DMMessageRequestRow, DMConversationRow } from "./dir
 
 const databaseMocks = vi.hoisted(() => ({
   getDb: vi.fn(),
+  withDb: vi.fn(async (fn) => fn(await databaseMocks.getDb())),
 }));
 
 const notificationMocks = vi.hoisted(() => ({

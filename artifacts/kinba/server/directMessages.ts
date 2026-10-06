@@ -22,7 +22,7 @@ import {
   type DMConversationReadRow,
   users,
 } from "../drizzle/schema";
-import { getDb } from "./db";
+import { getDb, withDb } from "./db";
 import {
   resolveOwnedDmMedia,
   signDmMessageMediaUrl,
@@ -244,115 +244,115 @@ async function insertMessage(
 
   return message;
 }
-
 export async function listConversations(
   userId: number,
   limit: number = LIST_DEFAULT_LIMIT
 ): Promise<DMConversationWithPartner[]> {
-  const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
-  const safeLimit = Math.min(Math.max(limit, 1), LIST_MAX_LIMIT);
+  return withDb(async (db) => {
+    const safeLimit = Math.min(Math.max(limit, 1), LIST_MAX_LIMIT);
 
-  const conversations = await db
-    .select()
-    .from(dmConversations)
-    .where(
-      and(
-        or(eq(dmConversations.userAId, userId), eq(dmConversations.userBId, userId)),
-        eq(dmConversations.status, "active")
-      )
-    )
-    .orderBy(desc(dmConversations.lastMessageAt))
-    .limit(safeLimit);
-
-  // Find conversations that have a pending request where the current user is the recipient
-  // These should be hidden from the normal inbox for the recipient
-  const conversationIds = conversations.map((c) => c.id);
-  let pendingRequestConversationIds = new Set<number>();
-  if (conversationIds.length > 0) {
-    const pendingRequests = await db
-      .select({ conversationId: dmMessageRequests.conversationId })
-      .from(dmMessageRequests)
+    const conversations = await db
+      .select()
+      .from(dmConversations)
       .where(
         and(
-          eq(dmMessageRequests.recipientId, userId),
-          eq(dmMessageRequests.status, "pending"),
-          inArray(dmMessageRequests.conversationId, conversationIds)
-        )
-      );
-    pendingRequestConversationIds = new Set(pendingRequests.map((r) => r.conversationId));
-  }
-
-  // Filter out conversations with pending requests for this recipient
-  const filteredConversations = conversations.filter(
-    (c) => !pendingRequestConversationIds.has(c.id)
-  );
-
-  const reads = await db
-    .select()
-    .from(dmConversationReads)
-    .where(
-      and(
-        eq(dmConversationReads.userId, userId),
-        inArray(
-          dmConversationReads.conversationId,
-          filteredConversations.map((c) => c.id)
+          or(eq(dmConversations.userAId, userId), eq(dmConversations.userBId, userId)),
+          eq(dmConversations.status, "active")
         )
       )
+      .orderBy(desc(dmConversations.lastMessageAt))
+      .limit(safeLimit);
+
+    // Find conversations that have a pending request where the current user is the recipient
+    // These should be hidden from the normal inbox for the recipient
+    const conversationIds = conversations.map((c) => c.id);
+    let pendingRequestConversationIds = new Set<number>();
+    if (conversationIds.length > 0) {
+      const pendingRequests = await db
+        .select({ conversationId: dmMessageRequests.conversationId })
+        .from(dmMessageRequests)
+        .where(
+          and(
+            eq(dmMessageRequests.recipientId, userId),
+            eq(dmMessageRequests.status, "pending"),
+            inArray(dmMessageRequests.conversationId, conversationIds)
+          )
+        );
+      pendingRequestConversationIds = new Set(pendingRequests.map((r) => r.conversationId));
+    }
+
+    // Filter out conversations with pending requests for this recipient
+    const filteredConversations = conversations.filter(
+      (c) => !pendingRequestConversationIds.has(c.id)
     );
 
-  const readMap = new Map(reads.map((r) => [r.conversationId, r.unreadCount]));
+    const reads = await db
+      .select()
+      .from(dmConversationReads)
+      .where(
+        and(
+          eq(dmConversationReads.userId, userId),
+          inArray(
+            dmConversationReads.conversationId,
+            filteredConversations.map((c) => c.id)
+          )
+        )
+      );
 
-  const partnerIds = filteredConversations.map((c) =>
-    c.userAId === userId ? c.userBId : c.userAId
-  );
-  const partners = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      username: profiles.username,
-      photoUrl: profiles.photoUrl,
-    })
-    .from(users)
-    .leftJoin(profiles, eq(profiles.userId, users.id))
-    .where(inArray(users.id, partnerIds));
+    const readMap = new Map(reads.map((r) => [r.conversationId, r.unreadCount]));
 
-  const partnerMap = new Map(partners.map((p) => [p.id, p]));
-
-  const lastMessageConversationIds = filteredConversations
-    .filter((c) => c.lastMessageAt)
-    .map((c) => c.id);
-  let lastMessages: DMMessageRow[] = [];
-  if (lastMessageConversationIds.length > 0) {
-    // Latest message per conversation (preview must survive read receipts —
-    // the previous readAt-filtered query dropped previews once messages were
-    // opened, which also hid sent attachments from the inbox).
-    const latest = await db
+    const partnerIds = filteredConversations.map((c) =>
+      c.userAId === userId ? c.userBId : c.userAId
+    );
+    const partners = await db
       .select({
-        id: sql<number>`max(${dmMessages.id})`,
-        conversationId: dmMessages.conversationId,
+        id: users.id,
+        name: users.name,
+        username: profiles.username,
+        photoUrl: profiles.photoUrl,
       })
-      .from(dmMessages)
-      .where(inArray(dmMessages.conversationId, lastMessageConversationIds))
-      .groupBy(dmMessages.conversationId);
-    const latestIds = latest
-      .map((row) => Number(row.id))
-      .filter((id) => Number.isSafeInteger(id) && id > 0);
-    if (latestIds.length > 0) {
-      lastMessages = await db
-        .select()
-        .from(dmMessages)
-        .where(inArray(dmMessages.id, latestIds));
-    }
-  }
-  const lastMessageMap = new Map(lastMessages.map((m) => [m.conversationId, m]));
+      .from(users)
+      .leftJoin(profiles, eq(profiles.userId, users.id))
+      .where(inArray(users.id, partnerIds));
 
-  return filteredConversations.map((c) => ({
-    ...c,
-    partner: partnerMap.get(c.userAId === userId ? c.userBId : c.userAId)!,
-    unreadCount: readMap.get(c.id) ?? 0,
-    lastMessage: lastMessageMap.get(c.id) ?? null,
-  }));
+    const partnerMap = new Map(partners.map((p) => [p.id, p]));
+
+    const lastMessageConversationIds = filteredConversations
+      .filter((c) => c.lastMessageAt)
+      .map((c) => c.id);
+    let lastMessages: DMMessageRow[] = [];
+    if (lastMessageConversationIds.length > 0) {
+      // Latest message per conversation (preview must survive read receipts —
+      // the previous readAt-filtered query dropped previews once messages were
+      // opened, which also hid sent attachments from the inbox).
+      const latest = await db
+        .select({
+          id: sql<number>`max(${dmMessages.id})`,
+          conversationId: dmMessages.conversationId,
+        })
+        .from(dmMessages)
+        .where(inArray(dmMessages.conversationId, lastMessageConversationIds))
+        .groupBy(dmMessages.conversationId);
+      const latestIds = latest
+        .map((row) => Number(row.id))
+
+        .filter((id) => Number.isSafeInteger(id) && id > 0);
+      if (latestIds.length > 0) {
+        lastMessages = await db
+          .select()
+          .from(dmMessages)
+          .where(inArray(dmMessages.id, latestIds));
+      }
+    }
+    const lastMessageMap = new Map(lastMessages.map((m) => [m.conversationId, m]));
+
+    return filteredConversations.map((c) => ({
+      ...c,
+      partner: partnerMap.get(c.userAId === userId ? c.userBId : c.userAId)!,
+      unreadCount: readMap.get(c.id) ?? 0,
+      lastMessage: lastMessageMap.get(c.id) ?? null,
+    }));
+  });
 }
 
 export async function listMessages(
@@ -564,39 +564,39 @@ export async function listMessageRequests(
   userId: number,
   limit: number = LIST_DEFAULT_LIMIT
 ): Promise<DMMessageRequestWithRequester[]> {
-  const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
-  const safeLimit = Math.min(Math.max(limit, 1), LIST_MAX_LIMIT);
+  return withDb(async (db) => {
+    const safeLimit = Math.min(Math.max(limit, 1), LIST_MAX_LIMIT);
 
-  const requests = await db
-    .select()
-    .from(dmMessageRequests)
-    .where(
-      and(
-        eq(dmMessageRequests.recipientId, userId),
-        eq(dmMessageRequests.status, "pending")
+    const requests = await db
+      .select()
+      .from(dmMessageRequests)
+      .where(
+        and(
+          eq(dmMessageRequests.recipientId, userId),
+          eq(dmMessageRequests.status, "pending")
+        )
       )
-    )
-    .orderBy(desc(dmMessageRequests.createdAt))
-    .limit(safeLimit);
+      .orderBy(desc(dmMessageRequests.createdAt))
+      .limit(safeLimit);
 
-  const requesterIds = [...new Set(requests.map((r) => r.requesterId))];
-  const requesters = await db
-    .select({
-      id: users.id,
-      name: users.name,
-      username: profiles.username,
-      photoUrl: profiles.photoUrl,
-    })
-    .from(users)
-    .leftJoin(profiles, eq(profiles.userId, users.id))
-    .where(inArray(users.id, requesterIds));
-  const requesterMap = new Map(requesters.map((r) => [r.id, r]));
+    const requesterIds = [...new Set(requests.map((r) => r.requesterId))];
+    const requesters = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        username: profiles.username,
+        photoUrl: profiles.photoUrl,
+      })
+      .from(users)
+      .leftJoin(profiles, eq(profiles.userId, users.id))
+      .where(inArray(users.id, requesterIds));
+    const requesterMap = new Map(requesters.map((r) => [r.id, r]));
 
-  return requests.map((r) => ({
-    ...r,
-    requester: requesterMap.get(r.requesterId)!,
-  }));
+    return requests.map((r) => ({
+      ...r,
+      requester: requesterMap.get(r.requesterId)!,
+    }));
+  });
 }
 
 export async function acceptMessageRequest(
@@ -872,15 +872,14 @@ export async function markConversationRead(
 }
 
 export async function getUnreadMessageCount(userId: number): Promise<number> {
-  const db = await getDb();
-  if (!db) throw new Error("Database unavailable");
+  return withDb(async (db) => {
+    const reads = await db
+      .select({ unreadCount: dmConversationReads.unreadCount })
+      .from(dmConversationReads)
+      .where(eq(dmConversationReads.userId, userId));
 
-  const reads = await db
-    .select({ unreadCount: dmConversationReads.unreadCount })
-    .from(dmConversationReads)
-    .where(eq(dmConversationReads.userId, userId));
-
-  return reads.reduce((sum, r) => sum + (r.unreadCount ?? 0), 0);
+    return reads.reduce((sum, r) => sum + (r.unreadCount ?? 0), 0);
+  });
 }
 
 export async function getOrCreateConversation(
