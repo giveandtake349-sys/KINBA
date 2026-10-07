@@ -67,6 +67,10 @@ function narrowReaction(value: string | null | undefined): ReactionType | null {
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: Pool | null = null;
+// Single-flight guard for cold starts: concurrent getDb() callers share exactly
+// one creation promise so at most one pool is ever published and none can be
+// orphaned outside _pool (where invalidateDbPool() would never reach it).
+let _creating: Promise<ReturnType<typeof drizzle>> | null = null;
 
 const GET_DB_MAX_RETRIES = 3;
 const GET_DB_BASE_DELAY_MS = 100;
@@ -101,6 +105,25 @@ function isTransientConnectionError(error: unknown): boolean {
   );
 }
 
+/**
+ * pg-pool lifecycle failures raised as plain `Error` objects. They carry no
+ * `code`/`errno`, so `isTransientConnectionError` cannot see them, yet they are
+ * connection-level: the query was never dispatched (or the connection dropped
+ * mid-flight), so running it once more cannot duplicate work.
+ */
+const RETRYABLE_POOL_ERROR_MESSAGES = new Set([
+  "Cannot use a pool after calling end on the pool",
+  "timeout exceeded when trying to connect",
+  "Connection terminated due to connection timeout",
+  "Connection terminated unexpectedly",
+  "Connection terminated",
+]);
+
+function isRetryablePoolError(error: unknown): boolean {
+  if (isTransientConnectionError(error)) return true;
+  return error instanceof Error && RETRYABLE_POOL_ERROR_MESSAGES.has(error.message);
+}
+
 async function createPoolWithRetry(
   connectionString: string,
   attempt: number
@@ -112,6 +135,14 @@ async function createPoolWithRetry(
       max: 5,
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 10_000,
+    });
+    // pg-pool re-emits idle-client failures on the pool itself. An EventEmitter
+    // 'error' with no listener throws, so absorb it defensively.
+    pool.on("error", (error: unknown) => {
+      console.warn(
+        "[Database] Pool error:",
+        error instanceof Error ? error.message : String(error)
+      );
     });
     const db = drizzle({ client: pool });
     await pool.query("SELECT 1");
@@ -141,32 +172,61 @@ async function validatePool(db: ReturnType<typeof drizzle>): Promise<boolean> {
   }
 }
 
-export function invalidateDbPool(): void {
-  if (_pool) {
-    _pool.end().catch(() => {});
+/**
+ * End exactly `target`, and clear the cached globals only while they still
+ * reference that same pool.
+ *
+ * Ownership matters: a request that proved one pool unusable must not tear down
+ * a newer pool that a concurrent request published in the meantime, and it must
+ * not unregister that newer pool from the module either.
+ */
+function retirePool(target: Pool | null | undefined): void {
+  if (!target) return;
+  if (_pool === target) {
     _pool = null;
+    _db = null;
   }
-  _db = null;
+  // pg-pool rejects a second end(); the rejection is intentionally swallowed.
+  target.end().catch(() => {});
 }
 
+export function invalidateDbPool(): void {
+  retirePool(_pool);
+}
+
+/**
+ * Warm path is deliberately synchronous: `if (_db) return _db` contains no
+ * `await`, so the returned instance is decided atomically and can never be a
+ * different (or null) global than the one that was just observed.
+ *
+ * Health is signalled by the application's own query, not by a per-call probe:
+ * pg-pool evicts a failed client on release and re-dials lazily, and `withDb`
+ * retries once after probing the pool it actually used.
+ */
 export async function getDb() {
-  if (_db) {
-    const isValid = await validatePool(_db);
-    if (isValid) return _db;
-    console.warn("[Database] Cached pool failed health check, recreating...");
-    invalidateDbPool();
+  if (_db) return _db;
+
+  if (!_creating) {
+    const connectionString = resolvePostgresDatabaseUrl();
+    if (!connectionString) {
+      console.error(
+        "[Database] PostgreSQL is not configured. Set SUPABASE_DATABASE_URL or a PostgreSQL DATABASE_URL."
+      );
+      throw new Error("PostgreSQL is not configured. Set SUPABASE_DATABASE_URL or a PostgreSQL DATABASE_URL.");
+    }
+    _creating = createPoolWithRetry(connectionString, 0)
+      .then((created) => {
+        _db = created;
+        _pool = (created as { $client: Pool }).$client;
+        return created;
+      })
+      .finally(() => {
+        _creating = null;
+      });
   }
 
-  const connectionString = resolvePostgresDatabaseUrl();
-  if (!connectionString) {
-    console.error(
-      "[Database] PostgreSQL is not configured. Set SUPABASE_DATABASE_URL or a PostgreSQL DATABASE_URL."
-    );
-    throw new Error("PostgreSQL is not configured. Set SUPABASE_DATABASE_URL or a PostgreSQL DATABASE_URL.");
-  }
-  _db = await createPoolWithRetry(connectionString, 0);
-  _pool = (_db as { $client: Pool }).$client;
-  return _db;
+  const created = await _creating;
+  return _db ?? created;
 }
 
 export async function withDb<T>(
@@ -176,24 +236,28 @@ export async function withDb<T>(
   try {
     db = await getDb();
   } catch (error) {
-    if (isTransientConnectionError(error)) {
+    if (isRetryablePoolError(error)) {
       console.warn("[Database] Transient error getting connection, will retry:", error);
-      invalidateDbPool();
       db = await getDb();
     } else {
       throw error;
     }
   }
+
   try {
     return await fn(db);
   } catch (error) {
-    if (isTransientConnectionError(error)) {
-      console.warn("[Database] Transient error during query, invalidating pool and retrying once:", error);
-      invalidateDbPool();
-      const retryDb = await getDb();
-      return await fn(retryDb);
+    if (!isRetryablePoolError(error)) throw error;
+
+    console.warn("[Database] Transient error during query, will retry once:", error);
+    // Probe the exact pool this operation used. Retire it only when the probe
+    // proves it unusable — a healthy pool stays untouched so concurrent
+    // requests are never interrupted by a one-off client-level blip.
+    if (!(await validatePool(db))) {
+      retirePool((db as { $client: Pool }).$client);
     }
-    throw error;
+    const retryDb = await getDb();
+    return await fn(retryDb);
   }
 }
 
