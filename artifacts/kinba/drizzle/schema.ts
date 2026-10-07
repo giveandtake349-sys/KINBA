@@ -1392,6 +1392,11 @@ export const dmMessages = pgTable(
     idempotencyKey: varchar("idempotencyKey", { length: 160 }).notNull(),
     createdAt: createdAt(),
     readAt: timestamp("readAt", { withTimezone: true }),
+    // Message actions (v1): null = never edited / still live.
+    editedAt: timestamp("editedAt", { withTimezone: true }),
+    deletedAt: timestamp("deletedAt", { withTimezone: true }),
+    // One-level reply: nullable parent within the same conversation (enforced in service).
+    replyToId: integer("replyToId"),
   },
   table => [
     uniqueIndex("dm_messages_idempotency_unique").on(
@@ -1405,6 +1410,13 @@ export const dmMessages = pgTable(
     ),
     index("dm_messages_sender_idx").on(table.senderId),
     index("dm_messages_unread_idx").on(table.conversationId, table.readAt),
+    index("dm_messages_reply_idx").on(table.replyToId),
+    // SET NULL: a reply stays valid when its target row is removed.
+    foreignKey({
+      name: "dm_messages_replyToId_dm_messages_id_fk",
+      columns: [table.replyToId],
+      foreignColumns: [table.id],
+    }).onDelete("set null"),
   ]
 );
 

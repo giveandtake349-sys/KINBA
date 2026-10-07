@@ -36,8 +36,25 @@ export type DMConversationWithPartner = DMConversationRow & {
   lastMessage?: DMMessageRow | null;
 };
 
+/**
+ * Quoted-reply preview returned by listMessages. Deliberately narrower than a
+ * full row: `mediaUrl` is never returned (quotes render a type label only) and
+ * a deleted target has `body`/`mediaType` stripped server-side.
+ */
+export type DMReplyPreview = {
+  id: number;
+  conversationId: number;
+  senderId: number;
+  sender: { id: number; name: string | null; username: string | null; photoUrl: string | null };
+  body: string | null;
+  mediaType: string | null;
+  createdAt: Date;
+  deletedAt: Date | null;
+};
+
 export type DMMessageWithSender = DMMessageRow & {
   sender: { id: number; name: string | null; username: string | null; photoUrl: string | null };
+  replyTo?: DMReplyPreview | null;
 };
 
 export type DMMessageRequestWithRequester = DMMessageRequestRow & {
@@ -52,6 +69,8 @@ const DM_MESSAGE_MAX_LENGTH = 4000;
 const DM_MEDIA_MAX_SIZE = 10 * 1024 * 1024;
 const LIST_DEFAULT_LIMIT = 50;
 const LIST_MAX_LIMIT = 100;
+// Server-enforced edit window: 30 minutes from message creation.
+const DM_EDIT_WINDOW_MS = 30 * 60 * 1000;
 
 type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 type TxClient = Parameters<Parameters<DbClient["transaction"]>[0]>[0];
@@ -154,13 +173,63 @@ async function checkFollows(db: DbLike, followerId: number, followedId: number):
   return !!row;
 }
 
+/** Inbox preview text, or null when the message was soft-deleted. */
+function previewFromMessage(message: DMMessageRow): string | null {
+  if (message.deletedAt != null) return null;
+  const body = message.body?.trim() ?? "";
+  if (body) return body.slice(0, 120);
+  return message.mediaUrl ? "Media" : null;
+}
+
+/**
+ * Deleted rows keep their columns (replies and the read cursor must keep
+ * resolving), but nothing but the fact of deletion may leave the server.
+ */
+function withoutDeletedContent<T extends DMMessageRow>(message: T | null | undefined): T | null {
+  if (!message) return null;
+  if (message.deletedAt == null) return message;
+  return {
+    ...message,
+    body: null,
+    mediaUrl: null,
+    mediaType: null,
+    mediaWidth: null,
+    mediaHeight: null,
+    mediaDuration: null,
+  };
+}
+
+/**
+ * One-level reply validation. The parent must exist, live in the same
+ * conversation (prevents cross-conversation enumeration), still be live, and
+ * must not itself be a reply — mirrors validateReplyParent in hype rooms.
+ */
+async function assertReplyTarget(
+  db: DbLike,
+  replyToId: number,
+  conversationId: number
+): Promise<void> {
+  const [parent] = await db
+    .select()
+    .from(dmMessages)
+    .where(eq(dmMessages.id, replyToId))
+    .limit(1);
+  if (!parent) throw new Error("Reply target not found.");
+  if (parent.conversationId !== conversationId) {
+    throw new Error("Reply target is not in this conversation.");
+  }
+  if (parent.deletedAt != null) throw new Error("Cannot reply to a deleted message.");
+  if (parent.replyToId != null) throw new Error("Replies can only be one level deep.");
+}
+
 async function insertMessage(
   db: DbLike,
   conversationId: number,
   senderId: number,
   body: string,
   idempotencyKey: string,
-  media?: DmMessageMedia
+  media?: DmMessageMedia,
+  replyToId?: number | null
 ): Promise<DMMessageRow> {
   const conversation = await getConversationOrThrow(db, conversationId, senderId);
   const partnerId = await getPartnerId(conversation, senderId);
@@ -173,6 +242,10 @@ async function insertMessage(
     throw new Error(`Message must be at most ${DM_MESSAGE_MAX_LENGTH} characters.`);
   }
   const attachment = media ? resolveOwnedDmMedia(senderId, media) : undefined;
+
+  if (replyToId != null) {
+    await assertReplyTarget(db, replyToId, conversationId);
+  }
 
   const [existing] = await db
     .select()
@@ -202,6 +275,9 @@ async function insertMessage(
       idempotencyKey,
       createdAt: now,
       readAt: null,
+      editedAt: null,
+      deletedAt: null,
+      replyToId: replyToId ?? null,
     })
     .returning();
   if (!message) throw new Error("Failed to send message.");
@@ -380,7 +456,9 @@ export async function listConversations(
       ...c,
       partner: partnerMap.get(c.userAId === userId ? c.userBId : c.userAId)!,
       unreadCount: readMap.get(c.id) ?? 0,
-      lastMessage: lastMessageMap.get(c.id) ?? null,
+      // A deleted latest message must not keep leaking its text/media in the
+      // inbox preview — the row stays, only its content is suppressed.
+      lastMessage: withoutDeletedContent(lastMessageMap.get(c.id) ?? null),
     }));
   });
 }
@@ -407,7 +485,28 @@ export async function listMessages(
     .orderBy(desc(dmMessages.id))
     .limit(safeLimit);
 
-  const senderIds = [...new Set(messages.map((m) => m.senderId))];
+  // One extra query for every quoted parent in the page (no N+1). A missing
+  // row means the parent was hard-deleted and the FK nulled it — the reply
+  // simply has no quote then.
+  const replyIds = [
+    ...new Set(
+      messages
+        .map((m) => m.replyToId)
+        .filter((id): id is number => id != null && Number.isSafeInteger(id))
+    ),
+  ];
+  let replyTargets: DMMessageRow[] = [];
+  if (replyIds.length > 0) {
+    replyTargets = await db
+      .select()
+      .from(dmMessages)
+      .where(inArray(dmMessages.id, replyIds));
+  }
+  const replyMap = new Map(replyTargets.map((r) => [r.id, r]));
+
+  const senderIds = [
+    ...new Set([...messages.map((m) => m.senderId), ...replyTargets.map((r) => r.senderId)]),
+  ];
   const senders = await db
     .select({
       id: users.id,
@@ -420,12 +519,44 @@ export async function listMessages(
     .where(inArray(users.id, senderIds));
   const senderMap = new Map(senders.map((s) => [s.id, s]));
 
+  const buildReplyPreview = (message: DMMessageRow): DMReplyPreview | null => {
+    if (message.replyToId == null) return null;
+    const target = replyMap.get(message.replyToId);
+    if (!target || target.conversationId !== conversationId) return null;
+    const deleted = target.deletedAt != null;
+    return {
+      id: target.id,
+      conversationId: target.conversationId,
+      senderId: target.senderId,
+      sender: senderMap.get(target.senderId) ?? {
+        id: target.senderId,
+        name: null,
+        username: null,
+        photoUrl: null,
+      },
+      body: deleted ? null : target.body,
+      mediaType: deleted ? null : target.mediaType,
+      createdAt: target.createdAt,
+      deletedAt: target.deletedAt,
+    };
+  };
+
   const ordered = messages.reverse();
   // Members only: object keys become short-lived signed read URLs here, after
   // getConversationOrThrow() has already proven the caller belongs to the
   // conversation. Keys are never handed out through any other endpoint.
   return Promise.all(
     ordered.map(async (message) => {
+      const replyTo = buildReplyPreview(message);
+      // Deleted messages keep their row (read cursor, replies) but never their
+      // content: strip before presigning so no signed URL is minted for them.
+      if (message.deletedAt != null) {
+        return {
+          ...withoutDeletedContent(message)!,
+          sender: senderMap.get(message.senderId)!,
+          replyTo,
+        };
+      }
       let mediaUrl = message.mediaUrl;
       if (mediaUrl?.startsWith("dm/")) {
         try {
@@ -434,7 +565,7 @@ export async function listMessages(
           console.warn("[DM] Media presign failed:", error);
         }
       }
-      return { ...message, mediaUrl, sender: senderMap.get(message.senderId)! };
+      return { ...message, mediaUrl, sender: senderMap.get(message.senderId)!, replyTo };
     })
   );
 }
@@ -444,11 +575,129 @@ export async function sendMessage(
   senderId: number,
   body: string,
   idempotencyKey: string,
-  media?: DmMessageMedia
+  media?: DmMessageMedia,
+  replyToId?: number | null
 ): Promise<DMMessageRow> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  return insertMessage(db, conversationId, senderId, body, idempotencyKey, media);
+  return insertMessage(db, conversationId, senderId, body, idempotencyKey, media, replyToId);
+}
+
+/**
+ * Edit an own message within 30 minutes of creation.
+ *
+ * Authorization is entirely server-side: membership (getConversationOrThrow),
+ * sender ownership, the soft-delete guard and the time window are all derived
+ * from the row — nothing is accepted from the client.
+ */
+export async function editMessage(
+  messageId: number,
+  userId: number,
+  body: string
+): Promise<DMMessageRow> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const [message] = await db
+    .select()
+    .from(dmMessages)
+    .where(eq(dmMessages.id, messageId))
+    .limit(1);
+  if (!message) throw new Error("Message not found.");
+
+  await getConversationOrThrow(db, message.conversationId, userId);
+  if (message.senderId !== userId) throw new Error("Not allowed.");
+  if (message.deletedAt != null) throw new Error("Message already deleted.");
+
+  const createdAt = new Date(message.createdAt).getTime();
+  if (Date.now() - createdAt > DM_EDIT_WINDOW_MS) {
+    throw new Error("Message can no longer be edited.");
+  }
+
+  const trimmedBody = body?.trim() ?? "";
+  if (!trimmedBody) throw new Error("Message body or media is required.");
+  if (trimmedBody.length > DM_MESSAGE_MAX_LENGTH) {
+    throw new Error(`Message must be at most ${DM_MESSAGE_MAX_LENGTH} characters.`);
+  }
+
+  const now = new Date();
+  await db
+    .update(dmMessages)
+    .set({ body: trimmedBody, editedAt: now })
+    .where(eq(dmMessages.id, messageId));
+
+  // Only the conversation's newest message drives the inbox preview.
+  const [latest] = await db
+    .select({ id: dmMessages.id })
+    .from(dmMessages)
+    .where(eq(dmMessages.conversationId, message.conversationId))
+    .orderBy(desc(dmMessages.id))
+    .limit(1);
+  if (latest && Number(latest.id) === message.id) {
+    await db
+      .update(dmConversations)
+      .set({ lastMessagePreview: trimmedBody.slice(0, 120), updatedAt: now })
+      .where(eq(dmConversations.id, message.conversationId));
+  }
+
+  return { ...message, body: trimmedBody, editedAt: now };
+}
+
+/**
+ * Soft-delete an own message: the row survives (replies and
+ * dm_conversation_reads.lastReadMessageId both point at it) and content is
+ * stripped on every read path. Idempotent — deleting twice is a no-op.
+ * Neither readAt nor any dm_conversation_reads row is touched.
+ */
+export async function deleteMessage(messageId: number, userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const [message] = await db
+    .select()
+    .from(dmMessages)
+    .where(eq(dmMessages.id, messageId))
+    .limit(1);
+  if (!message) throw new Error("Message not found.");
+
+  await getConversationOrThrow(db, message.conversationId, userId);
+  if (message.senderId !== userId) throw new Error("Not allowed.");
+  if (message.deletedAt != null) return;
+
+  const [latest] = await db
+    .select({ id: dmMessages.id })
+    .from(dmMessages)
+    .where(eq(dmMessages.conversationId, message.conversationId))
+    .orderBy(desc(dmMessages.id))
+    .limit(1);
+  const wasLatest = !!latest && Number(latest.id) === message.id;
+
+  const now = new Date();
+  await db
+    .update(dmMessages)
+    .set({ deletedAt: now })
+    .where(eq(dmMessages.id, messageId));
+
+  if (wasLatest) {
+    // Recompute the preview from the newest message that is still live (or
+    // null when none remains). lastMessageAt is deliberately left alone so a
+    // delete never reorders the inbox.
+    const [newestLive] = await db
+      .select()
+      .from(dmMessages)
+      .where(
+        and(eq(dmMessages.conversationId, message.conversationId), isNull(dmMessages.deletedAt))
+      )
+      .orderBy(desc(dmMessages.id))
+      .limit(1);
+    await db
+      .update(dmConversations)
+      .set({
+        lastMessagePreview: newestLive ? previewFromMessage(newestLive) : null,
+        updatedAt: now,
+      })
+      .where(eq(dmConversations.id, message.conversationId));
+  }
 }
 
 export async function sendMessageRequest(

@@ -55,6 +55,8 @@ import {
   getUnreadMessageCount,
   getOrCreateConversation,
   blockConversation,
+  editMessage,
+  deleteMessage,
 } from "./directMessages";
 
 const FIXED_TIME = new Date("2026-01-15T12:00:00.000Z");
@@ -783,6 +785,306 @@ it("2. recipient does NOT follow requester → creates pending request with conv
     });
   });
 
+  describe("editMessage", () => {
+    it("lets the author rewrite inside the 30-minute window", async () => {
+      const conv = makeConversation(90, 1, 2);
+      const msg = makeMessage(900, 90, 1, "Old body", {
+        createdAt: new Date(Date.now() - 5 * 60 * 1000),
+      });
+
+      const db = fakeDb([
+        msg, // message lookup
+        conv, // getConversationOrThrow
+        { id: 900 }, // newest message in conversation
+      ]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      const result = await editMessage(900, 1, "  New body  ");
+
+      expect(result.body).toBe("New body");
+      expect(result.editedAt).toBeInstanceOf(Date);
+      expect(db.__updateSets).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ body: "New body", editedAt: expect.any(Date) })
+      );
+      // The edited message is the newest one, so the inbox preview follows it.
+      expect(db.__updateSets).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ lastMessagePreview: "New body" })
+      );
+    });
+
+    it("rejects an edit by anyone other than the sender", async () => {
+      const conv = makeConversation(91, 1, 2);
+      const db = fakeDb([makeMessage(901, 91, 2, "Theirs"), conv]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      await expect(editMessage(901, 1, "tampered")).rejects.toThrow("Not allowed.");
+      expect(db.__updateSets).not.toHaveBeenCalled();
+    });
+
+    it("rejects edits outside the window", async () => {
+      const conv = makeConversation(92, 1, 2);
+      const stale = makeMessage(902, 92, 1, "Stale", {
+        createdAt: new Date(Date.now() - 31 * 60 * 1000),
+      });
+      const db = fakeDb([stale, conv]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      await expect(editMessage(902, 1, "Too late")).rejects.toThrow(
+        "Message can no longer be edited."
+      );
+      expect(db.__updateSets).not.toHaveBeenCalled();
+    });
+
+    it("rejects edits of a soft-deleted message", async () => {
+      const conv = makeConversation(93, 1, 2);
+      const dead = makeMessage(903, 93, 1, "Gone", { deletedAt: FIXED_TIME });
+      const db = fakeDb([dead, conv]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      await expect(editMessage(903, 1, "Nope")).rejects.toThrow(
+        "Message already deleted."
+      );
+      expect(db.__updateSets).not.toHaveBeenCalled();
+    });
+
+    it("rejects an unknown message", async () => {
+      const db = fakeDb([undefined]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      await expect(editMessage(999999, 1, "Ghost")).rejects.toThrow(
+        "Message not found."
+      );
+    });
+
+    it("does not touch the preview when the edited message is not the newest", async () => {
+      const conv = makeConversation(94, 1, 2);
+      const older = makeMessage(904, 94, 1, "Older", {
+        createdAt: new Date(Date.now() - 60 * 1000),
+      });
+      const db = fakeDb([older, conv, { id: 999 }]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      await editMessage(904, 1, "Rewritten");
+
+      expect(db.__updateSets).toHaveBeenCalledTimes(1);
+      expect(db.__updateSets).toHaveBeenCalledWith(
+        expect.objectContaining({ body: "Rewritten" })
+      );
+    });
+  });
+
+  describe("deleteMessage", () => {
+    it("soft-deletes, keeps the row, and recomputes the preview", async () => {
+      const conv = makeConversation(95, 1, 2);
+      const target = makeMessage(910, 95, 1, "Bye");
+      const olderLive = makeMessage(909, 95, 2, "Earlier preview");
+
+      const db = fakeDb([
+        target, // message lookup
+        conv, // getConversationOrThrow
+        { id: 910 }, // newest message in conversation
+        olderLive, // newest still-live message
+      ]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      await deleteMessage(910, 1);
+
+      expect(db.__updateSets).toHaveBeenCalledWith(
+        expect.objectContaining({ deletedAt: expect.any(Date) })
+      );
+      expect(db.__updateSets).toHaveBeenCalledWith(
+        expect.objectContaining({ lastMessagePreview: "Earlier preview" })
+      );
+      // Read state and the row itself must never be touched.
+      expect(db.__deleteWheres).not.toHaveBeenCalled();
+      expect(
+        db.__updateSets.mock.calls.every((call: [{ readAt?: unknown }]) => !("readAt" in call[0]))
+      ).toBe(true);
+    });
+
+    it("clears the preview entirely when no live message remains", async () => {
+      const conv = makeConversation(96, 1, 2);
+      const only = makeMessage(911, 96, 1, "Solo");
+
+      const db = fakeDb([only, conv, { id: 911 }, undefined]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      await deleteMessage(911, 1);
+
+      expect(db.__updateSets).toHaveBeenCalledWith(
+        expect.objectContaining({ lastMessagePreview: null })
+      );
+    });
+
+    it("rejects a delete by anyone other than the sender", async () => {
+      const conv = makeConversation(97, 1, 2);
+      const db = fakeDb([makeMessage(912, 97, 2, "Theirs"), conv]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      await expect(deleteMessage(912, 1)).rejects.toThrow("Not allowed.");
+      expect(db.__updateSets).not.toHaveBeenCalled();
+    });
+
+    it("is idempotent: deleting twice writes nothing", async () => {
+      const conv = makeConversation(98, 1, 2);
+      const already = makeMessage(913, 98, 1, "Gone", { deletedAt: FIXED_TIME });
+      const db = fakeDb([already, conv]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      await deleteMessage(913, 1);
+
+      expect(db.__updateSets).not.toHaveBeenCalled();
+      expect(db.__deleteWheres).not.toHaveBeenCalled();
+    });
+
+    it("rejects an unknown message", async () => {
+      const db = fakeDb([undefined]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      await expect(deleteMessage(999999, 1)).rejects.toThrow("Message not found.");
+    });
+  });
+
+  describe("replyToId — one level only", () => {
+    it("stores the parent id on send", async () => {
+      const conv = makeConversation(99, 1, 2);
+      const parent = makeMessage(920, 99, 2, "Original");
+
+      const db = fakeDb([
+        conv, // getConversationOrThrow
+        parent, // assertReplyTarget
+        null, // idempotency check
+      ]);
+      db.__insertReturning.mockResolvedValueOnce([makeMessage(921, 99, 1, "Reply", { replyToId: 920 })]);
+      db.__updateReturning.mockResolvedValue([{}]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      await sendMessage(99, 1, "Reply", "reply-key-1", undefined, 920);
+
+      expect(db.__insertValues).toHaveBeenCalledWith(
+        expect.objectContaining({ replyToId: 920 })
+      );
+    });
+
+    it("rejects a reply whose parent is missing", async () => {
+      const conv = makeConversation(100, 1, 2);
+      const db = fakeDb([conv, undefined]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      await expect(sendMessage(100, 1, "Reply", "reply-key-2", undefined, 424242)).rejects.toThrow(
+        "Reply target not found."
+      );
+      expect(db.__insertValues).not.toHaveBeenCalled();
+    });
+
+    it("rejects a reply to a message in another conversation", async () => {
+      const conv = makeConversation(101, 1, 2);
+      const foreign = makeMessage(922, 999, 2, "Elsewhere");
+      const db = fakeDb([conv, foreign]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      await expect(sendMessage(101, 1, "Reply", "reply-key-3", undefined, 922)).rejects.toThrow(
+        "Reply target is not in this conversation."
+      );
+      expect(db.__insertValues).not.toHaveBeenCalled();
+    });
+
+    it("rejects a reply to a soft-deleted message", async () => {
+      const conv = makeConversation(102, 1, 2);
+      const dead = makeMessage(923, 102, 2, "Gone", { deletedAt: FIXED_TIME });
+      const db = fakeDb([conv, dead]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      await expect(sendMessage(102, 1, "Reply", "reply-key-4", undefined, 923)).rejects.toThrow(
+        "Cannot reply to a deleted message."
+      );
+    });
+
+    it("rejects a nested reply (replying to a reply)", async () => {
+      const conv = makeConversation(103, 1, 2);
+      const nested = makeMessage(924, 103, 2, "Reply to a reply", { replyToId: 920 });
+      const db = fakeDb([conv, nested]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      await expect(sendMessage(103, 1, "Reply", "reply-key-5", undefined, 924)).rejects.toThrow(
+        "Replies can only be one level deep."
+      );
+      expect(db.__insertValues).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("listMessages — reply previews and soft delete", () => {
+    it("returns the quoted parent with its sender", async () => {
+      const conv = makeConversation(104, 1, 2);
+      const newest = makeMessage(930, 104, 1, "Reply body", { replyToId: 929 });
+      const target = makeMessage(929, 104, 2, "Original message");
+
+      const db = fakeDb([
+        conv, // getConversationOrThrow
+        [newest, target], // messages (DESC)
+        [target], // reply parents
+        [makeUser(1, "User 1", "user1"), makeUser(2, "User 2", "user2")], // senders
+      ]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      const result = await listMessages(104, 1);
+
+      // listMessages returns oldest-first: result[0] is the quoted parent.
+      expect(result).toHaveLength(2);
+      expect(result[0].replyTo).toBeNull();
+      expect(result[1].replyTo?.id).toBe(929);
+      expect(result[1].replyTo?.body).toBe("Original message");
+      expect(result[1].replyTo?.sender.username).toBe("user2");
+    });
+
+    it("strips deleted content and renders deleted parents as a tombstone", async () => {
+      const conv = makeConversation(105, 1, 2);
+      const newest = makeMessage(932, 105, 1, "Still here", { replyToId: 931 });
+      const dead = makeMessage(931, 105, 2, "Secret", { deletedAt: FIXED_TIME });
+
+      const db = fakeDb([
+        conv,
+        [newest, dead],
+        [dead],
+        [makeUser(1, "User 1", "user1"), makeUser(2, "User 2", "user2")],
+      ]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      const result = await listMessages(105, 1);
+
+      // Oldest first: the deleted row is result[0], the live reply result[1].
+      expect(result[0].body).toBeNull();
+      expect(result[0].mediaUrl).toBeNull();
+      expect(result[0].deletedAt).toBeInstanceOf(Date);
+      expect(result[1].body).toBe("Still here");
+      expect(result[1].replyTo?.body).toBeNull();
+      expect(result[1].replyTo?.mediaType).toBeNull();
+      expect(result[1].replyTo?.deletedAt).toBeInstanceOf(Date);
+      // No signed URL may ever be minted for deleted media.
+      expect(dmMediaMocks.signDmMessageMediaUrl).not.toHaveBeenCalled();
+    });
+
+    it("hides a reply parent that lives in another conversation", async () => {
+      const conv = makeConversation(106, 1, 2);
+      const newest = makeMessage(934, 106, 1, "Reply", { replyToId: 933 });
+      const foreign = makeMessage(933, 999, 2, "Elsewhere");
+
+      const db = fakeDb([
+        conv,
+        [newest],
+        [foreign],
+        [makeUser(1, "User 1", "user1"), makeUser(2, "User 2", "user2")],
+      ]);
+      databaseMocks.getDb.mockResolvedValue(db as never);
+
+      const result = await listMessages(106, 1);
+
+      expect(result[0].replyTo).toBeNull();
+    });
+  });
+
   describe("Transaction behavior", () => {
     it("9. sendMessageRequest does NOT use a transaction (uses db directly)", async () => {
       // Both mutual follow and non-mutual paths use db directly, not transaction
@@ -841,6 +1143,8 @@ describe("Direct Messages — router integration", () => {
     expect(typeof dm.getUnreadMessageCount).toBe("function");
     expect(typeof dm.getOrCreateConversation).toBe("function");
     expect(typeof dm.blockConversation).toBe("function");
+    expect(typeof dm.editMessage).toBe("function");
+    expect(typeof dm.deleteMessage).toBe("function");
   });
 });
 

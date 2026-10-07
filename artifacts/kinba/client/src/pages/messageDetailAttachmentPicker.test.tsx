@@ -68,6 +68,12 @@ vi.mock("@/lib/trpc", () => ({
       blockConversation: {
         useMutation: () => ({ mutateAsync: mocks.mutationMutate }),
       },
+      editMessage: {
+        useMutation: () => ({ mutateAsync: mocks.mutationMutate, isPending: false }),
+      },
+      deleteMessage: {
+        useMutation: () => ({ mutateAsync: mocks.mutationMutate, isPending: false }),
+      },
     },
   },
 }));

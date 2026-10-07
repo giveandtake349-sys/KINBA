@@ -1372,3 +1372,274 @@
   filter: none;
   color: var(--text);
 }
+/* ── Per-message actions (copy / reply / edit / delete) ───────────────── */
+
+.message-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+/* Own bubbles keep the timestamp/read receipt flush right, as the old
+   full-width .message-time did (see .message-bubble.own .message-time). */
+.message-bubble.own .message-meta {
+  justify-content: flex-end;
+}
+
+.message-edited {
+  font-size: 0.6875rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.message-more-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+/* Desktop affordance for the action trigger; touch devices use long-press. */
+@media (hover: hover) and (pointer: fine) {
+  .message-bubble:hover .message-more-btn,
+  .message-more-btn:focus-visible {
+    display: inline-flex;
+  }
+}
+
+.message-more-btn:hover {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
+}
+
+.message-context-menu {
+  position: fixed;
+  min-width: 176px;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-component);
+  box-shadow: var(--shadow-pop);
+  z-index: 60;
+  animation: fadeIn 0.15s ease;
+}
+
+.message-context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.message-context-item:hover {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.message-context-item--danger {
+  color: var(--error);
+}
+
+.message-context-item--danger:hover {
+  background: var(--error-soft);
+}
+
+/* Quoted reply inside a bubble */
+.message-reply-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 2px;
+  border: none;
+  border-left: 3px solid var(--accent-soft);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.15s ease;
+}
+
+.message-reply-quote:hover {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.reply-quote-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.reply-quote-body {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 260px;
+}
+
+/* Soft-deleted message placeholder */
+.message-bubble.deleted .message-body--deleted {
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+  border: 1px dashed var(--border);
+}
+
+.message-deleted-label {
+  margin: 0;
+  font-size: 0.875rem;
+  font-style: italic;
+  color: var(--muted);
+}
+
+/* Inline editor */
+.message-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 220px;
+  padding: 0.5rem;
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.message-edit textarea {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--page-bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+
+.message-edit textarea:focus {
+  outline: none;
+  border-color: var(--accent-soft);
+}
+
+.message-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.message-edit-cancel,
+.message-edit-save {
+  padding: 6px 12px;
+  border: none;
+  border-radius: var(--radius-control);
+  font-size: 0.8125rem;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.message-edit-cancel {
+  background: transparent;
+  color: var(--muted);
+}
+
+.message-edit-cancel:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.message-edit-save {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.message-edit-save:disabled,
+.message-edit-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Reply strip above the composer */
+.reply-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.reply-strip-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.reply-strip-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.reply-strip-preview {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reply-strip-cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.reply-strip-cancel:hover {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
+}
+
+/* Jump-to-message highlight */
+.message-bubble--flash .message-body {
+  outline: 2px solid var(--accent-soft);
+  animation: flashOutline 1.2s ease;
+}
+
+@keyframes flashOutline {
+  0%, 70% { outline-color: var(--accent-soft); }
+  100% { outline-color: transparent; }
+}

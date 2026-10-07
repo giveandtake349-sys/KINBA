@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -14,6 +14,11 @@ import {
   Shield,
   Plus,
   FileText,
+  Copy,
+  Reply,
+  Pencil,
+  Trash2,
+  X,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { nanoid } from "nanoid";
@@ -43,6 +48,7 @@ type OptimisticMessage = {
   idempotencyKey: string;
   text: string;
   media?: DmMessageMedia;
+  replyToId?: number | null;
   preview?: {
     kind: DMAttachmentKind;
     name: string;
@@ -51,6 +57,61 @@ type OptimisticMessage = {
   };
   failed: boolean;
 };
+
+/** Structural view of the quoted parent returned by listMessages. */
+type MessageQuote = {
+  id: number;
+  sender?: { name?: string | null; username?: string | null } | null;
+  body?: string | null;
+  mediaType?: string | null;
+  deletedAt?: Date | string | null;
+};
+
+/** Structural view of a persisted message row (server returns Dates via superjson). */
+type ActionableMessage = {
+  id: number;
+  senderId: number;
+  body?: string | null;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
+  createdAt: Date | string;
+  editedAt?: Date | string | null;
+  deletedAt?: Date | string | null;
+  replyTo?: MessageQuote | null;
+  sender?: { name?: string | null; username?: string | null } | null;
+};
+
+type MessageActionId = "copy" | "reply" | "edit" | "delete";
+
+type MessageAction = {
+  id: MessageActionId;
+  label: string;
+  icon: React.ReactNode;
+  danger?: boolean;
+};
+
+type ContextMenuState = {
+  messageId: number;
+  x: number;
+  y: number;
+};
+
+type ReplyTarget = {
+  id: number;
+  label: string;
+  preview: string;
+};
+
+// Mirrors the server's DM_EDIT_WINDOW_MS — the server re-checks and rejects.
+const EDIT_WINDOW_MS = 30 * 60 * 1000;
+
+function mediaLabel(mediaType?: string | null): string {
+  if (!mediaType) return "Attachment";
+  if (mediaType.startsWith("video")) return "Video";
+  if (mediaType.startsWith("image")) return "Photo";
+  if (mediaType === DM_DOCUMENT_MEDIA_TYPE) return "Document";
+  return "Attachment";
+}
 
 export default function MessageDetail() {
   const { isAuthenticated, user, session } = useAuth();
@@ -69,9 +130,19 @@ export default function MessageDetail() {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [blocking, setBlocking] = useState(false);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const longPressRef = useRef<{ timer: number | null; x: number; y: number }>({
+    timer: null,
+    x: 0,
+    y: 0,
+  });
 
   const attachmentsRef = useRef<DmPendingAttachment[]>([]);
   const uploadHandlesRef = useRef<Map<string, DmUploadHandle>>(new Map());
@@ -165,9 +236,33 @@ export default function MessageDetail() {
     },
   });
 
+  const editMut = trpc.directMessages.editMessage.useMutation({
+    onSuccess: () => {
+      utils.directMessages.listMessages.invalidate();
+      utils.directMessages.listConversations.invalidate();
+    },
+    onError: error => {
+      console.error("Failed to edit message:", error);
+    },
+  });
+
+  const deleteMut = trpc.directMessages.deleteMessage.useMutation({
+    onSuccess: () => {
+      utils.directMessages.listMessages.invalidate();
+      utils.directMessages.listConversations.invalidate();
+    },
+    onError: error => {
+      console.error("Failed to delete message:", error);
+    },
+  });
+
   const messages = conversationQuery.data ?? [];
   const isLoading = conversationQuery.isPending;
   const isError = conversationQuery.isError;
+  const messageById = useMemo(
+    () => new Map(messages.map(message => [message.id, message])),
+    [messages]
+  );
 
   // Determine partner from messages (the other participant, not current user)
   const partner = messages.find((m) => m.senderId !== user?.id)?.sender ?? messages[0]?.sender;
@@ -343,6 +438,7 @@ export default function MessageDetail() {
           body: entry.text,
           idempotencyKey: entry.idempotencyKey,
           ...(entry.media ? { media: entry.media } : {}),
+          ...(entry.replyToId ? { replyToId: entry.replyToId } : {}),
         });
         // Pull the persisted row in before dropping the optimistic bubble so
         // the thread never flashes empty.
@@ -375,6 +471,10 @@ export default function MessageDetail() {
       );
       if (payloads.length === 0) return;
 
+      // Captured before the strip clears so every payload of this send keeps
+      // quoting the same target message.
+      const activeReplyToId = replyTarget?.id ?? null;
+
       setSending(true);
       setMessageText("");
 
@@ -402,6 +502,7 @@ export default function MessageDetail() {
               idempotencyKey: nanoid(),
               text: payload.body,
               media: payload.media,
+              replyToId: activeReplyToId,
               preview: attachment
                 ? {
                     kind: attachment.kind,
@@ -419,6 +520,7 @@ export default function MessageDetail() {
         ...previous,
         ...Object.fromEntries(entries),
       }));
+      if (activeReplyToId != null) setReplyTarget(null);
 
       // Sequential sends keep multi-image ordering intact; each message keeps
       // its own idempotency key so a failed one can be retried on its own.
@@ -431,6 +533,7 @@ export default function MessageDetail() {
       sending,
       uploadingCount,
       messageText,
+      replyTarget,
       updateAttachments,
       dispatchMessage,
     ]
@@ -496,6 +599,199 @@ export default function MessageDetail() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showMenu]);
 
+  const cancelLongPress = useCallback(() => {
+    if (longPressRef.current.timer != null) {
+      window.clearTimeout(longPressRef.current.timer);
+      longPressRef.current.timer = null;
+    }
+  }, []);
+
+  const openMessageMenu = useCallback(
+    (messageId: number, x: number, y: number) => {
+      cancelLongPress();
+      setContextMenu({ messageId, x, y });
+    },
+    [cancelLongPress]
+  );
+
+  const closeMessageMenu = useCallback(() => setContextMenu(null), []);
+
+  // Escape dismisses the contextual menu.
+  useEffect(() => {
+    if (!contextMenu) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeMessageMenu();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [contextMenu, closeMessageMenu]);
+
+  // Mobile: a 450 ms long-press opens the contextual menu. Any scroll/drag
+  // (or lift) cancels it, so the gesture never hijacks reading or scrolling.
+  const handleBubbleTouchStart = useCallback(
+    (messageId: number, event: React.TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      cancelLongPress();
+      longPressRef.current.x = touch.clientX;
+      longPressRef.current.y = touch.clientY;
+      longPressRef.current.timer = window.setTimeout(() => {
+        longPressRef.current.timer = null;
+        openMessageMenu(messageId, touch.clientX, touch.clientY);
+      }, 450);
+    },
+    [cancelLongPress, openMessageMenu]
+  );
+
+  const handleBubbleTouchMove = useCallback(
+    (event: React.TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch) {
+        cancelLongPress();
+        return;
+      }
+      const moved =
+        Math.abs(touch.clientX - longPressRef.current.x) > 10 ||
+        Math.abs(touch.clientY - longPressRef.current.y) > 10;
+      if (moved) cancelLongPress();
+    },
+    [cancelLongPress]
+  );
+
+  const handleBubbleTouchEnd = useCallback(() => cancelLongPress(), [cancelLongPress]);
+
+  useEffect(() => cancelLongPress, [cancelLongPress]);
+
+  // The message menu dismisses on any interaction outside it.
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = (event: Event) => {
+      if (contextMenuRef.current?.contains(event.target as Node)) return;
+      setContextMenu(null);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("touchstart", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("touchstart", close);
+    };
+  }, [contextMenu]);
+
+  /**
+   * Actions differ by ownership. The client only greys/hides options — the
+   * server independently enforces ownership, the 30-minute window and the
+   * soft-delete guard.
+   */
+  const getActions = useCallback(
+    (msg: ActionableMessage): MessageAction[] => {
+      if (msg.deletedAt != null) return [];
+      const isOwn = msg.senderId === user?.id;
+      const hasBody = Boolean(msg.body?.trim());
+      const actions: MessageAction[] = [];
+      if (hasBody) {
+        actions.push({ id: "copy", label: "Copy", icon: <Copy size={16} /> });
+      }
+      actions.push({ id: "reply", label: "Reply", icon: <Reply size={16} /> });
+      if (isOwn) {
+        const withinWindow =
+          Date.now() - new Date(msg.createdAt).getTime() <= EDIT_WINDOW_MS;
+        if (hasBody && withinWindow) {
+          actions.push({ id: "edit", label: "Edit", icon: <Pencil size={16} /> });
+        }
+        actions.push({
+          id: "delete",
+          label: "Delete",
+          icon: <Trash2 size={16} />,
+          danger: true,
+        });
+      }
+      return actions;
+    },
+    [user?.id]
+  );
+
+  const runMessageAction = useCallback(
+    async (actionId: MessageActionId, msg: ActionableMessage) => {
+      setContextMenu(null);
+      if (actionId === "copy") {
+        const text = msg.body?.trim();
+        if (!text) return;
+        try {
+          await navigator.clipboard?.writeText(text);
+          toast.success("Copied");
+        } catch {
+          toast.error("Couldn't copy to the clipboard.");
+        }
+        return;
+      }
+      if (actionId === "reply") {
+        const label = msg.sender?.name || msg.sender?.username || "Message";
+        setReplyTarget({
+          id: msg.id,
+          label,
+          preview: msg.body?.trim() || mediaLabel(msg.mediaType),
+        });
+        textareaRef.current?.focus();
+        return;
+      }
+      if (actionId === "edit") {
+        setEditingId(msg.id);
+        setEditingText(msg.body ?? "");
+        return;
+      }
+      if (actionId === "delete") {
+        if (!window.confirm("Delete this message? This removes it for everyone.")) {
+          return;
+        }
+        try {
+          await deleteMut.mutateAsync({ messageId: msg.id });
+          toast.success("Message deleted");
+        } catch (error) {
+          toast.error(
+            error instanceof Error ? error.message : "Couldn't delete the message."
+          );
+        }
+      }
+    },
+    [deleteMut]
+  );
+
+  const cancelEdit = useCallback(() => {
+    setEditingId(null);
+    setEditingText("");
+  }, []);
+
+  const submitEdit = useCallback(async () => {
+    if (editingId == null) return;
+    const trimmed = editingText.trim();
+    if (!trimmed) {
+      toast.error("Message cannot be empty.");
+      return;
+    }
+    try {
+      await editMut.mutateAsync({ messageId: editingId, body: trimmed });
+      setEditingId(null);
+      setEditingText("");
+      toast.success("Message updated");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Couldn't edit the message."
+      );
+    }
+  }, [editingId, editingText, editMut]);
+
+  /** Tapping a quoted reply jumps to the original message in this thread. */
+  const jumpToMessage = useCallback((messageId: number) => {
+    const target = document.querySelector(`[data-message-id="${messageId}"]`);
+    if (!(target instanceof HTMLElement)) {
+      toast.info("That message is no longer loaded.");
+      return;
+    }
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.classList.add("message-bubble--flash");
+    window.setTimeout(() => target.classList.remove("message-bubble--flash"), 1200);
+  }, []);
+
   if (!isAuthenticated) {
     return (
       <div className="message-detail-shell">
@@ -556,6 +852,10 @@ export default function MessageDetail() {
       </div>
     );
   }
+
+  const menuTarget = contextMenu
+    ? messageById.get(contextMenu.messageId)
+    : undefined;
 
   return (
     <div className="message-detail-shell">
@@ -622,11 +922,26 @@ export default function MessageDetail() {
               const isVideo = Boolean(msg.mediaType?.startsWith("video"));
               const isDocument = msg.mediaType === DM_DOCUMENT_MEDIA_TYPE;
               const documentMeta = isDocument ? parseDmMediaDisplay(mediaUrl) : null;
+              const isDeleted = msg.deletedAt != null;
+              const isEditing = editingId === msg.id;
+              const quote = msg.replyTo;
               return (
                 <div
                   key={msg.id}
-                  className={`message-bubble${isOwn ? " own" : ""}`}
+                  className={`message-bubble${isOwn ? " own" : ""}${isDeleted ? " deleted" : ""}`}
                   data-message-id={msg.id}
+                  onContextMenu={(event) => {
+                    if (isDeleted) return;
+                    event.preventDefault();
+                    openMessageMenu(msg.id, event.clientX, event.clientY);
+                  }}
+                  onTouchStart={(event) => {
+                    if (isDeleted) return;
+                    handleBubbleTouchStart(msg.id, event);
+                  }}
+                  onTouchMove={handleBubbleTouchMove}
+                  onTouchEnd={handleBubbleTouchEnd}
+                  onTouchCancel={handleBubbleTouchEnd}
                 >
                   {showTime && (
                     <div className="message-date">
@@ -637,7 +952,58 @@ export default function MessageDetail() {
                     {!isOwn && idx > 0 && messages[idx - 1]?.senderId !== msg.senderId && (
                       <div className="message-sender-name">{msg.sender.name || msg.sender.username}</div>
                     )}
-                    <div className={`message-body${msg.mediaUrl ? " has-media" : ""}`}>
+                    {isDeleted ? (
+                      <div className="message-body message-body--deleted">
+                        <p className="message-deleted-label">Message deleted</p>
+                      </div>
+                    ) : isEditing ? (
+                      <div className="message-edit">
+                        <textarea
+                          value={editingText}
+                          onChange={(event) => setEditingText(event.target.value)}
+                          rows={2}
+                          aria-label="Edit message"
+                          autoFocus
+                        />
+                        <div className="message-edit-actions">
+                          <button
+                            type="button"
+                            className="message-edit-cancel"
+                            onClick={cancelEdit}
+                            disabled={editMut.isPending}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="message-edit-save"
+                            onClick={() => void submitEdit()}
+                            disabled={editMut.isPending || editingText.trim().length === 0}
+                          >
+                            {editMut.isPending ? "Saving..." : "Save"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {quote && (
+                          <button
+                            type="button"
+                            className="message-reply-quote"
+                            onClick={() => jumpToMessage(quote.id)}
+                            aria-label="Jump to the message being replied to"
+                          >
+                            <span className="reply-quote-name">
+                              {quote.sender?.name || quote.sender?.username || "Message"}
+                            </span>
+                            <span className="reply-quote-body">
+                              {quote.deletedAt
+                                ? "Message deleted"
+                                : quote.body?.trim() || mediaLabel(quote.mediaType)}
+                            </span>
+                          </button>
+                        )}
+                        <div className={`message-body${msg.mediaUrl ? " has-media" : ""}`}>
                       {msg.mediaUrl && (
                         <div className="message-media">
                           {!displayUrl ? (
@@ -686,11 +1052,33 @@ export default function MessageDetail() {
                         </div>
                       )}
                       {msg.body && <p>{msg.body}</p>}
+                        </div>
+                      </>
+                    )}
+                    <div className="message-meta">
+                      <time className="message-time" dateTime={new Date(msg.createdAt).toISOString()}>
+                        {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </time>
+                      {msg.editedAt != null && !isDeleted && (
+                        <span className="message-edited">edited</span>
+                      )}
+                      {isOwn && msg.readAt && <Check size={14} className="read-receipt" aria-label="Read" />}
+                      {!isDeleted && !isEditing && (
+                        <button
+                          type="button"
+                          className="message-more-btn"
+                          aria-label="Message actions"
+                          aria-haspopup="menu"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            const rect = event.currentTarget.getBoundingClientRect();
+                            openMessageMenu(msg.id, rect.left, rect.bottom + 4);
+                          }}
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+                      )}
                     </div>
-                    <time className="message-time" dateTime={new Date(msg.createdAt).toISOString()}>
-                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                    </time>
-                    {isOwn && msg.readAt && <Check size={14} className="read-receipt" aria-label="Read" />}
                   </div>
                 </div>
               );
@@ -768,7 +1156,52 @@ export default function MessageDetail() {
         )}
       </div>
 
+      {contextMenu && menuTarget && (
+        <div
+          ref={contextMenuRef}
+          role="menu"
+          className="message-context-menu"
+          style={{
+            left: Math.max(8, Math.min(contextMenu.x, window.innerWidth - 196)),
+            top: Math.max(8, Math.min(contextMenu.y, window.innerHeight - 220)),
+          }}
+          onClick={event => event.stopPropagation()}
+          onContextMenu={event => event.preventDefault()}
+        >
+          {getActions(menuTarget).map(action => (
+            <button
+              key={action.id}
+              type="button"
+              role="menuitem"
+              className={`message-context-item${action.danger ? " message-context-item--danger" : ""}`}
+              onClick={() => void runMessageAction(action.id, menuTarget)}
+            >
+              {action.icon}
+              {action.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="composer-shell">
+        {replyTarget && (
+          <div className="reply-strip" role="status">
+            <div className="reply-strip-text">
+              <span className="reply-strip-label">Replying to</span>
+              <span className="reply-strip-preview">
+                {replyTarget.label}: {replyTarget.preview}
+              </span>
+            </div>
+            <button
+              type="button"
+              className="reply-strip-cancel"
+              aria-label="Cancel reply"
+              onClick={() => setReplyTarget(null)}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
         <PendingAttachmentStrip
           items={attachments}
           onRemove={handleRemoveAttachment}

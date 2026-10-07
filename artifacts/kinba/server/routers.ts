@@ -147,6 +147,8 @@ import {
   acceptMessageRequest,
   blockConversation,
   declineMessageRequest,
+  deleteMessage,
+  editMessage,
   getOrCreateConversation,
   getUnreadMessageCount,
   listConversations,
@@ -412,13 +414,32 @@ function mapModerationError(error: unknown, _op: string): TRPCError {
 function mapDMError(error: unknown, _op: string): TRPCError {
   if (error instanceof TRPCError) return error;
   const message = error instanceof Error ? error.message : "";
-  if (message === "Conversation not found." || message === "Message request not found.") {
+  if (
+    message === "Conversation not found." ||
+    message === "Message request not found." ||
+    message === "Message not found." ||
+    message === "Reply target not found."
+  ) {
     return new TRPCError({ code: "NOT_FOUND", message });
+  }
+  // Owner-only message actions (edit/delete) — never leak existence to
+  // non-members (handled above), then deny non-owners outright.
+  if (message === "Not allowed.") {
+    return new TRPCError({ code: "FORBIDDEN", message });
   }
   if (message === "Cannot message yourself.") {
     return new TRPCError({ code: "BAD_REQUEST", message });
   }
-  if (message === "Message body or media is required." || message.startsWith("Message must be at most")) {
+  if (
+    message === "Message body or media is required." ||
+    message.startsWith("Message must be at most") ||
+    // Message actions v1: edit window / soft-delete / reply validation.
+    message === "Message already deleted." ||
+    message === "Message can no longer be edited." ||
+    message === "Reply target is not in this conversation." ||
+    message === "Cannot reply to a deleted message." ||
+    message === "Replies can only be one level deep."
+  ) {
     return new TRPCError({ code: "BAD_REQUEST", message });
   }
   // Attachment ownership / type / size validation from server/dmMedia.ts.
@@ -1783,6 +1804,7 @@ export const appRouter = router({
           conversationId: z.number().int().positive(),
           body: z.string().trim().max(4000).optional(),
           idempotencyKey: z.string().trim().min(1).max(160),
+          replyToId: z.number().int().positive().optional(),
           media: z
             .object({
               mediaUrl: z.string().url().max(1024),
@@ -1801,10 +1823,35 @@ export const appRouter = router({
             ctx.user.id,
             input.body ?? "",
             input.idempotencyKey,
-            input.media
+            input.media,
+            input.replyToId ?? null
           );
         } catch (error) {
           throw mapDMError(error, "sendMessage");
+        }
+      }),
+    editMessage: protectedProcedure
+      .input(
+        z.object({
+          messageId: z.number().int().positive(),
+          body: z.string().trim().min(1).max(4000),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await editMessage(input.messageId, ctx.user.id, input.body);
+        } catch (error) {
+          throw mapDMError(error, "editMessage");
+        }
+      }),
+    deleteMessage: protectedProcedure
+      .input(z.object({ messageId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        try {
+          await deleteMessage(input.messageId, ctx.user.id);
+          return { ok: true as const };
+        } catch (error) {
+          throw mapDMError(error, "deleteMessage");
         }
       }),
     sendMessageRequest: protectedProcedure
