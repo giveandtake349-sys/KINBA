@@ -61,6 +61,18 @@ function sortUserPair(a: number, b: number): [number, number] {
   return a < b ? [a, b] : [b, a];
 }
 
+/**
+ * Order-independent key for a pair of participant ids.
+ *
+ * `dm_message_requests` has no conversation id, so a request is tied to a
+ * conversation by matching its (requester, recipient) pair against the
+ * conversation's two participants, whichever way round they are stored.
+ */
+function participantPairKey(a: number, b: number): string {
+  const [low, high] = sortUserPair(a, b);
+  return `${low}:${high}`;
+}
+
 async function getConversationOrThrow(
   db: DbLike,
   conversationId: number,
@@ -264,21 +276,39 @@ export async function listConversations(
       .limit(safeLimit);
 
     // Find conversations that have a pending request where the current user is the recipient
-    // These should be hidden from the normal inbox for the recipient
-    const conversationIds = conversations.map((c) => c.id);
-    let pendingRequestConversationIds = new Set<number>();
-    if (conversationIds.length > 0) {
+    // These should be hidden from the normal inbox for the recipient.
+    //
+    // dm_message_requests stores no conversation id, so the link is derived from
+    // the participants: select only columns that exist on the table and match the
+    // request's (requesterId, recipientId) pair against each loaded conversation's
+    // (userAId, userBId) pair, order-independently. One extra query, no N+1.
+    const pendingRequestConversationIds = new Set<number>();
+    if (conversations.length > 0) {
       const pendingRequests = await db
-        .select({ conversationId: dmMessageRequests.conversationId })
+        .select({
+          requesterId: dmMessageRequests.requesterId,
+          recipientId: dmMessageRequests.recipientId,
+        })
         .from(dmMessageRequests)
         .where(
           and(
             eq(dmMessageRequests.recipientId, userId),
-            eq(dmMessageRequests.status, "pending"),
-            inArray(dmMessageRequests.conversationId, conversationIds)
+            eq(dmMessageRequests.status, "pending")
           )
         );
-      pendingRequestConversationIds = new Set(pendingRequests.map((r) => r.conversationId));
+
+      if (pendingRequests.length > 0) {
+        const pendingPairs = new Set(
+          pendingRequests.map((r) => participantPairKey(r.requesterId, r.recipientId))
+        );
+        for (const conversation of conversations) {
+          if (
+            pendingPairs.has(participantPairKey(conversation.userAId, conversation.userBId))
+          ) {
+            pendingRequestConversationIds.add(conversation.id);
+          }
+        }
+      }
     }
 
     // Filter out conversations with pending requests for this recipient

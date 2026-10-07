@@ -6,7 +6,9 @@
  * Uses fakeDb matching real Drizzle query patterns from directMessages.ts.
  */
 import { vi, describe, beforeEach, afterEach, expect, it } from "vitest";
-import { eq, and, or, desc, inArray, isNull, sql } from "drizzle-orm";
+import { eq, and, or, desc, getTableColumns, inArray, isNull, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { readFile } from "node:fs/promises";
 import {
   dmConversations,
   dmMessages,
@@ -489,16 +491,18 @@ it("2. recipient does NOT follow requester → creates pending request with conv
       const conv = makeConversation(20, 1, 2); // use default lastMessageAt to trigger all queries
       const read = makeRead(20, 2, 0);
       const partner = makeUser(1, "User 1", "user1");
-      const req = makeRequest(10, 1, 2, "Hello", "pending", { conversationId: 20 });
+      // dm_message_requests has no conversation id: listConversations selects the
+      // real (requesterId, recipientId) columns and matches the pair in memory.
+      const pendingRequest = makeRequest(10, 1, 2, "Hello", "pending");
       const msg = makeMessage(100, 20, 1, "Hello");
 
       const db = fakeDb([
         [conv], // 1. conversations
-        [read], // 2. reads
-        [partner], // 3. partners
-        [{ id: 100, conversationId: 20 }], // 4. latest (max message id)
-        [msg], // 5. lastMessages
-        [{ conversationId: 20 }], // 6. pendingRequests (actual last query)
+        [pendingRequest], // 2. pending requests (recipientId = 2, status = pending)
+        [read], // 3. reads
+        [partner], // 4. partners (users join profiles)
+        [{ id: 100, conversationId: 20 }], // 5. latest (max message id)
+        [msg], // 6. lastMessages
       ]);
       databaseMocks.getDb.mockResolvedValue(db as never);
 
@@ -532,8 +536,9 @@ it("2. recipient does NOT follow requester → creates pending request with conv
       const conv = makeConversation(22, 1, 2);
       const read = makeRead(22, 1, 0);
       const partner = makeUser(2, "User 2", "user2");
-      // Request where user 1 is the requester, not recipient
-      const req = makeRequest(11, 1, 2, "Hello", "pending", { conversationId: 22 });
+      // Request 1 -> 2 exists where user 1 is the requester, not the recipient.
+      // listConversations only selects requests with recipientId = user 1, so the
+      // pending-request queue below is empty for this caller.
 
       const db = fakeDb([
         [conv], // conversations
@@ -836,5 +841,135 @@ describe("Direct Messages — router integration", () => {
     expect(typeof dm.getUnreadMessageCount).toBe("function");
     expect(typeof dm.getOrCreateConversation).toBe("function");
     expect(typeof dm.blockConversation).toBe("function");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: listConversations must only touch columns that exist.
+//
+// The old implementation read `dmMessageRequests.conversationId`. That column is
+// in neither drizzle/schema.ts nor the production table, so Drizzle threw
+// `TypeError: Cannot convert undefined or null to object` while building SQL
+// (drizzle-orm orderSelectedFields) and every account with at least one active
+// conversation received HTTP 500 from directMessages.listConversations.
+//
+// The fakeDb helpers above never build SQL, so these tests drive the real
+// Drizzle schema/query builder against a capturing client. They fail if the
+// missing column is referenced again — no fake `conversationId` is added.
+// ---------------------------------------------------------------------------
+
+const SQL_TABLES: Record<string, object> = {
+  dm_conversations: dmConversations,
+  dm_messages: dmMessages,
+  dm_message_requests: dmMessageRequests,
+  dm_conversation_reads: dmConversationReads,
+  users,
+  profiles,
+};
+
+function knownColumns(tableName: string): Set<string> | undefined {
+  const table = SQL_TABLES[tableName];
+  if (!table) return undefined;
+  return new Set(
+    Object.values(getTableColumns(table as never)).map((column) => column.name)
+  );
+}
+
+function assertSqlOnlyUsesKnownColumns(statements: string[]) {
+  for (const statement of statements) {
+    const identifiers = statement.matchAll(/"([A-Za-z0-9_]+)"\."([A-Za-z0-9_]+)"/g);
+    for (const [, tableName, columnName] of identifiers) {
+      const known = knownColumns(tableName);
+      if (known && !known.has(columnName)) {
+        throw new Error(`Unknown column ${tableName}.${columnName} in SQL:\n${statement}`);
+      }
+    }
+  }
+}
+
+describe("listConversations — real Drizzle SQL (regression)", () => {
+  // Current user is 2. Conversation 20 joins users 1 & 2; conversation 21 joins
+  // users 2 & 5. The pending request is 5 -> 2 (user 2 is the recipient), so it
+  // belongs to conversation 21 regardless of participant ordering.
+  const conversationForUserOne = makeConversation(20, 1, 2);
+  const conversationForUserFive = makeConversation(21, 2, 5);
+  const pendingFromUserFive = makeRequest(70, 5, 2, "Hi", "pending");
+
+  function createCapturingClient() {
+    const captured: string[] = [];
+
+    const rowsFor = (text: string): unknown[][] => {
+      if (text.includes("max(")) return [];
+      if (text.includes('"dm_conversations"')) {
+        const keys = Object.keys(getTableColumns(dmConversations));
+        return [conversationForUserOne, conversationForUserFive].map((row) =>
+          keys.map((key) => (row as Record<string, unknown>)[key] ?? null)
+        );
+      }
+      if (text.includes('"dm_message_requests"')) {
+        // Column order mirrors the `.select({...})` literal in listConversations.
+        return [[pendingFromUserFive.requesterId, pendingFromUserFive.recipientId]];
+      }
+      return [];
+    };
+
+    const client = {
+      query: async (first: unknown) => {
+        const text =
+          typeof first === "string"
+            ? first
+            : String((first as { text?: string } | null)?.text ?? "");
+        captured.push(text);
+        return { rows: rowsFor(text) };
+      },
+    };
+
+    return { client, captured };
+  }
+
+  function runWithRealDrizzle() {
+    const { client, captured } = createCapturingClient();
+    const realDb = drizzle({ client: client as never });
+    databaseMocks.withDb.mockImplementationOnce(
+      async (fn: (db: unknown) => Promise<unknown>) => fn(realDb)
+    );
+    return { captured, done: () => listConversations(2, 50) };
+  }
+
+  it("builds SQL that only references columns present in the schema", async () => {
+    const { captured, done } = runWithRealDrizzle();
+
+    const result = await done();
+
+    expect(captured.length).toBeGreaterThan(0);
+    expect(() => assertSqlOnlyUsesKnownColumns(captured)).not.toThrow();
+  });
+
+  it("does not reference dm_message_requests.conversationId", async () => {
+    const { captured, done } = runWithRealDrizzle();
+
+    await done();
+
+    const requestSql = captured.find((text) => text.includes('"dm_message_requests"'));
+    expect(requestSql).toBeDefined();
+    expect(requestSql).toContain('"recipientId"');
+    expect(requestSql).toContain('"status"');
+    expect(requestSql).not.toContain('"conversationId"');
+  });
+
+  it("hides only the conversation whose participants match a pending request", async () => {
+    const { done } = runWithRealDrizzle();
+
+    const result = await done();
+
+    // Conversation 21 (2 & 5) matches pending request 5 -> 2 and is hidden;
+    // conversation 20 (1 & 2) has no pending request and stays visible.
+    expect(result.map((conversation) => conversation.id)).toEqual([20]);
+  });
+
+  it("directMessages.ts never references dmMessageRequests.conversationId", async () => {
+    const source = await readFile(new URL("./directMessages.ts", import.meta.url), "utf8");
+
+    expect(source).not.toContain("dmMessageRequests.conversationId");
   });
 });
