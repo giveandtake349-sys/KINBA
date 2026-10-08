@@ -52,6 +52,7 @@ import {
   isValidReaction,
   type ReactionType,
 } from "@shared/reactions";
+import { normalizeUsername, validateUsername, RESERVED_USERNAMES } from "../../shared/username";
 import { ENV } from "./_core/env";
 import { resolvePostgresDatabaseUrl } from "./databaseConfig";
 import { selectNomineeIds, selectSecondaryWinnerId } from "./sponsorBidsDraw";
@@ -369,17 +370,26 @@ export async function getPublicProfile(userId: number) {
 
 export async function updateOwnProfile(
   userId: number,
-  input: { username?: string | null; photoUrl?: string | null; about?: string | null }
+  input: { username?: string | null; photoUrl?: string | null; about?: string | null; displayName?: string | null; birthday?: string | null }
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const hasUsername = Object.prototype.hasOwnProperty.call(input, "username");
   const hasPhotoUrl = Object.prototype.hasOwnProperty.call(input, "photoUrl");
   const hasAbout = Object.prototype.hasOwnProperty.call(input, "about");
+  const hasDisplayName = Object.prototype.hasOwnProperty.call(input, "displayName");
+  const hasBirthday = Object.prototype.hasOwnProperty.call(input, "birthday");
+
   const username = hasUsername
     ? input.username?.trim().toLowerCase() || null
     : undefined;
+
   if (username) {
+    const validation = validateUsername(username);
+    if (!validation.valid) throw new Error(validation.error);
+    if (RESERVED_USERNAMES.has(username)) {
+      throw new Error("That username is reserved.");
+    }
     const [existing] = await db
       .select({ userId: profiles.userId })
       .from(profiles)
@@ -392,23 +402,103 @@ export async function updateOwnProfile(
       .limit(1);
     if (existing) throw new Error("That username is already taken.");
   }
+
+  const displayName = hasDisplayName
+    ? input.displayName?.trim() || null
+    : undefined;
+
+  const birthday = hasBirthday
+    ? input.birthday || null
+    : undefined;
+
+  if (birthday) {
+    const date = new Date(birthday);
+    if (isNaN(date.getTime()) || date > new Date()) {
+      throw new Error("Birthday cannot be in the future.");
+    }
+  }
+
   const updateSet: Partial<typeof profiles.$inferInsert> = {
     updatedAt: new Date(),
   };
   if (hasUsername) updateSet.username = username ?? null;
   if (hasPhotoUrl) updateSet.photoUrl = input.photoUrl ?? null;
   if (hasAbout) updateSet.about = input.about?.trim() || null;
+  if (hasDisplayName) updateSet.displayName = displayName ?? null;
+  if (hasBirthday) updateSet.birthday = birthday;
+
   const insertValues: typeof profiles.$inferInsert = {
     userId,
     username: username ?? null,
     photoUrl: hasPhotoUrl ? (input.photoUrl ?? null) : null,
     about: hasAbout ? (input.about?.trim() || null) : undefined,
+    displayName: hasDisplayName ? (displayName ?? null) : undefined,
+    birthday: hasBirthday ? birthday : undefined,
   };
   await db
     .insert(profiles)
     .values(insertValues)
     .onConflictDoUpdate({ target: profiles.userId, set: updateSet });
   return getOwnProfile(userId);
+}
+
+export async function claimUsername(userId: number, username: string): Promise<{ success: boolean; username: string }> {
+  const normalized = normalizeUsername(username);
+  const validation = validateUsername(normalized);
+  if (!validation.valid) throw new Error(validation.error);
+  if (RESERVED_USERNAMES.has(normalized)) throw new Error("That username is reserved.");
+
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const [existing] = await db
+    .select({ userId: profiles.userId })
+    .from(profiles)
+    .where(eq(profiles.username, normalized))
+    .limit(1);
+  if (existing) throw new Error("That username is already taken.");
+
+  const [current] = await db
+    .select({ username: profiles.username })
+    .from(profiles)
+    .where(eq(profiles.userId, userId))
+    .limit(1);
+  if (current?.username) throw new Error("Username already claimed.");
+
+  await db
+    .insert(profiles)
+    .values({ userId, username: normalized })
+    .onConflictDoUpdate({ target: profiles.userId, set: { username: normalized, updatedAt: new Date() } });
+
+  return { success: true, username: normalized };
+}
+
+export async function updateDisplayName(userId: number, displayName: string | null): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const trimmed = displayName?.trim() ?? null;
+  await db
+    .insert(profiles)
+    .values({ userId, displayName: trimmed })
+    .onConflictDoUpdate({ target: profiles.userId, set: { displayName: trimmed, updatedAt: new Date() } });
+}
+
+export async function setBirthday(userId: number, birthday: string | null): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  if (birthday) {
+    const date = new Date(birthday);
+    if (isNaN(date.getTime()) || date > new Date()) {
+      throw new Error("Birthday cannot be in the future.");
+    }
+  }
+
+  await db
+    .insert(profiles)
+    .values({ userId, birthday: birthday || null })
+    .onConflictDoUpdate({ target: profiles.userId, set: { birthday: birthday || null, updatedAt: new Date() } });
 }
 
 export async function getVerificationStatus(userId: number) {

@@ -516,6 +516,9 @@ describe("§22 writers — flag gating + payloads", () => {
     // anything else would silently widen the durable notification surface.
     expect(Object.values(NOTIFICATION_TYPES).sort()).toEqual(
       [
+        "dm_message",
+        "dm_request",
+        "dm_request_accepted",
         "drop_claim_cancelled",
         "drop_claim_fulfilled",
         "drop_sold_out",

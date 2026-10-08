@@ -22,7 +22,7 @@ export function SupabaseAuthDialog({
 
   if (!open) return null;
 
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
+  const submitAuth = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setPending(true);
     try {
@@ -68,11 +68,13 @@ export function SupabaseAuthDialog({
     }
   };
 
+  if (!open) return null;
+
   return (
     <div className="modal-backdrop" role="presentation">
       <form
         className="request-modal auth-modal"
-        onSubmit={submit}
+        onSubmit={submitAuth}
         role="dialog"
         aria-modal="true"
         aria-labelledby="auth-title"

@@ -59,6 +59,8 @@ export type ProfileSnapshot = {
     verificationStatus?: string | null;
     accountType?: "member" | "creator" | "company";
     about?: string | null;
+    displayName?: string | null;
+    birthday?: string | null;
   } | null;
   stats?: {
     reactionsReceived: number;
@@ -104,6 +106,8 @@ const EMPTY_COPY: Record<ProfileTab, { title: string; owner: string; guest: stri
 const VERIFIED_STATUSES = new Set(["verified", "business_verified", "official"]);
 
 function profileDisplayName(profile?: ProfileSnapshot): string {
+  const displayName = profile?.profile?.displayName?.trim();
+  if (displayName) return displayName;
   const name = profile?.user?.name?.trim();
   if (name && !name.includes("@")) return name;
   const username = profile?.profile?.username?.trim();
@@ -368,23 +372,29 @@ export function ProfileEditModal({
   onClose: () => void;
 }) {
   const [username, setUsername] = useState(profile?.profile?.username ?? "");
+  const [displayName, setDisplayName] = useState(profile?.profile?.displayName ?? "");
   const [about, setAbout] = useState(profile?.profile?.about ?? "");
+  const [birthday, setBirthday] = useState(profile?.profile?.birthday ? new Date(profile.profile.birthday).toISOString().split("T")[0] : "");
   const [photoUrl, setPhotoUrl] = useState(profile?.profile?.photoUrl ?? "");
   const [message, setMessage] = useState("");
   const [uploading, setUploading] = useState(false);
   const [cropFile, setCropFile] = useState<File | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
+  const [birthdayError, setBirthdayError] = useState("");
   const update = trpc.profile.update.useMutation();
   const utils = trpc.useUtils();
 
   useEffect(() => {
     if (open) {
       setUsername(profile?.profile?.username ?? "");
+      setDisplayName(profile?.profile?.displayName ?? "");
       setAbout(profile?.profile?.about ?? "");
+      setBirthday(profile?.profile?.birthday ? new Date(profile.profile.birthday).toISOString().split("T")[0] : "");
       setPhotoUrl(profile?.profile?.photoUrl ?? "");
       setMessage("");
+      setBirthdayError("");
     }
-  }, [open, profile?.profile?.username, profile?.profile?.about, profile?.profile?.photoUrl]);
+  }, [open, profile?.profile?.username, profile?.profile?.displayName, profile?.profile?.about, profile?.profile?.birthday, profile?.profile?.photoUrl]);
 
   const chooseAvatar = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -404,23 +414,41 @@ export function ProfileEditModal({
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setBirthdayError("");
     const nextUsername = username.trim() || null;
     const currentUsername = profile?.profile?.username?.trim() || null;
+    const nextDisplayName = displayName.trim() || null;
+    const currentDisplayName = profile?.profile?.displayName?.trim() || null;
     const nextPhotoUrl = photoUrl.trim() || null;
     const currentPhotoUrl = profile?.profile?.photoUrl || null;
     const nextAbout = about.trim() || null;
     const currentAbout = profile?.profile?.about?.trim() || null;
+    const nextBirthday = birthday || null;
+    const currentBirthday = profile?.profile?.birthday
+      ? new Date(profile.profile.birthday).toISOString().split("T")[0]
+      : null;
     const changes: {
       username?: string | null;
+      displayName?: string | null;
       photoUrl?: string | null;
       about?: string | null;
+      birthday?: string | null;
     } = {};
     if (nextUsername !== currentUsername) changes.username = nextUsername;
+    if (nextDisplayName !== currentDisplayName) changes.displayName = nextDisplayName;
     if (nextPhotoUrl !== currentPhotoUrl) changes.photoUrl = nextPhotoUrl;
     if (nextAbout !== currentAbout) changes.about = nextAbout;
+    if (nextBirthday !== currentBirthday) changes.birthday = nextBirthday;
     if (!Object.keys(changes).length) {
       setMessage("No changes to save.");
       return;
+    }
+    if (birthday) {
+      const date = new Date(birthday);
+      if (isNaN(date.getTime()) || date > new Date()) {
+        setBirthdayError("Invalid date or birthday cannot be in the future.");
+        return;
+      }
     }
     try {
       await update.mutateAsync(changes);
@@ -484,6 +512,27 @@ export function ProfileEditModal({
               pattern="[A-Za-z0-9_]+"
               placeholder="jhilik_creator"
             />
+          </label>
+          <label className="pr-field">
+            <span className="pr-field-label">Display name</span>
+            <input
+              className="pr-input"
+              value={displayName}
+              onChange={event => setDisplayName(event.target.value)}
+              maxLength={64}
+              placeholder="Your name"
+            />
+          </label>
+          <label className="pr-field">
+            <span className="pr-field-label">Birthday</span>
+            <input
+              type="date"
+              className="pr-input"
+              value={birthday}
+              onChange={event => setBirthday(event.target.value)}
+              max={new Date().toISOString().split("T")[0]}
+            />
+            {birthdayError && <p className="pr-field-hint" style={{ color: "var(--error)" }}>{birthdayError}</p>}
           </label>
           <label className="pr-field">
             <span className="pr-field-label">Bio</span>

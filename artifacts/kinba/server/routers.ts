@@ -68,7 +68,14 @@ import {
   voteRawPulse,
   createRawPulse,
   createTextPost,
+  claimUsername,
+  updateDisplayName,
+  setBirthday,
+  getProfileStats,
 } from "./db";
+import { getDb } from "./db";
+import { eq, desc } from "drizzle-orm";
+import { users, profiles } from "../drizzle/schema";
 import { communityAnnouncementInput, textPostInput, videoInput } from "./mediaValidation";
 import { REACTION_TYPES } from "@shared/reactions";
 import {
@@ -500,6 +507,8 @@ const profileUpdateInput = z.object({
     .optional(),
   photoUrl: z.string().url().max(1024).nullable().optional(),
   about: z.string().trim().max(500).nullable().optional(),
+  displayName: z.string().trim().max(64).nullable().optional(),
+  birthday: z.string().datetime({ offset: true }).nullable().optional(),
 });
 const sponsorInput = z.object({
   sessionId: z.number().int().positive(),
@@ -640,9 +649,32 @@ export const appRouter = router({
     byId: publicProcedure
       .input(z.object({ userId: z.number().int().positive() }))
       .query(({ input }) => getPublicProfile(input.userId)),
+    byUsername: publicProcedure
+      .input(z.object({ username: z.string().trim().min(3).max(64).regex(/^[a-z0-9_]+$/i) }))
+      .query(async ({ input }) => {
+        const db = await getDb();
+        if (!db) throw new Error("Database unavailable");
+        const [profile] = await db
+          .select({ user: users, profile: profiles })
+          .from(users)
+          .leftJoin(profiles, eq(users.id, profiles.userId))
+          .where(eq(profiles.username, input.username.toLowerCase()))
+          .limit(1);
+        if (!profile) return undefined;
+        return { ...profile, stats: await getProfileStats(profile.user.id) };
+      }),
     update: protectedProcedure
       .input(profileUpdateInput)
       .mutation(({ ctx, input }) => updateOwnProfile(ctx.user.id, input)),
+    claimUsername: protectedProcedure
+      .input(z.object({ username: z.string().trim().min(3).max(64).regex(/^[a-z0-9_]+$/i) }))
+      .mutation(({ ctx, input }) => claimUsername(ctx.user.id, input.username)),
+    updateDisplayName: protectedProcedure
+      .input(z.object({ displayName: z.string().trim().max(64).nullable().optional() }))
+      .mutation(({ ctx, input }) => updateDisplayName(ctx.user.id, input.displayName ?? null)),
+    setBirthday: protectedProcedure
+      .input(z.object({ birthday: z.string().datetime({ offset: true }).nullable().optional() }))
+      .mutation(({ ctx, input }) => setBirthday(ctx.user.id, input.birthday ?? null)),
     videos: protectedProcedure.query(({ ctx }) =>
       listProfileVideos(ctx.user.id)
     ),

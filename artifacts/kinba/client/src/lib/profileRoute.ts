@@ -19,10 +19,21 @@ export function parsePublicProfileRoute(location: string): number | undefined {
   return Number.isInteger(userId) && userId > 0 ? userId : undefined;
 }
 
-/** True for any `/profile/<something>` route, parsed id or not. */
+/** `/@username` or `/@username/` → "username". */
+export function parseUsernameProfileRoute(location: string): string | undefined {
+  const path = location.split(/[?#]/)[0] ?? location;
+  const match = /^\/@([A-Za-z0-9_]{3,64})\/?$/.exec(path);
+  if (!match) return undefined;
+  return match[1].toLowerCase();
+}
+
+/** True for any `/profile/<something>` or `/@username` route. */
 export function isPublicProfileRoute(location: string): boolean {
   const path = location.split(/[?#]/)[0] ?? location;
-  return path !== "/profile/" && path.startsWith("/profile/");
+  return (
+    path !== "/profile/" && path.startsWith("/profile/") ||
+    path.startsWith("/@") && path.length > 2
+  );
 }
 
 /**

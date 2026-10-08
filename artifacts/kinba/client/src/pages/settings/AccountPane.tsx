@@ -78,10 +78,20 @@ export default function AccountPane() {
         <SettingsRow
           kind="action"
           label="Personal information"
-          description="Username, bio and profile photo"
+          description="Username, display name, bio and profile photo"
           value={username ? `@${username}` : "Add a username"}
           onClick={() => setEditOpen(true)}
           data-testid="account-personal-information"
+        />
+        <SettingsRow
+          kind="information"
+          label="Display name"
+          value={snapshot.profile?.displayName?.trim() || "Not set"}
+        />
+        <SettingsRow
+          kind="information"
+          label="Birthday"
+          value={snapshot.profile?.birthday ? new Date(snapshot.profile.birthday).toLocaleDateString() : "Not set"}
         />
         <SettingsRow
           kind="navigation"

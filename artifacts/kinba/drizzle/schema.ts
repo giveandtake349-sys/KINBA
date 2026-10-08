@@ -361,6 +361,8 @@ export const profiles = pgTable(
     verificationStatus: verificationStatus("verificationStatus")
       .default("none")
       .notNull(),
+    displayName: text("display_name"),
+    birthday: date("birthday"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

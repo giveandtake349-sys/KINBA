@@ -45,8 +45,9 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import {
   isPublicProfileRoute,
-  matchesRouteProfile,
   parsePublicProfileRoute,
+  parseUsernameProfileRoute,
+  matchesRouteProfile,
 } from "@/lib/profileRoute";
 import { useTheme } from "@/contexts/ThemeContext";
 import { SupabaseAuthDialog } from "@/components/SupabaseAuthDialog";
@@ -111,6 +112,8 @@ type ProfileSnapshot = {
     isVerified?: boolean;
     accountType?: "member" | "creator" | "company";
     about?: string | null;
+    displayName?: string | null;
+    birthday?: string | null;
   } | null;
   stats?: {
     reactionsReceived: number;
@@ -149,7 +152,9 @@ function ThemeToggle({ onClose }: { onClose?: () => void }) {
   );
 }
 
-function profileDisplayName(profile?: ProfileSnapshot) {
+function profileDisplayName(profile?: ProfileSnapshot): string {
+  const displayName = profile?.profile?.displayName?.trim();
+  if (displayName) return displayName;
   const name = profile?.user?.name?.trim();
   if (name && !name.includes("@")) return name;
   const username = profile?.profile?.username?.trim();
@@ -1999,6 +2004,7 @@ export default function Home() {
   const topNavRef = useRef<HTMLDivElement>(null);
   const [location, navigate] = useLocation();
   const publicProfileId = parsePublicProfileRoute(location);
+  const publicProfileUsername = parseUsernameProfileRoute(location);
   const onPublicProfileRoute = isPublicProfileRoute(location);
   const { theme } = useTheme();
   const [activeView, setActiveView] = useState<FeedSection>("videos");
@@ -2016,6 +2022,10 @@ export default function Home() {
   const publicProfileQuery = trpc.profile.byId.useQuery(
     { userId: publicProfileId as number },
     { enabled: Boolean(publicProfileId), refetchOnWindowFocus: false, staleTime: 30_000 }
+  );
+  const publicProfileUsernameQuery = trpc.profile.byUsername.useQuery(
+    { username: publicProfileUsername as string },
+    { enabled: Boolean(publicProfileUsername), refetchOnWindowFocus: false, staleTime: 30_000 }
   );
   const unreadCountQuery = trpc.notifications.unreadCount.useQuery(undefined, {
     enabled: auth.isAuthenticated,
@@ -2037,24 +2047,30 @@ export default function Home() {
   const publicProfileData = matchesRouteProfile(cachedPublicProfile, publicProfileId)
     ? cachedPublicProfile
     : undefined;
+  const cachedUsernameProfile = publicProfileUsernameQuery.data;
+  const usernameProfileData = onPublicProfileRoute && publicProfileUsername
+    ? cachedUsernameProfile
+    : undefined;
   const ownProfileData = profileQuery.data;
   const profile = (onPublicProfileRoute
-    ? publicProfileData
+    ? (publicProfileData ?? usernameProfileData)
     : ownProfileData) as ProfileSnapshot | undefined;
   const profileForHeader = profile;
   // Ownership follows the route id, not whatever snapshot is in cache.
   const isOwner = Boolean(
     auth.user?.id &&
       (onPublicProfileRoute
-        ? publicProfileId === auth.user.id
+        ? (publicProfileId === auth.user.id || (usernameProfileData?.user.id === auth.user.id))
         : profileForHeader?.user?.id === auth.user.id)
   );
   const publicProfileLoading =
     onPublicProfileRoute &&
-    publicProfileId !== undefined &&
+    (publicProfileId !== undefined || publicProfileUsername !== undefined) &&
     !publicProfileData &&
+    !usernameProfileData &&
     !publicProfileQuery.isError &&
-    publicProfileQuery.isPending;
+    !publicProfileUsernameQuery.isError &&
+    (publicProfileQuery.isPending || publicProfileUsernameQuery.isPending);
   const screen: Screen =
     location === "/login"
       ? "landing"
