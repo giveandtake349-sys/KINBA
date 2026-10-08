@@ -119,6 +119,11 @@ async function startServer() {
   app.use("/api/trpc/home.search", rateLimit({ windowMs: 60_000, max: 60, keyPrefix: "srch" }));
   app.use("/api/trpc/home.searchAll", rateLimit({ windowMs: 60_000, max: 60, keyPrefix: "srch" }));
 
+  // Hashtag: 60 req/min — similar to search
+  app.use("/api/trpc/hashtag.byTag", rateLimit({ windowMs: 60_000, max: 60, keyPrefix: "tag" }));
+  app.use("/api/trpc/hashtag.content", rateLimit({ windowMs: 60_000, max: 60, keyPrefix: "tag" }));
+  app.use("/api/trpc/hashtag.suggest", rateLimit({ windowMs: 60_000, max: 60, keyPrefix: "tag" }));
+
   // Spotlight: 10 req/min — loaded on page views, not continuous
   app.use("/api/spotlight/highlights", rateLimit({ windowMs: 60_000, max: 10, keyPrefix: "spot" }));
 

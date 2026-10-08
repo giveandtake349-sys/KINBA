@@ -46,6 +46,16 @@ import {
   rawPulsePolls,
   rawPulseOptions,
   rawPulseVotes,
+  drops,
+  blocks,
+  hashtags,
+  videoHashtags,
+  videoCommentHashtags,
+  announcementHashtags,
+  communityCommentHashtags,
+  hypeRoomHashtags,
+  hypeRoomMessageHashtags,
+  dropHashtags,
 } from "../drizzle/schema";
 import {
   REACTION_TYPES,
@@ -57,6 +67,8 @@ import { ENV } from "./_core/env";
 import { resolvePostgresDatabaseUrl } from "./databaseConfig";
 import { selectNomineeIds, selectSecondaryWinnerId } from "./sponsorBidsDraw";
 import { storageDelete } from "./storage";
+import { extractHashtags, extractVideoHashtags, extractTextHashtags, extractHypeRoomHashtags, extractDropHashtags } from "./lib/hashtags";
+import { canDiscoverRoom, listViewerMemberRoomIds } from "./hypeRooms";
 
 /**
  * The viewer's stored reaction, narrowed to the shared vocabulary so no raw
@@ -193,6 +205,201 @@ function retirePool(target: Pool | null | undefined): void {
 
 export function invalidateDbPool(): void {
   retirePool(_pool);
+}
+
+/**
+ * Type that represents either a database client or a transaction client.
+ * Both share the same query interface in Drizzle.
+ */
+type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+type TxClient = Parameters<Parameters<DbClient["transaction"]>[0]>[0];
+type DbLike = DbClient | TxClient;
+
+/**
+ * Hashtag synchronization helpers.
+ * All functions are designed to be called within an existing transaction.
+ */
+
+async function upsertHashtagRows(
+  db: DbLike,
+  extractedHashtags: ReturnType<typeof extractHashtags>
+) {
+  if (extractedHashtags.length === 0) return [];
+
+  const results: { id: number; tag: string }[] = [];
+  for (const ht of extractedHashtags) {
+    const [upserted] = await db
+      .insert(hashtags)
+      .values({ tag: ht.normalized, displayTag: ht.display })
+      .onConflictDoUpdate({
+        target: hashtags.tag,
+        set: { updatedAt: new Date() },
+      })
+      .returning({ id: hashtags.id, tag: hashtags.tag });
+    results.push(upserted);
+  }
+  return results;
+}
+
+async function syncVideoHashtags(
+  db: DbLike,
+  videoId: number,
+  newHashtags: ReturnType<typeof extractHashtags>
+) {
+  if (newHashtags.length === 0) {
+    await db.delete(videoHashtags).where(eq(videoHashtags.videoId, videoId));
+    return;
+  }
+  const hashtagRows = await upsertHashtagRows(db, newHashtags);
+  const newHashtagIds = new Set(hashtagRows.map(h => h.id));
+  const existing = await db.select({ hashtagId: videoHashtags.hashtagId }).from(videoHashtags).where(eq(videoHashtags.videoId, videoId));
+  const existingHashtagIds = new Set(existing.map(e => e.hashtagId));
+  const toRemove = [...existingHashtagIds].filter(id => !newHashtagIds.has(id));
+  if (toRemove.length > 0) {
+    await db.delete(videoHashtags).where(and(eq(videoHashtags.videoId, videoId), inArray(videoHashtags.hashtagId, toRemove)));
+  }
+  const toAdd = [...newHashtagIds].filter(id => !existingHashtagIds.has(id));
+  if (toAdd.length > 0) {
+    await db.insert(videoHashtags).values(toAdd.map(hashtagId => ({ videoId, hashtagId })));
+  }
+}
+
+async function syncVideoCommentHashtags(
+  db: DbLike,
+  commentId: number,
+  newHashtags: ReturnType<typeof extractHashtags>
+) {
+  if (newHashtags.length === 0) {
+    await db.delete(videoCommentHashtags).where(eq(videoCommentHashtags.commentId, commentId));
+    return;
+  }
+  const hashtagRows = await upsertHashtagRows(db, newHashtags);
+  const newHashtagIds = new Set(hashtagRows.map(h => h.id));
+  const existing = await db.select({ hashtagId: videoCommentHashtags.hashtagId }).from(videoCommentHashtags).where(eq(videoCommentHashtags.commentId, commentId));
+  const existingHashtagIds = new Set(existing.map(e => e.hashtagId));
+  const toRemove = [...existingHashtagIds].filter(id => !newHashtagIds.has(id));
+  if (toRemove.length > 0) {
+    await db.delete(videoCommentHashtags).where(and(eq(videoCommentHashtags.commentId, commentId), inArray(videoCommentHashtags.hashtagId, toRemove)));
+  }
+  const toAdd = [...newHashtagIds].filter(id => !existingHashtagIds.has(id));
+  if (toAdd.length > 0) {
+    await db.insert(videoCommentHashtags).values(toAdd.map(hashtagId => ({ commentId, hashtagId })));
+  }
+}
+
+async function syncAnnouncementHashtags(
+  db: DbLike,
+  announcementId: number,
+  newHashtags: ReturnType<typeof extractHashtags>
+) {
+  if (newHashtags.length === 0) {
+    await db.delete(announcementHashtags).where(eq(announcementHashtags.announcementId, announcementId));
+    return;
+  }
+  const hashtagRows = await upsertHashtagRows(db, newHashtags);
+  const newHashtagIds = new Set(hashtagRows.map(h => h.id));
+  const existing = await db.select({ hashtagId: announcementHashtags.hashtagId }).from(announcementHashtags).where(eq(announcementHashtags.announcementId, announcementId));
+  const existingHashtagIds = new Set(existing.map(e => e.hashtagId));
+  const toRemove = [...existingHashtagIds].filter(id => !newHashtagIds.has(id));
+  if (toRemove.length > 0) {
+    await db.delete(announcementHashtags).where(and(eq(announcementHashtags.announcementId, announcementId), inArray(announcementHashtags.hashtagId, toRemove)));
+  }
+  const toAdd = [...newHashtagIds].filter(id => !existingHashtagIds.has(id));
+  if (toAdd.length > 0) {
+    await db.insert(announcementHashtags).values(toAdd.map(hashtagId => ({ announcementId, hashtagId })));
+  }
+}
+
+async function syncCommunityCommentHashtags(
+  db: DbLike,
+  commentId: number,
+  newHashtags: ReturnType<typeof extractHashtags>
+) {
+  if (newHashtags.length === 0) {
+    await db.delete(communityCommentHashtags).where(eq(communityCommentHashtags.commentId, commentId));
+    return;
+  }
+  const hashtagRows = await upsertHashtagRows(db, newHashtags);
+  const newHashtagIds = new Set(hashtagRows.map(h => h.id));
+  const existing = await db.select({ hashtagId: communityCommentHashtags.hashtagId }).from(communityCommentHashtags).where(eq(communityCommentHashtags.commentId, commentId));
+  const existingHashtagIds = new Set(existing.map(e => e.hashtagId));
+  const toRemove = [...existingHashtagIds].filter(id => !newHashtagIds.has(id));
+  if (toRemove.length > 0) {
+    await db.delete(communityCommentHashtags).where(and(eq(communityCommentHashtags.commentId, commentId), inArray(communityCommentHashtags.hashtagId, toRemove)));
+  }
+  const toAdd = [...newHashtagIds].filter(id => !existingHashtagIds.has(id));
+  if (toAdd.length > 0) {
+    await db.insert(communityCommentHashtags).values(toAdd.map(hashtagId => ({ commentId, hashtagId })));
+  }
+}
+
+async function syncHypeRoomHashtags(
+  db: DbLike,
+  roomId: number,
+  newHashtags: ReturnType<typeof extractHashtags>
+) {
+  if (newHashtags.length === 0) {
+    await db.delete(hypeRoomHashtags).where(eq(hypeRoomHashtags.roomId, roomId));
+    return;
+  }
+  const hashtagRows = await upsertHashtagRows(db, newHashtags);
+  const newHashtagIds = new Set(hashtagRows.map(h => h.id));
+  const existing = await db.select({ hashtagId: hypeRoomHashtags.hashtagId }).from(hypeRoomHashtags).where(eq(hypeRoomHashtags.roomId, roomId));
+  const existingHashtagIds = new Set(existing.map(e => e.hashtagId));
+  const toRemove = [...existingHashtagIds].filter(id => !newHashtagIds.has(id));
+  if (toRemove.length > 0) {
+    await db.delete(hypeRoomHashtags).where(and(eq(hypeRoomHashtags.roomId, roomId), inArray(hypeRoomHashtags.hashtagId, toRemove)));
+  }
+  const toAdd = [...newHashtagIds].filter(id => !existingHashtagIds.has(id));
+  if (toAdd.length > 0) {
+    await db.insert(hypeRoomHashtags).values(toAdd.map(hashtagId => ({ roomId, hashtagId })));
+  }
+}
+
+async function syncHypeRoomMessageHashtags(
+  db: DbLike,
+  messageId: number,
+  newHashtags: ReturnType<typeof extractHashtags>
+) {
+  if (newHashtags.length === 0) {
+    await db.delete(hypeRoomMessageHashtags).where(eq(hypeRoomMessageHashtags.messageId, messageId));
+    return;
+  }
+  const hashtagRows = await upsertHashtagRows(db, newHashtags);
+  const newHashtagIds = new Set(hashtagRows.map(h => h.id));
+  const existing = await db.select({ hashtagId: hypeRoomMessageHashtags.hashtagId }).from(hypeRoomMessageHashtags).where(eq(hypeRoomMessageHashtags.messageId, messageId));
+  const existingHashtagIds = new Set(existing.map(e => e.hashtagId));
+  const toRemove = [...existingHashtagIds].filter(id => !newHashtagIds.has(id));
+  if (toRemove.length > 0) {
+    await db.delete(hypeRoomMessageHashtags).where(and(eq(hypeRoomMessageHashtags.messageId, messageId), inArray(hypeRoomMessageHashtags.hashtagId, toRemove)));
+  }
+  const toAdd = [...newHashtagIds].filter(id => !existingHashtagIds.has(id));
+  if (toAdd.length > 0) {
+    await db.insert(hypeRoomMessageHashtags).values(toAdd.map(hashtagId => ({ messageId, hashtagId })));
+  }
+}
+
+async function syncDropHashtags(
+  db: DbLike,
+  dropId: number,
+  newHashtags: ReturnType<typeof extractHashtags>
+) {
+  if (newHashtags.length === 0) {
+    await db.delete(dropHashtags).where(eq(dropHashtags.dropId, dropId));
+    return;
+  }
+  const hashtagRows = await upsertHashtagRows(db, newHashtags);
+  const newHashtagIds = new Set(hashtagRows.map(h => h.id));
+  const existing = await db.select({ hashtagId: dropHashtags.hashtagId }).from(dropHashtags).where(eq(dropHashtags.dropId, dropId));
+  const existingHashtagIds = new Set(existing.map(e => e.hashtagId));
+  const toRemove = [...existingHashtagIds].filter(id => !newHashtagIds.has(id));
+  if (toRemove.length > 0) {
+    await db.delete(dropHashtags).where(and(eq(dropHashtags.dropId, dropId), inArray(dropHashtags.hashtagId, toRemove)));
+  }
+  const toAdd = [...newHashtagIds].filter(id => !existingHashtagIds.has(id));
+  if (toAdd.length > 0) {
+    await db.insert(dropHashtags).values(toAdd.map(hashtagId => ({ dropId, hashtagId })));
+  }
 }
 
 /**
@@ -1068,6 +1275,267 @@ export async function searchAll(
   };
 }
 
+// ---------------------------------------------------------------------------
+// JHILIK Phase 2B — Hashtag Queries
+// ---------------------------------------------------------------------------
+
+export type HashtagContentResult = {
+  type: "video" | "announcement" | "hype_room" | "hype_room_message" | "drop";
+  id: number;
+  title: string | null;
+  body: string | null;
+  createdAt: Date | string;
+  authorId: number | null;
+  authorName: string | null;
+};
+
+/**
+ * Get a hashtag by its normalized tag.
+ */
+export async function getHashtagByTag(tag: string): Promise<{ id: number; tag: string; displayTag: string; createdAt: Date } | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const normalized = tag.toLowerCase();
+  const [row] = await db
+    .select({ id: hashtags.id, tag: hashtags.tag, displayTag: hashtags.displayTag, createdAt: hashtags.createdAt })
+    .from(hashtags)
+    .where(eq(hashtags.tag, normalized))
+    .limit(1);
+  return row ?? null;
+}
+
+/**
+ * Get content associated with a hashtag, filtered by viewer permissions.
+ * Returns a unified list of public content across all surfaces.
+ * Respects blocks table and Hype Room authorization rules.
+ */
+export async function getHashtagContent(
+  tag: string,
+  viewerId?: number | null,
+  limit = 50
+): Promise<HashtagContentResult[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const normalized = tag.toLowerCase();
+
+  const [hashtagRow] = await db
+    .select({ id: hashtags.id })
+    .from(hashtags)
+    .where(eq(hashtags.tag, normalized))
+    .limit(1);
+  if (!hashtagRow) return [];
+
+  const hashtagId = hashtagRow.id;
+
+  // Fetch blocked user IDs for the viewer (if authenticated)
+  let blockedUserIds = new Set<number>();
+  let blockedByUserIds = new Set<number>();
+  if (viewerId != null) {
+    const [blockedRows, blockedByRows] = await Promise.all([
+      // Users the viewer has blocked
+      db
+        .select({ blockedId: blocks.blockedId })
+        .from(blocks)
+        .where(eq(blocks.blockerId, viewerId)),
+      // Users who have blocked the viewer
+      db
+        .select({ blockerId: blocks.blockerId })
+        .from(blocks)
+        .where(eq(blocks.blockedId, viewerId)),
+    ]);
+    blockedUserIds = new Set(blockedRows.map(r => r.blockedId));
+    blockedByUserIds = new Set(blockedByRows.map(r => r.blockerId));
+  }
+
+  // Fetch viewer's active Hype Room memberships for link-only room access
+  let memberRoomIds = new Set<number>();
+  if (viewerId != null) {
+    memberRoomIds = await listViewerMemberRoomIds(db, viewerId);
+  }
+
+  // Build a filter function for blocked users
+  const isAuthorBlocked = (authorId: number | null) => {
+    if (authorId == null) return false;
+    return blockedUserIds.has(authorId) || blockedByUserIds.has(authorId);
+  };
+
+  // Build a filter function for Hype Room visibility
+  const isHypeRoomDiscoverable = (room: { id: number; visibility: "public" | "link_only"; hostId: number }) => {
+    return canDiscoverRoom(room, viewerId ?? null, memberRoomIds);
+  };
+
+  // Fetch content from each surface with proper visibility filtering
+  const [
+    videoRows,
+    announcementRows,
+    hypeRoomRows,
+    hypeRoomMessageRows,
+    dropRows,
+  ] = await Promise.all([
+    // Videos: public, READY only, author not blocked
+    db
+      .select({
+        type: sql<"video">`'video'`,
+        id: videos.id,
+        title: videos.title,
+        body: videos.description,
+        createdAt: videos.createdAt,
+        authorId: videos.userId,
+        authorName: users.name,
+      })
+      .from(videoHashtags)
+      .innerJoin(videos, eq(videoHashtags.videoId, videos.id))
+      .innerJoin(users, eq(videos.userId, users.id))
+      .where(
+        and(
+          eq(videoHashtags.hashtagId, hashtagId),
+          eq(videos.processingStatus, "READY")
+        )
+      )
+      .orderBy(desc(videos.createdAt))
+      .limit(limit),
+
+    // Community Announcements: public, verified authors only, author not blocked
+    db
+      .select({
+        type: sql<"announcement">`'announcement'`,
+        id: communityAnnouncements.id,
+        title: sql<string | null>`null`,
+        body: communityAnnouncements.body,
+        createdAt: communityAnnouncements.createdAt,
+        authorId: communityAnnouncements.userId,
+        authorName: users.name,
+      })
+      .from(announcementHashtags)
+      .innerJoin(communityAnnouncements, eq(announcementHashtags.announcementId, communityAnnouncements.id))
+      .innerJoin(users, eq(communityAnnouncements.userId, users.id))
+      .innerJoin(profiles, eq(communityAnnouncements.userId, profiles.userId))
+      .where(
+        and(
+          eq(announcementHashtags.hashtagId, hashtagId),
+          eq(profiles.isVerified, true),
+          inArray(profiles.accountType, ["creator", "company"])
+        )
+      )
+      .orderBy(desc(communityAnnouncements.createdAt))
+      .limit(limit),
+
+    // Hype Rooms: use canDiscoverRoom for proper authorization
+    db
+      .select({
+        type: sql<"hype_room">`'hype_room'`,
+        id: hypeRooms.id,
+        title: hypeRooms.title,
+        body: hypeRooms.description,
+        createdAt: hypeRooms.createdAt,
+        authorId: hypeRooms.hostId,
+        authorName: users.name,
+        visibility: hypeRooms.visibility,
+        hostId: hypeRooms.hostId,
+      })
+      .from(hypeRoomHashtags)
+      .innerJoin(hypeRooms, eq(hypeRoomHashtags.roomId, hypeRooms.id))
+      .innerJoin(users, eq(hypeRooms.hostId, users.id))
+      .where(
+        and(
+          eq(hypeRoomHashtags.hashtagId, hashtagId),
+          inArray(hypeRooms.status, ["scheduled", "live"])
+        )
+      )
+      .orderBy(desc(hypeRooms.createdAt))
+      .limit(limit),
+
+    // Hype Room Messages: inherit room's exact authorization
+    db
+      .select({
+        type: sql<"hype_room_message">`'hype_room_message'`,
+        id: hypeRoomMessages.id,
+        title: sql<string | null>`null`,
+        body: hypeRoomMessages.body,
+        createdAt: hypeRoomMessages.createdAt,
+        authorId: hypeRoomMessages.userId,
+        authorName: users.name,
+        roomId: hypeRooms.id,
+        roomVisibility: hypeRooms.visibility,
+        roomHostId: hypeRooms.hostId,
+      })
+      .from(hypeRoomMessageHashtags)
+      .innerJoin(hypeRoomMessages, eq(hypeRoomMessageHashtags.messageId, hypeRoomMessages.id))
+      .innerJoin(hypeRooms, eq(hypeRoomMessages.roomId, hypeRooms.id))
+      .innerJoin(users, eq(hypeRoomMessages.userId, users.id))
+      .where(
+        and(
+          eq(hypeRoomMessageHashtags.hashtagId, hashtagId),
+          inArray(hypeRooms.status, ["scheduled", "live"])
+        )
+      )
+      .orderBy(desc(hypeRoomMessages.createdAt))
+      .limit(limit),
+
+    // Drops: live/scheduled with remaining quantity, author not blocked
+    db
+      .select({
+        type: sql<"drop">`'drop'`,
+        id: drops.id,
+        title: drops.title,
+        body: drops.description,
+        createdAt: drops.createdAt,
+        authorId: drops.sellerId,
+        authorName: users.name,
+      })
+      .from(dropHashtags)
+      .innerJoin(drops, eq(dropHashtags.dropId, drops.id))
+      .innerJoin(users, eq(drops.sellerId, users.id))
+      .where(
+        and(
+          eq(dropHashtags.hashtagId, hashtagId),
+          inArray(drops.status, ["live", "scheduled"]),
+          gt(drops.remainingQuantity, 0)
+        )
+      )
+      .orderBy(desc(drops.createdAt))
+      .limit(limit),
+  ]);
+
+  // Apply blocked-user filtering to all surfaces
+  const filteredVideos = videoRows.filter(r => !isAuthorBlocked(r.authorId));
+  const filteredAnnouncements = announcementRows.filter(r => !isAuthorBlocked(r.authorId));
+  const filteredHypeRooms = hypeRoomRows.filter(r => !isAuthorBlocked(r.authorId) && isHypeRoomDiscoverable({ id: r.id, visibility: r.visibility, hostId: r.hostId }));
+  const filteredHypeRoomMessages = hypeRoomMessageRows.filter(r => !isAuthorBlocked(r.authorId) && isHypeRoomDiscoverable({ id: r.roomId, visibility: r.roomVisibility, hostId: r.roomHostId }));
+  const filteredDrops = dropRows.filter(r => !isAuthorBlocked(r.authorId));
+
+  // Merge and sort by createdAt descending
+  const all = [
+    ...filteredVideos,
+    ...filteredAnnouncements,
+    ...filteredHypeRooms,
+    ...filteredHypeRoomMessages,
+    ...filteredDrops,
+  ];
+
+  all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  return all.slice(0, limit);
+}
+
+/**
+ * Suggest hashtags by prefix (for autocomplete).
+ */
+export async function suggestHashtags(prefix: string, limit = 10): Promise<{ tag: string; displayTag: string }[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const normalized = prefix.toLowerCase();
+  if (!normalized) return [];
+
+  const rows = await db
+    .select({ tag: hashtags.tag, displayTag: hashtags.displayTag })
+    .from(hashtags)
+    .where(sql`${hashtags.tag} LIKE ${normalized + '%'}`)
+    .orderBy(hashtags.createdAt)
+    .limit(limit);
+  return rows;
+}
+
 export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
   if (tab === "all") return listUnifiedHomeFeed(viewerId);
   if (tab === "shorts")
@@ -1259,22 +1727,35 @@ export async function createVideo(
     throw new Error("Authenticated application user ID is invalid.");
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const [created] = await db
-    .insert(videos)
-    .values({
-      userId,
-      title: requiredText(input.title, "Untitled video"),
-      description: optionalText(input.description) ?? "",
-      videoUrl: requiredText(input.videoUrl, "about:blank"),
-      thumbnailUrl: optionalText(input.thumbnailUrl),
-      mediaType: "VIDEO",
-      kind: input.kind === "SHORT" ? "SHORT" : "LONG",
-      durationSeconds: input.durationSeconds,
-      width: input.width,
-      height: input.height,
-      processingStatus: "READY",
-    })
-    .returning();
+
+  const title = requiredText(input.title, "Untitled video");
+  const description = optionalText(input.description) ?? "";
+
+  const [created] = await db.transaction(async (tx) => {
+    const [video] = await tx
+      .insert(videos)
+      .values({
+        userId,
+        title,
+        description,
+        videoUrl: requiredText(input.videoUrl, "about:blank"),
+        thumbnailUrl: optionalText(input.thumbnailUrl),
+        mediaType: "VIDEO",
+        kind: input.kind === "SHORT" ? "SHORT" : "LONG",
+        durationSeconds: input.durationSeconds,
+        width: input.width,
+        height: input.height,
+        processingStatus: "READY",
+      })
+      .returning();
+
+    // Sync hashtags from title + description
+    const videoTags = extractVideoHashtags(title, description);
+    await syncVideoHashtags(tx, video.id, videoTags);
+
+    return [video];
+  });
+
   if (input.sources.length) {
     try {
       await db
@@ -1305,22 +1786,35 @@ export async function createPhotoPost(
     throw new Error("Authenticated application user ID is invalid.");
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const [created] = await db
-    .insert(videos)
-    .values({
-      userId,
-      title: requiredText(input.title, "Untitled photo"),
-      description: optionalText(input.description) ?? "",
-      videoUrl: requiredText(input.imageUrl, "about:blank"),
-      thumbnailUrl: optionalText(input.imageUrl),
-      mediaType: "IMAGE",
-      kind: "LONG",
-      durationSeconds: 1,
-      width: input.width,
-      height: input.height,
-      processingStatus: "READY",
-    })
-    .returning();
+
+  const title = requiredText(input.title, "Untitled photo");
+  const description = optionalText(input.description) ?? "";
+
+  const [created] = await db.transaction(async (tx) => {
+    const [photo] = await tx
+      .insert(videos)
+      .values({
+        userId,
+        title,
+        description,
+        videoUrl: requiredText(input.imageUrl, "about:blank"),
+        thumbnailUrl: optionalText(input.imageUrl),
+        mediaType: "IMAGE",
+        kind: "LONG",
+        durationSeconds: 1,
+        width: input.width,
+        height: input.height,
+        processingStatus: "READY",
+      })
+      .returning();
+
+    // Sync hashtags from title + description
+    const photoTags = extractVideoHashtags(title, description);
+    await syncVideoHashtags(tx, photo.id, photoTags);
+
+    return [photo];
+  });
+
   return created;
 }
 
@@ -1334,34 +1828,59 @@ export async function createTextPost(
   if (!db) throw new Error("Database unavailable");
   const text = input.text.trim();
   if (!text) throw new Error("Text post cannot be empty.");
-  const [created] = await db
-    .insert(videos)
-    .values({
-      userId,
-      title: text.length > 80 ? text.slice(0, 80) + "…" : text,
-      description: text,
-      videoUrl: "",
-      thumbnailUrl: null,
-      mediaType: "TEXT",
-      kind: "LONG",
-      durationSeconds: 0,
-      width: 0,
-      height: 0,
-      processingStatus: "READY",
-    })
-    .returning();
+
+  const title = text.length > 80 ? text.slice(0, 80) + "…" : text;
+  const description = text;
+
+  const [created] = await db.transaction(async (tx) => {
+    const [post] = await tx
+      .insert(videos)
+      .values({
+        userId,
+        title,
+        description,
+        videoUrl: "",
+        thumbnailUrl: null,
+        mediaType: "TEXT",
+        kind: "LONG",
+        durationSeconds: 0,
+        width: 0,
+        height: 0,
+        processingStatus: "READY",
+      })
+      .returning();
+
+    // Sync hashtags from title + description (both come from text)
+    const textTags = extractVideoHashtags(title, description);
+    await syncVideoHashtags(tx, post.id, textTags);
+
+    return [post];
+  });
+
   return created;
 }
 
 export async function updateVideoDescription(videoId: number, userId: number, description: string) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const [updated] = await db
-    .update(videos)
-    .set({ description: description.trim(), updatedAt: new Date() })
-    .where(and(eq(videos.id, videoId), eq(videos.userId, userId)))
-    .returning({ id: videos.id, description: videos.description, updatedAt: videos.updatedAt });
-  if (!updated) throw new Error("Post not found or you are not the author.");
+
+  const trimmedDescription = description.trim();
+
+  const [updated] = await db.transaction(async (tx) => {
+    const [video] = await tx
+      .update(videos)
+      .set({ description: trimmedDescription, updatedAt: new Date() })
+      .where(and(eq(videos.id, videoId), eq(videos.userId, userId)))
+      .returning({ id: videos.id, title: videos.title, description: videos.description, updatedAt: videos.updatedAt });
+    if (!video) throw new Error("Post not found or you are not the author.");
+
+    // Sync hashtags from title + new description
+    const videoTags = extractVideoHashtags(video.title, video.description);
+    await syncVideoHashtags(tx, video.id, videoTags);
+
+    return [video];
+  });
+
   return updated;
 }
 
@@ -1815,17 +2334,29 @@ export async function createVideoComment(
       .limit(1);
     if (!parent) throw new Error("The comment you are replying to was not found.");
   }
-  const [comment] = await db
-    .insert(videoComments)
-    .values({
-      videoId,
-      userId,
-      body: body.trim() || null,
-      audioUrl: audio?.audioUrl ?? null,
-      audioDuration: audio?.audioDuration ?? null,
-      parentId: audio?.parentId ?? null,
-    })
-    .returning();
+
+  const trimmedBody = body.trim() || null;
+
+  const [comment] = await db.transaction(async (tx) => {
+    const [newComment] = await tx
+      .insert(videoComments)
+      .values({
+        videoId,
+        userId,
+        body: trimmedBody,
+        audioUrl: audio?.audioUrl ?? null,
+        audioDuration: audio?.audioDuration ?? null,
+        parentId: audio?.parentId ?? null,
+      })
+      .returning();
+
+    // Sync hashtags from comment body
+    const commentTags = extractTextHashtags(trimmedBody);
+    await syncVideoCommentHashtags(tx, newComment.id, commentTags);
+
+    return [newComment];
+  });
+
   return comment;
 }
 
@@ -3346,10 +3877,22 @@ export async function createAnnouncementComment(
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const [comment] = await db
-    .insert(communityComments)
-    .values({ announcementId, userId, body: body.trim(), audioUrl: audio?.audioUrl ?? null, audioDuration: audio?.audioDuration ?? null })
-    .returning();
+
+  const trimmedBody = body.trim();
+
+  const [comment] = await db.transaction(async (tx) => {
+    const [newComment] = await tx
+      .insert(communityComments)
+      .values({ announcementId, userId, body: trimmedBody, audioUrl: audio?.audioUrl ?? null, audioDuration: audio?.audioDuration ?? null })
+      .returning();
+
+    // Sync hashtags from comment body
+    const commentTags = extractTextHashtags(trimmedBody);
+    await syncCommunityCommentHashtags(tx, newComment.id, commentTags);
+
+    return [newComment];
+  });
+
   return comment;
 }
 
@@ -3380,11 +3923,19 @@ export async function createCommunityAnnouncement(
   }
   if (!input.body.trim() && !input.attachments.length)
     throw new Error("An announcement needs text or an attachment.");
+
+  const trimmedBody = input.body.trim();
+
   return db.transaction(async tx => {
     const [announcement] = await tx
       .insert(communityAnnouncements)
-      .values({ userId, body: input.body.trim() })
+      .values({ userId, body: trimmedBody })
       .returning();
+
+    // Sync hashtags from announcement body
+    const announcementTags = extractTextHashtags(trimmedBody);
+    await syncAnnouncementHashtags(tx, announcement.id, announcementTags);
+
     if (input.attachments.length)
       await tx.insert(communityAnnouncementAttachments).values(
         input.attachments.map(attachment => ({
@@ -3424,17 +3975,27 @@ export async function updateCommunityAnnouncement(
     if (!attachment)
       throw new Error("An announcement needs text or an attachment.");
   }
-  const [updated] = await db
-    .update(communityAnnouncements)
-    .set({ body: nextBody, updatedAt: new Date() })
-    .where(
-      and(
-        eq(communityAnnouncements.id, announcementId),
-        eq(communityAnnouncements.userId, userId)
+
+  const [updated] = await db.transaction(async (tx) => {
+    const [announcement] = await tx
+      .update(communityAnnouncements)
+      .set({ body: nextBody, updatedAt: new Date() })
+      .where(
+        and(
+          eq(communityAnnouncements.id, announcementId),
+          eq(communityAnnouncements.userId, userId)
+        )
       )
-    )
-    .returning();
-  if (!updated) throw new Error("Post not found or you are not the author.");
+      .returning();
+    if (!announcement) throw new Error("Post not found or you are not the author.");
+
+    // Sync hashtags from updated body
+    const announcementTags = extractTextHashtags(nextBody);
+    await syncAnnouncementHashtags(tx, announcement.id, announcementTags);
+
+    return [announcement];
+  });
+
   return updated;
 }
 

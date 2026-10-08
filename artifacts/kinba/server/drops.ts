@@ -7,8 +7,9 @@
  * Schema/enums/constraints reused from Phase 1 (no migration).
  * Spec: docs/JHILIK_MASTER_PRODUCT_SPEC.md §9, §19.2, §18.
  */
-import { and, asc, desc, eq, gt, sql } from "drizzle-orm";
-import { dropClaims, drops, profiles, type DropRow } from "../drizzle/schema";
+import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import type { PgTransaction } from "drizzle-orm/pg-core";
+import { dropClaims, drops, profiles, hashtags, dropHashtags, type DropRow } from "../drizzle/schema";
 import {
   assertTransition,
   canTransition,
@@ -20,6 +21,7 @@ import {
 } from "@shared/stateMachines";
 import { getDb } from "./db";
 import { notifyClaimStatusChange, notifyDropSoldOut } from "./notifications";
+import { extractHashtags, extractDropHashtags } from "./lib/hashtags";
 
 export type DropClaimRow = typeof dropClaims.$inferSelect;
 
@@ -104,6 +106,67 @@ function toNullableDate(value: Date | string | null | undefined): Date | null {
   const d = value instanceof Date ? new Date(value.getTime()) : new Date(value);
   if (Number.isNaN(d.getTime())) throw new Error("Date is invalid.");
   return d;
+}
+
+/**
+ * Sync hashtags for a Drop within a transaction.
+ */
+async function syncDropHashtags(
+  tx: PgTransaction<any, any, any>,
+  dropId: number,
+  newHashtags: ReturnType<typeof extractHashtags>
+) {
+  if (newHashtags.length === 0) {
+    await tx.delete(dropHashtags).where(eq(dropHashtags.dropId, dropId));
+    return;
+  }
+
+  // Upsert canonical hashtags and get their IDs
+  const hashtagRows: { id: number; tag: string }[] = [];
+  for (const ht of newHashtags) {
+    const [upserted] = await tx
+      .insert(hashtags)
+      .values({ tag: ht.normalized, displayTag: ht.display })
+      .onConflictDoUpdate({
+        target: hashtags.tag,
+        set: { updatedAt: new Date() },
+      })
+      .returning({ id: hashtags.id, tag: hashtags.tag });
+    hashtagRows.push(upserted);
+  }
+  const newHashtagIds = new Set(hashtagRows.map(h => h.id));
+
+  // Get existing associations
+  const existing = await tx
+    .select({ hashtagId: dropHashtags.hashtagId })
+    .from(dropHashtags)
+    .where(eq(dropHashtags.dropId, dropId));
+
+  const existingHashtagIds = new Set(existing.map(e => e.hashtagId));
+
+  // Remove associations that are no longer present
+  const toRemove = [...existingHashtagIds].filter(id => !newHashtagIds.has(id));
+  if (toRemove.length > 0) {
+    await tx
+      .delete(dropHashtags)
+      .where(
+        and(
+          eq(dropHashtags.dropId, dropId),
+          inArray(dropHashtags.hashtagId, toRemove)
+        )
+      );
+  }
+
+  // Add new associations
+  const toAdd = [...newHashtagIds].filter(id => !existingHashtagIds.has(id));
+  if (toAdd.length > 0) {
+    await tx.insert(dropHashtags).values(
+      toAdd.map(hashtagId => ({
+        dropId,
+        hashtagId,
+      }))
+    );
+  }
 }
 
 /**
@@ -356,31 +419,48 @@ export async function saveDraftDrop(
     updatedAt: now,
   };
 
+  // Extract hashtags from title + description
+  const dropTags = extractDropHashtags(title, description);
+
   if (input.dropId != null && input.dropId > 0) {
     const existing = await getDropOrThrow(db, input.dropId);
     await assertOwner(existing, sellerId);
     if (existing.status !== "draft") {
       throw new Error("Only draft drops can be edited this way.");
     }
-    const [updated] = await db
-      .update(drops)
-      .set(values)
-      .where(and(eq(drops.id, existing.id), eq(drops.status, "draft")))
-      .returning();
-    if (!updated) throw new Error("Failed to update draft.");
+    const [updated] = await db.transaction(async (tx) => {
+      const [drop] = await tx
+        .update(drops)
+        .set(values)
+        .where(and(eq(drops.id, existing.id), eq(drops.status, "draft")))
+        .returning();
+      if (!drop) throw new Error("Failed to update draft.");
+
+      // Sync hashtags
+      await syncDropHashtags(tx, drop.id, dropTags);
+
+      return [drop];
+    });
     return updated;
   }
 
-  const [created] = await db
-    .insert(drops)
-    .values({
-      ...values,
-      sellerId,
-      status: "draft",
-      createdAt: now,
-    })
-    .returning();
-  if (!created) throw new Error("Failed to create draft.");
+  const [created] = await db.transaction(async (tx) => {
+    const [drop] = await tx
+      .insert(drops)
+      .values({
+        ...values,
+        sellerId,
+        status: "draft",
+        createdAt: now,
+      })
+      .returning();
+    if (!drop) throw new Error("Failed to create draft.");
+
+    // Sync hashtags
+    await syncDropHashtags(tx, drop.id, dropTags);
+
+    return [drop];
+  });
   return created;
 }
 

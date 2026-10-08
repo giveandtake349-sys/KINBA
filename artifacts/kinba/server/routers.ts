@@ -72,6 +72,9 @@ import {
   updateDisplayName,
   setBirthday,
   getProfileStats,
+  getHashtagByTag,
+  getHashtagContent,
+  suggestHashtags,
 } from "./db";
 import { getDb } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -764,6 +767,18 @@ export const appRouter = router({
       .mutation(({ ctx, input }) =>
         markUserNotificationsRead(ctx.user.id, input?.ids)
       ),
+  }),
+  // Phase 2B — Hashtag queries
+  hashtag: router({
+    byTag: publicProcedure
+      .input(z.object({ tag: z.string().trim().min(1).max(120) }))
+      .query(({ input }) => getHashtagByTag(input.tag)),
+    content: publicProcedure
+      .input(z.object({ tag: z.string().trim().min(1).max(120), limit: z.number().int().positive().max(100).optional() }))
+      .query(({ ctx, input }) => getHashtagContent(input.tag, ctx.user?.id ?? null, input.limit)),
+    suggest: publicProcedure
+      .input(z.object({ prefix: z.string().trim().max(120) }))
+      .query(({ input }) => suggestHashtags(input.prefix)),
   }),
   rawPulse: router({
     get: publicProcedure

@@ -12,6 +12,7 @@
  * M7: durable notifications fire only on actual status transitions (§22).
  */
 import { and, asc, eq, inArray, isNull, isNotNull, ne, sql } from "drizzle-orm";
+import type { PgTransaction } from "drizzle-orm/pg-core";
 import {
   hypeRoomInvites,
   hypeRoomMembers,
@@ -21,8 +22,12 @@ import {
   hypeRooms,
   profiles,
   users,
+  hashtags,
+  hypeRoomHashtags,
+  hypeRoomMessageHashtags,
   type HypeRoomRow,
 } from "../drizzle/schema";
+import { extractHashtags, extractHypeRoomHashtags } from "./lib/hashtags";
 import {
   assertTransition,
   canTransition,
@@ -121,6 +126,128 @@ export function assertValidDurationHours(value: number): RoomDurationHours {
     );
   }
   return value;
+}
+
+/**
+ * Sync hashtags for a Hype Room within a transaction.
+ */
+async function syncHypeRoomHashtags(
+  tx: PgTransaction<any, any, any>,
+  roomId: number,
+  newHashtags: ReturnType<typeof extractHashtags>
+) {
+  if (newHashtags.length === 0) {
+    await tx.delete(hypeRoomHashtags).where(eq(hypeRoomHashtags.roomId, roomId));
+    return;
+  }
+
+  // Upsert canonical hashtags and get their IDs
+  const hashtagRows: { id: number; tag: string }[] = [];
+  for (const ht of newHashtags) {
+    const [upserted] = await tx
+      .insert(hashtags)
+      .values({ tag: ht.normalized, displayTag: ht.display })
+      .onConflictDoUpdate({
+        target: hashtags.tag,
+        set: { updatedAt: new Date() },
+      })
+      .returning({ id: hashtags.id, tag: hashtags.tag });
+    hashtagRows.push(upserted);
+  }
+  const newHashtagIds = new Set(hashtagRows.map(h => h.id));
+
+  // Get existing associations
+  const existing = await tx
+    .select({ hashtagId: hypeRoomHashtags.hashtagId })
+    .from(hypeRoomHashtags)
+    .where(eq(hypeRoomHashtags.roomId, roomId));
+
+  const existingHashtagIds = new Set(existing.map(e => e.hashtagId));
+
+  // Remove associations that are no longer present
+  const toRemove = [...existingHashtagIds].filter(id => !newHashtagIds.has(id));
+  if (toRemove.length > 0) {
+    await tx
+      .delete(hypeRoomHashtags)
+      .where(
+        and(
+          eq(hypeRoomHashtags.roomId, roomId),
+          inArray(hypeRoomHashtags.hashtagId, toRemove)
+        )
+      );
+  }
+
+  // Add new associations
+  const toAdd = [...newHashtagIds].filter(id => !existingHashtagIds.has(id));
+  if (toAdd.length > 0) {
+    await tx.insert(hypeRoomHashtags).values(
+      toAdd.map(hashtagId => ({
+        roomId,
+        hashtagId,
+      }))
+    );
+  }
+}
+
+/**
+ * Sync hashtags for a Hype Room message within a transaction.
+ */
+async function syncHypeRoomMessageHashtags(
+  tx: PgTransaction<any, any, any>,
+  messageId: number,
+  newHashtags: ReturnType<typeof extractHashtags>
+) {
+  if (newHashtags.length === 0) {
+    await tx.delete(hypeRoomMessageHashtags).where(eq(hypeRoomMessageHashtags.messageId, messageId));
+    return;
+  }
+
+  // Upsert canonical hashtags and get their IDs
+  const hashtagRows: { id: number; tag: string }[] = [];
+  for (const ht of newHashtags) {
+    const [upserted] = await tx
+      .insert(hashtags)
+      .values({ tag: ht.normalized, displayTag: ht.display })
+      .onConflictDoUpdate({
+        target: hashtags.tag,
+        set: { updatedAt: new Date() },
+      })
+      .returning({ id: hashtags.id, tag: hashtags.tag });
+    hashtagRows.push(upserted);
+  }
+  const newHashtagIds = new Set(hashtagRows.map(h => h.id));
+
+  // Get existing associations
+  const existing = await tx
+    .select({ hashtagId: hypeRoomMessageHashtags.hashtagId })
+    .from(hypeRoomMessageHashtags)
+    .where(eq(hypeRoomMessageHashtags.messageId, messageId));
+
+  const existingHashtagIds = new Set(existing.map(e => e.hashtagId));
+
+  // Remove associations that are no longer present
+  const toRemove = [...existingHashtagIds].filter(id => !newHashtagIds.has(id));
+  if (toRemove.length > 0) {
+    await tx
+      .delete(hypeRoomMessageHashtags)
+      .where(
+        and(
+          eq(hypeRoomMessageHashtags.messageId, messageId),
+          inArray(hypeRoomMessageHashtags.hashtagId, toRemove)
+        )
+      );
+  }
+
+  // Add new associations
+  const toAdd = [...newHashtagIds].filter(id => !existingHashtagIds.has(id));
+  if (toAdd.length > 0) {
+    await tx.insert(hypeRoomMessageHashtags).values(
+      toAdd.map(hashtagId => ({
+        messageId,
+        hashtagId,
+      }))
+    );
+  }
 }
 
 /** Deterministic expiry from persisted start + duration (server clock). */
@@ -288,7 +415,7 @@ export function canDiscoverRoom(
 }
 
 /** Active (not left, not banned) room ids the viewer belongs to. */
-async function listViewerMemberRoomIds(
+export async function listViewerMemberRoomIds(
   db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
   userId: number
 ): Promise<Set<number>> {
@@ -425,6 +552,7 @@ export async function createHypeRoom(
   if (description != null && description.length > 500) {
     throw new Error("Room description must be at most 500 characters.");
   }
+  const topic = input.topic?.trim() || null;
 
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -441,26 +569,34 @@ export async function createHypeRoom(
     }
   }
 
-  const [created] = await db
-    .insert(hypeRooms)
-    .values({
-      hostId,
-      title,
-      topic: input.topic?.trim() || null,
-      description,
-      status: "scheduled",
-      durationHours,
-      startsAt,
-      endsAt,
-      visibility: input.visibility ?? "public",
-      // dropId intentionally left null — no safe room↔drop mutation is wired yet.
-      dropId: null,
-      pinnedMessageId: null,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .returning();
-  if (!created) throw new Error("Failed to create room.");
+  const [created] = await db.transaction(async (tx) => {
+    const [room] = await tx
+      .insert(hypeRooms)
+      .values({
+        hostId,
+        title,
+        topic,
+        description,
+        status: "scheduled",
+        durationHours,
+        startsAt,
+        endsAt,
+        visibility: input.visibility ?? "public",
+        // dropId intentionally left null — no safe room↔drop mutation is wired yet.
+        dropId: null,
+        pinnedMessageId: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    if (!room) throw new Error("Failed to create room.");
+
+    // Sync hashtags from title + topic + description
+    const roomTags = extractHypeRoomHashtags(title, topic, description);
+    await syncHypeRoomHashtags(tx, room.id, roomTags);
+
+    return [room];
+  });
 
   // Immediate start → promote scheduled → live (or expired if window already over).
   return persistResolvedRoom(db, created, now);
@@ -1218,6 +1354,10 @@ export async function sendHypeRoomMessage(
       .returning();
     if (!inserted) throw new Error("Failed to send message.");
 
+    // Sync hashtags from message body
+    const messageTags = extractHashtags(validated);
+    await syncHypeRoomMessageHashtags(tx, inserted.id, messageTags);
+
     if (mentionIds.length > 0) {
       await tx.insert(hypeRoomMessageMentions).values(
         mentionIds.map(mentionedUserId => ({
@@ -1566,12 +1706,24 @@ export async function updateHypeRoomSettings(
     throw new Error("No settings provided.");
   }
 
-  const [updated] = await db
-    .update(hypeRooms)
-    .set(patch)
-    .where(eq(hypeRooms.id, roomId))
-    .returning();
-  if (!updated) throw new Error("Room not found.");
+  const [updated] = await db.transaction(async (tx) => {
+    const [room] = await tx
+      .update(hypeRooms)
+      .set(patch)
+      .where(eq(hypeRooms.id, roomId))
+      .returning();
+    if (!room) throw new Error("Room not found.");
+
+    // Sync hashtags from title + topic + description
+    const title = room.title;
+    const topic = room.topic;
+    const description = room.description;
+    const roomTags = extractHypeRoomHashtags(title, topic, description);
+    await syncHypeRoomHashtags(tx, room.id, roomTags);
+
+    return [room];
+  });
+
   return updated;
 }
 

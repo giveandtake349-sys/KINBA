@@ -1303,6 +1303,144 @@ export const milestoneAwards = pgTable(
   ]
 );
 
+// ---------------------------------------------------------------------------
+// JHILIK Phase 2B — Hashtag Foundation (additive only).
+// ---------------------------------------------------------------------------
+
+export const hashtags = pgTable(
+  "hashtags",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    tag: text("tag").notNull(),
+    displayTag: text("display_tag").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  table => [
+    uniqueIndex("hashtags_tag_unique").on(table.tag),
+    index("hashtags_created_idx").on(table.createdAt),
+  ]
+);
+
+export const videoHashtags = pgTable(
+  "video_hashtags",
+  {
+    videoId: integer("video_id")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    hashtagId: integer("hashtag_id")
+      .notNull()
+      .references(() => hashtags.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("video_hashtags_pk").on(table.videoId, table.hashtagId),
+    index("video_hashtags_hashtag_idx").on(table.hashtagId),
+  ]
+);
+
+export const videoCommentHashtags = pgTable(
+  "video_comment_hashtags",
+  {
+    commentId: integer("comment_id")
+      .notNull()
+      .references(() => videoComments.id, { onDelete: "cascade" }),
+    hashtagId: integer("hashtag_id")
+      .notNull()
+      .references(() => hashtags.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("video_comment_hashtags_pk").on(table.commentId, table.hashtagId),
+    index("video_comment_hashtags_hashtag_idx").on(table.hashtagId),
+  ]
+);
+
+export const announcementHashtags = pgTable(
+  "announcement_hashtags",
+  {
+    announcementId: integer("announcement_id")
+      .notNull()
+      .references(() => communityAnnouncements.id, { onDelete: "cascade" }),
+    hashtagId: integer("hashtag_id")
+      .notNull()
+      .references(() => hashtags.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("announcement_hashtags_pk").on(table.announcementId, table.hashtagId),
+    index("announcement_hashtags_hashtag_idx").on(table.hashtagId),
+  ]
+);
+
+export const communityCommentHashtags = pgTable(
+  "community_comment_hashtags",
+  {
+    commentId: integer("comment_id")
+      .notNull()
+      .references(() => communityComments.id, { onDelete: "cascade" }),
+    hashtagId: integer("hashtag_id")
+      .notNull()
+      .references(() => hashtags.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("community_comment_hashtags_pk").on(table.commentId, table.hashtagId),
+    index("community_comment_hashtags_hashtag_idx").on(table.hashtagId),
+  ]
+);
+
+export const hypeRoomHashtags = pgTable(
+  "hype_room_hashtags",
+  {
+    roomId: integer("room_id")
+      .notNull()
+      .references(() => hypeRooms.id, { onDelete: "cascade" }),
+    hashtagId: integer("hashtag_id")
+      .notNull()
+      .references(() => hashtags.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("hype_room_hashtags_pk").on(table.roomId, table.hashtagId),
+    index("hype_room_hashtags_hashtag_idx").on(table.hashtagId),
+  ]
+);
+
+export const hypeRoomMessageHashtags = pgTable(
+  "hype_room_message_hashtags",
+  {
+    messageId: integer("message_id")
+      .notNull()
+      .references(() => hypeRoomMessages.id, { onDelete: "cascade" }),
+    hashtagId: integer("hashtag_id")
+      .notNull()
+      .references(() => hashtags.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("hype_room_message_hashtags_pk").on(table.messageId, table.hashtagId),
+    index("hype_room_message_hashtags_hashtag_idx").on(table.hashtagId),
+  ]
+);
+
+export const dropHashtags = pgTable(
+  "drop_hashtags",
+  {
+    dropId: integer("drop_id")
+      .notNull()
+      .references(() => drops.id, { onDelete: "cascade" }),
+    hashtagId: integer("hashtag_id")
+      .notNull()
+      .references(() => hashtags.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("drop_hashtags_pk").on(table.dropId, table.hashtagId),
+    index("drop_hashtags_hashtag_idx").on(table.hashtagId),
+  ]
+);
+
 export const notifications = pgTable(
   "notifications",
   {
@@ -1575,3 +1713,11 @@ export type DMConversationRow = typeof dmConversations.$inferSelect;
 export type DMMessageRow = typeof dmMessages.$inferSelect;
 export type DMMessageRequestRow = typeof dmMessageRequests.$inferSelect;
 export type DMConversationReadRow = typeof dmConversationReads.$inferSelect;
+export type HashtagRow = typeof hashtags.$inferSelect;
+export type VideoHashtagRow = typeof videoHashtags.$inferSelect;
+export type VideoCommentHashtagRow = typeof videoCommentHashtags.$inferSelect;
+export type AnnouncementHashtagRow = typeof announcementHashtags.$inferSelect;
+export type CommunityCommentHashtagRow = typeof communityCommentHashtags.$inferSelect;
+export type HypeRoomHashtagRow = typeof hypeRoomHashtags.$inferSelect;
+export type HypeRoomMessageHashtagRow = typeof hypeRoomMessageHashtags.$inferSelect;
+export type DropHashtagRow = typeof dropHashtags.$inferSelect;
