@@ -18,6 +18,7 @@ import MessageRequestDetail from "./pages/MessageRequestDetail";
 import Settings from "./pages/settings/Settings";
 import NotFound from "./pages/NotFound";
 import { DesktopMessages } from "./pages/DesktopMessages";
+import HashtagPage from "./pages/HashtagPage";
 
 function ThemedToaster() {
   const { theme } = useTheme();
@@ -47,6 +48,8 @@ function AppRoutes() {
           because DesktopMessages hides its sidebar for conversations. */}
       <Route path="/messages/:id" component={DesktopMessages} />
       <Route path="/messages" component={DesktopMessages} />
+      {/* Hashtag page - case-insensitive via backend normalization */}
+      <Route path="/tag/:tag" component={HashtagPage} />
       <Route path="/login" component={Home} />
       <Route path="/" component={Home} />
       <Route path="/profile" component={Home} />
