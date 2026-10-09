@@ -62,7 +62,7 @@ import {
   isValidReaction,
   type ReactionType,
 } from "@shared/reactions";
-import { normalizeUsername, validateUsername, RESERVED_USERNAMES } from "../../shared/username";
+import { normalizeUsername, validateUsername, RESERVED_USERNAMES } from "../shared/username";
 import { ENV } from "./_core/env";
 import { resolvePostgresDatabaseUrl } from "./databaseConfig";
 import { selectNomineeIds, selectSecondaryWinnerId } from "./sponsorBidsDraw";
