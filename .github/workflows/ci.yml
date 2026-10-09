@@ -1,0 +1,51 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
+
+      # Exact Render build command from repository root
+      - name: Install dependencies (frozen lockfile)
+        run: corepack enable && pnpm install --frozen-lockfile
+
+      - name: Run Render-equivalent build (root typecheck + all package builds)
+        run: pnpm build
+
+      # Additional kinba-specific checks NOT run by Render
+      - name: Kinba server typecheck (tsconfig.servercheck.json) — informational
+        working-directory: ./artifacts/kinba
+        run: |
+          echo "=== Kinba server typecheck (tsconfig.servercheck.json) ==="
+          echo "NOTE: This check is informational and does NOT fail the build."
+          echo "Two pre-existing errors exist and are NOT distinguished from new errors:"
+          echo "  1. server/_core/imageGeneration.ts: cannot find module 'server/storage'"
+          echo "  2. server/videoUploadRoute.ts: Express Request type mismatch (@types/express version conflict)"
+          echo ""
+          pnpm tsc -p tsconfig.servercheck.json --noEmit || true
+          echo ""
+          echo "=== End server typecheck ==="
+
+      - name: Kinba client typecheck (tsconfig.json)
+        working-directory: ./artifacts/kinba
+        run: pnpm tsc -p tsconfig.json --noEmit
+
+      - name: Kinba Direct Messages tests
+        working-directory: ./artifacts/kinba
+        run: pnpm vitest run server/directMessages.test.ts
