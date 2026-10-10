@@ -1,8 +1,9 @@
 /**
  * M3 — reactor identity pages: offset/limit paging (limit+1 hasMore),
  * MAX(createdAt) DESC / userId DESC ordering, one grouped row per user,
- * vocabulary-ordered aggregated types, legacy comment_likes merge, the safe
- * user projection, and the four public tRPC read procedures.
+ * stored values normalized to the single Pookie/Love reaction, legacy
+ * comment_likes merge, the safe user projection, and the four public tRPC
+ * read procedures.
  */
 import { vi, describe, beforeEach, expect, it } from "vitest";
 import { SQL, sql } from "drizzle-orm";
@@ -21,7 +22,17 @@ import type { TrpcContext } from "./_core/context";
 const holder = vi.hoisted(() => ({ db: null as unknown }));
 const flagMocks = vi.hoisted(() => ({ isFeatureFlagEnabled: vi.fn() }));
 
-vi.mock("pg", () => ({ Pool: class {} }));
+// The pool only has to satisfy createPoolWithRetry's lifecycle handshake
+// ('error' listener + a health probe); every query goes through the drizzle
+// mock below, never through this class.
+vi.mock("pg", () => ({
+  Pool: class {
+    on() {}
+    async query() {
+      return { rows: [] };
+    }
+  },
+}));
 vi.mock("drizzle-orm/node-postgres", () => ({
   drizzle: vi.fn(
     () =>
@@ -319,7 +330,7 @@ describe("listVideoReactors — grouping, ordering, projection", () => {
       photoUrl: "https://cdn.test/u.png",
       accountType: "creator",
       isVerified: true,
-      reactions: ["clap"],
+      reactions: ["love"],
     });
     const serialized = JSON.stringify(page);
     expect(serialized).not.toContain("email");
@@ -327,7 +338,7 @@ describe("listVideoReactors — grouping, ordering, projection", () => {
     expect(serialized).not.toContain("member@example.test");
   });
 
-  it("emits types in deterministic vocabulary order and drops unknown stored values", async () => {
+  it("normalizes every stored value to the single reaction and drops unknown ones", async () => {
     const db = makeDb([
       [{ id: 7 }],
       [reactorRow()],
@@ -342,7 +353,21 @@ describe("listVideoReactors — grouping, ordering, projection", () => {
     holder.db = db;
 
     const page = await listVideoReactors(7);
-    expect(page.reactors[0]!.reactions).toEqual(["like", "love", "fire", "clap"]);
+    // Historical multi-reaction values collapse to one Pookie/Love entry;
+    // unknown stored strings ("thumb") never surface.
+    expect(page.reactors[0]!.reactions).toEqual(["love"]);
+  });
+
+  it("reports no reaction types when every stored value is unknown", async () => {
+    const db = makeDb([
+      [{ id: 7 }],
+      [reactorRow()],
+      [typeRow(41, "thumb"), typeRow(41, "haha")],
+    ]);
+    holder.db = db;
+
+    const page = await listVideoReactors(7);
+    expect(page.reactors[0]!.reactions).toEqual([]);
   });
 
   it("defaults a profile-less reactor to the member account type", async () => {
@@ -369,7 +394,7 @@ describe("listVideoReactors — grouping, ordering, projection", () => {
       photoUrl: null,
       accountType: "member",
       isVerified: false,
-      reactions: ["like"],
+      reactions: ["love"],
     });
   });
 });
@@ -441,8 +466,9 @@ describe("listCommentReactors — legacy comment_likes merge", () => {
     holder.db = db;
 
     const page = await listCommentReactors(5, { viewerId: 41 });
-    expect(page.reactors[0]!.reactions).toEqual(["like"]);
-    expect(page.viewerReactions).toEqual(["like"]);
+    // The legacy like and the typed like normalize to one Pookie/Love entry.
+    expect(page.reactors[0]!.reactions).toEqual(["love"]);
+    expect(page.viewerReactions).toEqual(["love"]);
     expect(page.reactors).toHaveLength(1);
   });
 
@@ -514,7 +540,8 @@ describe("listHypeRoomMessageReactors — moderated message reads", () => {
     expect(sqlText(db.__calls.from[1])).toBe(
       '(select "userId", "reaction", "createdAt" from "hype_room_message_reactions" where "messageId" = $1) as "reactor_source"'
     );
-    expect(page.reactors[0]!.reactions).toEqual(["fire"]);
+    // A historical 'fire' row still paints as the single Pookie reaction.
+    expect(page.reactors[0]!.reactions).toEqual(["love"]);
   });
 
   it("throws the existing room error when the room is missing", async () => {
@@ -659,7 +686,8 @@ describe("reactor procedures — contract and wiring", () => {
       .createCaller(context())
       .videos.comments.reactors({ commentId: 5 });
 
-    expect(page.reactors[0]!.reactions).toEqual(["like", "clap"]);
+    // 'clap' and 'like' both normalize into the single Pookie/Love entry.
+    expect(page.reactors[0]!.reactions).toEqual(["love"]);
     expect(sqlText(db.__calls.from[1])).toContain('from "comment_likes"');
   });
 
@@ -750,7 +778,9 @@ describe("reactor procedures — contract and wiring", () => {
 
     expect(page.offset).toBe(5);
     expect(page.hasMore).toBe(false);
-    expect(page.viewerReactions).toEqual(["like"]);
+    // A stored 'like' row normalizes to the single Pookie reaction for the
+    // viewer who holds it.
+    expect(page.viewerReactions).toEqual(["love"]);
     expect(flagMocks.isFeatureFlagEnabled).toHaveBeenCalledWith(
       "time_limited_communities"
     );

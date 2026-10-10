@@ -11,13 +11,17 @@ import {
 } from "./hypeRooms";
 
 describe("M-A1 reaction set", () => {
-  it("exposes a small explicit reaction set", () => {
-    expect([...HYPE_ROOM_REACTIONS]).toEqual(["like", "love", "fire", "clap"]);
+  it("exposes the single supported reaction", () => {
+    expect([...HYPE_ROOM_REACTIONS]).toEqual(["love"]);
   });
 
-  it("accepts only explicit reaction types", () => {
+  it("accepts the single reaction and keeps historical types working", () => {
     for (const r of HYPE_ROOM_REACTIONS) {
       expect(isValidHypeRoomReaction(r)).toBe(true);
+    }
+    // Historical rows must keep toggling until they are migrated away.
+    for (const legacy of ["like", "fire", "clap"]) {
+      expect(isValidHypeRoomReaction(legacy)).toBe(true);
     }
     for (const bad of ["", "ok", "LIKE", "thumbsup", "x", "repost"]) {
       expect(isValidHypeRoomReaction(bad)).toBe(false);

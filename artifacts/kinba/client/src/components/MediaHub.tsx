@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   memo,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent,
   type PointerEvent,
   type ReactNode,
@@ -72,23 +73,29 @@ import {
   type ConversationAction,
   type ConversationReactionEntry,
   type ConversationReactionId,
+  type MentionPickerHandle,
 } from "./conversation";
+import { MentionText } from "./MentionText";
+import {
+  applyMentionPick,
+  findMentionToken,
+  type MentionToken,
+} from "@/lib/mentionParser";
 import { isAbsoluteHttpUrl, resolveMediaUrl } from "@/lib/runtimeConfig";
 import { isAndroidApp, saveImageToGallery } from "@/lib/galleryDownload";
 import { useVideoReaction } from "@/hooks/useVideoReaction";
 import {
-  activeReactionEntry,
   adoptSingleReaction,
   applySingleReaction,
+  tappedReactionType,
   totalReactionCount,
   type SingleReactionState,
 } from "@/lib/reactionState";
 import {
-  ReactionPicker,
   ReactionSummaryPill,
   ReactorList,
-  useReactionPicker,
 } from "./reactions";
+import { useLongPress } from "@/hooks/useLongPress";
 import type { ReactionType } from "@shared/reactions";
 import { postCaption } from "@/lib/postCaption";
 import { Caption } from "./Caption";
@@ -597,6 +604,8 @@ function VoiceCommentComposer({
   disabled,
   inputRef,
   placeholder,
+  onInputChange,
+  onInputKeyDown,
 }: {
   body: string;
   onBodyChange: (value: string) => void;
@@ -607,6 +616,9 @@ function VoiceCommentComposer({
   disabled?: boolean;
   inputRef?: RefObject<HTMLInputElement | null>;
   placeholder: string;
+  /** Reports the live caret position for cursor-aware mention insertion. */
+  onInputChange?: (value: string, cursor: number) => void;
+  onInputKeyDown?: (event: ReactKeyboardEvent<HTMLInputElement>) => void;
 }) {
   const recorder = useVoiceCommentRecorder();
   const [uploading, setUploading] = useState(false);
@@ -635,7 +647,21 @@ function VoiceCommentComposer({
       <input
         ref={inputRef}
         value={body}
-        onChange={event => onBodyChange(event.target.value)}
+        onChange={event => {
+          onBodyChange(event.target.value);
+          onInputChange?.(
+            event.target.value,
+            event.target.selectionStart ?? event.target.value.length
+          );
+        }}
+        onSelect={event => {
+          const target = event.currentTarget;
+          onInputChange?.(
+            target.value,
+            target.selectionStart ?? target.value.length
+          );
+        }}
+        onKeyDown={event => onInputKeyDown?.(event)}
         maxLength={500}
         placeholder={placeholder}
         aria-label={placeholder}
@@ -1515,7 +1541,6 @@ function EngagementActions({
   engagement,
   videoId,
   onReact,
-  onSelectReaction,
   onShare,
   onComments,
   pending,
@@ -1529,7 +1554,6 @@ function EngagementActions({
   engagement: Engagement;
   videoId?: number;
   onReact: () => void;
-  onSelectReaction?: (reaction: ReactionType) => void;
   onShare: () => void;
   onComments: () => void;
   pending: "react" | "share" | null;
@@ -1542,8 +1566,13 @@ function EngagementActions({
 }) {
   const auth = useAuth();
   const utils = trpc.useUtils();
-  const picker = useReactionPicker(Boolean(onSelectReaction));
   const [reactorsOpen, setReactorsOpen] = useState(false);
+  // Single reaction (Pookie/Love): a tap toggles it; a long-press opens the
+  // reactor list instead of a multi-option picker.
+  const longPress = useLongPress({
+    enabled: Boolean(videoId),
+    onLongPress: () => setReactorsOpen(true),
+  });
   const followState = trpc.profile.followState.useQuery(
     { userId: owner?.id ?? 0 },
     {
@@ -1603,7 +1632,7 @@ function EngagementActions({
       <button
         type="button"
         className={engagement.viewerReacted ? "is-active" : ""}
-        {...picker.longPress}
+        {...longPress}
         onClick={event => {
           event.preventDefault();
           event.stopPropagation();
@@ -1666,27 +1695,13 @@ function EngagementActions({
           <span>{bookmarked ? "Saved" : "Save"}</span>
         </button>
       )}
-      {onSelectReaction ? (
-        <>
-          <ReactionPicker
-            open={picker.open}
-            anchor={picker.anchor}
-            active={engagement.viewerReaction}
-            disabled={pending === "react"}
-            label="Choose a video reaction"
-            onSelect={onSelectReaction}
-            onClose={picker.close}
-            onOpenReactors={() => setReactorsOpen(true)}
-          />
-          {videoId != null ? (
-            <ReactorList
-              open={reactorsOpen}
-              title="Video reactions"
-              source={{ kind: "video", videoId }}
-              onClose={() => setReactorsOpen(false)}
-            />
-          ) : null}
-        </>
+      {videoId != null ? (
+        <ReactorList
+          open={reactorsOpen}
+          title="Video reactions"
+          source={{ kind: "video", videoId }}
+          onClose={() => setReactorsOpen(false)}
+        />
       ) : null}
     </div>
   );
@@ -1718,7 +1733,7 @@ function commentReactionEntries(
   }
   return [
     {
-      reaction: "like",
+      reaction: "love",
       count: comment.likeCount ?? 0,
       reactedByMe: Boolean(comment.viewerLiked),
     },
@@ -1746,17 +1761,31 @@ function CommentDrawer({
   const [reactionTargetId, setReactionTargetId] = useState<number | null>(null);
   const [reactorsOpen, setReactorsOpen] = useState(false);
   // Long-press carries no React state, so recover the comment it came from
-  // from the rendered row and remember it until the tray closes.
-  const picker = useReactionPicker(open, gesture => {
-    const target =
-      gesture.target instanceof HTMLElement ? gesture.target : null;
-    const raw = target
-      ?.closest("[data-comment-id]")
-      ?.getAttribute("data-comment-id");
-    const id = raw == null ? Number.NaN : Number(raw);
-    setReactionTargetId(Number.isInteger(id) && id > 0 ? id : null);
+  // from the rendered row and open the reactor list for it. There is a single
+  // reaction (Pookie/Love) — no multi-option tray exists anymore.
+  const longPress = useLongPress({
+    enabled: open,
+    onLongPress: gesture => {
+      const target =
+        gesture.target instanceof HTMLElement ? gesture.target : null;
+      const raw = target
+        ?.closest("[data-comment-id]")
+        ?.getAttribute("data-comment-id");
+      const id = raw == null ? Number.NaN : Number(raw);
+      const commentId = Number.isInteger(id) && id > 0 ? id : null;
+      if (commentId == null) return;
+      setReactionTargetId(commentId);
+      setReactorsOpen(true);
+    },
   });
   const [mentionPickerOpen, setMentionPickerOpen] = useState(false);
+  // Active "@query" token in the composer, plus what opened the picker:
+  // the @ button (search box in the picker) or typing "@" in the input.
+  const [mentionToken, setMentionToken] = useState<MentionToken | null>(null);
+  const [mentionSource, setMentionSource] = useState<
+    "button" | "typing" | null
+  >(null);
+  const mentionPickerRef = useRef<MentionPickerHandle | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const commentsQuery = trpc.videos.comments.list.useQuery(
     { videoId: postId },
@@ -1797,20 +1826,8 @@ function CommentDrawer({
     );
   };
 
-  // Which comment the shared reaction tray is acting on: set when a pill is
+  // Which comment the shared reaction surface is acting on: set when a pill is
   // tapped or when a long-press is recovered from a rendered row above.
-  const reactionTargetRow =
-    reactionTargetId == null
-      ? null
-      : (comments.find(row => row.id === reactionTargetId) ??
-        Object.values(repliesByParent)
-          .flat()
-          .find(row => row.id === reactionTargetId) ??
-        null);
-  const reactionTargetActive = reactionTargetRow
-    ? activeReactionEntry(commentReactionEntries(reactionTargetRow))
-    : null;
-
   const loadReplies = async (parentId: number, offset: number) => {
     setThreadMeta(prev => ({
       ...prev,
@@ -1935,7 +1952,7 @@ function CommentDrawer({
     }
     setBody("");
     setReplyTo(null);
-    setMentionPickerOpen(false);
+    closeMentionPicker();
     if (replyParentId != null && needsExpand) {
       setExpandedIds(prev =>
         prev.includes(replyParentId) ? prev : [...prev, replyParentId]
@@ -1983,22 +2000,103 @@ function CommentDrawer({
     }
   };
 
+  const closeMentionPicker = () => {
+    setMentionPickerOpen(false);
+    setMentionToken(null);
+    setMentionSource(null);
+  };
+
+  // Typing "@" (or moving the caret into an existing token) opens the picker
+  // in typing mode: the token query drives the results and the composer keeps
+  // focus. Backspacing past the "@" closes it again.
+  const handleComposerInputChange = (value: string, cursor: number) => {
+    const token = findMentionToken(value, cursor);
+    setMentionToken(prev => {
+      if (prev === token) return prev;
+      if (
+        prev &&
+        token &&
+        prev.start === token.start &&
+        prev.end === token.end &&
+        prev.query === token.query
+      ) {
+        return prev;
+      }
+      return token;
+    });
+    if (token) {
+      setMentionPickerOpen(true);
+      setMentionSource("typing");
+    } else if (mentionSource === "typing") {
+      setMentionPickerOpen(false);
+      setMentionSource(null);
+    }
+  };
+
+  const handleComposerKeyDown = (
+    event: ReactKeyboardEvent<HTMLInputElement>
+  ) => {
+    if (event.key === "Escape") {
+      if (mentionPickerOpen) {
+        event.preventDefault();
+        closeMentionPicker();
+      }
+      return;
+    }
+    if (!mentionPickerOpen) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      mentionPickerRef.current?.moveHighlight(1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      mentionPickerRef.current?.moveHighlight(-1);
+    } else if (event.key === "Enter") {
+      // Enter picks the highlighted person instead of submitting; with an
+      // empty list it falls through so the comment still submits.
+      if (mentionPickerRef.current?.selectHighlighted()) {
+        event.preventDefault();
+      }
+    }
+  };
+
   const insertMention = (user: {
     id: number;
     name: string | null;
     username: string | null;
   }) => {
-    const handle = user.username?.trim() || user.name?.trim() || "";
+    const username = user.username?.trim();
+    // Only a real username becomes a @mention token (usernames are unique
+    // and immutable, so the handle is the stable identifier). A user without
+    // a username is inserted as plain display text that never linkifies.
+    const handle = username ? `@${username}` : user.name?.trim() || "";
     if (!handle) return;
-    const token = handle.startsWith("@") ? handle : `@${handle}`;
-    setBody(prev => {
-      const next = prev.endsWith(" ") || prev.length === 0
-        ? `${prev}${token} `
-        : `${prev} ${token} `;
-      return next.slice(0, 500);
+    const input = inputRef.current;
+    const token = mentionToken;
+    if (token) {
+      const next = applyMentionPick(body, token, handle, 500);
+      setBody(next.text);
+      closeMentionPicker();
+      requestAnimationFrame(() => {
+        input?.focus();
+        input?.setSelectionRange(next.cursor, next.cursor);
+      });
+      return;
+    }
+    // Button mode: insert at the live caret (or append) with clean spacing.
+    const cursor = Math.min(input?.selectionStart ?? body.length, body.length);
+    const before = body.slice(0, cursor);
+    const after = body.slice(cursor);
+    const glue = before.length === 0 || /\s$/.test(before) ? "" : " ";
+    const tail = after.length === 0 || !/^\s/.test(after) ? " " : "";
+    const insertion = `${glue}${handle}${tail}`;
+    const nextText = `${before}${insertion}${after}`.slice(0, 500);
+    const nextCursor = Math.min(before.length + insertion.length, 500);
+    setBody(nextText);
+    closeMentionPicker();
+    requestAnimationFrame(() => {
+      input?.focus();
+      input?.setSelectionRange(nextCursor, nextCursor);
     });
-    setMentionPickerOpen(false);
-    inputRef.current?.focus();
   };
 
   const renderComment = (
@@ -2035,8 +2133,8 @@ function CommentDrawer({
       {
         id: "react",
         label: activeReaction ? "Remove reaction" : "React",
-        icon: <span aria-hidden="true">👍</span>,
-        run: () => void reactToComment(comment.id, activeReaction ?? "like"),
+        icon: <span aria-hidden="true">❤️</span>,
+        run: () => void reactToComment(comment.id, activeReaction ?? "love"),
       },
       {
         id: "copy",
@@ -2104,7 +2202,9 @@ function CommentDrawer({
             <ActionMenu actions={menuActions} ariaLabel="Comment actions" />
           </div>
           {comment.body ? (
-            <p className="conv-comment-body">{comment.body}</p>
+            <p className="conv-comment-body">
+              <MentionText text={comment.body} />
+            </p>
           ) : null}
           {comment.audioUrl ? (
             <CommentAudioPlayer
@@ -2121,12 +2221,12 @@ function CommentDrawer({
               ariaLabel="Comment reactions"
               total={totalReactionCount(reactionEntries)}
               active={activeReaction}
-              longPress={picker.longPress}
+              longPress={longPress}
               onTotalClick={event => {
                 event.preventDefault();
                 event.stopPropagation();
                 setReactionTargetId(comment.id);
-                picker.openFromEvent(event);
+                setReactorsOpen(true);
               }}
             />
             <button
@@ -2268,8 +2368,12 @@ function CommentDrawer({
         ) : null}
         {mentionPickerOpen && auth.isAuthenticated ? (
           <MentionPicker
+            ref={mentionPickerRef}
             viewerId={auth.user?.id ?? null}
             onPick={insertMention}
+            query={
+              mentionSource === "typing" ? (mentionToken?.query ?? "") : undefined
+            }
           />
         ) : null}
         <div className="conv-composer-row">
@@ -2286,7 +2390,13 @@ function CommentDrawer({
             disabled={!auth.isAuthenticated}
             onClick={() => {
               if (!auth.isAuthenticated) return auth.openAuth();
-              setMentionPickerOpen(value => !value);
+              if (mentionPickerOpen) {
+                closeMentionPicker();
+              } else {
+                setMentionPickerOpen(true);
+                setMentionSource("button");
+                setMentionToken(null);
+              }
             }}
           >
             @
@@ -2297,6 +2407,8 @@ function CommentDrawer({
             onSend={submitComment}
             disabled={createComment.isPending}
             inputRef={inputRef}
+            onInputChange={handleComposerInputChange}
+            onInputKeyDown={handleComposerKeyDown}
             placeholder={
               auth.isAuthenticated
                 ? replyTo
@@ -2307,19 +2419,6 @@ function CommentDrawer({
           />
         </div>
       </section>
-      <ReactionPicker
-        open={picker.open}
-        anchor={picker.anchor}
-        active={reactionTargetActive}
-        disabled={reactingId !== null}
-        label="Choose a comment reaction"
-        onSelect={reaction => {
-          if (reactionTargetId == null) return;
-          void reactToComment(reactionTargetId, reaction);
-        }}
-        onClose={picker.close}
-        onOpenReactors={() => setReactorsOpen(true)}
-      />
       {reactionTargetId != null ? (
         <ReactorList
           open={reactorsOpen}
@@ -2633,10 +2732,12 @@ function VideoCard({
   };
   const [views, setViews] = useState(video.viewCount);
   const viewMutation = trpc.videos.view.useMutation();
-  const { current, react, selectReaction, share, pending } =
-    useOptimisticEngagement(video);
-  const picker = useReactionPicker();
+  const { current, react, share, pending } = useOptimisticEngagement(video);
   const [reactorsOpen, setReactorsOpen] = useState(false);
+  // Single reaction (Pookie/Love): tap toggles; long-press opens who reacted.
+  const longPress = useLongPress({
+    onLongPress: () => setReactorsOpen(true),
+  });
   const openViewer = (event: MouseEvent<HTMLElement>) => {
     if (!onOpenViewer) return;
     const target = event.target;
@@ -2769,7 +2870,7 @@ function VideoCard({
           <button
             type="button"
             className={current.viewerReacted ? "is-active" : ""}
-            {...picker.longPress}
+            {...longPress}
             onClick={react}
             disabled={!!pending}
             aria-pressed={current.viewerReacted}
@@ -2782,12 +2883,12 @@ function VideoCard({
             count={current.reactionCount}
             active={current.viewerReaction}
             disabled={!!pending}
-            ariaLabel="Choose a reaction"
-            title="Choose a reaction"
+            ariaLabel="See who reacted"
+            title="See who reacted"
             onClick={event => {
               event.preventDefault();
               event.stopPropagation();
-              picker.openFromEvent(event);
+              setReactorsOpen(true);
             }}
           />
           <button
@@ -2819,16 +2920,6 @@ function VideoCard({
           postOwnerId={video.owner.id}
           open={commentsOpen}
           onClose={() => setCommentsOpen(false)}
-        />
-        <ReactionPicker
-          open={picker.open}
-          anchor={picker.anchor}
-          active={current.viewerReaction}
-          disabled={!!pending}
-          label="Choose a video reaction"
-          onSelect={selectReaction}
-          onClose={picker.close}
-          onOpenReactors={() => setReactorsOpen(true)}
         />
         <ReactorList
           open={reactorsOpen}
@@ -3322,8 +3413,7 @@ function ShortVideoCard({
       notifyError(error);
     }
   };
-  const { current, react, selectReaction, share, pending } =
-    useOptimisticEngagement(video);
+  const { current, react, share, pending } = useOptimisticEngagement(video);
   if (deleted) return null;
   return (
     <article
@@ -3419,7 +3509,6 @@ function ShortVideoCard({
             engagement={current}
             videoId={video.id}
             onReact={react}
-            onSelectReaction={selectReaction}
             onShare={share}
             onComments={() => {
               if (!auth.isAuthenticated) return auth.openAuth();
@@ -3927,7 +4016,11 @@ function AnnouncementComments({
                     {displayName(comment.author.name, comment.author.username)}
                   </strong>
                 </a>
-                {comment.body && <span>{comment.body}</span>}
+                {comment.body && (
+                  <span>
+                    <MentionText text={comment.body} />
+                  </span>
+                )}
                 {comment.audioUrl && (
                   <CommentAudioPlayer
                     src={comment.audioUrl}
@@ -4196,10 +4289,10 @@ function announcementState(row: {
 }
 
 /**
- * Announcement reactions: the count pill is the always-available tap target
- * and the long-press zone, so the shared picker (and, through its footer, the
- * reactor list) is reachable without a gesture. State lives in the
- * `community.list` cache — nothing is painted that the server did not confirm.
+ * Announcement reactions: a single Pookie/Love reaction — the count pill is
+ * the always-available tap target that toggles it, and a long-press opens the
+ * reactor list. State lives in the `community.list` cache — nothing is
+ * painted that the server did not confirm.
  */
 function AnnouncementReactionBar({
   announcement,
@@ -4213,8 +4306,10 @@ function AnnouncementReactionBar({
 }) {
   const auth = useAuth();
   const utils = trpc.useUtils();
-  const picker = useReactionPicker();
   const [reactorsOpen, setReactorsOpen] = useState(false);
+  const longPress = useLongPress({
+    onLongPress: () => setReactorsOpen(true),
+  });
   const reactMut = trpc.community.react.useMutation();
   const state = announcementState(announcement);
 
@@ -4255,33 +4350,21 @@ function AnnouncementReactionBar({
       className="announcement-reactions"
       role="group"
       aria-label="Announcement reactions"
-      {...picker.longPress}
+      {...longPress}
     >
       <ReactionSummaryPill
         count={state.reactionCount}
         active={state.viewerReaction}
         disabled={reactMut.isPending}
         ariaLabel={
-          state.viewerReaction
-            ? "Change your reaction"
-            : "React to this announcement"
+          state.viewerReacted ? "Remove Pookie" : "Pookie this announcement"
         }
-        title="React"
+        title="Pookie"
         onClick={event => {
           event.preventDefault();
           event.stopPropagation();
-          picker.openFromEvent(event);
+          void commit(tappedReactionType(state.viewerReaction));
         }}
-      />
-      <ReactionPicker
-        open={picker.open}
-        anchor={picker.anchor}
-        active={state.viewerReaction}
-        disabled={reactMut.isPending}
-        label="Choose an announcement reaction"
-        onSelect={type => void commit(type)}
-        onClose={picker.close}
-        onOpenReactors={() => setReactorsOpen(true)}
       />
       <ReactorList
         open={reactorsOpen}

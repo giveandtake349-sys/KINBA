@@ -272,7 +272,7 @@ describe("listVideoComments — correlated replyCount (regression)", () => {
     expect(rows.find(row => row.id === 1)!.likeCount).toBe(1);
     expect(rows.find(row => row.id === 4)!.likeCount).toBe(0);
     expect(rows.find(row => row.id === 1)!.reactions).toEqual([
-      { reaction: "like", count: 1, reactedByMe: false },
+      { reaction: "love", count: 1, reactedByMe: false },
     ]);
     expect(rows.find(row => row.id === 4)!.reactions).toEqual([]);
   });

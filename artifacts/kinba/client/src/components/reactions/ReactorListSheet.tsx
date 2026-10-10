@@ -5,6 +5,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { resolveMediaUrl } from "@/lib/runtimeConfig";
 import {
   REACTION_OPTIONS,
+  normalizeReaction,
   type ReactionType,
 } from "@shared/reactions";
 import "../profileRedesign.css";
@@ -40,6 +41,22 @@ export type ReactorListSheetProps = {
 const GLYPH_BY_TYPE = new Map(
   REACTION_OPTIONS.map(option => [option.id, option.glyph])
 );
+
+/**
+ * Historical reactors rows carry legacy types; normalize them to the single
+ * supported reaction so the sheet paints one glyph per viewer instead of
+ * falling back to a raw database string.
+ */
+function normalizeTypes(
+  types: readonly ReactionType[] | null | undefined
+): ReactionType[] {
+  const out: ReactionType[] = [];
+  for (const type of types ?? []) {
+    const normalized = normalizeReaction(type);
+    if (normalized && !out.includes(normalized)) out.push(normalized);
+  }
+  return out;
+}
 
 function entryLabel(entry: ReactorSheetEntry): string {
   const name = entry.name?.trim();
@@ -89,13 +106,18 @@ export function ReactorListSheet({
     }
     try {
       const page = await loadRef.current(offset);
-      const batch = Array.isArray(page.reactors) ? page.reactors : [];
+      const batch = Array.isArray(page.reactors)
+        ? page.reactors.map(row => ({
+            ...row,
+            reactions: normalizeTypes(row.reactions),
+          }))
+        : [];
       setReactors(previous => {
         if (initial) return batch;
         const known = new Set(previous.map(row => row.userId));
         return [...previous, ...batch.filter(row => !known.has(row.userId))];
       });
-      setViewerReactions(page.viewerReactions ?? []);
+      setViewerReactions(normalizeTypes(page.viewerReactions));
       setNextOffset(offset + batch.length);
       setHasMore(Boolean(page.hasMore));
       setStatus("ready");

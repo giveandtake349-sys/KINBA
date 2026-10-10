@@ -59,6 +59,7 @@ export type DMMessageWithSender = DMMessageRow & {
 
 export type DMMessageRequestWithRequester = DMMessageRequestRow & {
   requester: { id: number; name: string | null; username: string | null; photoUrl: string | null };
+  conversationId?: number;
 };
 
 export type SendMessageRequestResult = DMMessageRequestRow & {
@@ -871,9 +872,43 @@ export async function listMessageRequests(
       .where(inArray(users.id, requesterIds));
     const requesterMap = new Map(requesters.map((r) => [r.id, r]));
 
+    // Look up conversationId for each request by matching (requesterId, recipientId)
+    // against conversation participants (userAId, userBId), order-independently.
+    const conversationIds = new Map<string, number>();
+    if (requests.length > 0) {
+      const requestPairs = new Set(
+        requests.map((r) => participantPairKey(r.requesterId, r.recipientId))
+      );
+      // Fetch only conversations where the recipient (userId) is a participant.
+      // Uses indexes dm_conversations_userA_idx / dm_conversations_userB_idx.
+      const conversations = await db
+        .select({
+          id: dmConversations.id,
+          userAId: dmConversations.userAId,
+          userBId: dmConversations.userBId,
+        })
+        .from(dmConversations)
+        .where(
+          and(
+            eq(dmConversations.status, "active"),
+            or(
+              eq(dmConversations.userAId, userId),
+              eq(dmConversations.userBId, userId)
+            )
+          )
+        );
+      for (const conv of conversations) {
+        const pairKey = participantPairKey(conv.userAId, conv.userBId);
+        if (requestPairs.has(pairKey)) {
+          conversationIds.set(pairKey, conv.id);
+        }
+      }
+    }
+
     return requests.map((r) => ({
       ...r,
       requester: requesterMap.get(r.requesterId)!,
+      conversationId: conversationIds.get(participantPairKey(r.requesterId, r.recipientId)),
     }));
   });
 }

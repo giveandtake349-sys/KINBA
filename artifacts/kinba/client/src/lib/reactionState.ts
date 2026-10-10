@@ -7,7 +7,11 @@
  * mirror that contract so the UI can paint optimistically and then adopt the
  * server's answer — never inventing state the backend would disagree with.
  */
-import { isValidReaction, type ReactionType } from "@shared/reactions";
+import {
+  PRIMARY_REACTION,
+  normalizeReaction,
+  type ReactionType,
+} from "@shared/reactions";
 
 /** Per-type chips (comments, Hype Room messages). */
 export type ReactionEntry = {
@@ -34,12 +38,12 @@ function clampCount(value: number): number {
 
 /**
  * The type a tap on the default control should send: remove whatever is
- * already active, otherwise activate the default "like".
+ * already active, otherwise activate the single Pookie/Love reaction.
  */
 export function tappedReactionType(
   active: ReactionType | null | undefined
 ): ReactionType {
-  return active ?? "like";
+  return active ?? PRIMARY_REACTION;
 }
 
 /** Optimistic single-count state after requesting `type`. */
@@ -75,11 +79,14 @@ export function adoptSingleReaction(
   response: { reactionCount?: number; viewerReacted: boolean }
 ): SingleReactionState {
   const reacted = Boolean(response.viewerReacted);
+  const wasReacted = previous.viewerReacted;
   return {
     reactionCount:
       typeof response.reactionCount === "number"
         ? response.reactionCount
-        : applySingleReaction(previous, type).reactionCount,
+        : clampCount(
+            previous.reactionCount + (reacted === wasReacted ? 0 : reacted ? 1 : -1)
+          ),
     viewerReacted: reacted,
     viewerReaction: reacted ? type : null,
   };
@@ -93,9 +100,25 @@ export function toReactionEntries(
     | undefined
 ): ReactionEntry[] {
   if (!rows) return [];
-  return rows.filter(
-    (entry): entry is ReactionEntry => isValidReaction(entry.reaction)
-  );
+  const byReaction = new Map<ReactionType, ReactionEntry>();
+  for (const row of rows) {
+    // Historical multi-reaction values normalize to the single reaction and
+    // merge, so a legacy row still paints as an active Pookie/Love.
+    const reaction = normalizeReaction(row.reaction);
+    if (!reaction) continue;
+    const existing = byReaction.get(reaction);
+    if (existing) {
+      existing.count += row.count;
+      existing.reactedByMe = existing.reactedByMe || row.reactedByMe;
+    } else {
+      byReaction.set(reaction, {
+        reaction,
+        count: row.count,
+        reactedByMe: row.reactedByMe,
+      });
+    }
+  }
+  return [...byReaction.values()];
 }
 
 /** The viewer's active chip, or null when they have not reacted. */

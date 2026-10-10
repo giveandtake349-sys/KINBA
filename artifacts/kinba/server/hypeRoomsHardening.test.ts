@@ -612,7 +612,7 @@ describe("FIX 5 — reaction unique race", () => {
     databaseMocks.getDb.mockResolvedValue(db as never);
     await expect(
       toggleHypeRoomMessageReaction(11, 41, 3, "like")
-    ).resolves.toMatchObject({ active: true, reaction: "like" });
+    ).resolves.toMatchObject({ active: true, reaction: "love" });
     expect(db.delete).not.toHaveBeenCalled();
   });
 
@@ -676,7 +676,7 @@ describe("FIX 5 — reaction unique race", () => {
     expect(databaseMocks.getDb).not.toHaveBeenCalled();
   });
 
-  it("replaces the previous type instead of stacking a second one", async () => {
+  it("clears a historical row instead of stacking a second one", async () => {
     const db = reactionDb({
       existing: {
         id: 7,
@@ -686,34 +686,18 @@ describe("FIX 5 — reaction unique race", () => {
         reaction: "fire",
         createdAt: new Date(),
       },
-      insertReturning: [
-        {
-          id: 9,
-          roomId: 11,
-          messageId: 3,
-          userId: 41,
-          reaction: "clap",
-          createdAt: new Date(),
-        },
-      ],
+      insertReturning: [],
     });
     databaseMocks.getDb.mockResolvedValue(db as never);
 
+    // A legacy 'fire' row already counts as the single reaction, so asking
+    // for any accepted type removes it rather than rewriting it in place.
     await expect(
       toggleHypeRoomMessageReaction(11, 41, 3, "clap")
-    ).resolves.toMatchObject({ active: true, reaction: "clap" });
+    ).resolves.toMatchObject({ active: false, reaction: "love" });
 
-    expect(db.__insertValues).toHaveBeenCalledWith({
-      roomId: 11,
-      messageId: 3,
-      userId: 41,
-      reaction: "clap",
-    });
-    // Clear every type this user holds first, then insert — never insert-then-clear.
-    expect(db.__deleteWheres).toHaveBeenCalledTimes(1);
-    expect(db.__deleteWheres.mock.invocationCallOrder[0]).toBeLessThan(
-      db.__insertValues.mock.invocationCallOrder[0]
-    );
+    expect(db.delete).toHaveBeenCalledTimes(1);
+    expect(db.insert).not.toHaveBeenCalled();
   });
 
   it("locks the message row FOR UPDATE inside a single transaction", async () => {

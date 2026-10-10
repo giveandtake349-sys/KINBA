@@ -57,7 +57,7 @@ describe("useVideoReaction", () => {
     mocks.mutateAsync.mockResolvedValue({ viewerReacted: true });
   });
 
-  it("sends the default like on a tap when nothing is active", async () => {
+  it("sends the single Pookie/Love reaction on a tap when nothing is active", async () => {
     const { result } = renderHook(() => useVideoReaction(target));
     act(() => {
       result.current.react();
@@ -66,23 +66,23 @@ describe("useVideoReaction", () => {
 
     expect(mocks.mutateAsync).toHaveBeenCalledWith({
       videoId: 99,
-      reaction: "like",
+      reaction: "love",
     });
     expect(result.current.state).toEqual({
       reactionCount: 11,
       viewerReacted: true,
-      viewerReaction: "like",
+      viewerReaction: "love",
     });
     expect(result.current.pending).toBe(false);
   });
 
-  it("sends the active type on a tap so the server removes it", async () => {
+  it("sends the active reaction on a tap so the server removes it", async () => {
     mocks.mutateAsync.mockResolvedValue({ viewerReacted: false });
     const { result } = renderHook(() =>
       useVideoReaction({
         ...target,
         viewerReacted: true,
-        viewerReaction: "fire",
+        viewerReaction: "love",
       })
     );
 
@@ -93,7 +93,7 @@ describe("useVideoReaction", () => {
 
     expect(mocks.mutateAsync).toHaveBeenCalledWith({
       videoId: 99,
-      reaction: "fire",
+      reaction: "love",
     });
     expect(result.current.state).toEqual({
       reactionCount: 9,
@@ -102,20 +102,20 @@ describe("useVideoReaction", () => {
     });
   });
 
-  it("sends the picker's explicit type", async () => {
+  it("selecting the single reaction type sends it", async () => {
     const { result } = renderHook(() => useVideoReaction(target));
     act(() => {
-      result.current.select("clap");
+      result.current.select("love");
     });
     await flush();
 
     expect(mocks.mutateAsync).toHaveBeenCalledWith({
       videoId: 99,
-      reaction: "clap",
+      reaction: "love",
     });
   });
 
-  it("keeps the total stable when the server replaces the type", async () => {
+  it("normalizes a legacy active row to the single reaction without moving the total", async () => {
     const { result } = renderHook(() =>
       useVideoReaction({
         ...target,

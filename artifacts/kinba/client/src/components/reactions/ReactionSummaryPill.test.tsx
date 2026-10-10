@@ -9,19 +9,19 @@ describe("ReactionSummaryPill", () => {
     expect(screen.getByText("7")).toBeTruthy();
   });
 
-  it("shows the viewer's own glyph next to the total", () => {
-    render(<ReactionSummaryPill count={3} active="fire" />);
-    expect(screen.getByText("🔥")).toBeTruthy();
+  it("shows the viewer's own Pookie glyph next to the total", () => {
+    render(<ReactionSummaryPill count={3} active="love" />);
+    expect(screen.getByText("❤️")).toBeTruthy();
     expect(screen.getByText("3")).toBeTruthy();
     expect(screen.getByRole("button").getAttribute("aria-label")).toBe(
       "3 reactions"
     );
   });
 
-  it("falls back to the default glyph when there is no count to show", () => {
+  it("falls back to the Pookie glyph when there is no count to show", () => {
     render(<ReactionSummaryPill />);
-    expect(screen.getByText("👍")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Choose a reaction" })).toBeTruthy();
+    expect(screen.getByText("❤️")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "See who reacted" })).toBeTruthy();
   });
 
   it("prefers an explicit accessible label", () => {
@@ -33,7 +33,7 @@ describe("ReactionSummaryPill", () => {
     ).toBeTruthy();
   });
 
-  it("reports the click so a tap can open the picker", () => {
+  it("reports the click so a tap can open the reactor list or toggle", () => {
     const onClick = vi.fn();
     render(<ReactionSummaryPill count={1} onClick={onClick} />);
     fireEvent.click(screen.getByRole("button"));

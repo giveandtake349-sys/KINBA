@@ -1,11 +1,12 @@
 /**
  * Optimistic viewer reaction state for a video/post.
  *
- * Every gesture funnels through one commit: a tap asks to toggle the default
- * "like" (which means "remove" when something is already active), the picker
- * asks for a specific type. The server's M2 toggle decides insert/remove/replace
- * from that single type, so the UI only has to mirror the response — no
- * client-only state that could disagree with the backend.
+ * Every gesture funnels through one commit: a tap toggles the single
+ * Pookie/Love reaction (removing it when it is already active), and `select`
+ * lets a caller target a specific (possibly historical) type. The server's M2
+ * toggle decides insert/remove from that one type, so the UI only has to
+ * mirror the response — no client-only state that could disagree with the
+ * backend.
  */
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -92,9 +93,9 @@ export function useVideoReaction(
   return {
     state,
     pending,
-    /** Tap on the default control: remove the active type, else add "like". */
+    /** Tap on the default control: remove the active reaction, else add it. */
     react: () => void commit(tappedReactionType(active)),
-    /** Picker selection: inserts, replaces, or removes via the same commit. */
+    /** Explicit type (legacy callers): same commit path as a tap. */
     select: (type: ReactionType) => void commit(type),
   };
 }

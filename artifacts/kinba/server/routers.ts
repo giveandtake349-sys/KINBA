@@ -80,7 +80,7 @@ import { getDb } from "./db";
 import { eq, desc } from "drizzle-orm";
 import { users, profiles } from "../drizzle/schema";
 import { communityAnnouncementInput, textPostInput, videoInput } from "./mediaValidation";
-import { REACTION_TYPES } from "@shared/reactions";
+import { REACTION_INPUT_TYPES } from "@shared/reactions";
 import {
   FEATURE_FLAG_KEYS,
   getActiveFeatureFlags,
@@ -123,7 +123,6 @@ import {
   toggleHypeRoomMessageReaction,
   unpinHypeRoomMessage,
   updateHypeRoomSettings,
-  HYPE_ROOM_REACTIONS,
   ROOM_DURATION_HOURS,
   ROOM_LINK_MAX_LENGTH,
   ROOM_MESSAGE_MAX_LENGTH,
@@ -817,7 +816,7 @@ export const appRouter = router({
     react: protectedProcedure
       .input(
         videoIdInput.extend({
-          reaction: z.enum(REACTION_TYPES).optional(),
+          reaction: z.enum(REACTION_INPUT_TYPES).optional(),
         })
       )
       .mutation(({ ctx, input }) =>
@@ -907,7 +906,7 @@ export const appRouter = router({
         .input(
           z.object({
             commentId: z.number().int().positive(),
-            reaction: z.enum(REACTION_TYPES),
+            reaction: z.enum(REACTION_INPUT_TYPES),
           })
         )
         .mutation(({ ctx, input }) =>
@@ -1435,7 +1434,7 @@ export const appRouter = router({
         z.object({
           roomId: z.number().int().positive(),
           messageId: z.number().int().positive(),
-          reaction: z.enum(HYPE_ROOM_REACTIONS),
+          reaction: z.enum(REACTION_INPUT_TYPES),
         })
       )
       .mutation(async ({ ctx, input }) => {
@@ -1762,7 +1761,7 @@ export const appRouter = router({
     react: protectedProcedure
       .input(
         announcementIdInput.extend({
-          reaction: z.enum(REACTION_TYPES).optional(),
+          reaction: z.enum(REACTION_INPUT_TYPES).optional(),
         })
       )
       .mutation(({ ctx, input }) =>

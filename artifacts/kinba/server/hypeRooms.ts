@@ -1161,7 +1161,10 @@ export async function listRoomMessages(
   >();
   const reactionCount = new Map<string, number>();
   for (const row of reactionRows) {
-    const key = `${row.messageId}:${row.reaction}`;
+    // Normalize historical multi-reaction values to the single reaction.
+    const reaction = normalizeReaction(row.reaction);
+    if (!reaction) continue;
+    const key = `${row.messageId}:${reaction}`;
     reactionCount.set(key, (reactionCount.get(key) ?? 0) + 1);
   }
   for (const [key, count] of reactionCount) {
@@ -1173,7 +1176,7 @@ export async function listRoomMessages(
       reactionRows.some(
         r =>
           r.messageId === messageId &&
-          r.reaction === reaction &&
+          normalizeReaction(r.reaction) === reaction &&
           r.userId === viewerUserId
       );
     const list = reactionsByMessage.get(messageId) ?? [];
@@ -1205,21 +1208,23 @@ export async function listRoomMessages(
 
 import {
   REACTION_TYPES,
-  isValidReaction,
+  PRIMARY_REACTION,
+  isAcceptedReaction,
+  normalizeReaction,
   type ReactionType,
 } from "@shared/reactions";
 
 /**
  * Explicit small reaction set — arbitrary strings are rejected.
  * Single source: shared/reactions (re-exported so existing imports keep working).
+ * The site exposes exactly one reaction (Pookie/Love); historical values are
+ * still accepted here for backward compatibility and normalized on write.
  */
 export { REACTION_TYPES as HYPE_ROOM_REACTIONS };
 export type HypeRoomReaction = ReactionType;
 
-export function isValidHypeRoomReaction(
-  value: string
-): value is HypeRoomReaction {
-  return isValidReaction(value);
+export function isValidHypeRoomReaction(value: string): boolean {
+  return isAcceptedReaction(value);
 }
 
 /** One-level reply: parent must be a visible top-level message in the same room. */
@@ -1410,10 +1415,11 @@ export type ReactionToggleResult = {
  * Toggle a reaction on a room message.
  * Active members only; message must belong to roomId.
  *
- * One reaction per (message, user): activating X first clears every row this
- * user holds on that message, then inserts X, so a user can never hold two
- * types at once (including rows written before this invariant existed).
- * Deactivating removes only the tapped type.
+ * Single-reaction model: the site exposes one reaction (Pookie/Love).
+ * Every accepted value — including historical multi-reaction types —
+ * normalizes to the primary reaction, and any row this user already holds
+ * (legacy or current) counts as active, so tapping removes it; otherwise the
+ * primary reaction is inserted. Unknown types are rejected.
  *
  * Concurrency: the message row is locked FOR UPDATE inside the transaction.
  * All reaction writes for a message funnel through that row, so the
@@ -1430,6 +1436,7 @@ export async function toggleHypeRoomMessageReaction(
   if (!isValidHypeRoomReaction(reaction)) {
     throw new Error("Invalid reaction type.");
   }
+  const target: HypeRoomReaction = PRIMARY_REACTION;
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
@@ -1462,7 +1469,7 @@ export async function toggleHypeRoomMessageReaction(
       throw new Error("Message does not belong to this room.");
     }
 
-    // Every typed reaction this user holds on this message (all types).
+    // Every typed reaction this user holds on this message (any value).
     const existingRows = await tx
       .select({
         id: hypeRoomMessageReactions.id,
@@ -1476,21 +1483,22 @@ export async function toggleHypeRoomMessageReaction(
         )
       );
 
-    const matchingTyped = existingRows.filter(row => row.reaction === reaction);
-    if (matchingTyped.length > 0) {
+    const active = existingRows.some(
+      row => normalizeReaction(row.reaction) === target
+    );
+    if (active) {
       await tx
         .delete(hypeRoomMessageReactions)
         .where(
           and(
             eq(hypeRoomMessageReactions.messageId, messageId),
-            eq(hypeRoomMessageReactions.userId, userId),
-            eq(hypeRoomMessageReactions.reaction, reaction)
+            eq(hypeRoomMessageReactions.userId, userId)
           )
         );
-      return { messageId, reaction: reaction as HypeRoomReaction, active: false };
+      return { messageId, reaction: target, active: false };
     }
 
-    // Activating: clear every source first so exactly one type survives.
+    // Activating: clear every source first so exactly one reaction survives.
     if (existingRows.length > 0) {
       await tx
         .delete(hypeRoomMessageReactions)
@@ -1508,12 +1516,12 @@ export async function toggleHypeRoomMessageReaction(
         roomId,
         messageId,
         userId,
-        reaction,
+        reaction: target,
       })
       .onConflictDoNothing()
       .returning();
     if (inserted) {
-      return { messageId, reaction: reaction as HypeRoomReaction, active: true };
+      return { messageId, reaction: target, active: true };
     }
 
     // Concurrent identical activation won the unique race — reaction is active.
@@ -1524,12 +1532,12 @@ export async function toggleHypeRoomMessageReaction(
         and(
           eq(hypeRoomMessageReactions.messageId, messageId),
           eq(hypeRoomMessageReactions.userId, userId),
-          eq(hypeRoomMessageReactions.reaction, reaction)
+          eq(hypeRoomMessageReactions.reaction, target)
         )
       )
       .limit(1);
     if (confirmed) {
-      return { messageId, reaction: reaction as HypeRoomReaction, active: true };
+      return { messageId, reaction: target, active: true };
     }
     throw new Error("Failed to toggle reaction.");
   });

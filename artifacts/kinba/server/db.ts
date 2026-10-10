@@ -59,7 +59,9 @@ import {
 } from "../drizzle/schema";
 import {
   REACTION_TYPES,
-  isValidReaction,
+  PRIMARY_REACTION,
+  isAcceptedReaction,
+  normalizeReaction,
   type ReactionType,
 } from "@shared/reactions";
 import { normalizeUsername, validateUsername, RESERVED_USERNAMES } from "../shared/username";
@@ -71,11 +73,12 @@ import { extractHashtags, extractVideoHashtags, extractTextHashtags, extractHype
 import { canDiscoverRoom, listViewerMemberRoomIds } from "./hypeRooms";
 
 /**
- * The viewer's stored reaction, narrowed to the shared vocabulary so no raw
- * database string can leak into the client's `ReactionType` unions.
+ * The viewer's stored reaction, normalized to the single supported reaction
+ * so no raw (possibly historical) database string can leak into the client's
+ * `ReactionType` unions.
  */
 function narrowReaction(value: string | null | undefined): ReactionType | null {
-  return value != null && isValidReaction(value) ? value : null;
+  return normalizeReaction(value);
 }
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -2246,17 +2249,20 @@ export async function listVideoComments(
       ])
     : [[], []] as const;
 
-  const typedByComment = new Map<number, Map<string, Set<number>>>();
+  const typedByComment = new Map<number, Map<ReactionType, Set<number>>>();
   for (const row of reactionRows) {
+    // Normalize historical multi-reaction values to the single reaction.
+    const type = normalizeReaction(row.reaction);
+    if (!type) continue;
     let byType = typedByComment.get(row.commentId);
     if (!byType) {
       byType = new Map();
       typedByComment.set(row.commentId, byType);
     }
-    let userIds = byType.get(row.reaction);
+    let userIds = byType.get(type);
     if (!userIds) {
       userIds = new Set();
-      byType.set(row.reaction, userIds);
+      byType.set(type, userIds);
     }
     userIds.add(row.userId);
   }
@@ -2280,7 +2286,7 @@ export async function listVideoComments(
     }> = [];
     for (const type of REACTION_TYPES) {
       const userIds = new Set(typed?.get(type));
-      if (type === "like" && legacyLikers) {
+      if (type === PRIMARY_REACTION && legacyLikers) {
         for (const id of legacyLikers) userIds.add(id);
       }
       if (userIds.size === 0) continue;
@@ -2439,9 +2445,14 @@ export async function toggleCommentReaction(
   userId: number,
   reaction: string
 ): Promise<CommentReactionToggleResult> {
-  if (!isValidReaction(reaction)) {
+  if (!isAcceptedReaction(reaction)) {
     throw new Error("Invalid reaction type.");
   }
+  // Single-reaction model: every accepted value (including historical
+  // multi-reaction types) resolves to the one user-facing reaction, and any
+  // existing row — legacy or current — counts as active so toggling keeps
+  // working for pre-existing reactions without touching old rows.
+  const target: ReactionType = PRIMARY_REACTION;
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
@@ -2454,7 +2465,7 @@ export async function toggleCommentReaction(
       .limit(1);
     if (!comment) throw new Error("Comment not found.");
 
-    // Every typed reaction this user holds on this comment (all types).
+    // Every typed reaction this user holds on this comment (any value).
     const existingRows = await tx
       .select({ id: commentReactions.id, reaction: commentReactions.reaction })
       .from(commentReactions)
@@ -2465,75 +2476,45 @@ export async function toggleCommentReaction(
         )
       );
 
-    // Legacy like counts as an active "like" — read only when the tapped
-    // type is "like", so other types keep their historical query shape.
-    let legacyLike: { id: number } | undefined;
-    if (reaction === "like") {
-      [legacyLike] = await tx
-        .select({ id: commentLikes.id })
-        .from(commentLikes)
-        .where(
-          and(
-            eq(commentLikes.commentId, commentId),
-            eq(commentLikes.userId, userId)
-          )
+    // The legacy binary like also counts as an active reaction.
+    const [legacyLike] = await tx
+      .select({ id: commentLikes.id })
+      .from(commentLikes)
+      .where(
+        and(
+          eq(commentLikes.commentId, commentId),
+          eq(commentLikes.userId, userId)
         )
-        .limit(1);
-    }
+      )
+      .limit(1);
 
-    const matchingTyped = existingRows.filter(row => row.reaction === reaction);
-    const active = matchingTyped.length > 0 || Boolean(legacyLike);
+    const active = existingRows.length > 0 || Boolean(legacyLike);
 
     if (active) {
-      if (matchingTyped.length > 0) {
+      if (existingRows.length > 0) {
         await tx
           .delete(commentReactions)
           .where(
             and(
               eq(commentReactions.commentId, commentId),
-              eq(commentReactions.userId, userId),
-              eq(commentReactions.reaction, reaction)
+              eq(commentReactions.userId, userId)
             )
           );
       }
       if (legacyLike) {
         await tx.delete(commentLikes).where(eq(commentLikes.id, legacyLike.id));
       }
-      return { commentId, reaction: reaction as ReactionType, active: false };
+      return { commentId, reaction: target, active: false };
     }
 
-    // Activating: clear every source first so exactly one type survives.
-    if (existingRows.length > 0) {
-      await tx
-        .delete(commentReactions)
-        .where(
-          and(
-            eq(commentReactions.commentId, commentId),
-            eq(commentReactions.userId, userId)
-          )
-        );
-    }
-    if (reaction !== "like") {
-      // A legacy like must not survive a switch to another type. Not selected
-      // above (reaction !== "like"), so clear it by predicate — a no-op when
-      // the user has no legacy row.
-      await tx
-        .delete(commentLikes)
-        .where(
-          and(
-            eq(commentLikes.commentId, commentId),
-            eq(commentLikes.userId, userId)
-          )
-        );
-    }
-
+    // Activating: write exactly the one supported reaction.
     const [inserted] = await tx
       .insert(commentReactions)
-      .values({ commentId, userId, reaction })
+      .values({ commentId, userId, reaction: target })
       .onConflictDoNothing()
       .returning();
     if (inserted) {
-      return { commentId, reaction: reaction as ReactionType, active: true };
+      return { commentId, reaction: target, active: true };
     }
 
     // Concurrent identical activation won the unique race — reaction is active.
@@ -2544,12 +2525,12 @@ export async function toggleCommentReaction(
         and(
           eq(commentReactions.commentId, commentId),
           eq(commentReactions.userId, userId),
-          eq(commentReactions.reaction, reaction)
+          eq(commentReactions.reaction, target)
         )
       )
       .limit(1);
     if (confirmed) {
-      return { commentId, reaction: reaction as ReactionType, active: true };
+      return { commentId, reaction: target, active: true };
     }
     throw new Error("Failed to toggle reaction.");
   });
@@ -2559,11 +2540,12 @@ export async function toggleCommentReaction(
  * Toggle the viewer's reaction on a video.
  *
  * One reaction per (video, user), enforced by video_reactions_pair_unique.
- * Omitting `reaction` preserves the historical binary behavior: every
- * pre-existing row resolves to "like" (column default), so an omitted call
- * removes an active reaction and otherwise inserts one. Passing a type equal
- * to the stored one removes it; passing a different type replaces the row in
- * place (id/createdAt preserved). Unknown types are rejected.
+ * The site supports a single reaction (Pookie/Love): omitting `reaction`
+ * preserves the historical binary behavior (legacy rows default to "like"),
+ * and every accepted value — including historical multi-reaction types —
+ * normalizes to the primary reaction. An existing row (legacy or current)
+ * counts as active, so tapping removes it; otherwise a primary-reaction row
+ * is inserted. Unknown types are rejected.
  *
  * Concurrency: the video row is locked FOR UPDATE inside the transaction, so
  * the read-modify-write below is serialized — the pair-unique index alone
@@ -2573,9 +2555,10 @@ export async function toggleCommentReaction(
 export async function toggleVideoReaction(
   videoId: number,
   userId: number,
-  reaction: ReactionType = "like"
+  reaction: string = PRIMARY_REACTION
 ) {
-  if (!isValidReaction(reaction)) throw new Error("Invalid reaction type.");
+  if (!isAcceptedReaction(reaction)) throw new Error("Invalid reaction type.");
+  const target: ReactionType = PRIMARY_REACTION;
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
@@ -2600,16 +2583,18 @@ export async function toggleVideoReaction(
       .limit(1);
 
     if (!existing) {
-      await tx.insert(videoReactions).values({ videoId, userId, reaction });
+      await tx.insert(videoReactions).values({ videoId, userId, reaction: target });
       return;
     }
-    if (existing.reaction === reaction) {
+    // Any stored value (legacy or primary) represents the single reaction:
+    // tapping again removes it, otherwise normalize the row in place.
+    if (normalizeReaction(existing.reaction) === target) {
       await tx.delete(videoReactions).where(eq(videoReactions.id, existing.id));
       return;
     }
     await tx
       .update(videoReactions)
-      .set({ reaction })
+      .set({ reaction: target })
       .where(eq(videoReactions.id, existing.id));
   });
 
@@ -2833,10 +2818,16 @@ export type ReactorListPage = {
   viewerReactions: ReactionType[];
 };
 
-/** Vocabulary-ordered distinct types; unknown stored values are ignored. */
+/**
+ * Normalize stored values to the single supported reaction; unknown stored
+ * values are ignored. Historical multi-reaction values all resolve to the
+ * primary reaction so legacy reactors keep their active state.
+ */
 function toReactionTypes(values: readonly string[]): ReactionType[] {
-  const present = new Set(values);
-  return REACTION_TYPES.filter(type => present.has(type));
+  const primary = values.find(value => normalizeReaction(value) != null);
+  return primary != null && normalizeReaction(primary) != null
+    ? [PRIMARY_REACTION]
+    : [];
 }
 
 /**
@@ -3751,12 +3742,13 @@ export async function listCommunityAnnouncements(
  * Toggle the viewer's reaction on a community announcement.
  *
  * One reaction per (announcement, user), enforced by
- * community_reactions_pair_unique. Omitting `reaction` preserves the
- * historical binary behavior: every pre-existing row resolves to "like"
- * (column default), so an omitted call removes an active reaction and
- * otherwise inserts one. Passing a type equal to the stored one removes it;
- * passing a different type replaces the row in place (id/createdAt
- * preserved). Unknown types are rejected.
+ * community_reactions_pair_unique. The site supports a single reaction
+ * (Pookie/Love): omitting `reaction` preserves the historical binary
+ * behavior (legacy rows default to "like"), and every accepted value —
+ * including historical multi-reaction types — normalizes to the primary
+ * reaction. An existing row (legacy or current) counts as active, so tapping
+ * removes it; otherwise a primary-reaction row is inserted. Unknown types
+ * are rejected.
  *
  * Concurrency: the announcement row is locked FOR UPDATE inside the
  * transaction, so the read-modify-write below is serialized — the
@@ -3767,9 +3759,10 @@ export async function listCommunityAnnouncements(
 export async function toggleCommunityReaction(
   announcementId: number,
   userId: number,
-  reaction: ReactionType = "like"
+  reaction: string = PRIMARY_REACTION
 ): Promise<{ viewerReacted: boolean }> {
-  if (!isValidReaction(reaction)) throw new Error("Invalid reaction type.");
+  if (!isAcceptedReaction(reaction)) throw new Error("Invalid reaction type.");
+  const target: ReactionType = PRIMARY_REACTION;
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
@@ -3799,10 +3792,12 @@ export async function toggleCommunityReaction(
     if (!existing) {
       await tx
         .insert(communityReactions)
-        .values({ announcementId, userId, reaction });
+        .values({ announcementId, userId, reaction: target });
       return { viewerReacted: true };
     }
-    if (existing.reaction === reaction) {
+    // Any stored value (legacy or primary) represents the single reaction:
+    // tapping again removes it, otherwise normalize the row in place.
+    if (normalizeReaction(existing.reaction) === target) {
       await tx
         .delete(communityReactions)
         .where(eq(communityReactions.id, existing.id));
@@ -3810,7 +3805,7 @@ export async function toggleCommunityReaction(
     }
     await tx
       .update(communityReactions)
-      .set({ reaction })
+      .set({ reaction: target })
       .where(eq(communityReactions.id, existing.id));
     return { viewerReacted: true };
   });

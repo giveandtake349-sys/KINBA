@@ -1,13 +1,24 @@
 /**
- * Comment multi-reaction hardening — toggleCommentReaction semantics and the
- * merged listVideoComments view (comment_reactions ∪ legacy comment_likes).
+ * Comment single-reaction (Pookie/Love) hardening — toggleCommentReaction
+ * semantics and the merged listVideoComments view (comment_reactions ∪ legacy
+ * comment_likes, every value normalized to the one supported reaction).
  */
 import { vi, describe, beforeEach, expect, it } from "vitest";
 import { commentLikes, commentReactions, videoComments } from "../drizzle/schema";
 
 const holder = vi.hoisted(() => ({ db: null as unknown }));
 
-vi.mock("pg", () => ({ Pool: class {} }));
+// The pool only has to satisfy createPoolWithRetry's lifecycle handshake
+// ('error' listener + a health probe); every query goes through the drizzle
+// mock below, never through this class.
+vi.mock("pg", () => ({
+  Pool: class {
+    on() {}
+    async query() {
+      return { rows: [] };
+    }
+  },
+}));
 vi.mock("drizzle-orm/node-postgres", () => ({
   drizzle: vi.fn(
     () =>
@@ -142,63 +153,63 @@ describe("toggleCommentReaction — validation and lookup", () => {
 });
 
 describe("toggleCommentReaction — activation", () => {
-  it("inserts a like when neither source holds one", async () => {
+  it("inserts the single Pookie reaction when neither source holds one", async () => {
     const db = makeDb([[commentRow()], [], []]);
     holder.db = db;
 
     await expect(toggleCommentReaction(5, 41, "like")).resolves.toEqual({
       commentId: 5,
-      reaction: "like",
+      reaction: "love",
       active: true,
     });
     expect(db.__insertValues).toHaveBeenCalledWith({
       commentId: 5,
       userId: 41,
-      reaction: "like",
+      reaction: "love",
     });
     expect(db.__deleteWheres).not.toHaveBeenCalled();
     expect(db.transaction).toHaveBeenCalledTimes(1);
   });
 
-  it("inserts a non-like reaction without consulting comment_likes", async () => {
-    const db = makeDb([[commentRow()], []]);
+  it("coerces a historical input type to the single reaction and still reads the legacy source", async () => {
+    const db = makeDb([[commentRow()], [], []]);
     holder.db = db;
 
     await expect(toggleCommentReaction(5, 41, "fire")).resolves.toEqual({
       commentId: 5,
-      reaction: "fire",
+      reaction: "love",
       active: true,
     });
     expect(db.__insertValues).toHaveBeenCalledWith({
       commentId: 5,
       userId: 41,
-      reaction: "fire",
+      reaction: "love",
     });
-    expect(db.__fromCalls).toEqual([videoComments, commentReactions]);
+    expect(db.__fromCalls).toEqual([videoComments, commentReactions, commentLikes]);
   });
 });
 
 describe("toggleCommentReaction — deactivation", () => {
-  it("removes an existing typed reaction", async () => {
-    const db = makeDb([[commentRow()], [{ id: 77, reaction: "fire" }]]);
+  it("removes an existing typed row no matter which historical type it holds", async () => {
+    const db = makeDb([[commentRow()], [{ id: 77, reaction: "fire" }], []]);
     holder.db = db;
 
-    await expect(toggleCommentReaction(5, 41, "fire")).resolves.toEqual({
+    await expect(toggleCommentReaction(5, 41, "clap")).resolves.toEqual({
       commentId: 5,
-      reaction: "fire",
+      reaction: "love",
       active: false,
     });
     expect(db.__deleteWheres).toHaveBeenCalledTimes(1);
     expect(db.__insertValues).not.toHaveBeenCalled();
   });
 
-  it("treats a legacy comment_likes row as an active like and removes it instead of duplicating", async () => {
+  it("treats a legacy comment_likes row as an active reaction and removes it instead of duplicating", async () => {
     const db = makeDb([[commentRow()], [], [{ id: 55 }]]);
     holder.db = db;
 
     await expect(toggleCommentReaction(5, 41, "like")).resolves.toEqual({
       commentId: 5,
-      reaction: "like",
+      reaction: "love",
       active: false,
     });
     expect(db.__insertValues).not.toHaveBeenCalled();
@@ -210,7 +221,7 @@ describe("toggleCommentReaction — deactivation", () => {
     ]);
   });
 
-  it("removes both sources when a like exists in comment_reactions and comment_likes", async () => {
+  it("removes both sources when a row exists in comment_reactions and comment_likes", async () => {
     const db = makeDb([
       [commentRow()],
       [{ id: 77, reaction: "like" }],
@@ -220,7 +231,7 @@ describe("toggleCommentReaction — deactivation", () => {
 
     await expect(toggleCommentReaction(5, 41, "like")).resolves.toEqual({
       commentId: 5,
-      reaction: "like",
+      reaction: "love",
       active: false,
     });
     expect(db.__deleteWheres).toHaveBeenCalledTimes(2);
@@ -229,47 +240,36 @@ describe("toggleCommentReaction — deactivation", () => {
 });
 
 describe("toggleCommentReaction — one reaction per user per target", () => {
-  it("clears every existing type before inserting the replacement", async () => {
-    const db = makeDb([[commentRow()], [{ id: 77, reaction: "fire" }]]);
+  it("clears a historical row instead of stacking a second one", async () => {
+    const db = makeDb([[commentRow()], [{ id: 77, reaction: "fire" }], []]);
     holder.db = db;
 
+    // A legacy 'fire' row already counts as the single reaction, so asking
+    // for any accepted type removes it rather than rewriting it in place.
     await expect(toggleCommentReaction(5, 41, "clap")).resolves.toEqual({
       commentId: 5,
-      reaction: "clap",
-      active: true,
+      reaction: "love",
+      active: false,
     });
-    expect(db.__insertValues).toHaveBeenCalledTimes(1);
-    expect(db.__insertValues).toHaveBeenCalledWith({
-      commentId: 5,
-      userId: 41,
-      reaction: "clap",
-    });
-    // Two clearing statements — every typed row for this user, plus the legacy
-    // comment_likes row by predicate — and they run before the insert, so the
-    // user can never hold two types, not even transiently.
-    expect(db.__deleteWheres).toHaveBeenCalledTimes(2);
-    expect(db.__deleteWheres.mock.invocationCallOrder[0]).toBeLessThan(
-      db.__insertValues.mock.invocationCallOrder[0]
-    );
+    expect(db.__insertValues).not.toHaveBeenCalled();
+    expect(db.__deleteWheres).toHaveBeenCalledTimes(1);
   });
 
-  it("clears a legacy comment_likes row when switching to another type", async () => {
-    const db = makeDb([[commentRow()], []]);
+  it("always reads the legacy comment_likes source before deciding", async () => {
+    const db = makeDb([[commentRow()], [], []]);
     holder.db = db;
 
     await expect(toggleCommentReaction(5, 41, "fire")).resolves.toEqual({
       commentId: 5,
-      reaction: "fire",
+      reaction: "love",
       active: true,
     });
-    // The legacy row is cleared by predicate, so comment_likes is never read
-    // for a non-like activation (historical query shape preserved).
-    expect(db.__deleteWheres).toHaveBeenCalledTimes(1);
-    expect(db.__fromCalls).toEqual([videoComments, commentReactions]);
+    expect(db.__deleteWheres).not.toHaveBeenCalled();
+    expect(db.__fromCalls).toEqual([videoComments, commentReactions, commentLikes]);
   });
 
   it("locks the comment row FOR UPDATE inside a single transaction", async () => {
-    const db = makeDb([[commentRow()], [{ id: 77, reaction: "fire" }]]);
+    const db = makeDb([[commentRow()], [{ id: 77, reaction: "fire" }], []]);
     holder.db = db;
 
     await toggleCommentReaction(5, 41, "clap");
@@ -277,13 +277,13 @@ describe("toggleCommentReaction — one reaction per user per target", () => {
     expect(db.__lockCalls).toEqual(["update"]);
   });
 
-  it("deactivating the active type never inserts a replacement", async () => {
-    const db = makeDb([[commentRow()], [{ id: 77, reaction: "clap" }]]);
+  it("deactivating the active reaction never inserts a replacement", async () => {
+    const db = makeDb([[commentRow()], [{ id: 77, reaction: "clap" }], []]);
     holder.db = db;
 
     await expect(toggleCommentReaction(5, 41, "clap")).resolves.toEqual({
       commentId: 5,
-      reaction: "clap",
+      reaction: "love",
       active: false,
     });
     expect(db.__insertValues).not.toHaveBeenCalled();
@@ -299,7 +299,7 @@ describe("toggleCommentReaction — unique race", () => {
 
     await expect(toggleCommentReaction(5, 41, "like")).resolves.toEqual({
       commentId: 5,
-      reaction: "like",
+      reaction: "love",
       active: true,
     });
   });
@@ -373,7 +373,7 @@ describe("listVideoComments — merged reaction view", () => {
     viewerLiked: true,
   };
 
-  it("merges legacy likes into the like entry with a Set union and emits types in vocabulary order", async () => {
+  it("normalizes every historical row and legacy like into the single Pookie entry", async () => {
     const db = makeDb([
       [baseRow],
       [
@@ -389,9 +389,9 @@ describe("listVideoComments — merged reaction view", () => {
 
     const rows = await listVideoComments(9, viewer);
     expect(rows).toHaveLength(1);
+    // Typed rows (41, 42) and legacy likes (41, 43) merge into one reaction.
     expect(rows[0]!.reactions).toEqual([
-      { reaction: "like", count: 2, reactedByMe: true },
-      { reaction: "fire", count: 1, reactedByMe: false },
+      { reaction: "love", count: 3, reactedByMe: true },
     ]);
     expect(db.__fromCalls).toEqual([
       videoComments,
@@ -418,7 +418,7 @@ describe("listVideoComments — merged reaction view", () => {
     expect(rows[0]!.likeCount).toBe(0);
     expect(rows[0]!.viewerLiked).toBe(false);
     expect(rows[0]!.reactions).toEqual([
-      { reaction: "like", count: 1, reactedByMe: false },
+      { reaction: "love", count: 1, reactedByMe: false },
     ]);
   });
 
@@ -446,9 +446,21 @@ describe("listVideoComments — merged reaction view", () => {
 
     const rows = await listVideoComments(9);
     expect(rows[0]!.reactions).toEqual([
-      { reaction: "like", count: 1, reactedByMe: false },
+      { reaction: "love", count: 1, reactedByMe: false },
     ]);
     expect(rows[0]!.viewerLiked).toBe(false);
+  });
+
+  it("drops stored values the single-reaction vocabulary does not accept", async () => {
+    const db = makeDb([
+      [{ ...baseRow, likeCount: 0, viewerLiked: false }],
+      [{ commentId: 5, userId: 42, reaction: "haha" }],
+      [],
+    ]);
+    holder.db = db;
+
+    const rows = await listVideoComments(9, viewer);
+    expect(rows[0]!.reactions).toEqual([]);
   });
 
   it("skips the reaction lookups when a video has no comments", async () => {

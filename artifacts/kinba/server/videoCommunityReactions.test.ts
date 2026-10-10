@@ -306,7 +306,7 @@ beforeEach(() => {
 });
 
 describe("toggleVideoReaction — binary + typed", () => {
-  it("omitted argument inserts a binary 'like' and keeps the exact return shape", async () => {
+  it("omitted argument inserts the single Pookie reaction and keeps the exact return shape", async () => {
     const result = await toggleVideoReaction(40, 81);
 
     expect(result).toEqual({
@@ -320,7 +320,7 @@ describe("toggleVideoReaction — binary + typed", () => {
     });
     const rows = videoReactionRows(40);
     expect(rows).toHaveLength(1);
-    expect(rows[0].reaction).toBe("like");
+    expect(rows[0].reaction).toBe("love");
 
     // One transaction; the video row is locked FOR UPDATE before any
     // video_reactions statement runs.
@@ -362,29 +362,25 @@ describe("toggleVideoReaction — binary + typed", () => {
     expect(after[0].reaction).toBe("like");
   });
 
-  it("adds a typed reaction on an empty target", async () => {
+  it("coerces any accepted type to the single reaction on an empty target", async () => {
     const result = await toggleVideoReaction(42, 81, "fire");
 
     expect(result.viewerReacted).toBe(true);
     expect(result.reactionCount).toBe(1);
     const rows = videoReactionRows(42);
     expect(rows).toHaveLength(1);
-    expect(rows[0].reaction).toBe("fire");
+    expect(rows[0].reaction).toBe("love");
   });
 
-  it("replaces 'like' with another type in place (same row id and createdAt)", async () => {
+  it("treats a legacy 'like' row as already active, so requesting removes it", async () => {
     const seeded = videoReactionRows(43).find(row => row.userId === 81);
     expect(seeded?.reaction).toBe("like");
 
     const result = await toggleVideoReaction(43, 81, "clap");
 
-    expect(result.viewerReacted).toBe(true);
-    expect(result.reactionCount).toBe(1);
-    const rows = videoReactionRows(43);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].reaction).toBe("clap");
-    expect(rows[0].id).toBe(seeded!.id);
-    expect(rows[0].createdAt).toBe(seeded!.createdAt);
+    expect(result.viewerReacted).toBe(false);
+    expect(result.reactionCount).toBe(0);
+    expect(videoReactionRows(43)).toHaveLength(0);
   });
 
   it("requesting the stored type removes the reaction", async () => {
@@ -404,7 +400,7 @@ describe("toggleVideoReaction — binary + typed", () => {
     expect(videoReactionRows(44)).toHaveLength(0);
   });
 
-  it("keeps exactly one row per (video, user) across typed transitions", async () => {
+  it("keeps exactly one row per (video, user) across single-reaction toggles", async () => {
     await expect(toggleVideoReaction(67, 81)).resolves.toEqual({
       reactionCount: 2,
       shareCount: 0,
@@ -415,8 +411,17 @@ describe("toggleVideoReaction — binary + typed", () => {
       viewerBookmarked: false,
     });
     expect(videoReactionRows(67).find(row => row.userId === 81)?.reaction).toBe(
-      "like"
+      "love"
     );
+
+    // The seeded legacy row counts as the single reaction, so requesting it
+    // (even under a historical type) removes rather than stacking a second row.
+    await expect(toggleVideoReaction(67, 81, "fire")).resolves.toMatchObject({
+      reactionCount: 1,
+      viewerReacted: false,
+    });
+    expect(videoReactionRows(67)).toHaveLength(1);
+    expect(videoReactionRows(67).map(row => row.userId)).toEqual([82]);
 
     await expect(toggleVideoReaction(67, 81, "fire")).resolves.toMatchObject({
       reactionCount: 2,
@@ -424,20 +429,8 @@ describe("toggleVideoReaction — binary + typed", () => {
     });
     expect(videoReactionRows(67)).toHaveLength(2);
     expect(videoReactionRows(67).find(row => row.userId === 81)?.reaction).toBe(
-      "fire"
+      "love"
     );
-
-    await expect(toggleVideoReaction(67, 81, "fire")).resolves.toMatchObject({
-      reactionCount: 1,
-      viewerReacted: false,
-    });
-    expect(videoReactionRows(67).map(row => row.userId)).toEqual([82]);
-
-    await expect(toggleVideoReaction(67, 81)).resolves.toMatchObject({
-      reactionCount: 2,
-      viewerReacted: true,
-    });
-    expect(videoReactionRows(67)).toHaveLength(2);
 
     // Database-level guard: a second row for the same pair must violate the
     // pair-unique index even when a write bypasses the toggle.
@@ -473,13 +466,13 @@ describe("toggleVideoReaction — binary + typed", () => {
 });
 
 describe("toggleCommunityReaction — binary + typed", () => {
-  it("omitted argument inserts a binary 'like' with the exact return shape", async () => {
+  it("omitted argument inserts the single Pookie reaction with the exact return shape", async () => {
     await expect(toggleCommunityReaction(60, 81)).resolves.toEqual({
       viewerReacted: true,
     });
     const rows = communityReactionRows(60);
     expect(rows).toHaveLength(1);
-    expect(rows[0].reaction).toBe("like");
+    expect(rows[0].reaction).toBe("love");
 
     const texts = holder.queries.map(query => query.text);
     const targetRead = texts.find(text =>
@@ -519,18 +512,14 @@ describe("toggleCommunityReaction — binary + typed", () => {
     expect(rows[0].reaction).toBe("love");
   });
 
-  it("replaces 'like' with another type in place (same row id and createdAt)", async () => {
+  it("treats a legacy 'like' row as already active, so requesting removes it", async () => {
     const seeded = communityReactionRows(63).find(row => row.userId === 81);
     expect(seeded?.reaction).toBe("like");
 
     await expect(toggleCommunityReaction(63, 81, "clap")).resolves.toEqual({
-      viewerReacted: true,
+      viewerReacted: false,
     });
-    const rows = communityReactionRows(63);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].reaction).toBe("clap");
-    expect(rows[0].id).toBe(seeded!.id);
-    expect(rows[0].createdAt).toBe(seeded!.createdAt);
+    expect(communityReactionRows(63)).toHaveLength(0);
   });
 
   it("requesting the stored type removes the reaction", async () => {
@@ -542,28 +531,23 @@ describe("toggleCommunityReaction — binary + typed", () => {
     expect(communityReactionRows(64)).toHaveLength(0);
   });
 
-  it("keeps exactly one row per (announcement, user) across typed transitions", async () => {
+  it("keeps exactly one row per (announcement, user) across single-reaction toggles", async () => {
     await expect(toggleCommunityReaction(65, 81)).resolves.toEqual({
       viewerReacted: true,
     });
     expect(communityReactionRows(65)).toHaveLength(2);
     expect(
       communityReactionRows(65).find(row => row.userId === 81)?.reaction
-    ).toBe("like");
+    ).toBe("love");
 
-    await expect(toggleCommunityReaction(65, 81, "clap")).resolves.toEqual({
-      viewerReacted: true,
-    });
-    const afterReplace = communityReactionRows(65);
-    expect(afterReplace).toHaveLength(2);
-    expect(afterReplace.find(row => row.userId === 81)?.reaction).toBe("clap");
-
+    // Requesting any accepted type while a row exists removes it — one
+    // reaction per viewer, no stacking and no replace-in-place.
     await expect(toggleCommunityReaction(65, 81, "clap")).resolves.toEqual({
       viewerReacted: false,
     });
     expect(communityReactionRows(65).map(row => row.userId)).toEqual([82]);
 
-    await expect(toggleCommunityReaction(65, 81)).resolves.toEqual({
+    await expect(toggleCommunityReaction(65, 81, "clap")).resolves.toEqual({
       viewerReacted: true,
     });
     expect(communityReactionRows(65)).toHaveLength(2);

@@ -293,7 +293,7 @@ beforeEach(() => {
 });
 
 describe("typed reaction inputs reach the database", () => {
-  it("forwards videos.react's typed reaction to the M2 toggle", async () => {
+  it("coerces videos.react's typed reaction to the single reaction", async () => {
     const result = await appRouter
       .createCaller(context())
       .videos.react({ videoId: 51, reaction: "fire" });
@@ -301,7 +301,7 @@ describe("typed reaction inputs reach the database", () => {
     expect(result.viewerReacted).toBe(true);
     expect(result.reactionCount).toBe(1);
     expect(reactionRowsOf("video_reactions", "videoId", 51)).toEqual([
-      { userId: 81, reaction: "fire" },
+      { userId: 81, reaction: "love" },
     ]);
   });
 
@@ -312,7 +312,7 @@ describe("typed reaction inputs reach the database", () => {
 
     expect(result.viewerReacted).toBe(true);
     expect(reactionRowsOf("video_reactions", "videoId", 52)).toEqual([
-      { userId: 81, reaction: "like" },
+      { userId: 81, reaction: "love" },
     ]);
   });
 
@@ -327,14 +327,14 @@ describe("typed reaction inputs reach the database", () => {
     expect(holder.queries).toHaveLength(0);
   });
 
-  it("forwards community.react's typed reaction to the M2 toggle", async () => {
+  it("coerces community.react's typed reaction to the single reaction", async () => {
     const result = await appRouter
       .createCaller(context())
       .community.react({ announcementId: 73, reaction: "clap" });
 
     expect(result.viewerReacted).toBe(true);
     expect(reactionRowsOf("community_reactions", "announcementId", 73)).toEqual([
-      { userId: 81, reaction: "clap" },
+      { userId: 81, reaction: "love" },
     ]);
   });
 
@@ -346,7 +346,7 @@ describe("typed reaction inputs reach the database", () => {
     expect(result.viewerReacted).toBe(true);
     expect(
       reactionRowsOf("community_reactions", "announcementId", 74)
-    ).toEqual([{ userId: 81, reaction: "like" }]);
+    ).toEqual([{ userId: 81, reaction: "love" }]);
   });
 
   it("rejects an unknown community reaction before any statement runs", async () => {
@@ -371,7 +371,7 @@ describe("video list carries the viewer's active reaction", () => {
 
     const reactive = list.find(video => video.id === 50)!;
     expect(reactive.viewerReacted).toBe(true);
-    expect(reactive.viewerReaction).toBe("clap");
+    expect(reactive.viewerReaction).toBe("love");
     expect(reactive.reactionCount).toBe(2);
 
     const inert = list.find(video => video.id === 56)!;
@@ -396,7 +396,7 @@ describe("community list carries the viewer's active reaction", () => {
 
     const reactive = list.find(item => item.id === 70)!;
     expect(reactive.viewerReacted).toBe(true);
-    expect(reactive.viewerReaction).toBe("fire");
+    expect(reactive.viewerReaction).toBe("love");
     expect(reactive.reactionCount).toBe(2);
     expect(reactive.viewerBookmarked).toBe(false);
 
@@ -423,6 +423,6 @@ describe("community list carries the viewer's active reaction", () => {
     expect(list.map(item => item.id).sort()).toEqual([70, 71, 73, 74, 75]);
     const reactive = list.find(item => item.id === 70)!;
     expect(reactive.viewerReacted).toBe(true);
-    expect(reactive.viewerReaction).toBe("fire");
+    expect(reactive.viewerReaction).toBe("love");
   });
 });

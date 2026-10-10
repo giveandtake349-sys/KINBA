@@ -245,7 +245,8 @@
   width: 100%;
 }
 
-.conv-mention-picker-list button:hover {
+.conv-mention-picker-list button:hover,
+.conv-mention-picker-list button.is-highlighted {
   background: color-mix(in srgb, var(--blue) 12%, transparent);
 }
 
@@ -341,9 +342,11 @@
   word-break: break-word;
 }
 
-.conv-comment-body .conv-mention-token {
+.conv-comment-body .conv-mention-token,
+.conv-comment-body .mention-link {
   color: var(--blue);
   font-weight: 600;
+  text-decoration: none;
 }
 
 .conv-comment-foot {

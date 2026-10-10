@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import {
   CornerUpLeft,
   Copy,
@@ -18,13 +19,13 @@ import {
   type MessageRow,
 } from "./shared";
 
-import { REACTION_OPTIONS, type ReactionType } from "@shared/reactions";
+import { PRIMARY_REACTION, REACTION_OPTIONS, type ReactionType } from "@shared/reactions";
 import {
-  ReactionPicker,
   ReactionSummaryPill,
   ReactorList,
-  useReactionPicker,
 } from "@/components/reactions";
+import { MentionText } from "@/components/MentionText";
+import { useLongPress } from "@/hooks/useLongPress";
 import {
   activeReactionEntry,
   toReactionEntries,
@@ -119,10 +120,17 @@ export function MessageCard({
   onHide?: () => void;
   onOpenThread?: () => void;
 }) {
+  const [, navigate] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [trayOpen, setTrayOpen] = useState(false);
   const [reactorsOpen, setReactorsOpen] = useState(false);
-  const picker = useReactionPicker(isActiveMember && !busy);
+  // Single reaction (Pookie/Love): a tap toggles it; a long-press opens the
+  // reactor list instead of a multi-option picker.
+  const longPress = useLongPress({
+    enabled: isActiveMember && !busy,
+    onLongPress: () => {
+      if (roomId != null) setReactorsOpen(true);
+    },
+  });
 
   const entries = toReactionEntries(row.reactions);
   const activeReaction = activeReactionEntry(entries);
@@ -156,9 +164,9 @@ export function MessageCard({
   if (canReply) {
     actions.push({
       id: "react",
-      label: "React",
-      icon: <span aria-hidden="true">+</span>,
-      run: () => setTrayOpen(open => !open),
+      label: activeReaction ? "Remove reaction" : "React",
+      icon: <span aria-hidden="true">❤️</span>,
+      run: () => onReact(activeReaction ?? PRIMARY_REACTION),
     });
   }
   actions.push({
@@ -204,9 +212,14 @@ export function MessageCard({
     });
   }
 
-  const mentionNames = useMemo(() => {
-    if (!row.mentionUserIds?.length) return [] as string[];
-    return row.mentionUserIds.map(id => displayInviteName(id, members));
+  // Mention chips keep the real user id end-to-end, so each token links to
+  // the mentioned member's profile (not a display-name lookup).
+  const mentionRows = useMemo(() => {
+    if (!row.mentionUserIds?.length) return [] as Array<{ id: number; label: string }>;
+    return row.mentionUserIds.map(id => ({
+      id,
+      label: displayInviteName(id, members),
+    }));
   }, [row.mentionUserIds, members]);
 
   return (
@@ -289,15 +302,26 @@ export function MessageCard({
         </div>
       ) : null}
 
-      <p className="hype-room-message-body">{row.message.body}</p>
+      <p className="hype-room-message-body">
+        <MentionText text={row.message.body} />
+      </p>
 
-      {mentionNames.length > 0 ? (
+      {mentionRows.length > 0 ? (
         <p className="hype-room-message-mentions">
           Mentioned:{" "}
-          {mentionNames.map((label, index) => (
-            <span key={`${row.message.id}-m-${index}`} className="hype-room-mention-token">
-              @{label}
-            </span>
+          {mentionRows.map(mention => (
+            <a
+              key={`${row.message.id}-m-${mention.id}`}
+              className="hype-room-mention-token"
+              href={`/profile/${mention.id}`}
+              onClick={event => {
+                event.preventDefault();
+                event.stopPropagation();
+                navigate(`/profile/${mention.id}`);
+              }}
+            >
+              @{mention.label}
+            </a>
           ))}
         </p>
       ) : null}
@@ -307,22 +331,28 @@ export function MessageCard({
           className="hype-room-reactions"
           role="group"
           aria-label="Message reactions"
-          {...picker.longPress}
+          {...longPress}
         >
           <ReactionSummaryPill
             count={reactionTotal}
             active={activeReaction}
             disabled={!isActiveMember || busy}
-            ariaLabel="Choose a reaction"
-            title="Choose a reaction"
-            onClick={event => {
-              event.preventDefault();
-              event.stopPropagation();
-              picker.openFromEvent(event);
-            }}
+            ariaLabel={
+              roomId != null ? "See who reacted" : `${reactionTotal} reactions`
+            }
+            title={roomId != null ? "See who reacted" : undefined}
+            onClick={
+              roomId != null
+                ? event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setReactorsOpen(true);
+                  }
+                : undefined
+            }
           />
           {HYPE_REACTIONS.map(({ id, label, glyph }) => {
-            const entry = (row.reactions ?? []).find(r => r.reaction === id);
+            const entry = entries.find(r => r.reaction === id);
             const count = entry?.count ?? 0;
             const mine = entry?.reactedByMe ?? false;
             const visible = count > 0 || mine;
@@ -355,21 +385,6 @@ export function MessageCard({
               </button>
             );
           })}
-          {isActiveMember ? (
-            <button
-              type="button"
-              className="hype-room-reaction hype-room-reaction--add"
-              aria-label="More reactions"
-              aria-expanded={trayOpen}
-              disabled={busy}
-              onClick={event => {
-                event.stopPropagation();
-                setTrayOpen(open => !open);
-              }}
-            >
-              +
-            </button>
-          ) : null}
         </div>
 
         {replyCount > 0 && onOpenThread && isTopLevel ? (
@@ -386,51 +401,6 @@ export function MessageCard({
         ) : null}
       </div>
 
-      {trayOpen ? (
-        <div className="hype-room-reaction-tray" role="menu" aria-label="Reaction tray">
-          {HYPE_REACTIONS.map(({ id, label, glyph }) => (
-            <button
-              key={`tray-${id}`}
-              type="button"
-              role="menuitem"
-              aria-label={label}
-              title={label}
-              disabled={!isActiveMember}
-              onClick={event => {
-                event.stopPropagation();
-                setTrayOpen(false);
-                onReact(id);
-              }}
-            >
-              {glyph}
-            </button>
-          ))}
-          <button
-            type="button"
-            className="hype-room-reaction-tray-close"
-            aria-label="Close reaction tray"
-            onClick={event => {
-              event.stopPropagation();
-              setTrayOpen(false);
-            }}
-          >
-            <X size={14} />
-          </button>
-        </div>
-      ) : null}
-
-      <ReactionPicker
-        open={picker.open}
-        anchor={picker.anchor}
-        active={activeReaction}
-        disabled={!isActiveMember || busy}
-        label="Choose a message reaction"
-        onSelect={onReact}
-        onClose={picker.close}
-        onOpenReactors={
-          roomId != null ? () => setReactorsOpen(true) : undefined
-        }
-      />
       {roomId != null ? (
         <ReactorList
           open={reactorsOpen}

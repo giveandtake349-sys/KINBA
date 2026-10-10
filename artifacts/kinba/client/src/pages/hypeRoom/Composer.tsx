@@ -1,6 +1,7 @@
-import type { FormEvent } from "react";
+import { useRef, type FormEvent, type KeyboardEvent } from "react";
 import { AtSign, X } from "lucide-react";
-import { MentionPicker } from "./MentionPicker";
+import { MentionPicker, type HypeMentionPickerHandle } from "./MentionPicker";
+import { findMentionToken, type MentionToken } from "@/lib/mentionParser";
 import {
   displayMessageName,
   displayMemberName,
@@ -13,6 +14,8 @@ export const ROOM_MESSAGE_MAX = 5000;
 /**
  * Message composer — normal, reply, mention. Keyboard/safe-area friendly
  * layout; disabled/loading states; no backend model changes.
+ * Typing "@" in the textarea opens the member picker in typing mode (the
+ * token query filters); the @ button keeps the classic search-box mode.
  */
 export function Composer({
   draft,
@@ -23,11 +26,14 @@ export function Composer({
   members,
   viewerId,
   hostId,
+  mentionQuery,
   onDraftChange,
   onToggleMentionPicker,
   onToggleMention,
   onCancelReply,
   onSubmit,
+  onMentionTokenChange,
+  onDismissMentionPicker,
 }: {
   draft: string;
   sending: boolean;
@@ -37,12 +43,43 @@ export function Composer({
   members: MemberRow[];
   viewerId: number | null;
   hostId: number | null;
+  /** Controlled typing-mode filter; undefined renders the search box. */
+  mentionQuery?: string;
   onDraftChange: (value: string) => void;
   onToggleMentionPicker: () => void;
   onToggleMention: (userId: number) => void;
   onCancelReply: () => void;
   onSubmit: (event: FormEvent) => void;
+  /** Reports the active "@query" token (or null) as the member types. */
+  onMentionTokenChange?: (token: MentionToken | null) => void;
+  onDismissMentionPicker?: () => void;
 }) {
+  const pickerRef = useRef<HypeMentionPickerHandle | null>(null);
+
+  const handleTextareaKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Escape") {
+      if (mentionPickerOpen) {
+        event.preventDefault();
+        onDismissMentionPicker?.();
+      }
+      return;
+    }
+    if (!mentionPickerOpen) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      pickerRef.current?.moveHighlight(1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      pickerRef.current?.moveHighlight(-1);
+    } else if (event.key === "Enter") {
+      // Enter picks the highlighted member instead of inserting a newline;
+      // with an empty list it falls through so the message still sends.
+      if (pickerRef.current?.selectHighlighted()) {
+        event.preventDefault();
+      }
+    }
+  };
+
   return (
     <form
       className="hype-room-composer"
@@ -90,11 +127,13 @@ export function Composer({
 
       {mentionPickerOpen ? (
         <MentionPicker
+          ref={pickerRef}
           members={members}
           viewerId={viewerId}
           hostId={hostId}
           selectedIds={mentionedIds}
           onToggle={onToggleMention}
+          query={mentionQuery}
         />
       ) : null}
 
@@ -104,7 +143,17 @@ export function Composer({
       <textarea
         id="hype-room-message"
         value={draft}
-        onChange={event => onDraftChange(event.target.value)}
+        onChange={event => {
+          onDraftChange(event.target.value);
+          const target = event.target;
+          onMentionTokenChange?.(
+            findMentionToken(
+              target.value,
+              target.selectionStart ?? target.value.length
+            )
+          );
+        }}
+        onKeyDown={handleTextareaKeyDown}
         maxLength={ROOM_MESSAGE_MAX}
         rows={2}
         enterKeyHint="send"

@@ -10,14 +10,13 @@ import {
 } from "@/lib/reactionState";
 
 describe("tappedReactionType", () => {
-  it("activates the default like when nothing is active", () => {
-    expect(tappedReactionType(null)).toBe("like");
-    expect(tappedReactionType(undefined)).toBe("like");
+  it("activates the single Pookie/Love reaction when nothing is active", () => {
+    expect(tappedReactionType(null)).toBe("love");
+    expect(tappedReactionType(undefined)).toBe("love");
   });
 
-  it("removes whatever is already active", () => {
-    expect(tappedReactionType("fire")).toBe("fire");
-    expect(tappedReactionType("clap")).toBe("clap");
+  it("reports the active reaction so the tap removes it", () => {
+    expect(tappedReactionType("love")).toBe("love");
   });
 });
 
@@ -32,7 +31,7 @@ describe("applySingleReaction", () => {
     });
   });
 
-  it("removes when the requested type is already active", () => {
+  it("removes when the single reaction is already active", () => {
     const state = {
       reactionCount: 5,
       viewerReacted: true,
@@ -45,24 +44,11 @@ describe("applySingleReaction", () => {
     });
   });
 
-  it("replaces in place so the total does not move", () => {
-    const state = {
-      reactionCount: 5,
-      viewerReacted: true,
-      viewerReaction: "love" as const,
-    };
-    expect(applySingleReaction(state, "fire")).toEqual({
-      reactionCount: 5,
-      viewerReacted: true,
-      viewerReaction: "fire",
-    });
-  });
-
   it("never reports a negative count", () => {
     expect(
       applySingleReaction(
-        { reactionCount: 0, viewerReacted: true, viewerReaction: "like" },
-        "like"
+        { reactionCount: 0, viewerReacted: true, viewerReaction: "love" },
+        "love"
       ).reactionCount
     ).toBe(0);
   });
@@ -73,13 +59,13 @@ describe("adoptSingleReaction", () => {
     expect(
       adoptSingleReaction(
         { reactionCount: 5, viewerReacted: false, viewerReaction: null },
-        "fire",
+        "love",
         { reactionCount: 6, viewerReacted: true }
       )
     ).toEqual({
       reactionCount: 6,
       viewerReacted: true,
-      viewerReaction: "fire",
+      viewerReaction: "love",
     });
   });
 
@@ -89,15 +75,15 @@ describe("adoptSingleReaction", () => {
       viewerReacted: false,
       viewerReaction: null,
     };
-    expect(adoptSingleReaction(previous, "fire", { viewerReacted: true })).toEqual({
+    expect(adoptSingleReaction(previous, "love", { viewerReacted: true })).toEqual({
       reactionCount: 6,
       viewerReacted: true,
-      viewerReaction: "fire",
+      viewerReaction: "love",
     });
     expect(
       adoptSingleReaction(
-        { reactionCount: 6, viewerReacted: true, viewerReaction: "fire" },
-        "fire",
+        { reactionCount: 6, viewerReacted: true, viewerReaction: "love" },
+        "love",
         { viewerReacted: false }
       )
     ).toEqual({
@@ -107,87 +93,76 @@ describe("adoptSingleReaction", () => {
     });
   });
 
-  it("keeps the total stable when the server replaced the type", () => {
+  it("keeps the total stable when the server confirms the active reaction", () => {
     const previous = {
       reactionCount: 6,
       viewerReacted: true,
-      viewerReaction: "like" as const,
+      viewerReaction: "love" as const,
     };
-    expect(adoptSingleReaction(previous, "clap", { viewerReacted: true })).toEqual({
+    expect(adoptSingleReaction(previous, "love", { viewerReacted: true })).toEqual({
       reactionCount: 6,
       viewerReacted: true,
-      viewerReaction: "clap",
+      viewerReaction: "love",
     });
   });
 });
 
 describe("chip entries", () => {
-  const entries = [
-    { reaction: "like" as const, count: 3, reactedByMe: false },
-    { reaction: "fire" as const, count: 1, reactedByMe: true },
-    { reaction: "clap" as const, count: 4, reactedByMe: false },
-  ];
+  const entries = [{ reaction: "love" as const, count: 8, reactedByMe: true }];
 
   it("finds the viewer's active chip", () => {
-    expect(activeReactionEntry(entries)).toBe("fire");
+    expect(activeReactionEntry(entries)).toBe("love");
     expect(activeReactionEntry([])).toBeNull();
     expect(activeReactionEntry(null)).toBeNull();
     expect(activeReactionEntry(undefined)).toBeNull();
   });
 
-  it("sums every chip", () => {
+  it("sums the chips", () => {
     expect(totalReactionCount(entries)).toBe(8);
     expect(totalReactionCount(null)).toBe(0);
   });
 
   it("adds the first chip", () => {
-    expect(applyReactionEntries([], "like")).toEqual([
-      { reaction: "like", count: 1, reactedByMe: true },
+    expect(applyReactionEntries([], "love")).toEqual([
+      { reaction: "love", count: 1, reactedByMe: true },
     ]);
   });
 
   it("toggles the active chip off and drops it at zero", () => {
-    const only = [{ reaction: "fire" as const, count: 1, reactedByMe: true }];
-    expect(applyReactionEntries(only, "fire")).toEqual([]);
+    const only = [{ reaction: "love" as const, count: 1, reactedByMe: true }];
+    expect(applyReactionEntries(only, "love")).toEqual([]);
   });
 
-  it("keeps a shared active chip at a lower count when toggled off", () => {
-    const shared = [
-      { reaction: "fire" as const, count: 3, reactedByMe: true },
-      { reaction: "like" as const, count: 1, reactedByMe: false },
-    ];
-    expect(applyReactionEntries(shared, "fire")).toEqual([
-      { reaction: "fire", count: 2, reactedByMe: false },
-      { reaction: "like", count: 1, reactedByMe: false },
+  it("keeps the active chip at a lower count when toggled off", () => {
+    const shared = [{ reaction: "love" as const, count: 3, reactedByMe: true }];
+    expect(applyReactionEntries(shared, "love")).toEqual([
+      { reaction: "love", count: 2, reactedByMe: false },
     ]);
-  });
-
-  it("replaces the held chip, keeping the total unchanged", () => {
-    const next = applyReactionEntries(entries, "clap");
-    expect(activeReactionEntry(next)).toBe("clap");
-    expect(totalReactionCount(next)).toBe(8);
-    expect(next.find(entry => entry.reaction === "fire")).toBeUndefined();
-    expect(next.find(entry => entry.reaction === "clap")).toEqual({
-      reaction: "clap",
-      count: 5,
-      reactedByMe: true,
-    });
-    expect(next.some(entry => entry.count === 0)).toBe(false);
   });
 });
 
 describe("toReactionEntries", () => {
-  it("narrows raw backend strings to the shared vocabulary", () => {
+  it("normalizes historical multi-reaction values to the single reaction", () => {
     expect(
       toReactionEntries([
         { reaction: "like", count: 2, reactedByMe: false },
         { reaction: "haha", count: 9, reactedByMe: true },
         { reaction: "fire", count: 1, reactedByMe: true },
+        { reaction: "clap", count: 4, reactedByMe: false },
       ])
-    ).toEqual([
-      { reaction: "like", count: 2, reactedByMe: false },
-      { reaction: "fire", count: 1, reactedByMe: true },
-    ]);
+    ).toEqual([{ reaction: "love", count: 7, reactedByMe: true }]);
+  });
+
+  it("keeps a lone legacy row active for its owner", () => {
+    expect(
+      toReactionEntries([{ reaction: "like", count: 5, reactedByMe: true }])
+    ).toEqual([{ reaction: "love", count: 5, reactedByMe: true }]);
+  });
+
+  it("drops unknown values", () => {
+    expect(
+      toReactionEntries([{ reaction: "haha", count: 9, reactedByMe: true }])
+    ).toEqual([]);
   });
 
   it("tolerates a missing row", () => {

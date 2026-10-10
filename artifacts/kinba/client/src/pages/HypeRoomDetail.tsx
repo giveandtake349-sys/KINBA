@@ -31,6 +31,10 @@ import { validateRoomDescription, validateRoomTitle } from "./hypeRoom/roomText"
 import { RoomLinkBar } from "./hypeRoom/RoomLinkBar";
 import { Composer } from "./hypeRoom/Composer";
 import {
+  removeMentionToken,
+  type MentionToken,
+} from "@/lib/mentionParser";
+import {
   displayMemberName,
   displayMessageName,
   type InviteRow,
@@ -118,6 +122,12 @@ export default function HypeRoomDetail({
   const [replyTarget, setReplyTarget] = useState<MessageRow | null>(null);
   const [mentionedIds, setMentionedIds] = useState<number[]>([]);
   const [mentionPickerOpen, setMentionPickerOpen] = useState(false);
+  // Active "@query" token typed into the composer, plus what opened the
+  // picker: the @ button (search box) or typing "@" in the textarea.
+  const [mentionToken, setMentionToken] = useState<MentionToken | null>(null);
+  const [mentionSource, setMentionSource] = useState<
+    "button" | "typing" | null
+  >(null);
   const [selectedMessageId, setSelectedMessageId] = useState<number | null>(null);
   const [threadRootId, setThreadRootId] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -406,10 +416,16 @@ export default function HypeRoomDetail({
     }
   };
 
+  const closeMentionPicker = () => {
+    setMentionPickerOpen(false);
+    setMentionToken(null);
+    setMentionSource(null);
+  };
+
   const clearComposerExtras = () => {
     setReplyTarget(null);
     setMentionedIds([]);
-    setMentionPickerOpen(false);
+    closeMentionPicker();
   };
 
   const handleSend = async (event: FormEvent) => {
@@ -668,7 +684,7 @@ export default function HypeRoomDetail({
     if (!requireAuth()) return;
     if (row.message.parentId != null) return;
     setReplyTarget(row);
-    setMentionPickerOpen(false);
+    closeMentionPicker();
     setThreadRootId(null);
   };
 
@@ -680,13 +696,35 @@ export default function HypeRoomDetail({
     }
   };
 
+  // Typing "@" (or moving the caret into an existing token) opens the picker
+  // in typing mode: the token query filters members and the textarea keeps
+  // focus. Backspacing past the "@" closes it again.
+  const handleMentionTokenChange = (token: MentionToken | null) => {
+    setMentionToken(token);
+    if (token) {
+      setMentionPickerOpen(true);
+      setMentionSource("typing");
+    } else if (mentionSource === "typing") {
+      setMentionPickerOpen(false);
+      setMentionSource(null);
+    }
+  };
+
   const toggleMention = (memberUserId: number) => {
     if (memberUserId === userId) return;
+    const adding = !mentionedIds.includes(memberUserId);
     setMentionedIds(prev =>
-      prev.includes(memberUserId)
-        ? prev.filter(id => id !== memberUserId)
-        : [...prev, memberUserId]
+      adding
+        ? [...prev, memberUserId]
+        : prev.filter(id => id !== memberUserId)
     );
+    // A typed "@query" converted into a chip is stripped from the draft so
+    // the member is mentioned once, via the notification-linked chip flow.
+    if (adding && mentionToken && mentionSource === "typing") {
+      const token = mentionToken;
+      setDraft(prev => removeMentionToken(prev, token).text);
+      closeMentionPicker();
+    }
   };
 
   const backToLobby = () => navigate("/rooms");
@@ -948,13 +986,26 @@ export default function HypeRoomDetail({
                     members={members}
                     viewerId={userId}
                     hostId={room.hostId}
-                    onDraftChange={setDraft}
-                    onToggleMentionPicker={() =>
-                      setMentionPickerOpen(open => !open)
+                    mentionQuery={
+                      mentionSource === "typing"
+                        ? (mentionToken?.query ?? "")
+                        : undefined
                     }
+                    onDraftChange={setDraft}
+                    onToggleMentionPicker={() => {
+                      if (mentionPickerOpen) {
+                        closeMentionPicker();
+                      } else {
+                        setMentionPickerOpen(true);
+                        setMentionSource("button");
+                        setMentionToken(null);
+                      }
+                    }}
                     onToggleMention={toggleMention}
                     onCancelReply={() => setReplyTarget(null)}
                     onSubmit={event => void handleSend(event)}
+                    onMentionTokenChange={handleMentionTokenChange}
+                    onDismissMentionPicker={closeMentionPicker}
                   />
                 ) : room.status === "live" && !isActiveMember ? (
                   <p className="hype-room-composer-hint">

@@ -22,8 +22,10 @@ export type ReactionSummaryPillProps = {
 
 /**
  * The always-clickable entry point for reaction surfaces (M5): long-press must
- * never be the only way to reach a picker or a reactor list, so every surface
- * renders this small pill next to its reaction zone.
+ * never be the only way to reach the reactor list, so every surface renders
+ * this small pill next to its reaction zone. With a single reaction the pill
+ * opens the reactor list ("see who reacted"); the reaction itself toggles
+ * from its own control.
  */
 export function ReactionSummaryPill({
   count,
@@ -45,7 +47,7 @@ export function ReactionSummaryPill({
     ariaLabel ??
     (hasCount
       ? `${count} reaction${count === 1 ? "" : "s"}`
-      : "Choose a reaction");
+      : "See who reacted");
 
   return (
     <button

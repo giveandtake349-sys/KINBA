@@ -997,8 +997,9 @@
 }
 
 .hype-room-mention-option:hover,
+.hype-room-mention-option.is-highlighted,
 .hype-room-mention-option--on {
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--blue) 12%, transparent);
   color: var(--blue);
 }
 
@@ -1652,43 +1653,6 @@
   padding: 4px 0;
 }
 
-.hype-room-reaction-tray {
-  align-items: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  box-shadow: var(--shadow-pop);
-  display: inline-flex;
-  gap: 4px;
-  margin-top: 8px;
-  padding: 5px 8px;
-  position: relative;
-  z-index: 5;
-}
-
-.hype-room-reaction-tray button {
-  background: transparent;
-  border: 0;
-  border-radius: 999px;
-  cursor: pointer;
-  font-size: 1.05rem;
-  line-height: 1;
-  padding: 6px;
-}
-
-.hype-room-reaction-tray button:hover:not(:disabled) {
-  background: var(--gold-soft);
-}
-
-.hype-room-reaction-tray button:disabled {
-  opacity: 0.5;
-}
-
-.hype-room-reaction-tray-close {
-  color: var(--muted);
-  display: inline-flex;
-}
-
 .hype-room-message-menu {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -1742,6 +1706,11 @@
   font-weight: 700;
   margin-right: 4px;
   padding: 0.1rem 0.4rem;
+  text-decoration: none;
+}
+
+a.hype-room-mention-token:hover {
+  text-decoration: underline;
 }
 
 .hype-room-mention-search {
@@ -1974,8 +1943,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hype-room-message-card,
-  .hype-room-reaction-tray {
+  .hype-room-message-card {
     transition: none;
   }
 }

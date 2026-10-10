@@ -1,5 +1,5 @@
 /**
- * Long-press gesture for reaction pickers.
+ * Long-press gesture for reaction surfaces (opens the reactor list).
  *
  * A pointer held for `thresholdMs` without leaving an `slopPx` box fires
  * `onLongPress` once. The gesture is deliberately isolated from the element's
@@ -132,7 +132,7 @@ export function useLongPress({
     onContextMenu(event) {
       if (!enabled) return;
       // Touch/pen reuses contextmenu for the same hold; swallow the native menu
-      // so it never covers the picker. Mouse right-click keeps its menu.
+      // so it never covers the surface. Mouse right-click keeps its menu.
       if (pointerTypeRef.current !== "touch" && pointerTypeRef.current !== "pen") {
         return;
       }

@@ -17,5 +17,5 @@ export {
 } from "./shared";
 export { ReactionBar } from "./ReactionBar";
 export { ActionMenu } from "./ActionMenu";
-export { MentionPicker } from "./MentionPicker";
+export { MentionPicker, type MentionPickerHandle } from "./MentionPicker";
 export { ReplyBanner } from "./ReplyBanner";

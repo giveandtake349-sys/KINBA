@@ -91,35 +91,42 @@ describe("MessageCard reactions", () => {
     vi.useRealTimers();
   });
 
-  it("shows the total and the viewer's own glyph", () => {
+  it("normalizes every stored row to the single Pookie reaction", () => {
     renderCard();
-    const pill = screen.getByRole("button", { name: "Choose a reaction" });
-    expect(pill.textContent).toBe("🔥6"); // active glyph + every chip
+    // Legacy fire/clap rows still count toward the one reaction (6 total).
+    const pill = screen.getByRole("button", { name: "6 reactions" });
+    expect(pill.textContent).toBe("❤️6");
+    const chip = screen.getByRole("button", { name: "Remove Pookie reaction" });
+    expect(chip.textContent).toBe("❤️6");
+    expect(chip.getAttribute("aria-pressed")).toBe("true");
     expect(
-      screen.getByRole("button", { name: "Remove Fire reaction" }).textContent
-    ).toBe("🔥4");
+      screen.queryByRole("button", { name: "React with Fire" })
+    ).toBeNull();
     expect(
-      screen.getByRole("button", { name: "React with Clap" }).textContent
-    ).toBe("👏2");
+      screen.queryByRole("button", { name: "React with Clap" })
+    ).toBeNull();
+    expect(screen.queryByRole("menu", { name: "Reaction tray" })).toBeNull();
   });
 
-  it("tapping the pill opens the picker instead of reacting", () => {
-    const { onReact } = renderCard();
-    fireEvent.click(screen.getByRole("button", { name: "Choose a reaction" }));
+  it("tapping the pill opens the reactor list instead of reacting", () => {
+    const { onReact } = renderCard({ roomId: 5 });
+    fireEvent.click(screen.getByRole("button", { name: "See who reacted" }));
 
-    expect(screen.getByRole("menu", { name: "Choose a message reaction" })).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
     expect(onReact).not.toHaveBeenCalled();
   });
 
-  it("a chip still toggles its own type directly", () => {
+  it("the chip toggles the single reaction directly", () => {
     const { onReact } = renderCard();
-    fireEvent.click(screen.getByRole("button", { name: "React with Clap" }));
-    expect(onReact).toHaveBeenCalledWith("clap");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Remove Pookie reaction" })
+    );
+    expect(onReact).toHaveBeenCalledWith("love");
   });
 
-  it("long-pressing the reaction zone opens the picker without tapping", () => {
+  it("long-pressing the reaction zone opens the reactor list without tapping", () => {
     vi.useFakeTimers();
-    const { onReact } = renderCard();
+    const { onReact } = renderCard({ roomId: 5 });
     const zone = document.querySelector(".hype-room-reactions")!;
 
     fireEvent.pointerDown(zone, {
@@ -134,7 +141,7 @@ describe("MessageCard reactions", () => {
       vi.advanceTimersByTime(LONG_PRESS_THRESHOLD_MS + 10);
     });
 
-    expect(screen.getByRole("menu", { name: "Choose a message reaction" })).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
     expect(onReact).not.toHaveBeenCalled();
 
     fireEvent.pointerUp(zone, {
@@ -149,18 +156,9 @@ describe("MessageCard reactions", () => {
     expect(onReact).not.toHaveBeenCalled();
   });
 
-  it("choosing a type in the picker reports it", () => {
-    const { onReact } = renderCard();
-    fireEvent.click(screen.getByRole("button", { name: "Choose a reaction" }));
-    fireEvent.click(screen.getByRole("menuitemradio", { name: "Love" }));
-    expect(onReact).toHaveBeenCalledWith("love");
-    expect(screen.queryByRole("menu", { name: "Choose a message reaction" })).toBeNull();
-  });
-
-  it("opens the reactor list from the picker footer", async () => {
+  it("loads the reactors for this message when the list opens", async () => {
     renderCard({ roomId: 5 });
-    fireEvent.click(screen.getByRole("button", { name: "Choose a reaction" }));
-    fireEvent.click(screen.getByRole("button", { name: /see who reacted/i }));
+    fireEvent.click(screen.getByRole("button", { name: "See who reacted" }));
 
     expect(await screen.findByRole("dialog")).toBeTruthy();
     await waitFor(() =>
@@ -174,21 +172,20 @@ describe("MessageCard reactions", () => {
   });
 
   it("offers no reactor entry point without a room", () => {
-    renderCard();
-    fireEvent.click(screen.getByRole("button", { name: "Choose a reaction" }));
-    expect(
-      screen.queryByRole("button", { name: /see who reacted/i })
-    ).toBeNull();
+    const { onReact } = renderCard();
+    fireEvent.click(screen.getByRole("button", { name: "6 reactions" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onReact).not.toHaveBeenCalled();
   });
 
-  it("keeps the picker closed for a viewer who cannot react", () => {
+  it("disables the pill and the chip for a viewer who cannot react", () => {
     renderCard({ isActiveMember: false });
     expect(
-      (screen.getByRole("button", { name: "Choose a reaction" }) as HTMLButtonElement)
+      (screen.getByRole("button", { name: "6 reactions" }) as HTMLButtonElement)
         .disabled
     ).toBe(true);
     const chip = screen.getByRole("button", {
-      name: "React with Clap",
+      name: "Remove Pookie reaction",
     }) as HTMLButtonElement;
     expect(chip.disabled).toBe(true);
   });

@@ -1,4 +1,10 @@
-import { useMemo, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useState,
+} from "react";
 import { Check, Search } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import type { ConversationAuthor } from "./shared";
@@ -24,27 +30,49 @@ function labelOf(user: ConversationAuthor & { photoUrl?: string | null }) {
 }
 
 /**
+ * Imperative handle the composer uses to drive keyboard selection while its
+ * own input keeps focus: ArrowUp/ArrowDown move the highlight, Enter picks
+ * the highlighted row.
+ */
+export type MentionPickerHandle = {
+  moveHighlight: (delta: number) => void;
+  /** Picks the highlighted row; returns false when the list is empty. */
+  selectHighlighted: () => boolean;
+};
+
+/**
  * Shared @ mention picker for conversation surfaces (comments).
  * Uses existing home.searchAll — real users only, no fabricated suggestions.
- * Selecting a user calls onPick with their handle for inline @text insertion.
+ * Selecting a user calls onPick with their id/name/username so the caller
+ * can preserve the actual identity (never just a display name).
+ *
+ * Two modes:
+ * - Button mode (default): renders its own search input and autofocuses it.
+ * - Typing mode (`query` provided): the composer input is the typing surface,
+ *   so the search box is hidden and the controlled `query` drives results.
  */
-export function MentionPicker({
-  viewerId,
-  excludeIds,
-  onPick,
-  autoFocus = true,
-}: {
-  viewerId?: number | null;
-  excludeIds?: number[];
-  onPick: (user: {
-    id: number;
-    name: string | null;
-    username: string | null;
-  }) => void;
-  autoFocus?: boolean;
-}) {
+export const MentionPicker = forwardRef<
+  MentionPickerHandle,
+  {
+    viewerId?: number | null;
+    excludeIds?: number[];
+    onPick: (user: {
+      id: number;
+      name: string | null;
+      username: string | null;
+    }) => void;
+    autoFocus?: boolean;
+    /** Controlled search text (typing mode); omits the internal search box. */
+    query?: string;
+  }
+>(function MentionPicker(
+  { viewerId, excludeIds, onPick, autoFocus = true, query: controlledQuery },
+  ref
+) {
   const [term, setTerm] = useState("");
-  const trimmed = term.trim();
+  const [highlight, setHighlight] = useState(0);
+  const activeQuery = controlledQuery ?? term;
+  const trimmed = activeQuery.trim();
   const query = trpc.home.searchAll.useQuery(
     { term: trimmed },
     {
@@ -62,20 +90,85 @@ export function MentionPicker({
     return rows.filter(row => !excluded.has(row.id));
   }, [query.data, excludeIds, viewerId]);
 
+  // Clamp the highlight into range whenever the result list shrinks, so a
+  // stale index can never point at nothing.
+  const safeHighlight = users.length
+    ? Math.min(highlight, users.length - 1)
+    : 0;
+
+  useEffect(() => {
+    setHighlight(0);
+  }, [trimmed]);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      moveHighlight(delta: number) {
+        if (users.length === 0) return;
+        setHighlight(prev => (prev + delta + users.length) % users.length);
+      },
+      selectHighlighted() {
+        const user = users[safeHighlight];
+        if (!user) return false;
+        onPick({
+          id: user.id,
+          name: user.name,
+          username: user.username,
+        });
+        return true;
+      },
+    }),
+    [users, safeHighlight, onPick]
+  );
+
+  const pick = (user: {
+    id: number;
+    name: string | null;
+    username: string | null;
+  }) => {
+    onPick(user);
+    setTerm("");
+  };
+
   return (
     <div className="conv-mention-picker" role="listbox" aria-label="Mention someone">
-      <div className="conv-mention-picker-search">
-        <Search size={14} aria-hidden="true" />
-        <input
-          type="search"
-          value={term}
-          onChange={event => setTerm(event.target.value)}
-          placeholder="Search people…"
-          aria-label="Search people to mention"
-          autoFocus={autoFocus}
-          enterKeyHint="done"
-        />
-      </div>
+      {controlledQuery === undefined ? (
+        <div className="conv-mention-picker-search">
+          <Search size={14} aria-hidden="true" />
+          <input
+            type="search"
+            value={term}
+            onChange={event => setTerm(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === "ArrowDown") {
+                event.preventDefault();
+                setHighlight(prev =>
+                  users.length ? (prev + 1) % users.length : 0
+                );
+              } else if (event.key === "ArrowUp") {
+                event.preventDefault();
+                setHighlight(prev =>
+                  users.length ? (prev - 1 + users.length) % users.length : 0
+                );
+              } else if (event.key === "Enter") {
+                const user = users[safeHighlight];
+                if (user) {
+                  event.preventDefault();
+                  pick({
+                    id: user.id,
+                    name: user.name,
+                    username: user.username,
+                  });
+                }
+              }
+            }}
+            placeholder="Search people…"
+            aria-label="Search people to mention"
+            autoFocus={autoFocus}
+            enterKeyHint="done"
+          />
+        </div>
+      ) : null}
       {query.isPending && trimmed ? (
         <p className="conv-mention-picker-hint">Searching…</p>
       ) : query.isError ? (
@@ -86,20 +179,25 @@ export function MentionPicker({
         <p className="conv-mention-picker-hint">No people found.</p>
       ) : (
         <ul className="conv-mention-picker-list">
-          {users.map(user => (
+          {users.map((user, index) => (
             <li key={user.id}>
               <button
                 type="button"
                 role="option"
-                aria-selected={false}
-                onClick={() => {
-                  onPick({
+                aria-selected={index === highlight}
+                className={index === highlight ? "is-highlighted" : undefined}
+                onMouseDown={event => {
+                  // Keep the composer input focused so the caret survives.
+                  event.preventDefault();
+                }}
+                onMouseEnter={() => setHighlight(index)}
+                onClick={() =>
+                  pick({
                     id: user.id,
                     name: user.name,
                     username: user.username,
-                  });
-                  setTerm("");
-                }}
+                  })
+                }
               >
                 <span className="conv-mention-avatar" aria-hidden="true">
                   {user.photoUrl ? (
@@ -122,4 +220,4 @@ export function MentionPicker({
       )}
     </div>
   );
-}
+});

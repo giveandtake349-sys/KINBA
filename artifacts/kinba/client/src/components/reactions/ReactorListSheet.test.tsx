@@ -61,9 +61,12 @@ describe("ReactorListSheet", () => {
     expect(screen.getByText("Bela")).toBeTruthy();
     expect(fetchPage).toHaveBeenCalledWith(0);
     expect(document.querySelector(".reaction-reactor-viewer")).toBeTruthy();
-    expect(
-      screen.getByRole("img", { name: "Reacted with Like, Clap" })
-    ).toBeTruthy();
+    // Legacy types normalize to the single Pookie reaction, merged per row.
+    expect(screen.getByRole("img", { name: "Pookie" })).toBeTruthy();
+    const labels = screen.getAllByRole("img", {
+      name: "Reacted with Pookie",
+    });
+    expect(labels).toHaveLength(2);
   });
 
   it("pages with the backend batch offset and dedupes repeated rows", async () => {
