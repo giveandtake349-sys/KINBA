@@ -1850,6 +1850,35 @@
   color: var(--kinba-blue);
   border-color: var(--kinba-blue);
 }
+/* Active Pookie/Love button — shared light-red reaction accent. Scoped by the
+   __pookie modifier so Share/Save keep their brand-blue active state. */
+.media-engagement-actions button.is-active.media-engagement-actions__pookie,
+.k-post__actions button.is-active.media-engagement-actions__pookie {
+  background: var(--reaction-accent-soft, rgba(255, 90, 110, 0.12));
+  border-color: var(--reaction-accent-border, rgba(255, 90, 110, 0.45));
+  color: var(--reaction-accent, #ff5a6e);
+}
+/* modernFeed.css (loaded later) tints the k-post active hover blue at equal
+   specificity; keep the Pookie hover on the light-red accent instead. */
+.k-post__actions button.is-active.media-engagement-actions__pookie:hover {
+  background: var(--reaction-accent-soft, rgba(255, 90, 110, 0.12));
+}
+.media-hub .media-engagement-actions button.is-active.media-engagement-actions__pookie {
+  background: var(--reaction-accent-soft, rgba(255, 90, 110, 0.12));
+  border-color: var(--reaction-accent-border, rgba(255, 90, 110, 0.45));
+  color: var(--reaction-accent, #ff5a6e);
+}
+/* Overlay rail keeps a solid fill; ink text stays legible on light red, and the
+   !important rules out-specify the kinbaModern.css overlay color cascade. */
+.media-hub .media-engagement-actions--overlay button.is-active.media-engagement-actions__pookie {
+  background: var(--reaction-accent, #ff5a6e) !important;
+  border-color: transparent !important;
+  color: var(--accent-ink, #050608) !important;
+}
+.media-hub .media-engagement-actions--overlay button.is-active.media-engagement-actions__pookie > strong,
+.media-hub .media-engagement-actions--overlay button.is-active.media-engagement-actions__pookie > svg {
+  color: var(--accent-ink, #050608) !important;
+}
 .media-empty {
   margin: 14px auto;
   max-width: 720px;

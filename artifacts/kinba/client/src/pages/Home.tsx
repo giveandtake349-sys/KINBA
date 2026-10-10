@@ -2236,7 +2236,7 @@ export default function Home() {
               isOwner={isOwner}
               isAuthenticated={auth.isAuthenticated}
               isAdmin={auth.user?.role === "admin"}
-              userId={publicProfileId}
+              userId={publicProfileId ?? usernameProfileData?.user.id}
               onBack={closeProfile}
               onOpenShort={(id) => { setInitialShortId(id); setActiveView("shorts"); }}
               onOpenPhoto={setPhotoViewer}

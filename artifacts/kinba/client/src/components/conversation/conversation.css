@@ -35,10 +35,13 @@
   opacity: 0.55;
 }
 
-.conv-reaction--on {
-  background: color-mix(in srgb, var(--blue) 18%, transparent);
-  border-color: color-mix(in srgb, var(--blue) 45%, transparent);
-  color: var(--blue);
+/* Active Pookie/Love chip — shared light-red reaction accent. The hover arm
+   keeps the accent when the generic chip hover (higher specificity) fires. */
+.conv-reaction--on,
+.conv-reaction--on:hover:not(:disabled) {
+  background: var(--reaction-accent-soft, rgba(255, 90, 110, 0.12));
+  border-color: var(--reaction-accent-border, rgba(255, 90, 110, 0.45));
+  color: var(--reaction-accent, #ff5a6e);
 }
 
 .conv-reaction--add {

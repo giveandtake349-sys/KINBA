@@ -1631,7 +1631,7 @@ function EngagementActions({
       )}
       <button
         type="button"
-        className={engagement.viewerReacted ? "is-active" : ""}
+        className={`media-engagement-actions__pookie${engagement.viewerReacted ? " is-active" : ""}`}
         {...longPress}
         onClick={event => {
           event.preventDefault();
@@ -2869,7 +2869,7 @@ function VideoCard({
         <div className="k-post__actions">
           <button
             type="button"
-            className={current.viewerReacted ? "is-active" : ""}
+            className={`media-engagement-actions__pookie${current.viewerReacted ? " is-active" : ""}`}
             {...longPress}
             onClick={react}
             disabled={!!pending}

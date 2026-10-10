@@ -898,10 +898,13 @@
   opacity: 0.55;
 }
 
-.hype-room-reaction--on {
-  background: var(--accent-soft);
-  border-color: var(--accent-border);
-  color: var(--blue);
+/* Active Pookie/Love chip — shared light-red reaction accent. The hover arm
+   keeps the accent when the generic chip hover (higher specificity) fires. */
+.hype-room-reaction--on,
+.hype-room-reaction--on:hover:not(:disabled) {
+  background: var(--reaction-accent-soft, rgba(255, 90, 110, 0.12));
+  border-color: var(--reaction-accent-border, rgba(255, 90, 110, 0.45));
+  color: var(--reaction-accent, #ff5a6e);
 }
 
 .hype-room-reaction-count {
