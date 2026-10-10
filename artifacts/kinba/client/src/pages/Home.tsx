@@ -749,7 +749,6 @@ function AppHeader({
   onMenu,
   onProfile,
   onLogout,
-  onSettings,
 }: {
   profile?: ProfileSnapshot;
   notificationCount: number;
@@ -759,7 +758,6 @@ function AppHeader({
   onMenu: () => void;
   onProfile: () => void;
   onLogout: () => void;
-  onSettings: () => void;
 }) {
   return (
     <header className="topbar mobile-first-header">
@@ -778,15 +776,6 @@ function AppHeader({
         <button type="button" onClick={safeClick(onProfile)}>Profile</button>
       </nav>
       <div className="topbar-actions">
-        <button
-          type="button"
-          className="topbar-icon-button"
-          onClick={safeClick(() => onOpenModal("upload"))}
-          aria-label="Create a video"
-          title="Create a video"
-        >
-          <Plus size={18} />
-        </button>
         <button
           type="button"
           className="topbar-icon-button"
@@ -818,15 +807,6 @@ function AppHeader({
         >
           <ProfileIdentity profile={profile} compact />
           <Menu size={24} />
-        </button>
-        <button
-          type="button"
-          className="topbar-icon-button"
-          onClick={safeClick(onSettings)}
-          aria-label="Settings"
-          title="Settings"
-        >
-          <Settings size={18} />
         </button>
         <ThemeToggle />
         <button type="button" className="logout-btn" onClick={safeClick(onLogout)}>
@@ -2212,7 +2192,6 @@ export default function Home() {
             onMenu={() => setMenuOpen(value => !value)}
             onProfile={openProfile}
             onLogout={logout}
-            onSettings={() => navigate("/settings")}
           />
           {screen === "dashboard" && (
             <FeedTabs activeSection={activeView} onSectionChange={showFeed} />
