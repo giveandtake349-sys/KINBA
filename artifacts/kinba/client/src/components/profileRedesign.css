@@ -1081,14 +1081,14 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--accent, #25d8e8);
+  background: var(--accent, #38bdf8);
   cursor: pointer;
 }
 .pr-crop-zoom-label input[type="range"]::-moz-range-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--accent, #25d8e8);
+  background: var(--accent, #38bdf8);
   border: none;
   cursor: pointer;
 }
@@ -1107,7 +1107,7 @@
 .pr-crop-checkbox input[type="checkbox"] {
   width: 16px;
   height: 16px;
-  accent-color: var(--accent, #25d8e8);
+  accent-color: var(--accent, #38bdf8);
 }
 .pr-crop-caption {
   margin-top: 8px;

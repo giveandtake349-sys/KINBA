@@ -971,7 +971,7 @@
 .video-comment-action:hover,
 .video-comment-like:hover,
 .video-comment-like.is-active {
-  color: #3b82f6;
+  color: var(--blue);
 }
 .video-comment-action--danger:hover {
   color: #f87171;
@@ -981,7 +981,7 @@
 }
 .video-comment-replying,
 .comment-replying-banner {
-  color: #3b82f6;
+  color: var(--blue);
   font-size: 11px;
 }
 .comment-replying-banner {

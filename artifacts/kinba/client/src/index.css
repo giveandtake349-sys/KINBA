@@ -21,7 +21,7 @@
   --color-accent-foreground: var(--blue);
   --color-destructive: var(--error);
   --color-destructive-foreground: #ffffff;
-  --color-success: var(--teal);
+  --color-success: var(--success);
   --color-gold: var(--gold);
   --color-border: var(--border);
   --color-input: var(--input);
@@ -41,18 +41,22 @@
   --surface-elevated: #eaeaea;
   --border: #d4d4d4;
   --input: #d4d4d4;
-  /* Blue — premium royal/bright functional accent */
-  --blue: #2563eb;
-  --blue-soft: rgba(37, 99, 235, 0.12);
-  --blue-border: rgba(37, 99, 235, 0.42);
-  --blue-ink: #ffffff;
+  /* Brand blue — #00A8FF functional, #38BDF8 sky accent */
+  --blue: #00a8ff;
+  --blue-soft: rgba(0, 168, 255, 0.12);
+  --blue-border: rgba(0, 168, 255, 0.42);
+  --blue-ink: #050608;
+  /* Ink placed on brand-blue fills (primary buttons) — near-black for contrast */
+  --accent-ink: #050608;
   /* Champagne/gold — premium brand identity only */
   --gold: #d4af37;
   --gold-soft: rgba(212, 175, 55, 0.14);
   --gold-border: rgba(212, 175, 55, 0.42);
-  /* Semantic status */
-  --teal: #2f8580;
-  --teal-soft: rgba(47, 133, 128, 0.12);
+  /* Sky accent (brand #38BDF8) + semantic status (green reserved for success) */
+  --teal: #38bdf8;
+  --teal-soft: rgba(56, 189, 248, 0.12);
+  --success: #16a34a;
+  --success-soft: rgba(22, 163, 74, 0.12);
   --error: #bf3b30;
   --error-soft: rgba(191, 59, 48, 0.12);
   --line: cubic-bezier(0.23, 1, 0.32, 1);
@@ -90,8 +94,8 @@
   }
 }
 :root[data-theme="dark"] {
-  /* Foundation — charcoal/dark grey */
-  --page-bg: #151719;
+  /* Foundation — brand near-black (#050608) */
+  --page-bg: #050608;
   --text: #f2f3f3;
   --muted: #a8adb1;
   --surface: #1c1f21;
@@ -99,18 +103,22 @@
   --surface-elevated: #2d3135;
   --border: #34383b;
   --input: #3a3f44;
-  /* Blue — premium royal/bright functional accent */
-  --blue: #3b82f6;
-  --blue-soft: rgba(59, 130, 246, 0.14);
-  --blue-border: rgba(59, 130, 246, 0.42);
-  --blue-ink: #0b0f17;
+  /* Brand blue — #00A8FF functional, #38BDF8 sky accent */
+  --blue: #00a8ff;
+  --blue-soft: rgba(0, 168, 255, 0.14);
+  --blue-border: rgba(0, 168, 255, 0.42);
+  --blue-ink: #050608;
+  /* Ink placed on brand-blue fills (primary buttons) */
+  --accent-ink: #050608;
   /* Champagne/gold — premium brand identity only */
   --gold: #d8b877;
   --gold-soft: rgba(216, 184, 119, 0.14);
   --gold-border: rgba(216, 184, 119, 0.42);
-  /* Semantic status */
-  --teal: #25d8e8;
-  --teal-soft: rgba(37, 216, 232, 0.13);
+  /* Sky accent (brand #38BDF8) + semantic status (green reserved for success) */
+  --teal: #38bdf8;
+  --teal-soft: rgba(56, 189, 248, 0.13);
+  --success: #4ade80;
+  --success-soft: rgba(74, 222, 128, 0.14);
   --error: #ef6a63;
   --error-soft: rgba(239, 106, 99, 0.14);
   --shadow-pop: 0 14px 36px rgba(0, 0, 0, 0.55);
@@ -148,7 +156,7 @@
 }
 /* Verification badges use a consistent classic blue across every surface. */
 .verified-badge {
-  color: #3b82f6;
+  color: var(--blue);
   flex: 0 0 auto;
 }
 
@@ -1690,8 +1698,8 @@
   gap: 0.4rem;
 }
 .status-chip--approved {
-  color: var(--teal);
-  border-color: color-mix(in srgb, var(--teal) 45%, transparent);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 45%, transparent);
   background: var(--success-soft);
 }
 .status-chip--rejected {
@@ -1835,8 +1843,8 @@
   background: var(--teal-soft);
 }
 .status-chip--resolved {
-  color: var(--teal);
-  border-color: color-mix(in srgb, var(--teal) 45%, transparent);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 45%, transparent);
   background: var(--success-soft);
 }
 .danger-btn {
@@ -2255,6 +2263,13 @@ h3 {
   border-color: color-mix(in srgb, var(--teal) 36%, transparent);
   color: var(--teal);
 }
+/* Success states stay green regardless of the generic chip restyle above. */
+.status-chip--approved,
+.status-chip--resolved {
+  background: var(--success-soft);
+  border-color: color-mix(in srgb, var(--success) 45%, transparent);
+  color: var(--success);
+}
 .admin-card {
   background: var(--surface);
   border-color: var(--border);
@@ -2355,6 +2370,19 @@ h3 {
 .selected-file::before {
   pointer-events: none;
 }
+/* @mention links — functional blue, readable on every surface. */
+.mention-text {
+  overflow-wrap: anywhere;
+}
+.mention-link {
+  color: var(--blue);
+  font-weight: 600;
+  text-decoration: none;
+}
+.mention-link:hover {
+  text-decoration: underline;
+}
+
 button,
 a,
 [role="button"],

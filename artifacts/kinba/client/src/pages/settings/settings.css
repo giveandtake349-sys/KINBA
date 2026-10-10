@@ -553,7 +553,7 @@
 }
 
 .settings-form-message--success {
-  color: var(--teal);
+  color: var(--success);
 }
 
 .settings-form-message--error {

@@ -1045,7 +1045,7 @@ body {
   gap: 8px;
 }
 .report-dialog .action-modal-head h2 svg {
-  color: var(--kinba-cyan, #25d8e8);
+  color: var(--kinba-cyan, #38bdf8);
 }
 .report-dialog-hint {
   margin: 0;
@@ -1054,7 +1054,7 @@ body {
   line-height: 1.45;
 }
 .report-dialog-req {
-  color: var(--kinba-cyan, #25d8e8);
+  color: var(--kinba-cyan, #38bdf8);
   font-weight: 600;
 }
 .report-dialog-optional {
