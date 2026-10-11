@@ -12,6 +12,7 @@ import {
   BadgeCheck,
   ArrowLeft,
   Bookmark,
+  Camera,
   Flag,
   MoreHorizontal,
   Play,
@@ -703,6 +704,145 @@ function ContentSkeleton({ tab }: { tab: ProfileTab }) {
   );
 }
 
+/**
+ * Full-size profile photo viewer. Anyone can look at the photo; the owner can
+ * also pick a new one here. The crop modal uploads the image, and we save the
+ * returned URL straight to the profile, so there is no separate Save step.
+ */
+function AvatarViewer({
+  open,
+  photoUrl,
+  name,
+  isOwner,
+  onClose,
+}: {
+  open: boolean;
+  photoUrl: string | null;
+  name: string;
+  isOwner: boolean;
+  onClose: () => void;
+}) {
+  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [error, setError] = useState("");
+  const update = trpc.profile.update.useMutation();
+  const utils = trpc.useUtils();
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !cropOpen) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, cropOpen, onClose]);
+
+  useEffect(() => {
+    if (open) setError("");
+  }, [open]);
+
+  if (!open) return null;
+
+  const chooseFile = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Choose a JPG, PNG, or WEBP image.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image must be under 5 MB.");
+      return;
+    }
+    setError("");
+    setCropFile(file);
+    setCropOpen(true);
+  };
+
+  const saveUploaded = async (url: string) => {
+    setCropOpen(false);
+    setCropFile(null);
+    try {
+      await update.mutateAsync({ photoUrl: url });
+      await Promise.all([
+        utils.profile.me.invalidate(),
+        utils.profile.byId.invalidate(),
+      ]);
+      toast.success("Profile photo updated.");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not update profile photo."
+      );
+    }
+  };
+
+  return (
+    <>
+      <div
+        className="pr-viewer"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Profile photo"
+        onClick={onClose}
+      >
+        <button
+          type="button"
+          className="pr-viewer-close"
+          onClick={onClose}
+          aria-label="Close"
+        >
+          <X size={20} />
+        </button>
+        <div className="pr-viewer-stage" onClick={e => e.stopPropagation()}>
+          <div className="pr-viewer-photo">
+            {photoUrl ? (
+              <img src={photoUrl} alt={`${name}'s profile photo`} />
+            ) : (
+              <UserRound size={72} />
+            )}
+          </div>
+          <p className="pr-viewer-name">{name}</p>
+          {isOwner && (
+            <label
+              className="pr-btn pr-btn--primary pr-viewer-change"
+              aria-disabled={update.isPending}
+            >
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={chooseFile}
+                disabled={update.isPending}
+                className="pr-hidden-input"
+              />
+              {update.isPending ? (
+                <Loader2 size={16} className="pr-spin" />
+              ) : (
+                <Camera size={16} />
+              )}
+              {photoUrl ? "Change photo" : "Add photo"}
+            </label>
+          )}
+          {error && (
+            <p className="pr-message pr-message--error" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+      </div>
+      <AvatarCropModal
+        file={cropFile}
+        open={cropOpen}
+        onClose={() => {
+          setCropOpen(false);
+          setCropFile(null);
+        }}
+        onSaved={saveUploaded}
+      />
+    </>
+  );
+}
+
 export default function ProfileView({
   profile,
   isOwner,
@@ -728,6 +868,7 @@ export default function ProfileView({
 }) {
   const [activeTab, setActiveTab] = useState<ProfileTab>("posts");
   const [editOpen, setEditOpen] = useState(false);
+  const [avatarOpen, setAvatarOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [followList, setFollowList] = useState<FollowListMode | null>(null);
   const [messageComposeOpen, setMessageComposeOpen] = useState(false);
@@ -895,8 +1036,9 @@ export default function ProfileView({
     const index = tabIdsRef.current.indexOf(tab);
     if (index === -1 || !contentRef.current) return;
     isScrollingContent.current = true;
+    const page = contentRef.current.children[index] as HTMLElement | undefined;
     contentRef.current.scrollTo({
-      left: index * contentRef.current.clientWidth,
+      left: page ? page.offsetLeft : index * contentRef.current.clientWidth,
       behavior,
     });
     setActiveTab(tab);
@@ -917,7 +1059,13 @@ export default function ProfileView({
     const container = contentRef.current;
     const handleScroll = () => {
       if (isScrollingContent.current) return;
-      const index = Math.round(container.scrollLeft / container.clientWidth);
+      const first = container.children[0] as HTMLElement | undefined;
+      const second = container.children[1] as HTMLElement | undefined;
+      const pitch =
+        first && second
+          ? second.offsetLeft - first.offsetLeft
+          : container.clientWidth;
+      const index = Math.round(container.scrollLeft / (pitch || 1));
       const ids = tabIdsRef.current;
       const clampedIndex = Math.max(0, Math.min(index, ids.length - 1));
       const newTab = ids[clampedIndex];
@@ -985,14 +1133,28 @@ export default function ProfileView({
           >
             <ArrowLeft size={20} />
           </button>
-          <div className="pr-avatar pr-avatar--hero">
-            {profile?.profile?.photoUrl ? (
-              <img
-                src={profile.profile.photoUrl}
-                alt={`${displayName}'s avatar`}
-              />
-            ) : (
-              <UserRound size={32} />
+          <div className="pr-avatar-wrap">
+            <button
+              type="button"
+              className="pr-avatar pr-avatar--hero pr-avatar--button"
+              onClick={() => setAvatarOpen(true)}
+              aria-label={
+                isOwner ? "View or change profile photo" : "View profile photo"
+              }
+            >
+              {profile?.profile?.photoUrl ? (
+                <img
+                  src={profile.profile.photoUrl}
+                  alt={`${displayName}'s avatar`}
+                />
+              ) : (
+                <UserRound size={32} />
+              )}
+            </button>
+            {isOwner && (
+              <span className="pr-avatar-badge" aria-hidden="true">
+                <Camera size={14} />
+              </span>
             )}
           </div>
           <div className="pr-header-info">
@@ -1275,6 +1437,13 @@ export default function ProfileView({
         targetType="user"
         targetId={userId ?? null}
         title="Report user"
+      />
+      <AvatarViewer
+        open={avatarOpen}
+        photoUrl={profile?.profile?.photoUrl ?? null}
+        name={displayName}
+        isOwner={isOwner}
+        onClose={() => setAvatarOpen(false)}
       />
       <FollowListModal
         open={followList !== null}
