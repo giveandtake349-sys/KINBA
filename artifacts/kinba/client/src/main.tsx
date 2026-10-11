@@ -8,6 +8,8 @@ import superjson from "superjson";
 import App from "./App";
 import OpeningSplash from "./components/OpeningSplash";
 import "./index.css";
+// Keep last: the modern feed layer must load after every other feed stylesheet.
+import "./components/feedModern.css";
 
 const queryClient = new QueryClient();
 
