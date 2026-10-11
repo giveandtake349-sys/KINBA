@@ -1,5 +1,5 @@
 /* ============================================================================
-   Signal Noir — unified button + Settings skin
+   Unified button + Settings skin (black/grey surfaces, blue main buttons)
    Loaded last (see main.tsx). Every selector is prefixed with :root so it
    out-ranks the single-class rules in index.css / profileRedesign.css / etc.
    regardless of stylesheet load order. Colours come from the existing theme
@@ -9,11 +9,10 @@
 :root {
   --sn-radius: 10px;
   --sn-radius-lg: 14px;
-  --sn-glow: 0 0 0 1px color-mix(in srgb, var(--blue) 55%, transparent),
-    0 6px 20px color-mix(in srgb, var(--blue) 26%, transparent);
+  --sn-glow: none;
   --sn-hairline: color-mix(in srgb, var(--text) 12%, transparent);
   --sn-hairline-strong: color-mix(in srgb, var(--text) 24%, transparent);
-  --sn-card: color-mix(in srgb, var(--surface) 92%, var(--blue) 3%);
+  --sn-card: var(--surface);
   --sn-ease: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
@@ -41,15 +40,11 @@
 :root .settings-btn--primary,
 :root .pr-btn--primary,
 :root .send-btn {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--blue) 92%, #fff) 0%,
-    var(--blue) 100%
-  );
-  border: 1px solid color-mix(in srgb, var(--blue) 70%, #fff);
+  background: var(--blue);
+  border: 1px solid transparent;
   border-radius: var(--sn-radius);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--blue) 22%, transparent);
-  color: var(--accent-ink);
+  box-shadow: none;
+  color: #fff;
   font-weight: 700;
   letter-spacing: 0.01em;
   transition:
@@ -68,13 +63,9 @@
 :root .settings-btn--primary:hover:not(:disabled),
 :root .pr-btn--primary:hover:not(:disabled),
 :root .send-btn:hover:not(:disabled) {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--blue) 92%, #fff) 0%,
-    var(--blue) 100%
-  );
-  box-shadow: var(--sn-glow);
-  filter: brightness(1.05);
+  background: var(--teal);
+  box-shadow: none;
+  filter: none;
 }
 
 :root .primary-btn:active:not(:disabled),
@@ -174,7 +165,7 @@
 :root .settings-btn--danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--error) 22%, transparent);
   border-color: var(--error);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--error) 22%, transparent);
+  box-shadow: none;
 }
 
 /* --- Round icon buttons ---------------------------------------------------- */
@@ -245,10 +236,7 @@
 :root .settings-header__eyebrow,
 :root .settings-pane__eyebrow,
 :root .settings-group__title {
-  color: var(--blue);
-  font-family: "DM Mono", ui-monospace, monospace;
-  font-weight: 500;
-  letter-spacing: 0.2em;
+  color: var(--muted);
 }
 
 :root .settings-group__title {
@@ -369,8 +357,6 @@
 :root .settings-badge {
   background: color-mix(in srgb, var(--blue) 8%, var(--surface-raised));
   border-color: var(--sn-hairline);
-  font-family: "DM Mono", ui-monospace, monospace;
-  letter-spacing: 0.04em;
 }
 
 :root .settings-note {
@@ -395,7 +381,7 @@
 :root .settings-input:focus,
 :root .settings-textarea:focus {
   border-color: var(--blue);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 22%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 24%, transparent);
 }
 
 /* Switch */
@@ -414,12 +400,11 @@
 :root .settings-switch--on {
   background: color-mix(in srgb, var(--blue) 30%, var(--surface-raised));
   border-color: var(--blue);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--blue) 35%, transparent);
 }
 
 :root .settings-switch--on .settings-switch__thumb {
   background: var(--blue);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--blue) 70%, transparent);
+  box-shadow: none;
 }
 
 /* Segmented control */

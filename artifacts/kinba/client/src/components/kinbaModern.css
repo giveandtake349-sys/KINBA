@@ -1045,7 +1045,7 @@ body {
   gap: 8px;
 }
 .report-dialog .action-modal-head h2 svg {
-  color: var(--kinba-cyan, #38bdf8);
+  color: var(--kinba-cyan, #1877f2);
 }
 .report-dialog-hint {
   margin: 0;
@@ -1054,7 +1054,7 @@ body {
   line-height: 1.45;
 }
 .report-dialog-req {
-  color: var(--kinba-cyan, #38bdf8);
+  color: var(--kinba-cyan, #1877f2);
   font-weight: 600;
 }
 .report-dialog-optional {
@@ -1415,7 +1415,7 @@ body {
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: #05070d;
+  background: #050505;
 }
 
 .media-photo {
@@ -1424,7 +1424,7 @@ body {
   height: 100%;
   max-height: 72dvh;
   object-fit: contain;
-  background: #05070d;
+  background: #050505;
 }
 
 .photo-card-details {
@@ -1438,7 +1438,7 @@ body {
   margin: 8px 0;
   border-radius: var(--radius-component);
   object-fit: contain;
-  background: #05070d;
+  background: #050505;
 }
 
 /* One-post vertical streams for the feed-only videos view. */
@@ -1775,7 +1775,7 @@ body {
   box-shadow: 0 0 16px rgba(231, 182, 51, .10), inset 0 0 0 1px rgba(255,255,255,.025);
 }
 .spotlight-highlight-card:active { transform: scale(.985); }
-.spotlight-highlight-card__media { height: 104px; overflow: hidden; border-radius: var(--radius-control); background: #090c12; }
+.spotlight-highlight-card__media { height: 104px; overflow: hidden; border-radius: var(--radius-control); background: #0a0a0a; }
 .spotlight-highlight-card__media img { width: 100%; height: 100%; object-fit: cover; }
 .spotlight-highlight-card__text {
   display: -webkit-box;
@@ -2193,7 +2193,7 @@ body {
 
 .media-hub .shorts-tab-panel .shorts-list-feed > .media-section-heading {
   display: flex !important;
-  background: #000 !important;
+  background: var(--page-bg) !important;
 }
 
 .media-hub .shorts-tab-panel .shorts-list-viewport {
@@ -2324,7 +2324,7 @@ body {
   gap: 16px !important;
   margin: 0 !important;
   padding: 16px !important;
-  background: #000 !important;
+  background: var(--page-bg) !important;
   position: relative !important;
   z-index: 2 !important;
 }
@@ -2367,7 +2367,7 @@ body {
   scroll-snap-type: y mandatory !important;
   touch-action: pan-y !important;
   padding: 0 0 calc(96px + env(safe-area-inset-bottom)) !important;
-  background: #000 !important;
+  background: var(--page-bg) !important;
 }
 
 .media-hub .shorts-list-feed > .shorts-list-viewport > .short-card {

@@ -32,29 +32,33 @@
   --radius-xl: 16px;
 }
 :root {
-  /* Foundation — warm neutral light */
-  --page-bg: #f0f0f0;
-  --text: #1a1d21;
-  --muted: #747a7f;
+  /* Foundation — Facebook-style light */
+  --page-bg: #f0f2f5;
+  --text: #050505;
+  --muted: #65676b;
   --surface: #ffffff;
-  --surface-raised: #f5f5f5;
-  --surface-elevated: #eaeaea;
-  --border: #d4d4d4;
-  --input: #d4d4d4;
-  /* Brand blue — #00A8FF functional, #38BDF8 sky accent */
-  --blue: #00a8ff;
-  --blue-soft: rgba(0, 168, 255, 0.12);
-  --blue-border: rgba(0, 168, 255, 0.42);
-  --blue-ink: #050608;
-  /* Ink placed on brand-blue fills (primary buttons) — near-black for contrast */
-  --accent-ink: #050608;
+  --surface-raised: #f0f2f5;
+  --surface-elevated: #e4e6eb;
+  --border: #ced0d4;
+  --input: #ced0d4;
+  /* Brand — Facebook blue for main buttons and links */
+  --blue: #1877f2;
+  --blue-soft: rgba(24, 119, 242, 0.12);
+  --blue-border: rgba(24, 119, 242, 0.45);
+  --link: #1877f2;
+  --accent: var(--blue);
+  --accent-soft: var(--blue-soft);
+  --accent-border: var(--blue-border);
+  --blue-ink: #ffffff;
+  /* Ink placed on brand-blue fills (primary buttons) */
+  --accent-ink: #ffffff;
   /* Champagne/gold — premium brand identity only */
   --gold: #d4af37;
   --gold-soft: rgba(212, 175, 55, 0.14);
   --gold-border: rgba(212, 175, 55, 0.42);
-  /* Sky accent (brand #38BDF8) + semantic status (green reserved for success) */
-  --teal: #38bdf8;
-  --teal-soft: rgba(56, 189, 248, 0.12);
+  /* Facebook blue second tone + semantic status (green reserved for success) */
+  --teal: #1877f2;
+  --teal-soft: rgba(24, 119, 242, 0.12);
   --success: #16a34a;
   --success-soft: rgba(22, 163, 74, 0.12);
   --error: #bf3b30;
@@ -94,29 +98,33 @@
   }
 }
 :root[data-theme="dark"] {
-  /* Foundation — brand near-black (#050608) */
-  --page-bg: #050608;
-  --text: #f2f3f3;
-  --muted: #a8adb1;
-  --surface: #1c1f21;
-  --surface-raised: #24282b;
-  --surface-elevated: #2d3135;
-  --border: #34383b;
-  --input: #3a3f44;
-  /* Brand blue — #00A8FF functional, #38BDF8 sky accent */
-  --blue: #00a8ff;
-  --blue-soft: rgba(0, 168, 255, 0.14);
-  --blue-border: rgba(0, 168, 255, 0.42);
-  --blue-ink: #050608;
+  /* Foundation — Dark grey #262729 */
+  --page-bg: #262729;
+  --text: #e4e6eb;
+  --muted: #b0b3b8;
+  --surface: #2f3032;
+  --surface-raised: #3a3b3c;
+  --surface-elevated: #444546;
+  --border: #464849;
+  --input: #464849;
+  /* Brand — Facebook blue for main buttons and links */
+  --blue: #2d88ff;
+  --blue-soft: rgba(45, 136, 255, 0.18);
+  --blue-border: rgba(45, 136, 255, 0.5);
+  --link: #5aa7ff;
+  --accent: var(--blue);
+  --accent-soft: var(--blue-soft);
+  --accent-border: var(--blue-border);
+  --blue-ink: #ffffff;
   /* Ink placed on brand-blue fills (primary buttons) */
-  --accent-ink: #050608;
+  --accent-ink: #ffffff;
   /* Champagne/gold — premium brand identity only */
   --gold: #d8b877;
   --gold-soft: rgba(216, 184, 119, 0.14);
   --gold-border: rgba(216, 184, 119, 0.42);
-  /* Sky accent (brand #38BDF8) + semantic status (green reserved for success) */
-  --teal: #38bdf8;
-  --teal-soft: rgba(56, 189, 248, 0.13);
+  /* Facebook blue second tone + semantic status (green reserved for success) */
+  --teal: #1877f2;
+  --teal-soft: rgba(24, 119, 242, 0.14);
   --success: #4ade80;
   --success-soft: rgba(74, 222, 128, 0.14);
   --error: #ef6a63;
@@ -1884,7 +1892,7 @@
 
 /* TikTok-inspired KINBA menu drawer; bottom navigation remains unchanged */
 .mobile-drawer {
-  background: color-mix(in srgb, var(--page-bg) 96%, #111827);
+  background: color-mix(in srgb, var(--page-bg) 96%, #1c1c1c);
   border-left: 1px solid var(--border);
   padding: 20px 16px calc(28px + env(safe-area-inset-bottom));
 }
