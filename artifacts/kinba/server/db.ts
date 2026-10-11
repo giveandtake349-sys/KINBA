@@ -2114,16 +2114,25 @@ export async function deleteComment(commentId: number, userId: number) {
 }
 
 export const COMMENT_ROOT_LIMIT = 100;
+/** Hard cap for an explicit root `limit` (the "load more" button grows it). */
+export const COMMENT_ROOT_LIMIT_MAX = 200;
 export const COMMENT_REPLY_BATCH_DEFAULT = 5;
 export const COMMENT_REPLY_BATCH_MAX = 50;
+/** Authors may edit their own comment for this long after posting. */
+export const COMMENT_EDIT_WINDOW_MS = 30 * 60 * 1000;
+
+export type VideoCommentSort = "top" | "new";
 
 export type VideoCommentListOptions = {
   /** When set, only direct replies of this comment are returned (batched). */
   parentId?: number | null;
-  /** Reply batch size — ignored for the root listing. */
+  /** Reply batch size, or the root page size (default COMMENT_ROOT_LIMIT). */
   limit?: number;
-  /** Replies already loaded for this parent (batched paging). */
+  /** Rows already loaded (batched paging) — replies or roots. */
   offset?: number;
+  /** Root ordering: "new" (default, newest first) or "top" (most reacted
+   *  first). A pinned root always comes first. Ignored for reply batches. */
+  sort?: VideoCommentSort;
 };
 
 /**
@@ -2165,6 +2174,23 @@ export async function listVideoComments(
     select count(*) from video_comments rc
     where rc."parentId" = ${videoComments.id}
   )`;
+  // Post owner of the comment's video — drives the "Creator" badge and the
+  // "reacted by creator" marker without an extra round trip.
+  const postOwnerId = sql<number | null>`(
+    select v."userId" from videos v
+    where v.id = ${videoComments.videoId}
+  )`;
+  // Distinct people who reacted (typed ∪ legacy like) — used only to order
+  // the "top" sort so paging stays stable in SQL.
+  const reactionScore = sql<number>`(
+    select count(*) from (
+      select cr."userId" from comment_reactions cr
+      where cr."commentId" = ${videoComments.id}
+      union
+      select cl."userId" from comment_likes cl
+      where cl."commentId" = ${videoComments.id}
+    ) ru
+  )`;
   const parentId = options?.parentId ?? null;
 
   if (parentId != null) {
@@ -2191,6 +2217,7 @@ export async function listVideoComments(
         likeCount,
         viewerLiked,
         replyCount,
+        postOwnerId,
       })
       .from(videoComments)
       .innerJoin(users, eq(videoComments.userId, users.id))
@@ -2223,8 +2250,22 @@ export async function listVideoComments(
               isNull(videoComments.parentId)
             )
           )
-          .orderBy(desc(videoComments.createdAt))
-          .limit(COMMENT_ROOT_LIMIT);
+          .orderBy(
+            // A creator-pinned root always leads, then the chosen sort.
+            desc(sql`(${videoComments.pinnedAt} is not null)`),
+            ...(options?.sort === "top" ? [desc(reactionScore)] : []),
+            desc(videoComments.createdAt),
+            desc(videoComments.id)
+          )
+          .limit(
+            options?.limit != null
+              ? Math.min(
+                  Math.max(Math.trunc(options.limit), 1),
+                  COMMENT_ROOT_LIMIT_MAX
+                )
+              : COMMENT_ROOT_LIMIT
+          )
+          .offset(Math.max(Math.trunc(options?.offset ?? 0), 0));
 
   // Merged multi-reaction view: comment_reactions ∪ legacy comment_likes for "like".
   // Read-only — no legacy rows are rewritten here.
@@ -2284,12 +2325,18 @@ export async function listVideoComments(
       count: number;
       reactedByMe: boolean;
     }> = [];
+    const ownerId =
+      row.postOwnerId != null && Number.isFinite(Number(row.postOwnerId))
+        ? Number(row.postOwnerId)
+        : null;
+    let creatorReacted = false;
     for (const type of REACTION_TYPES) {
       const userIds = new Set(typed?.get(type));
       if (type === PRIMARY_REACTION && legacyLikers) {
         for (const id of legacyLikers) userIds.add(id);
       }
       if (userIds.size === 0) continue;
+      if (ownerId != null && userIds.has(ownerId)) creatorReacted = true;
       reactions.push({
         reaction: type,
         count: userIds.size,
@@ -2309,10 +2356,15 @@ export async function listVideoComments(
       viewerLiked: Boolean(row.viewerLiked),
       replyCount: Number(row.replyCount ?? 0),
       reactions,
+      isPinned: row.comment.pinnedAt != null,
+      isEdited: row.comment.editedAt != null,
+      creatorReacted,
       author: {
         id: row.user.id,
         name: row.user.name,
         username: row.profile?.username ?? null,
+        photoUrl: row.profile?.photoUrl ?? null,
+        isCreator: ownerId != null && row.user.id === ownerId,
       },
     };
   });
@@ -2364,6 +2416,118 @@ export async function createVideoComment(
   });
 
   return comment;
+}
+
+/**
+ * Edit the text of the viewer's own video comment.
+ *
+ * Only the author may edit, only within COMMENT_EDIT_WINDOW_MS of posting, and
+ * a comment must keep either text or its voice note. Hashtags are re-synced and
+ * `editedAt` is stamped so the UI can show an "edited" label.
+ */
+export async function editVideoComment(
+  commentId: number,
+  userId: number,
+  body: string
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const trimmedBody = body.trim();
+  return db.transaction(async tx => {
+    const [existing] = await tx
+      .select({
+        id: videoComments.id,
+        userId: videoComments.userId,
+        body: videoComments.body,
+        audioUrl: videoComments.audioUrl,
+        createdAt: videoComments.createdAt,
+      })
+      .from(videoComments)
+      .where(eq(videoComments.id, commentId))
+      .for("update")
+      .limit(1);
+    if (!existing) throw new Error("Comment not found.");
+    if (existing.userId !== userId) {
+      throw new Error("You are not authorized to edit this comment.");
+    }
+    if (!trimmedBody && !existing.audioUrl) {
+      throw new Error("A comment cannot be empty.");
+    }
+    if (Date.now() - new Date(existing.createdAt).getTime() > COMMENT_EDIT_WINDOW_MS) {
+      throw new Error("Comments can only be edited within 30 minutes of posting.");
+    }
+    if ((existing.body ?? "") === trimmedBody) {
+      // Nothing changed — keep editedAt untouched so no false "edited" label.
+      return { commentId, body: trimmedBody, editedAt: null as Date | null };
+    }
+    const editedAt = new Date();
+    await tx
+      .update(videoComments)
+      .set({ body: trimmedBody || null, editedAt })
+      .where(eq(videoComments.id, commentId));
+    await syncVideoCommentHashtags(
+      tx,
+      commentId,
+      extractTextHashtags(trimmedBody || null)
+    );
+    return { commentId, body: trimmedBody, editedAt };
+  });
+}
+
+/**
+ * Pin / unpin a root comment — post owner only.
+ *
+ * A video keeps at most one pinned comment: pinning a new one releases the
+ * previous pin in the same transaction. Replies cannot be pinned.
+ */
+export async function setVideoCommentPinned(
+  commentId: number,
+  userId: number,
+  pinned: boolean
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  return db.transaction(async tx => {
+    const [match] = await tx
+      .select({
+        id: videoComments.id,
+        videoId: videoComments.videoId,
+        parentId: videoComments.parentId,
+        postUserId: videos.userId,
+      })
+      .from(videoComments)
+      .innerJoin(videos, eq(videoComments.videoId, videos.id))
+      .where(eq(videoComments.id, commentId))
+      .limit(1);
+    if (!match) throw new Error("Comment not found.");
+    if (match.postUserId !== userId) {
+      throw new Error("Only the post owner can pin a comment.");
+    }
+    if (match.parentId != null) {
+      throw new Error("Only top-level comments can be pinned.");
+    }
+    if (pinned) {
+      await tx
+        .update(videoComments)
+        .set({ pinnedAt: null })
+        .where(
+          and(
+            eq(videoComments.videoId, match.videoId),
+            sql`${videoComments.pinnedAt} is not null`
+          )
+        );
+      await tx
+        .update(videoComments)
+        .set({ pinnedAt: new Date() })
+        .where(eq(videoComments.id, commentId));
+    } else {
+      await tx
+        .update(videoComments)
+        .set({ pinnedAt: null })
+        .where(eq(videoComments.id, commentId));
+    }
+    return { commentId, pinned };
+  });
 }
 
 /**

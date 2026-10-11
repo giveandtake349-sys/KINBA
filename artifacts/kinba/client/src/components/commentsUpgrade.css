@@ -1,0 +1,533 @@
+/* ==========================================================================
+   Comments section — refreshed look + new features (edit, pin, sort, load
+   more, creator badges, waveform voice player).
+   Loaded after the base comment styles on purpose, so it layers on top of
+   mediaHub.css / kinbaModern.css / conversation.css without editing them.
+   Colours come from the existing theme tokens, so light and dark both work.
+   ========================================================================== */
+
+/* ---- Sheet ------------------------------------------------------------- */
+.comment-drawer-layer .comment-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.45);
+}
+
+.comment-drawer-layer .comment-drawer > * {
+  flex: 0 0 auto;
+}
+
+.comment-drawer-layer .comment-drawer > .comment-drawer-list {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.comment-drawer .comment-sheet-header {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 34px;
+  padding-top: 8px;
+  position: relative;
+}
+
+.comment-drawer .comment-sheet-header::before {
+  background: var(--border);
+  border-radius: 999px;
+  content: "";
+  height: 4px;
+  left: 50%;
+  position: absolute;
+  top: -4px;
+  transform: translateX(-50%);
+  width: 40px;
+}
+
+.comment-drawer .comment-sheet-header > span {
+  display: none;
+}
+
+.comment-drawer .comment-sheet-header strong {
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+
+.comment-drawer .comment-sheet-header button {
+  background: var(--surface-raised);
+  border-radius: 50%;
+  height: 32px;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-40%);
+  width: 32px;
+}
+
+/* ---- Sort control ------------------------------------------------------ */
+.comment-sort {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  display: inline-flex;
+  gap: 2px;
+  justify-self: center;
+  align-self: center;
+  padding: 3px;
+}
+
+.comment-sort button {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  min-height: 30px;
+  padding: 5px 16px;
+  transition:
+    background 140ms ease,
+    color 140ms ease;
+}
+
+.comment-sort button.is-active {
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  color: var(--text);
+}
+
+/* ---- List states ------------------------------------------------------- */
+.comment-drawer-list {
+  gap: 14px;
+}
+
+.comment-empty {
+  align-content: center;
+  color: var(--muted);
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  min-height: 180px;
+  text-align: center;
+}
+
+.comment-empty svg {
+  opacity: 0.55;
+}
+
+.comment-empty strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.comment-empty span {
+  font-size: 12.5px;
+}
+
+.comment-skeletons {
+  display: grid;
+  gap: 16px;
+  padding: 6px 2px;
+}
+
+.comment-skeleton {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 34px minmax(0, 1fr);
+}
+
+.comment-skeleton > div {
+  align-content: start;
+  display: grid;
+  gap: 8px;
+}
+
+.comment-skeleton > span {
+  border-radius: 50%;
+  height: 34px;
+  width: 34px;
+}
+
+.comment-skeleton i {
+  border-radius: 6px;
+  display: block;
+  height: 10px;
+  width: 70%;
+}
+
+.comment-skeleton i + i {
+  width: 92%;
+}
+
+.comment-skeleton > span,
+.comment-skeleton i {
+  animation: comment-shimmer 1.2s linear infinite;
+  background: linear-gradient(
+    90deg,
+    var(--surface-raised) 25%,
+    color-mix(in srgb, var(--text) 10%, var(--surface-raised)) 50%,
+    var(--surface-raised) 75%
+  );
+  background-size: 200% 100%;
+}
+
+@keyframes comment-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.comment-load-more {
+  align-self: center;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  justify-self: center;
+  margin: 2px 0 8px;
+  min-height: 36px;
+  padding: 8px 18px;
+}
+
+.comment-load-more:hover:not(:disabled) {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.comment-load-more:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* ---- Comment card ------------------------------------------------------ */
+.comment-drawer .conv-comment {
+  align-items: start;
+  font-size: 13px;
+  gap: 10px;
+  grid-template-columns: 34px minmax(0, 1fr);
+  line-height: 1.5;
+}
+
+.comment-drawer .conv-comment--pending {
+  opacity: 0.6;
+}
+
+.conv-comment-avatar {
+  align-items: center;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--blue) 75%, #7c4dff),
+    color-mix(in srgb, var(--teal) 75%, #22d3a6)
+  );
+  border-radius: 50%;
+  color: #fff;
+  display: grid;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 700;
+  height: 34px;
+  justify-content: center;
+  overflow: hidden;
+  place-items: center;
+  text-decoration: none;
+  width: 34px;
+}
+
+.conv-comment-avatar img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.conv-comment-main {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.conv-comment-meta {
+  align-items: center;
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 3px 6px;
+  min-width: 0;
+}
+
+.comment-drawer .conv-comment-author {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.comment-drawer .conv-comment-time {
+  font-size: 11px;
+}
+
+.comment-drawer .conv-comment-body {
+  color: var(--text);
+  font-size: 13.5px;
+  opacity: 0.92;
+}
+
+/* Replies: smaller avatar, same card. */
+.comment-drawer .conv-comment-thread--reply .conv-comment {
+  gap: 8px;
+  grid-template-columns: 26px minmax(0, 1fr);
+}
+
+.comment-drawer .conv-comment-thread--reply .conv-comment-avatar {
+  font-size: 12px;
+  height: 26px;
+  width: 26px;
+}
+
+/* Creator-pinned comment stands out at the top of the list. */
+.comment-drawer .conv-comment-thread--pinned > .conv-comment {
+  background: color-mix(in srgb, var(--blue) 7%, transparent);
+  border-radius: 14px;
+  outline: 1px solid color-mix(in srgb, var(--blue) 22%, transparent);
+  padding: 10px;
+}
+
+/* ---- Badges ------------------------------------------------------------ */
+.conv-badge {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 700;
+  gap: 3px;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+
+.conv-badge--creator {
+  background: linear-gradient(135deg, var(--blue), var(--teal));
+  color: #fff;
+}
+
+.conv-badge--pin {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.conv-creator-liked {
+  align-items: center;
+  background: color-mix(in srgb, #ff4d6d 12%, transparent);
+  border-radius: 999px;
+  color: #ff4d6d;
+  display: inline-flex;
+  font-size: 10.5px;
+  font-weight: 600;
+  gap: 3px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+/* ---- Inline edit ------------------------------------------------------- */
+.conv-comment-edit {
+  display: grid;
+  gap: 6px;
+}
+
+.conv-comment-edit textarea {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  max-height: 140px;
+  min-height: 56px;
+  outline: none;
+  padding: 8px 10px;
+  resize: vertical;
+  width: 100%;
+}
+
+.conv-comment-edit textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 20%, transparent);
+}
+
+.conv-comment-edit-foot {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.conv-comment-edit-foot .conv-char-count {
+  margin-right: auto;
+}
+
+.conv-comment-edit-foot button {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  min-height: 30px;
+  padding: 5px 14px;
+}
+
+.conv-comment-edit-foot button.is-primary {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+
+.conv-comment-edit-foot button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ---- Character counter ------------------------------------------------- */
+.conv-char-count {
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.conv-char-count.is-near {
+  color: #f59e0b;
+}
+
+.conv-char-count.is-max {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.conv-char-count--composer {
+  padding-right: 6px;
+  text-align: right;
+}
+
+/* ---- Composer ---------------------------------------------------------- */
+.comment-drawer .comment-form input {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 14px;
+  padding: 10px 16px;
+}
+
+.comment-drawer .comment-form input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 18%, transparent);
+  outline: none;
+}
+
+/* ---- Voice comment player (waveform + speed) --------------------------- */
+.comment-audio-player {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  gap: 8px;
+  padding: 6px 10px 6px 6px;
+  width: min(100%, 340px);
+}
+
+.comment-audio-player > button.comment-audio-play {
+  background: linear-gradient(135deg, var(--blue), var(--teal));
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  flex: 0 0 30px;
+  height: 30px;
+  width: 30px;
+}
+
+.comment-audio-player .comment-audio-wave {
+  align-items: center;
+  background: transparent;
+  border-radius: 0;
+  cursor: pointer;
+  display: flex;
+  flex: 1 1 auto;
+  gap: 2px;
+  height: 26px;
+  min-width: 0;
+  overflow: visible;
+}
+
+.comment-audio-player .comment-audio-wave span {
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
+  border-radius: 2px;
+  display: block;
+  flex: 1 1 0;
+  max-width: 4px;
+  min-width: 2px;
+  transition: background 120ms ease;
+}
+
+.comment-audio-player .comment-audio-wave span.is-played {
+  background: var(--blue);
+}
+
+.comment-audio-player .comment-audio-wave:focus-visible {
+  border-radius: 6px;
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.comment-audio-player > .comment-audio-time {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.comment-audio-player > button.comment-audio-speed {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 10.5px;
+  font-weight: 700;
+  height: 26px;
+  padding: 0 9px;
+  width: auto;
+}
+
+/* ---- Small screens / motion ------------------------------------------- */
+@media (max-width: 560px) {
+  .comment-drawer .conv-comment {
+    gap: 8px;
+    grid-template-columns: 32px minmax(0, 1fr);
+  }
+
+  .conv-comment-avatar {
+    height: 32px;
+    width: 32px;
+  }
+
+  .comment-audio-player > .comment-audio-time {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .comment-skeleton > span,
+  .comment-skeleton i {
+    animation: none;
+  }
+
+  .comment-sort button,
+  .comment-audio-player .comment-audio-wave span {
+    transition: none;
+  }
+}

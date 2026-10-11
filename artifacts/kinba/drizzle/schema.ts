@@ -547,6 +547,10 @@ export const videoComments = pgTable(
         audioDuration: integer("audio_duration"),
     parentId: integer("parentId"),
     createdAt: createdAt(),
+    // Comment upgrades (additive): null editedAt = never edited; a non-null
+    // pinnedAt marks the single creator-pinned root comment of a video.
+    editedAt: timestamp("editedAt", { withTimezone: true }),
+    pinnedAt: timestamp("pinnedAt", { withTimezone: true }),
   },
   table => [
     index("video_comments_video_idx").on(table.videoId, table.createdAt),

@@ -32,6 +32,8 @@ import {
   listNotifications,
   listVerificationTransactions,
   listVideoComments,
+  editVideoComment,
+  setVideoCommentPinned,
   approveVerificationTransaction,
   getVerificationStatus,
   submitVerificationTransaction,
@@ -861,8 +863,11 @@ export const appRouter = router({
         .input(
           videoIdInput.extend({
             parentId: z.number().int().positive().optional(),
-            limit: z.number().int().min(1).max(50).optional(),
+            // Reply batches are clamped to 50 in the db layer; a root page may
+            // be larger (the "load more" button grows it up to 200).
+            limit: z.number().int().min(1).max(200).optional(),
             offset: z.number().int().min(0).optional(),
+            sort: z.enum(["top", "new"]).optional(),
           })
         )
         .query(({ ctx, input }) =>
@@ -870,6 +875,7 @@ export const appRouter = router({
             parentId: input.parentId,
             limit: input.limit,
             offset: input.offset,
+            ...(input.sort ? { sort: input.sort } : {}),
           })
         ),
       create: protectedProcedure
@@ -896,6 +902,26 @@ export const appRouter = router({
             ? createVideoComment(input.videoId, ctx.user.id, input.body, options)
             : createVideoComment(input.videoId, ctx.user.id, input.body);
         }),
+      edit: protectedProcedure
+        .input(
+          z.object({
+            commentId: z.number().int().positive(),
+            body: z.string().trim().max(500),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          editVideoComment(input.commentId, ctx.user.id, input.body)
+        ),
+      pin: protectedProcedure
+        .input(
+          z.object({
+            commentId: z.number().int().positive(),
+            pinned: z.boolean(),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          setVideoCommentPinned(input.commentId, ctx.user.id, input.pinned)
+        ),
       delete: protectedProcedure
         .input(z.object({ commentId: z.number().int().positive() }))
         .mutation(({ ctx, input }) => deleteComment(input.commentId, ctx.user.id)),

@@ -13,6 +13,7 @@ import {
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
+import { keepPreviousData } from "@tanstack/react-query";
 import {
   BadgeCheck,
   Bookmark,
@@ -38,6 +39,8 @@ import {
   Trash2,
   MoreHorizontal,
   Pause,
+  Pencil,
+  Pin,
   Play,
   Plus,
   Share2,
@@ -105,6 +108,7 @@ import "./feedUi.css";
 import "./modernFeed.css";
 import "./shorts-stage.css";
 import "./conversation/conversation.css";
+import "./commentsUpgrade.css";
 
 type HomeTab = "videos" | "trendy" | "following" | "icons" | "spotlight";
 type VideoKind = "LONG" | "SHORT" | "WHEEL";
@@ -545,6 +549,28 @@ function useVoiceCommentRecorder() {
   return { recording, elapsed, audioBlob, previewUrl, start, stop, discard };
 }
 
+const COMMENT_WAVE_BARS = 32;
+const COMMENT_AUDIO_SPEEDS = [1, 1.5, 2] as const;
+
+/** Stable pseudo-random bar heights per recording (no audio analysis needed). */
+function commentWaveform(seed: string, count = COMMENT_WAVE_BARS): number[] {
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  let state = hash >>> 0;
+  const bars: number[] = [];
+  for (let index = 0; index < count; index += 1) {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    const base = 0.3 + (state / 0xffffffff) * 0.7;
+    // Taper the ends so the bars read like a real voice note.
+    const edge = Math.min(1, 0.55 + (Math.min(index, count - 1 - index) / 4) * 0.45);
+    bars.push(Math.max(0.22, Math.min(1, base * edge)));
+  }
+  return bars;
+}
+
 function CommentAudioPlayer({
   src,
   duration,
@@ -555,14 +581,41 @@ function CommentAudioPlayer({
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [current, setCurrent] = useState(0);
+  const [speedIndex, setSpeedIndex] = useState(0);
+  const bars = useMemo(() => commentWaveform(src), [src]);
+  const mediaDuration = audioRef.current?.duration;
+  const total = Math.max(
+    typeof mediaDuration === "number" &&
+      Number.isFinite(mediaDuration) &&
+      mediaDuration > 0
+      ? mediaDuration
+      : (duration ?? 1),
+    1
+  );
+  const progress = Math.min(1, Math.max(0, current / total));
+  const speed = COMMENT_AUDIO_SPEEDS[speedIndex] ?? 1;
   const toggle = () => {
     const audio = audioRef.current;
     if (!audio) return;
     if (audio.paused) void audio.play();
     else audio.pause();
   };
+  const seekTo = (seconds: number) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const next = Math.min(Math.max(seconds, 0), total);
+    audio.currentTime = next;
+    setCurrent(next);
+  };
+  const cycleSpeed = () => {
+    const next = (speedIndex + 1) % COMMENT_AUDIO_SPEEDS.length;
+    setSpeedIndex(next);
+    if (audioRef.current) {
+      audioRef.current.playbackRate = COMMENT_AUDIO_SPEEDS[next] ?? 1;
+    }
+  };
   return (
-    <div className="comment-audio-player">
+    <div className={`comment-audio-player${playing ? " is-playing" : ""}`}>
       <audio
         ref={audioRef}
         src={src}
@@ -577,22 +630,55 @@ function CommentAudioPlayer({
       />
       <button
         type="button"
+        className="comment-audio-play"
         onClick={toggle}
         aria-label={playing ? "Pause voice comment" : "Play voice comment"}
       >
         {playing ? <Pause size={14} /> : <Play size={14} />}
       </button>
-      <div className="comment-audio-wave" aria-hidden="true">
-        <span
-          style={{
-            width: `${Math.min(100, Math.max(0, (current / Math.max(audioRef.current?.duration || duration || 1, 1)) * 100))}%`,
-          }}
-        />
+      <div
+        className="comment-audio-wave"
+        role="slider"
+        tabIndex={0}
+        aria-label="Voice comment position"
+        aria-valuemin={0}
+        aria-valuemax={Math.round(total)}
+        aria-valuenow={Math.round(current)}
+        onClick={event => {
+          const rect = event.currentTarget.getBoundingClientRect();
+          if (rect.width <= 0) return;
+          seekTo(((event.clientX - rect.left) / rect.width) * total);
+        }}
+        onKeyDown={event => {
+          if (event.key === "ArrowRight") {
+            event.preventDefault();
+            seekTo(current + 5);
+          } else if (event.key === "ArrowLeft") {
+            event.preventDefault();
+            seekTo(current - 5);
+          }
+        }}
+      >
+        {bars.map((height, index) => (
+          <span
+            key={index}
+            className={index / bars.length < progress ? "is-played" : undefined}
+            style={{ height: `${Math.round(height * 100)}%` }}
+          />
+        ))}
       </div>
-      <span>
+      <span className="comment-audio-time">
         {formatAudioTime(current)} /{" "}
         {formatAudioTime(duration ?? audioRef.current?.duration ?? 0)}
       </span>
+      <button
+        type="button"
+        className="comment-audio-speed"
+        onClick={cycleSpeed}
+        aria-label={`Playback speed ${speed}x, tap to change`}
+      >
+        {speed}×
+      </button>
     </div>
   );
 }
@@ -1740,6 +1826,22 @@ function commentReactionEntries(
   ];
 }
 
+/** Root comments requested per page; "Load more" grows it by this much. */
+const COMMENT_ROOT_PAGE = 20;
+const COMMENT_ROOT_MAX = 200;
+/** Mirrors the server's edit window (server/db.ts COMMENT_EDIT_WINDOW_MS). */
+const COMMENT_EDIT_WINDOW_MS = 30 * 60 * 1000;
+const COMMENT_MAX_LENGTH = 500;
+
+type CommentSortMode = "new" | "top";
+
+/** A text comment that is still being sent — shown instantly as "Sending…". */
+type PendingComment = {
+  tempId: number;
+  parentId: number | null;
+  body: string;
+};
+
 function CommentDrawer({
   postId,
   postOwnerId,
@@ -1787,11 +1889,24 @@ function CommentDrawer({
   >(null);
   const mentionPickerRef = useRef<MentionPickerHandle | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [sort, setSort] = useState<CommentSortMode>("new");
+  const [rootLimit, setRootLimit] = useState(COMMENT_ROOT_PAGE);
+  const [editing, setEditing] = useState<{ id: number; text: string } | null>(
+    null
+  );
+  const [pending, setPending] = useState<PendingComment[]>([]);
   const commentsQuery = trpc.videos.comments.list.useQuery(
-    { videoId: postId },
-    { enabled: open, refetchOnWindowFocus: false }
+    { videoId: postId, sort, limit: rootLimit },
+    {
+      enabled: open,
+      refetchOnWindowFocus: false,
+      // Keep the current rows on screen while a new sort / page loads.
+      placeholderData: keepPreviousData,
+    }
   );
   const createComment = trpc.videos.comments.create.useMutation();
+  const editComment = trpc.videos.comments.edit.useMutation();
+  const pinComment = trpc.videos.comments.pin.useMutation();
   const reactComment = trpc.videos.comments.react.useMutation();
   const deleteComment = trpc.videos.comments.delete.useMutation();
   const comments = commentsQuery.data ?? [];
@@ -1932,39 +2047,101 @@ function CommentDrawer({
   ) => {
     if (!auth.isAuthenticated) return auth.openAuth();
     const replyParentId = replyTo?.id;
+    const previousReplyTo = replyTo;
+    const draft = body;
+    const text = draft.trim();
     const needsExpand =
       replyParentId != null && !expandedIds.includes(replyParentId);
-    const created = await createComment.mutateAsync({
-      videoId: postId,
-      body: body.trim(),
-      audioUrl,
-      audioDuration,
-      parentId: replyParentId,
-    });
-    // Pin the new reply to its parent for this session so it can never fall
-    // back to the root list, even before the refetch lands.
-    const createdId = created?.id ?? null;
-    if (replyParentId != null && createdId != null) {
-      setReplyParentByCommentId(prev => ({
-        ...prev,
-        [createdId]: replyParentId,
-      }));
+    // A new top-level comment is easiest to find under "Newest".
+    if (replyParentId == null && sort !== "new") {
+      setSort("new");
+      setRootLimit(COMMENT_ROOT_PAGE);
     }
-    setBody("");
-    setReplyTo(null);
-    closeMentionPicker();
-    if (replyParentId != null && needsExpand) {
-      setExpandedIds(prev =>
-        prev.includes(replyParentId) ? prev : [...prev, replyParentId]
-      );
+    // Text-only comments appear instantly ("Sending…") while the request runs.
+    const optimistic: PendingComment | null =
+      !audioUrl && text
+        ? {
+            tempId: -Date.now() - Math.floor(Math.random() * 1000),
+            parentId: replyParentId ?? null,
+            body: text,
+          }
+        : null;
+    if (optimistic) {
+      setPending(prev => [...prev, optimistic]);
+      setBody("");
+      setReplyTo(null);
+      closeMentionPicker();
     }
-    await Promise.all([
-      commentsQuery.refetch(),
-      needsExpand && replyParentId != null
-        ? loadReplies(replyParentId, 0)
-        : Promise.resolve(),
-      refreshThreads(replyParentId),
-    ]);
+    try {
+      const created = await createComment.mutateAsync({
+        videoId: postId,
+        body: text,
+        audioUrl,
+        audioDuration,
+        parentId: replyParentId,
+      });
+      // Pin the new reply to its parent for this session so it can never fall
+      // back to the root list, even before the refetch lands.
+      const createdId = created?.id ?? null;
+      if (replyParentId != null && createdId != null) {
+        setReplyParentByCommentId(prev => ({
+          ...prev,
+          [createdId]: replyParentId,
+        }));
+      }
+      if (!optimistic) {
+        setBody("");
+        setReplyTo(null);
+        closeMentionPicker();
+      }
+      if (replyParentId != null && needsExpand) {
+        setExpandedIds(prev =>
+          prev.includes(replyParentId) ? prev : [...prev, replyParentId]
+        );
+      }
+      await Promise.all([
+        commentsQuery.refetch(),
+        needsExpand && replyParentId != null
+          ? loadReplies(replyParentId, 0)
+          : Promise.resolve(),
+        refreshThreads(replyParentId),
+      ]);
+    } catch (error) {
+      // Give the text (and reply target) back so nothing the member typed is lost.
+      if (optimistic) {
+        setBody(draft);
+        setReplyTo(previousReplyTo);
+      }
+      throw error;
+    } finally {
+      if (optimistic) {
+        setPending(prev => prev.filter(item => item.tempId !== optimistic.tempId));
+      }
+    }
+  };
+
+  const saveEdit = async () => {
+    if (!editing || editComment.isPending) return;
+    const text = editing.text.trim();
+    if (!text) return;
+    try {
+      await editComment.mutateAsync({ commentId: editing.id, body: text });
+      setEditing(null);
+      await Promise.all([commentsQuery.refetch(), refreshThreads()]);
+    } catch (error) {
+      notifyError(error);
+    }
+  };
+
+  const togglePin = async (commentId: number, pinned: boolean) => {
+    if (pinComment.isPending) return;
+    try {
+      await pinComment.mutateAsync({ commentId, pinned });
+      await commentsQuery.refetch();
+      toast.success(pinned ? "Comment pinned to the top." : "Comment unpinned.");
+    } catch (error) {
+      notifyError(error);
+    }
   };
 
   const reactToComment = async (
@@ -2099,6 +2276,31 @@ function CommentDrawer({
     });
   };
 
+  // A text comment that is still being sent: shown at once, dimmed, no menu.
+  const renderPending = (item: PendingComment): ReactNode => (
+    <div
+      className="conv-comment-thread conv-comment-thread--pending"
+      key={`pending-${item.tempId}`}
+    >
+      <article className="conv-comment conv-comment--pending" aria-busy="true">
+        <span className="conv-comment-avatar" aria-hidden="true">
+          <UserRound size={16} />
+        </span>
+        <div className="conv-comment-main">
+          <div className="conv-comment-head">
+            <div className="conv-comment-meta">
+              <span className="conv-comment-author">You</span>
+              <span className="conv-comment-time">Sending…</span>
+            </div>
+          </div>
+          <p className="conv-comment-body">
+            <MentionText text={item.body} />
+          </p>
+        </div>
+      </article>
+    </div>
+  );
+
   const renderComment = (
     comment: (typeof comments)[number],
     depth = 0
@@ -2108,7 +2310,21 @@ function CommentDrawer({
     const canDelete =
       auth.user?.id === comment.author.id || auth.user?.id === postOwnerId;
     const isOwn = auth.user?.id === comment.author.id;
+    const isPostOwner = auth.user?.id === postOwnerId;
+    const authorIsCreator =
+      Boolean(comment.author.isCreator) || comment.author.id === postOwnerId;
+    const isEditingThis = editing?.id === comment.id;
+    const canEdit =
+      isOwn &&
+      Boolean(comment.body) &&
+      Date.now() - new Date(comment.createdAt).getTime() <=
+        COMMENT_EDIT_WINDOW_MS;
+    const avatarUrl = comment.author.photoUrl
+      ? resolveMediaUrl(comment.author.photoUrl, "avatars")
+      : null;
+    const pendingReplies = pending.filter(item => item.parentId === comment.id);
     const isExpanded = expandedIds.includes(comment.id);
+    const showThread = isExpanded || pendingReplies.length > 0;
     // Server batch first, then any listing row already attributed to this
     // parent — a reply can only ever render inside its parent's thread.
     const replies = repliesFor(comment.id);
@@ -2147,6 +2363,22 @@ function CommentDrawer({
         },
       },
     ];
+    if (canEdit) {
+      menuActions.push({
+        id: "edit",
+        label: "Edit",
+        icon: <Pencil size={14} />,
+        run: () => setEditing({ id: comment.id, text: comment.body ?? "" }),
+      });
+    }
+    if (isPostOwner && depth === 0) {
+      menuActions.push({
+        id: "pin",
+        label: comment.isPinned ? "Unpin" : "Pin to top",
+        icon: <Pin size={14} />,
+        run: () => void togglePin(comment.id, !comment.isPinned),
+      });
+    }
     if (canDelete) {
       menuActions.push({
         id: "delete",
@@ -2175,95 +2407,184 @@ function CommentDrawer({
 
     return (
       <div
-        className={
-          depth
-            ? "conv-comment-thread conv-comment-thread--reply"
-            : "conv-comment-thread"
-        }
+        className={`conv-comment-thread${depth ? " conv-comment-thread--reply" : ""}${comment.isPinned ? " conv-comment-thread--pinned" : ""}`}
         key={comment.id}
       >
         <article className="conv-comment" data-comment-id={comment.id}>
-          <div className="conv-comment-head">
-            <a
-              className="conv-comment-author"
-              href={`/profile/${comment.author.id}`}
-              onClick={event => {
-                event.preventDefault();
-                event.stopPropagation();
-                navigateToProfile(event, comment.author.id);
-              }}
-              aria-label={`Open ${displayNameValue} profile`}
-            >
-              {displayNameValue}
-            </a>
-            <span className="conv-comment-time">
-              {relativeTime(comment.createdAt)}
-            </span>
-            <ActionMenu actions={menuActions} ariaLabel="Comment actions" />
-          </div>
-          {comment.body ? (
-            <p className="conv-comment-body">
-              <MentionText text={comment.body} />
-            </p>
-          ) : null}
-          {comment.audioUrl ? (
-            <CommentAudioPlayer
-              src={comment.audioUrl}
-              duration={comment.audioDuration}
-            />
-          ) : null}
-          <div className="conv-comment-foot">
-            <ReactionBar
-              reactions={reactionEntries}
-              onReact={reaction => void reactToComment(comment.id, reaction)}
-              disabled={reactingId !== null}
-              busy={reactingId === comment.id}
-              ariaLabel="Comment reactions"
-              total={totalReactionCount(reactionEntries)}
-              active={activeReaction}
-              longPress={longPress}
-              onTotalClick={event => {
-                event.preventDefault();
-                event.stopPropagation();
-                setReactionTargetId(comment.id);
-                setReactorsOpen(true);
-              }}
-            />
-            <button
-              type="button"
-              className="conv-comment-reply-count"
-              onClick={() => setReplyTo({ id: comment.id, username })}
-              aria-label={`Reply to ${authorLabel}`}
-            >
-              Reply
-            </button>
-            {replyCount > 0 ? (
+          <a
+            className="conv-comment-avatar"
+            href={`/profile/${comment.author.id}`}
+            tabIndex={-1}
+            aria-hidden="true"
+            onClick={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              navigateToProfile(event, comment.author.id);
+            }}
+          >
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" loading="lazy" />
+            ) : (
+              <span>
+                {(displayNameValue.replace(/^@/, "").charAt(0) || "J").toUpperCase()}
+              </span>
+            )}
+          </a>
+          <div className="conv-comment-main">
+            <div className="conv-comment-head">
+              <div className="conv-comment-meta">
+                <a
+                  className="conv-comment-author"
+                  href={`/profile/${comment.author.id}`}
+                  onClick={event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    navigateToProfile(event, comment.author.id);
+                  }}
+                  aria-label={`Open ${displayNameValue} profile`}
+                >
+                  {displayNameValue}
+                </a>
+                {authorIsCreator ? (
+                  <span className="conv-badge conv-badge--creator">Creator</span>
+                ) : null}
+                {comment.isPinned ? (
+                  <span className="conv-badge conv-badge--pin">
+                    <Pin size={10} aria-hidden="true" /> Pinned
+                  </span>
+                ) : null}
+                <span className="conv-comment-time">
+                  {relativeTime(comment.createdAt)}
+                  {comment.isEdited ? " · edited" : ""}
+                </span>
+              </div>
+              <ActionMenu actions={menuActions} ariaLabel="Comment actions" />
+            </div>
+            {isEditingThis && editing ? (
+              <div className="conv-comment-edit">
+                <textarea
+                  value={editing.text}
+                  maxLength={COMMENT_MAX_LENGTH}
+                  rows={2}
+                  autoFocus
+                  aria-label="Edit your comment"
+                  onChange={event =>
+                    setEditing({ id: comment.id, text: event.target.value })
+                  }
+                  onKeyDown={event => {
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      setEditing(null);
+                    } else if (
+                      event.key === "Enter" &&
+                      (event.metaKey || event.ctrlKey)
+                    ) {
+                      event.preventDefault();
+                      void saveEdit();
+                    }
+                  }}
+                />
+                <div className="conv-comment-edit-foot">
+                  <span
+                    className={`conv-char-count${editing.text.length >= COMMENT_MAX_LENGTH ? " is-max" : editing.text.length >= 450 ? " is-near" : ""}`}
+                  >
+                    {editing.text.length}/{COMMENT_MAX_LENGTH}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(null)}
+                    disabled={editComment.isPending}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="is-primary"
+                    onClick={() => void saveEdit()}
+                    disabled={
+                      editComment.isPending ||
+                      !editing.text.trim() ||
+                      editing.text.trim() === (comment.body ?? "").trim()
+                    }
+                  >
+                    {editComment.isPending ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              </div>
+            ) : comment.body ? (
+              <p className="conv-comment-body">
+                <MentionText text={comment.body} />
+              </p>
+            ) : null}
+            {comment.audioUrl ? (
+              <CommentAudioPlayer
+                src={comment.audioUrl}
+                duration={comment.audioDuration}
+              />
+            ) : null}
+            <div className="conv-comment-foot">
+              <ReactionBar
+                reactions={reactionEntries}
+                onReact={reaction => void reactToComment(comment.id, reaction)}
+                disabled={reactingId !== null}
+                busy={reactingId === comment.id}
+                ariaLabel="Comment reactions"
+                total={totalReactionCount(reactionEntries)}
+                active={activeReaction}
+                longPress={longPress}
+                onTotalClick={event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setReactionTargetId(comment.id);
+                  setReactorsOpen(true);
+                }}
+              />
+              {comment.creatorReacted && !authorIsCreator ? (
+                <span
+                  className="conv-creator-liked"
+                  title="Liked by the creator"
+                >
+                  <Heart size={11} fill="currentColor" aria-hidden="true" />{" "}
+                  by creator
+                </span>
+              ) : null}
               <button
                 type="button"
-                className={`conv-comment-reply-count conv-comment-reply-toggle${isExpanded ? " is-open" : ""}`}
-                aria-expanded={isExpanded}
-                aria-label={
-                  isExpanded
-                    ? `Hide replies to ${authorLabel}`
-                    : `View replies to ${authorLabel}`
-                }
-                onClick={event => {
-                  event.stopPropagation();
-                  toggleThread(comment.id);
-                }}
+                className="conv-comment-reply-count"
+                onClick={() => setReplyTo({ id: comment.id, username })}
+                aria-label={`Reply to ${authorLabel}`}
               >
-                ↳ {replyCountLabel(replyCount)}
+                Reply
               </button>
-            ) : null}
-            {replyTo?.id === comment.id ? (
-              <span className="video-comment-replying">
-                Replying to {authorLabel}
-              </span>
-            ) : null}
+              {replyCount > 0 ? (
+                <button
+                  type="button"
+                  className={`conv-comment-reply-count conv-comment-reply-toggle${isExpanded ? " is-open" : ""}`}
+                  aria-expanded={isExpanded}
+                  aria-label={
+                    isExpanded
+                      ? `Hide replies to ${authorLabel}`
+                      : `View replies to ${authorLabel}`
+                  }
+                  onClick={event => {
+                    event.stopPropagation();
+                    toggleThread(comment.id);
+                  }}
+                >
+                  ↳ {replyCountLabel(replyCount)}
+                </button>
+              ) : null}
+              {replyTo?.id === comment.id ? (
+                <span className="video-comment-replying">
+                  Replying to {authorLabel}
+                </span>
+              ) : null}
+            </div>
           </div>
         </article>
-        {isExpanded ? (
+        {showThread ? (
           <div className="conv-comment-reply-thread">
+            {pendingReplies.map(item => renderPending(item))}
             {threadState?.loading && replies.length === 0 ? (
               <span className="conv-comment-reply-status">Loading replies…</span>
             ) : (
@@ -2323,6 +2644,17 @@ function CommentDrawer({
   if (!open) return null;
   // Roots are only rows with no known parent — a reply never qualifies.
   const roots = comments.filter(comment => parentOf(comment) == null);
+  const pendingRoots = pending.filter(item => item.parentId == null);
+  const canLoadMore =
+    !commentsQuery.isPending &&
+    !commentsQuery.isError &&
+    comments.length >= rootLimit &&
+    rootLimit < COMMENT_ROOT_MAX;
+  const changeSort = (mode: CommentSortMode) => {
+    if (mode === sort) return;
+    setSort(mode);
+    setRootLimit(COMMENT_ROOT_PAGE);
+  };
   return createPortal(
     <div className="comment-drawer-layer" role="presentation">
       <button
@@ -2345,18 +2677,67 @@ function CommentDrawer({
             <X size={18} />
           </button>
         </div>
+        {roots.length > 1 || sort === "top" ? (
+          <div className="comment-sort" role="tablist" aria-label="Sort comments">
+            {(["new", "top"] as const).map(mode => (
+              <button
+                key={mode}
+                type="button"
+                role="tab"
+                aria-selected={sort === mode}
+                className={sort === mode ? "is-active" : undefined}
+                onClick={() => changeSort(mode)}
+              >
+                {mode === "new" ? "Newest" : "Top"}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="comment-drawer-list">
           {commentsQuery.isPending ? (
-            <div className="comment-loading">Loading comments…</div>
+            <div
+              className="comment-skeletons"
+              role="status"
+              aria-label="Loading comments"
+            >
+              {[0, 1, 2].map(index => (
+                <div className="comment-skeleton" key={index}>
+                  <span />
+                  <div>
+                    <i />
+                    <i />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : commentsQuery.isError ? (
             <div className="comment-loading">
               Comments are temporarily unavailable.
             </div>
-          ) : roots.length ? (
-            roots.map(comment => renderComment(comment))
+          ) : roots.length || pendingRoots.length ? (
+            <>
+              {pendingRoots.map(item => renderPending(item))}
+              {roots.map(comment => renderComment(comment))}
+              {canLoadMore ? (
+                <button
+                  type="button"
+                  className="comment-load-more"
+                  disabled={commentsQuery.isFetching}
+                  onClick={() =>
+                    setRootLimit(limit =>
+                      Math.min(limit + COMMENT_ROOT_PAGE, COMMENT_ROOT_MAX)
+                    )
+                  }
+                >
+                  {commentsQuery.isFetching ? "Loading…" : "Load more comments"}
+                </button>
+              ) : null}
+            </>
           ) : (
-            <div className="comment-loading">
-              No comments yet. Start the conversation.
+            <div className="comment-empty">
+              <MessageCircle size={28} aria-hidden="true" />
+              <strong>No comments yet</strong>
+              <span>Start the conversation.</span>
             </div>
           )}
         </div>
@@ -2375,6 +2756,14 @@ function CommentDrawer({
               mentionSource === "typing" ? (mentionToken?.query ?? "") : undefined
             }
           />
+        ) : null}
+        {body.length >= 400 ? (
+          <div
+            className={`conv-char-count conv-char-count--composer${body.length >= COMMENT_MAX_LENGTH ? " is-max" : body.length >= 450 ? " is-near" : ""}`}
+            aria-live="polite"
+          >
+            {body.length}/{COMMENT_MAX_LENGTH}
+          </div>
         ) : null}
         <div className="conv-composer-row">
           <button

@@ -69,9 +69,12 @@ vi.mock("pg", async () => {
       sqlite
         .prepare(`create temp table ${table} as ${rewritten}`)
         .all(...(bound as never[]));
-      const statement = sqlite.prepare(`select * from ${table}`);
-      const names = statement.columns().map(column => column.name);
-      const rows = statement
+      const names = sqlite
+        .prepare(`pragma table_info(${table})`)
+        .all()
+        .map(column => (column as { name: string }).name);
+      const rows = sqlite
+        .prepare(`select * from ${table}`)
         .all()
         .map(row => names.map(name => (row as Record<string, unknown>)[name]));
       return { rows };
@@ -116,6 +119,7 @@ import {
   profiles,
   users,
   videoComments,
+  videos,
 } from "../drizzle/schema";
 import { listVideoComments } from "./db";
 
@@ -136,9 +140,15 @@ beforeAll(() => {
     videoComments,
     commentLikes,
     commentReactions,
+    videos,
   ]) {
     sqlite.exec(createTable(table));
   }
+
+  // The listing resolves the post owner (creator badge) from `videos`.
+  sqlite
+    .prepare(`INSERT INTO "videos" ("id", "userId") VALUES (?, ?)`)
+    .run(10, 7);
 
   // The listing inner-joins `users`, so the author must exist.
   sqlite
@@ -275,5 +285,70 @@ describe("listVideoComments — correlated replyCount (regression)", () => {
       { reaction: "love", count: 1, reactedByMe: false },
     ]);
     expect(rows.find(row => row.id === 4)!.reactions).toEqual([]);
+  });
+});
+
+describe("listVideoComments — sort, pin, paging and creator flags", () => {
+  it("defaults to newest first and ranks by reactions with sort=top", async () => {
+    const newest = await listVideoComments(10);
+    expect(newest.map(row => row.id)).toEqual([4, 1]);
+
+    // Comment 1 carries the only like, so it leads under "top".
+    const top = await listVideoComments(10, undefined, { sort: "top" });
+    expect(top.map(row => row.id)).toEqual([1, 4]);
+  });
+
+  it("puts a pinned root first and reports isPinned / isEdited", async () => {
+    const sqlite = holder.sqlite!;
+    sqlite
+      .prepare(
+        `UPDATE "video_comments" SET "pinnedAt" = ?, "editedAt" = ? WHERE "id" = 1`
+      )
+      .run("2026-09-03T10:00:00.000Z", "2026-09-03T11:00:00.000Z");
+    try {
+      const rows = await listVideoComments(10);
+      expect(rows.map(row => row.id)).toEqual([1, 4]);
+      expect(rows[0]!.isPinned).toBe(true);
+      expect(rows[0]!.isEdited).toBe(true);
+      expect(rows[1]!.isPinned).toBe(false);
+      expect(rows[1]!.isEdited).toBe(false);
+    } finally {
+      sqlite
+        .prepare(
+          `UPDATE "video_comments" SET "pinnedAt" = NULL, "editedAt" = NULL WHERE "id" = 1`
+        )
+        .run();
+    }
+  });
+
+  it("pages the root listing with limit and offset", async () => {
+    const first = await listVideoComments(10, undefined, { limit: 1 });
+    expect(first.map(row => row.id)).toEqual([4]);
+
+    const second = await listVideoComments(10, undefined, {
+      limit: 1,
+      offset: 1,
+    });
+    expect(second.map(row => row.id)).toEqual([1]);
+  });
+
+  it("flags the post owner as creator and detects a creator reaction", async () => {
+    const sqlite = holder.sqlite!;
+    sqlite
+      .prepare(
+        `INSERT INTO "comment_likes" ("id", "commentId", "userId") VALUES (?, ?, ?)`
+      )
+      .run(900, 4, 7);
+    try {
+      const rows = await listVideoComments(10);
+      const withCreatorLike = rows.find(row => row.id === 4)!;
+      const withOtherLike = rows.find(row => row.id === 1)!;
+      // User 7 owns video 10 and wrote both comments.
+      expect(withCreatorLike.author.isCreator).toBe(true);
+      expect(withCreatorLike.creatorReacted).toBe(true);
+      expect(withOtherLike.creatorReacted).toBe(false);
+    } finally {
+      sqlite.prepare(`DELETE FROM "comment_likes" WHERE "id" = 900`).run();
+    }
   });
 });
