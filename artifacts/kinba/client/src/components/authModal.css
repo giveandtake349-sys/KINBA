@@ -1,0 +1,253 @@
+/* Modern JHILIK sign-in dialog. Scoped to .auth-modal so no other modal changes. */
+.modal-backdrop:has(.auth-modal) {
+  -webkit-backdrop-filter: blur(10px) saturate(1.1);
+  backdrop-filter: blur(10px) saturate(1.1);
+  animation: auth-fade 0.18s ease-out both;
+}
+
+.request-modal.auth-modal {
+  background:
+    radial-gradient(120% 70% at 50% -10%, var(--blue-soft), transparent 60%),
+    var(--surface);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, var(--blue) 20%);
+  border-radius: 24px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--blue) 8%, transparent),
+    0 28px 70px rgba(0, 0, 0, 0.35);
+  max-width: 420px;
+  overflow: hidden;
+  padding: 34px 28px 26px;
+  animation: auth-rise 0.28s var(--line) both;
+}
+
+.auth-modal .modal-close {
+  align-items: center;
+  background: var(--surface-raised);
+  border-radius: 999px;
+  display: grid;
+  height: 32px;
+  place-items: center;
+  right: 14px;
+  top: 14px;
+  transition:
+    background 0.15s,
+    color 0.15s;
+  width: 32px;
+}
+.auth-modal .modal-close:hover {
+  background: var(--surface-elevated);
+  color: var(--text);
+}
+
+.auth-modal .auth-head {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+}
+.auth-modal .auth-brand-wordmark {
+  background: linear-gradient(90deg, var(--blue), var(--teal));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  font-size: 22px;
+  margin-bottom: 18px;
+}
+.auth-modal .request-modal h2,
+.auth-modal h2 {
+  font-size: 28px;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  margin: 0 0 8px;
+}
+.auth-modal .modal-copy {
+  margin: 0 0 20px;
+  max-width: 30ch;
+}
+
+/* Sign in / Sign up segmented control */
+.auth-modal .auth-tabs {
+  background: var(--page-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 18px;
+  padding: 4px;
+}
+.auth-modal .auth-tab {
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 10px;
+  transition:
+    background 0.18s,
+    color 0.18s;
+}
+.auth-modal .auth-tab:hover {
+  color: var(--text);
+}
+.auth-modal .auth-tab[aria-selected="true"] {
+  background: var(--surface-raised);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  color: var(--text);
+}
+
+/* Fields */
+.auth-modal .input-label {
+  gap: 7px;
+  margin: 0 0 14px;
+}
+.auth-modal .input-label > span {
+  font-size: 12px;
+  font-weight: 600;
+}
+.auth-modal .auth-field {
+  align-items: center;
+  background: var(--page-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  gap: 10px;
+  padding: 0 12px;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.auth-modal .auth-field:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-soft);
+}
+.auth-modal .auth-field > svg {
+  color: var(--muted);
+  flex: none;
+}
+.auth-modal .auth-field:focus-within > svg {
+  color: var(--blue);
+}
+.auth-modal .auth-field input {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  flex: 1;
+  font-size: 15px; /* 16px-ish: stops iOS zoom-on-focus */
+  min-width: 0;
+  padding: 13px 0;
+}
+.auth-modal .auth-field input:focus {
+  border: 0;
+}
+.auth-modal .auth-eye {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  display: grid;
+  flex: none;
+  padding: 4px;
+  place-items: center;
+}
+.auth-modal .auth-eye:hover {
+  color: var(--text);
+}
+
+/* Buttons */
+.auth-modal .primary-btn--wide {
+  background: linear-gradient(135deg, var(--blue), var(--teal));
+  border: 0;
+  border-radius: 12px;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--blue) 35%, transparent);
+  font-size: 14px;
+  margin-top: 4px;
+  padding: 13px 16px;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s,
+    filter 0.15s;
+}
+.auth-modal .primary-btn--wide:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--blue), var(--teal));
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+.auth-modal .primary-btn--wide:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
+}
+
+.auth-modal .oauth-btn {
+  background: var(--surface-raised);
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  padding: 12px;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.auth-modal .oauth-btn:hover:not(:disabled) {
+  background: var(--surface-elevated);
+  border-color: var(--blue-border);
+}
+
+.auth-modal .auth-divider {
+  font-size: 12px;
+  margin: 16px 0;
+}
+
+.auth-modal .auth-mode-toggle {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 16px;
+}
+.auth-modal .auth-mode-toggle strong {
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.auth-modal :focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .modal-backdrop:has(.auth-modal) {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .request-modal.auth-modal {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    max-width: none;
+    padding-bottom: calc(26px + env(safe-area-inset-bottom));
+    animation-name: auth-sheet;
+  }
+}
+
+@keyframes auth-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes auth-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+}
+@keyframes auth-sheet {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop:has(.auth-modal),
+  .request-modal.auth-modal {
+    animation: none;
+  }
+}
