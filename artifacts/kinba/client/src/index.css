@@ -41,20 +41,30 @@
   --surface-elevated: #eaeaea;
   --border: #d4d4d4;
   --input: #d4d4d4;
-  /* Brand blue — #00A8FF functional, #38BDF8 sky accent */
-  --blue: #00a8ff;
-  --blue-soft: rgba(0, 168, 255, 0.12);
-  --blue-border: rgba(0, 168, 255, 0.42);
-  --blue-ink: #050608;
+  /* Brand — Instagram-style: pink #E1306C main, orange #F77737 second stop (token names kept for compatibility) */
+  --blue: #e1306c;
+  --blue-soft: rgba(225, 48, 108, 0.12);
+  --blue-border: rgba(225, 48, 108, 0.45);
+  /* Instagram palette helpers */
+  --ig-purple: #833ab4;
+  --ig-pink: #e1306c;
+  --ig-orange: #f77737;
+  --ig-gradient: linear-gradient(135deg, #833ab4 0%, #e1306c 52%, #f77737 100%);
+  --ig-blue: #0095f6;
+  --link: #0095f6;
+  --accent: var(--blue);
+  --accent-soft: var(--blue-soft);
+  --accent-border: var(--blue-border);
+  --blue-ink: #ffffff;
   /* Ink placed on brand-blue fills (primary buttons) — near-black for contrast */
-  --accent-ink: #050608;
+  --accent-ink: #ffffff;
   /* Champagne/gold — premium brand identity only */
   --gold: #d4af37;
   --gold-soft: rgba(212, 175, 55, 0.14);
   --gold-border: rgba(212, 175, 55, 0.42);
-  /* Sky accent (brand #38BDF8) + semantic status (green reserved for success) */
-  --teal: #38bdf8;
-  --teal-soft: rgba(56, 189, 248, 0.12);
+  /* Orange accent (#F77737) + semantic status (green reserved for success) */
+  --teal: #f77737;
+  --teal-soft: rgba(247, 119, 55, 0.12);
   --success: #16a34a;
   --success-soft: rgba(22, 163, 74, 0.12);
   --error: #bf3b30;
@@ -103,20 +113,30 @@
   --surface-elevated: #2d3135;
   --border: #34383b;
   --input: #3a3f44;
-  /* Brand blue — #00A8FF functional, #38BDF8 sky accent */
-  --blue: #00a8ff;
-  --blue-soft: rgba(0, 168, 255, 0.14);
-  --blue-border: rgba(0, 168, 255, 0.42);
-  --blue-ink: #050608;
+  /* Brand — Instagram-style: pink #E1306C main, orange #F77737 second stop (token names kept for compatibility) */
+  --blue: #e1306c;
+  --blue-soft: rgba(225, 48, 108, 0.16);
+  --blue-border: rgba(225, 48, 108, 0.45);
+  /* Instagram palette helpers */
+  --ig-purple: #833ab4;
+  --ig-pink: #e1306c;
+  --ig-orange: #f77737;
+  --ig-gradient: linear-gradient(135deg, #833ab4 0%, #e1306c 52%, #f77737 100%);
+  --ig-blue: #0095f6;
+  --link: #4db5f9;
+  --accent: var(--blue);
+  --accent-soft: var(--blue-soft);
+  --accent-border: var(--blue-border);
+  --blue-ink: #ffffff;
   /* Ink placed on brand-blue fills (primary buttons) */
-  --accent-ink: #050608;
+  --accent-ink: #ffffff;
   /* Champagne/gold — premium brand identity only */
   --gold: #d8b877;
   --gold-soft: rgba(216, 184, 119, 0.14);
   --gold-border: rgba(216, 184, 119, 0.42);
-  /* Sky accent (brand #38BDF8) + semantic status (green reserved for success) */
-  --teal: #38bdf8;
-  --teal-soft: rgba(56, 189, 248, 0.13);
+  /* Orange accent (#F77737) + semantic status (green reserved for success) */
+  --teal: #f77737;
+  --teal-soft: rgba(247, 119, 55, 0.14);
   --success: #4ade80;
   --success-soft: rgba(74, 222, 128, 0.14);
   --error: #ef6a63;

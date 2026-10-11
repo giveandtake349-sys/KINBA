@@ -9,8 +9,8 @@
 :root {
   --sn-radius: 10px;
   --sn-radius-lg: 14px;
-  --sn-glow: 0 0 0 1px color-mix(in srgb, var(--blue) 55%, transparent),
-    0 6px 20px color-mix(in srgb, var(--blue) 26%, transparent);
+  --sn-glow: 0 0 0 1px color-mix(in srgb, var(--ig-pink) 55%, transparent),
+    0 6px 20px color-mix(in srgb, var(--ig-pink) 32%, transparent);
   --sn-hairline: color-mix(in srgb, var(--text) 12%, transparent);
   --sn-hairline-strong: color-mix(in srgb, var(--text) 24%, transparent);
   --sn-card: color-mix(in srgb, var(--surface) 92%, var(--blue) 3%);
@@ -31,7 +31,7 @@
 :root .settings-index__button:focus-visible,
 :root .settings-switch:focus-visible,
 :root .settings-segmented__item:focus-visible {
-  outline: 2px solid var(--blue);
+  outline: 2px solid var(--ig-blue);
   outline-offset: 2px;
 }
 
@@ -41,15 +41,11 @@
 :root .settings-btn--primary,
 :root .pr-btn--primary,
 :root .send-btn {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--blue) 92%, #fff) 0%,
-    var(--blue) 100%
-  );
-  border: 1px solid color-mix(in srgb, var(--blue) 70%, #fff);
+  background: var(--ig-gradient);
+  border: 1px solid transparent;
   border-radius: var(--sn-radius);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--blue) 22%, transparent);
-  color: var(--accent-ink);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--ig-pink) 28%, transparent);
+  color: #fff;
   font-weight: 700;
   letter-spacing: 0.01em;
   transition:
@@ -68,13 +64,9 @@
 :root .settings-btn--primary:hover:not(:disabled),
 :root .pr-btn--primary:hover:not(:disabled),
 :root .send-btn:hover:not(:disabled) {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--blue) 92%, #fff) 0%,
-    var(--blue) 100%
-  );
+  background: var(--ig-gradient);
   box-shadow: var(--sn-glow);
-  filter: brightness(1.05);
+  filter: brightness(1.08);
 }
 
 :root .primary-btn:active:not(:disabled),
@@ -394,8 +386,8 @@
 
 :root .settings-input:focus,
 :root .settings-textarea:focus {
-  border-color: var(--blue);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 22%, transparent);
+  border-color: var(--ig-blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ig-blue) 24%, transparent);
 }
 
 /* Switch */
@@ -418,8 +410,8 @@
 }
 
 :root .settings-switch--on .settings-switch__thumb {
-  background: var(--blue);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--blue) 70%, transparent);
+  background: var(--ig-gradient);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--ig-pink) 70%, transparent);
 }
 
 /* Segmented control */
@@ -465,4 +457,56 @@
   :root .settings-pane {
     border-left-color: var(--sn-hairline);
   }
+}
+
+/* ============================================================================
+   Instagram-style accents: gradient highlights + blue for links / info
+   ============================================================================ */
+
+:root .settings-note--info {
+  border-left-color: var(--ig-blue);
+}
+
+:root .settings-note--warning {
+  border-left-color: var(--ig-orange);
+}
+
+:root .settings-pane__subtitle a,
+:root .settings-row__description a,
+:root .settings-note a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+:root .settings-pane__subtitle a:hover,
+:root .settings-row__description a:hover,
+:root .settings-note a:hover {
+  text-decoration: underline;
+}
+
+:root .settings-index__button[aria-current="page"] {
+  box-shadow: none;
+  position: relative;
+}
+
+:root .settings-index__button[aria-current="page"]::before {
+  background: var(--ig-gradient);
+  border-radius: 3px;
+  bottom: 10px;
+  content: "";
+  left: 0;
+  position: absolute;
+  top: 10px;
+  width: 3px;
+}
+
+:root .settings-header__eyebrow,
+:root .settings-pane__eyebrow,
+:root .settings-group__title {
+  background: var(--ig-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  display: inline-block;
 }
