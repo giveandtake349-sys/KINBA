@@ -38,7 +38,7 @@
   overflow: hidden;
 }
 .media-video-frame {
-  background: #080d18;
+  background: #0a0a0a;
   overflow: hidden;
   position: relative;
 }
@@ -79,8 +79,8 @@
 }
 .media-video-controls button:hover,
 .shorts-controls button:hover:not(:disabled) {
-  background: #f59e0b;
-  color: #06111d;
+  background: var(--blue);
+  color: #ffffff;
 }
 .media-video-controls span {
   color: #eef2ff;
@@ -224,7 +224,7 @@
 .media-publish-form input:focus,
 .media-publish-form textarea:focus,
 .announcement-composer textarea:focus {
-  border-color: #f59e0b;
+  border-color: var(--blue);
 }
 .media-kind-switch {
   background: rgba(11, 18, 30, 0.44);
@@ -275,7 +275,7 @@
   padding: 9px;
 }
 .media-selection video {
-  background: #070c16;
+  background: #0a0a0a;
   border-radius: var(--radius-control);
   height: 55px;
   object-fit: contain;
@@ -336,7 +336,7 @@
   display: none;
 }
 .short-card {
-  background: #080d18;
+  background: #0a0a0a;
   border-radius: var(--radius-surface);
   height: 100%;
   min-height: 100%;
@@ -400,7 +400,7 @@
 .announcement-selection img,
 .announcement-selection video {
   aspect-ratio: 1;
-  background: #080d18;
+  background: #0a0a0a;
   border-radius: var(--radius-control);
   height: 76px;
   object-fit: cover;
@@ -464,7 +464,7 @@
 }
 .announcement-attachments img,
 .announcement-attachments video {
-  background: #080d18;
+  background: #0a0a0a;
   border-radius: var(--radius-control);
   max-height: 440px;
   object-fit: cover;
@@ -577,8 +577,8 @@
   transform: scale(0.97);
 }
 .home-feed-tabs button.active {
-  background: #f59e0b;
-  color: #06111d;
+  background: var(--blue);
+  color: #ffffff;
 }
 .media-quality-control {
   align-items: center;
@@ -601,7 +601,7 @@
   padding: 7px 0;
 }
 .media-quality-control option {
-  background: #111a2b;
+  background: #1c1c1c;
   color: #eef2ff;
 }
 .quality-upload-grid {
@@ -1112,7 +1112,7 @@
   opacity: 0.6;
 }
 .media-quality-control option {
-  background: #111827;
+  background: #1c1c1c;
   color: #eef2ff;
 }
 @media (max-width: 560px) {
