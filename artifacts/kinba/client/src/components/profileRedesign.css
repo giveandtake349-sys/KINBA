@@ -1188,3 +1188,252 @@
   outline: 2px solid var(--blue);
   outline-offset: -2px;
 }
+
+/* ============================================
+   Modern layer — cover glow, ring avatar, stat
+   cards, pill tabs, soft tiles. Appended last so
+   it refines the rules above without touching JSX.
+   ============================================ */
+
+/* --- Header: cover glow + centered identity --- */
+.pr-header {
+  position: relative;
+  padding-top: 18px;
+}
+.pr-header::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -16px;
+  right: -16px;
+  height: 150px;
+  background:
+    radial-gradient(70% 120% at 20% 0%, var(--blue-soft), transparent 70%),
+    radial-gradient(60% 110% at 85% 10%, var(--teal-soft), transparent 70%);
+  -webkit-mask-image: linear-gradient(#000 40%, transparent);
+  mask-image: linear-gradient(#000 40%, transparent);
+  pointer-events: none;
+}
+.pr-header > * {
+  position: relative;
+}
+.pr-identity {
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 22px;
+  text-align: center;
+}
+.pr-back-btn {
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  border-color: var(--border);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.pr-avatar--hero {
+  width: 96px;
+  height: 96px;
+  box-shadow:
+    0 0 0 4px var(--page-bg),
+    0 0 0 6px var(--blue),
+    0 10px 30px color-mix(in srgb, var(--blue) 30%, transparent);
+}
+.pr-header-info {
+  flex: none;
+  max-width: 100%;
+}
+.pr-name {
+  justify-content: center;
+  font-size: clamp(1.4rem, 5.5vw, 1.8rem);
+}
+.pr-handle {
+  font-size: 13px;
+}
+.pr-meta {
+  justify-content: center;
+  margin-top: 14px;
+}
+.pr-about {
+  margin: 14px auto 0;
+  max-width: 46ch;
+  text-align: center;
+}
+
+/* --- Stats: soft cards instead of hairline rules --- */
+.pr-stats {
+  gap: 8px;
+  margin-top: 22px;
+  border: 0;
+}
+.pr-stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px 2px;
+  transition:
+    border-color 0.16s var(--line),
+    background 0.16s var(--line),
+    transform 0.12s var(--line);
+}
+.pr-stat + .pr-stat {
+  border-left: 1px solid var(--border);
+}
+.pr-stat-value {
+  font-size: 18px;
+}
+.pr-stat--link:hover {
+  background: var(--surface-raised);
+  border-color: var(--blue-border);
+}
+.pr-stat--link:active {
+  transform: scale(0.97);
+}
+
+/* --- Actions --- */
+.pr-actions {
+  justify-content: center;
+  margin-top: 14px;
+}
+.pr-btn {
+  border-radius: 14px;
+  min-height: 46px;
+}
+.pr-btn--primary {
+  background: linear-gradient(135deg, var(--blue), var(--teal));
+  border-color: transparent;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--blue) 28%, transparent);
+}
+.pr-btn--primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--blue), var(--teal));
+  border-color: transparent;
+  filter: brightness(1.06);
+}
+.pr-btn--outline,
+.pr-btn--icon {
+  background: var(--surface);
+}
+
+/* --- Tabs: pill strip --- */
+.pr-tabs {
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 10px 16px;
+  background: color-mix(in srgb, var(--page-bg) 86%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  border-bottom: 1px solid var(--border);
+}
+.pr-tab {
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  box-shadow: none;
+  transition:
+    color 0.16s var(--line),
+    background 0.16s var(--line);
+}
+.pr-tab:hover {
+  background: var(--surface);
+}
+.pr-tab--active {
+  background: var(--blue-soft);
+  box-shadow: inset 0 0 0 1px var(--blue-border);
+  color: var(--text);
+}
+.pr-tab:focus-visible {
+  border-radius: 999px;
+  outline-offset: 2px;
+}
+
+/* --- Tiles --- */
+.pr-tile {
+  border-radius: 16px;
+  transition:
+    border-color 0.16s var(--line),
+    transform 0.2s var(--line),
+    box-shadow 0.2s var(--line);
+}
+.pr-tile:hover {
+  border-color: var(--blue-border);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
+  transform: translateY(-2px);
+}
+.pr-tile--static:hover {
+  border-color: var(--border);
+  box-shadow: none;
+  transform: none;
+}
+.pr-tile-img {
+  transition: transform 0.35s var(--line);
+}
+.pr-tile:hover .pr-tile-img {
+  transform: scale(1.03);
+}
+.pr-tile--static:hover .pr-tile-img {
+  transform: none;
+}
+
+/* --- Empty state as a soft card --- */
+.pr-empty {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 20px;
+  margin: 4px 0;
+  padding: 40px 24px;
+}
+.pr-empty-icon {
+  background: var(--blue-soft);
+  border-radius: 999px;
+  box-sizing: content-box;
+  color: var(--blue);
+  opacity: 1;
+  padding: 14px;
+}
+
+/* --- Modals --- */
+.pr-modal-overlay {
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.pr-modal {
+  border: 1px solid var(--border);
+  box-shadow: 0 -10px 50px rgba(0, 0, 0, 0.3);
+}
+.pr-input {
+  border-radius: 12px;
+}
+.pr-input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-soft);
+  outline: 0;
+}
+
+@media (min-width: 641px) {
+  .pr-header::before {
+    height: 170px;
+  }
+  .pr-avatar--hero {
+    width: 112px;
+    height: 112px;
+  }
+  .pr-identity {
+    gap: 14px;
+  }
+  .pr-stat {
+    padding: 16px 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pr-tile,
+  .pr-tile-img,
+  .pr-stat {
+    transition: none;
+  }
+  .pr-tile:hover,
+  .pr-tile:hover .pr-tile-img {
+    transform: none;
+  }
+}
