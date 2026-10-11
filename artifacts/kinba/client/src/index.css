@@ -98,15 +98,15 @@
   }
 }
 :root[data-theme="dark"] {
-  /* Foundation — Facebook-style grey (main background sampled from the app: #262729) */
-  --page-bg: #262729;
-  --text: #e4e6eb;
-  --muted: #b0b3b8;
-  --surface: #2f3032;
-  --surface-raised: #3a3b3c;
-  --surface-elevated: #444546;
-  --border: #464849;
-  --input: #464849;
+  /* Foundation — Graphite / charcoal grey */
+  --page-bg: #303134;
+  --text: #ececee;
+  --muted: #b4b6bb;
+  --surface: #3a3b3f;
+  --surface-raised: #45464a;
+  --surface-elevated: #505155;
+  --border: #56575c;
+  --input: #56575c;
   /* Brand — Facebook blue for main buttons and links */
   --blue: #2d88ff;
   --blue-soft: rgba(45, 136, 255, 0.18);
