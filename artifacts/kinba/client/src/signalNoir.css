@@ -458,3 +458,32 @@
   --normal-text: var(--text);
   --normal-border: var(--border);
 }
+
+/* --- Manus-style dark charcoal chrome ------------------------------------- */
+:root[data-theme="dark"] .topbar,
+:root[data-theme="dark"] .notification-item,
+:root[data-theme="dark"] .notification-list,
+:root[data-theme="dark"] [data-sonner-toast] {
+  background: #262729 !important;
+  color: #f5f6f7;
+}
+
+:root[data-theme="dark"] .topbar {
+  backdrop-filter: none;
+  border-bottom-color: #3b3d40;
+}
+
+:root[data-theme="dark"] .notification-item--unread {
+  background: #2d2f32 !important;
+  border-color: #45474b;
+}
+
+:root[data-theme="dark"] .notification-item:hover,
+:root[data-theme="dark"] [data-sonner-toast]:hover {
+  background: #303236 !important;
+}
+
+:root[data-theme="dark"] .notification-item svg,
+:root[data-theme="dark"] .notification-item strong {
+  color: #f5f6f7;
+}
