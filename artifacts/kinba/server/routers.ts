@@ -9,6 +9,9 @@ import {
 } from "./_core/trpc";
 import {
   createAnnouncementComment,
+  editAnnouncementComment,
+  setAnnouncementCommentPinned,
+  toggleAnnouncementCommentLike,
   createCommunityAnnouncement,
   updateCommunityAnnouncement,
   deleteCommunityAnnouncement,
@@ -1813,8 +1816,22 @@ export const appRouter = router({
       ),
     comments: router({
       list: publicProcedure
-        .input(announcementIdInput)
-        .query(({ input }) => listAnnouncementComments(input.announcementId)),
+        .input(
+          announcementIdInput.extend({
+            parentId: z.number().int().positive().optional(),
+            limit: z.number().int().min(1).max(200).optional(),
+            offset: z.number().int().min(0).optional(),
+            sort: z.enum(["top", "new"]).optional(),
+          })
+        )
+        .query(({ ctx, input }) =>
+          listAnnouncementComments(input.announcementId, ctx.user?.id, {
+            parentId: input.parentId,
+            limit: input.limit,
+            offset: input.offset,
+            sort: input.sort,
+          })
+        ),
       create: protectedProcedure
         .input(
           announcementIdInput
@@ -1822,6 +1839,7 @@ export const appRouter = router({
               body: z.string().trim().max(500).default(""),
               audioUrl: z.string().url().nullable().optional(),
               audioDuration: z.number().int().min(1).max(60).nullable().optional(),
+              parentId: z.number().int().positive().nullable().optional(),
             })
             .refine(
               input => input.body.trim().length > 0 || Boolean(input.audioUrl),
@@ -1833,9 +1851,23 @@ export const appRouter = router({
             ? createAnnouncementComment(input.announcementId, ctx.user.id, input.body, {
                 audioUrl: input.audioUrl,
                 audioDuration: input.audioDuration,
+                ...(input.parentId != null ? { parentId: input.parentId } : {}),
               })
-            : createAnnouncementComment(input.announcementId, ctx.user.id, input.body)
+            : input.parentId != null
+              ? createAnnouncementComment(input.announcementId, ctx.user.id, input.body, {
+                  parentId: input.parentId,
+                })
+              : createAnnouncementComment(input.announcementId, ctx.user.id, input.body)
         ),
+      edit: protectedProcedure
+        .input(z.object({ commentId: z.number().int().positive(), body: z.string().trim().max(500) }))
+        .mutation(({ ctx, input }) => editAnnouncementComment(input.commentId, ctx.user.id, input.body)),
+      pin: protectedProcedure
+        .input(z.object({ commentId: z.number().int().positive(), pinned: z.boolean() }))
+        .mutation(({ ctx, input }) => setAnnouncementCommentPinned(input.commentId, ctx.user.id, input.pinned)),
+      like: protectedProcedure
+        .input(z.object({ commentId: z.number().int().positive() }))
+        .mutation(({ ctx, input }) => toggleAnnouncementCommentLike(input.commentId, ctx.user.id)),
     }),
   }),
   directMessages: router({

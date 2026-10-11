@@ -4348,28 +4348,45 @@ function AnnouncementComments({
   const utils = trpc.useUtils();
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
+  const [sort, setSort] = useState<"new" | "top">("new");
+  const [limit, setLimit] = useState(20);
+  const [replyTo, setReplyTo] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const [editing, setEditing] = useState<{ id: number; body: string } | null>(null);
   const commentsQuery = trpc.community.comments.list.useQuery(
-    { announcementId },
-    { enabled: open, refetchOnWindowFocus: false }
+    { announcementId, sort, limit },
+    { enabled: open, refetchOnWindowFocus: false, placeholderData: keepPreviousData }
   );
   const createComment = trpc.community.comments.create.useMutation();
-  const submitComment = async (
-    audioUrl: string | null,
-    audioDuration: number | null
-  ) => {
+  const editComment = trpc.community.comments.edit.useMutation();
+  const pinComment = trpc.community.comments.pin.useMutation();
+  const likeComment = trpc.community.comments.like.useMutation();
+  const visibleCount = commentsQuery.data?.length ?? commentCount;
+  const refresh = async () => {
+    await Promise.all([
+      commentsQuery.refetch(),
+      utils.community.list.invalidate(),
+    ]);
+  };
+  const submitComment = async (audioUrl: string | null, audioDuration: number | null) => {
     if (!auth.isAuthenticated) return auth.openAuth();
     await createComment.mutateAsync({
       announcementId,
       body: body.trim(),
       audioUrl,
       audioDuration,
+      parentId: replyTo,
     });
-    await Promise.all([
-      commentsQuery.refetch(),
-      utils.community.list.invalidate(),
-    ]);
+    setBody("");
+    setReplyTo(null);
+    await refresh();
   };
-  const visibleCount = commentsQuery.data?.length ?? commentCount;
+  const saveEdit = async () => {
+    if (!editing) return;
+    await editComment.mutateAsync({ commentId: editing.id, body: editing.body });
+    setEditing(null);
+    await refresh();
+  };
   return (
     <div className="announcement-comments">
       <button
@@ -4381,63 +4398,51 @@ function AnnouncementComments({
         }}
         aria-expanded={open}
       >
-        <MessageCircle size={16} />
-        Comment <strong>{formatCount(visibleCount)}</strong>
+        <MessageCircle size={16} /> Comment <strong>{formatCount(visibleCount)}</strong>
       </button>
       {open && (
         <div className="announcement-comments__panel" aria-live="polite">
-          {commentsQuery.isPending ? (
-            <div className="comment-loading">Loading comments…</div>
-          ) : commentsQuery.isError ? (
-            <div className="comment-loading">
-              Comments are temporarily unavailable.
-            </div>
-          ) : commentsQuery.data?.length ? (
-            commentsQuery.data.map(comment => (
-              <div className="video-comment" key={comment.id}>
-                <a
-                  className="profile-link"
-                  href={`/profile/${comment.author.id}`}
-                  onClick={event => navigateToProfile(event, comment.author.id)}
-                  aria-label={`Open ${displayName(comment.author.name, comment.author.username)} profile`}
-                >
-                  <strong>
-                    {displayName(comment.author.name, comment.author.username)}
-                  </strong>
-                </a>
-                {comment.body && (
-                  <span>
-                    <MentionText text={comment.body} />
-                  </span>
-                )}
-                {comment.audioUrl && (
-                  <CommentAudioPlayer
-                    src={comment.audioUrl}
-                    duration={comment.audioDuration}
-                  />
-                )}
+          <div className="comment-sort-row">
+            <button type="button" className={sort === "new" ? "is-active" : ""} onClick={() => { setSort("new"); setLimit(20); }}>Newest</button>
+            <button type="button" className={sort === "top" ? "is-active" : ""} onClick={() => { setSort("top"); setLimit(20); }}>Top</button>
+          </div>
+          {commentsQuery.isPending ? <div className="comment-loading">Loading comments…</div> : commentsQuery.isError ? <div className="comment-loading">Comments are temporarily unavailable.</div> : commentsQuery.data?.length ? commentsQuery.data.map(comment => (
+            <div className="video-comment" key={comment.id}>
+              <a className="profile-link" href={`/profile/${comment.author.id}`} onClick={event => navigateToProfile(event, comment.author.id)}>
+                <strong>{displayName(comment.author.name, comment.author.username)}</strong>
+              </a>
+              {comment.author.isCreator && <span className="conv-badge conv-badge--creator">Creator</span>}
+              {comment.isPinned && <span className="comment-pin-label"><Pin size={12} /> Pinned</span>}
+              {comment.isEdited && <span className="conv-comment-time">edited</span>}
+              {editing?.id === comment.id ? (
+                <div className="comment-edit-box">
+                  <input value={editing.body} maxLength={500} onChange={event => setEditing({ ...editing, body: event.target.value })} />
+                  <button type="button" onClick={() => void saveEdit()} disabled={editComment.isPending}>Save</button>
+                  <button type="button" onClick={() => setEditing(null)}>Cancel</button>
+                </div>
+              ) : comment.body ? <span><MentionText text={comment.body} /></span> : null}
+              {comment.audioUrl && <CommentAudioPlayer src={comment.audioUrl} duration={comment.audioDuration} />}
+              <div className="comment-row-actions">
+                <button type="button" onClick={() => void likeComment.mutateAsync({ commentId: comment.id }).then(refresh)}>{comment.viewerLiked ? "Pookied" : "Pookie"} {formatCount(comment.likeCount)}</button>
+                <button type="button" onClick={() => { setReplyTo(comment.id); setExpanded(comment.id); }}>Reply {comment.replyCount ? `(${comment.replyCount})` : ""}</button>
+                {auth.user?.id === comment.author.id && <button type="button" onClick={() => setEditing({ id: comment.id, body: comment.body ?? "" })}><Pencil size={12} /> Edit</button>}
+                {auth.user?.id === comment.postOwnerId && <button type="button" onClick={() => void pinComment.mutateAsync({ commentId: comment.id, pinned: !comment.isPinned }).then(refresh)}>{comment.isPinned ? "Unpin" : "Pin"}</button>}
               </div>
-            ))
-          ) : (
-            <div className="comment-loading">
-              No comments yet. Start the conversation.
+              {expanded === comment.id && comment.replyCount > 0 && <CommunityCommentReplies announcementId={announcementId} parentId={comment.id} />}
             </div>
-          )}
-          <VoiceCommentComposer
-            body={body}
-            onBodyChange={setBody}
-            onSend={submitComment}
-            disabled={createComment.isPending}
-            placeholder={
-              auth.isAuthenticated ? "Write a comment…" : "Sign in to comment"
-            }
-          />
+          )) : <div className="comment-loading">No comments yet. Start the conversation.</div>}
+          {commentsQuery.data && commentsQuery.data.length >= limit && limit < 200 && <button type="button" className="comment-load-more" onClick={() => setLimit(value => Math.min(200, value + 20))}>Load more comments</button>}
+          <VoiceCommentComposer body={body} onBodyChange={setBody} onSend={submitComment} disabled={createComment.isPending} placeholder={auth.isAuthenticated ? (replyTo ? "Write a reply…" : "Write a comment…") : "Sign in to comment"} />
         </div>
       )}
     </div>
   );
 }
-
+function CommunityCommentReplies({ announcementId, parentId }: { announcementId: number; parentId: number }) {
+  const query = trpc.community.comments.list.useQuery({ announcementId, parentId, limit: 50 }, { refetchOnWindowFocus: false });
+  if (query.isPending) return <div className="comment-loading">Loading replies…</div>;
+  return <div className="comment-replies">{query.data?.map(reply => <div className="video-comment" key={reply.id}><strong>{displayName(reply.author.name, reply.author.username)}</strong>{reply.body && <span><MentionText text={reply.body} /></span>}{reply.audioUrl && <CommentAudioPlayer src={reply.audioUrl} duration={reply.audioDuration} />}</div>)}</div>;
+}
 function AnnouncementManagementMenu({
   announcement,
 }: {

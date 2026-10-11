@@ -634,10 +634,13 @@ export const communityComments = pgTable(
     userId: integer("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    body: text("body").notNull(),
+    body: text("body"),
     audioUrl: text("audio_url"),
     audioDuration: integer("audio_duration"),
+    parentId: integer("parentId"),
     createdAt: createdAt(),
+    editedAt: timestamp("editedAt", { withTimezone: true }),
+    pinnedAt: timestamp("pinnedAt", { withTimezone: true }),
   },
   table => [
     index("community_comments_announcement_idx").on(
@@ -645,6 +648,48 @@ export const communityComments = pgTable(
       table.createdAt
     ),
     index("community_comments_user_idx").on(table.userId),
+    index("community_comments_parent_idx").on(table.parentId),
+    index("community_comments_pinned_idx").on(table.announcementId, table.pinnedAt),
+    foreignKey({
+      name: "community_comments_parentId_community_comments_id_fk",
+      columns: [table.parentId],
+      foreignColumns: [table.id],
+    }).onDelete("cascade"),
+  ]
+);
+export const communityCommentLikes = pgTable(
+  "community_comment_likes",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    commentId: integer("commentId")
+      .notNull()
+      .references(() => communityComments.id, { onDelete: "cascade" }),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("community_comment_likes_comment_user_unique").on(table.commentId, table.userId),
+    index("community_comment_likes_comment_idx").on(table.commentId),
+  ]
+);
+export const communityCommentReactions = pgTable(
+  "community_comment_reactions",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    commentId: integer("commentId")
+      .notNull()
+      .references(() => communityComments.id, { onDelete: "cascade" }),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    reaction: varchar("reaction", { length: 32 }).notNull(),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("community_comment_reactions_unique").on(table.commentId, table.userId, table.reaction),
+    index("community_comment_reactions_comment_idx").on(table.commentId),
   ]
 );
 

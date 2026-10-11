@@ -18,6 +18,8 @@ import {
   communityAnnouncements,
   communityBookmarks,
   communityComments,
+  communityCommentLikes,
+  communityCommentReactions,
   communityReactions,
   liveSponsors,
   participants,
@@ -4001,30 +4003,68 @@ export async function toggleCommunityBookmark(
   return { viewerBookmarked: true };
 }
 
-export async function listAnnouncementComments(announcementId: number) {
+export const COMMUNITY_COMMENT_EDIT_WINDOW_MS = 30 * 60 * 1000;
+export type CommunityCommentListOptions = {
+  parentId?: number | null;
+  limit?: number;
+  offset?: number;
+  sort?: "new" | "top";
+};
+export async function listAnnouncementComments(
+  announcementId: number,
+  viewerId?: number,
+  options?: CommunityCommentListOptions
+) {
   const db = await getDb();
   if (!db) return [];
+  const parentId = options?.parentId ?? null;
+  if (parentId != null) {
+    const [parent] = await db.select({ id: communityComments.id })
+      .from(communityComments)
+      .where(and(eq(communityComments.id, parentId), eq(communityComments.announcementId, announcementId)))
+      .limit(1);
+    if (!parent) return [];
+  }
+  const likeCount = sql<number>`(select count(*) from community_comment_likes l where l."commentId" = ${communityComments.id})`;
+  const viewerLiked = viewerId
+    ? sql<boolean>`exists (select 1 from community_comment_likes l where l."commentId" = ${communityComments.id} and l."userId" = ${viewerId})`
+    : sql<boolean>`false`;
+  const replyCount = sql<number>`(select count(*) from community_comments rc where rc."parentId" = ${communityComments.id})`;
   const rows = await db
-    .select({ comment: communityComments, user: users, profile: profiles })
+    .select({ comment: communityComments, user: users, profile: profiles, ownerId: communityAnnouncements.userId, likeCount, viewerLiked, replyCount })
     .from(communityComments)
+    .innerJoin(communityAnnouncements, eq(communityComments.announcementId, communityAnnouncements.id))
     .innerJoin(users, eq(communityComments.userId, users.id))
     .leftJoin(profiles, eq(communityComments.userId, profiles.userId))
-    .where(eq(communityComments.announcementId, announcementId))
-    .orderBy(desc(communityComments.createdAt))
-    .limit(50);
+    .where(and(eq(communityComments.announcementId, announcementId), parentId == null ? isNull(communityComments.parentId) : eq(communityComments.parentId, parentId)))
+    .orderBy(
+      ...(parentId == null ? [desc(sql`(${communityComments.pinnedAt} is not null)`)] : []),
+      ...(options?.sort === "top" && parentId == null ? [desc(likeCount)] : []),
+      desc(communityComments.createdAt),
+      desc(communityComments.id)
+    )
+    .limit(Math.min(Math.max(Math.trunc(options?.limit ?? (parentId == null ? 20 : 20)), 1), parentId == null ? 200 : 50))
+    .offset(Math.max(Math.trunc(options?.offset ?? 0), 0));
     return rows.map(row => ({
     ...row.comment,
     body: typeof row.comment.body === "string" ? row.comment.body : "",
     audioUrl: typeof row.comment.audioUrl === "string" && row.comment.audioUrl.trim()
       ? row.comment.audioUrl
       : null,
-    audioDuration: Number.isFinite(Number(row.comment.audioDuration))
+      audioDuration: Number.isFinite(Number(row.comment.audioDuration))
       ? Math.max(1, Math.min(60, Math.round(Number(row.comment.audioDuration))))
       : null,
+    likeCount: Number(row.likeCount ?? 0),
+    viewerLiked: Boolean(row.viewerLiked),
+    replyCount: Number(row.replyCount ?? 0),
+    postOwnerId: row.ownerId,
+    isPinned: row.comment.pinnedAt != null,
+    isEdited: row.comment.editedAt != null,
     author: {
       id: row.user.id,
       name: row.user.name,
       username: row.profile?.username ?? null,
+      isCreator: row.user.id === row.ownerId,
     },
   }));
 }
@@ -4032,17 +4072,23 @@ export async function createAnnouncementComment(
   announcementId: number,
   userId: number,
   body: string,
-  audio?: { audioUrl?: string | null; audioDuration?: number | null }
+  audio?: { audioUrl?: string | null; audioDuration?: number | null; parentId?: number | null }
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
   const trimmedBody = body.trim();
+  if (!trimmedBody && !audio?.audioUrl) throw new Error("Comment text or audio is required.");
+  if (audio?.parentId != null) {
+    const [parent] = await db.select({ id: communityComments.id }).from(communityComments)
+      .where(and(eq(communityComments.id, audio.parentId), eq(communityComments.announcementId, announcementId))).limit(1);
+    if (!parent) throw new Error("The comment you are replying to was not found.");
+  }
 
   const [comment] = await db.transaction(async (tx) => {
     const [newComment] = await tx
       .insert(communityComments)
-      .values({ announcementId, userId, body: trimmedBody, audioUrl: audio?.audioUrl ?? null, audioDuration: audio?.audioDuration ?? null })
+      .values({ announcementId, userId, body: trimmedBody, audioUrl: audio?.audioUrl ?? null, audioDuration: audio?.audioDuration ?? null, parentId: audio?.parentId ?? null })
       .returning();
 
     // Sync hashtags from comment body
@@ -4053,6 +4099,38 @@ export async function createAnnouncementComment(
   });
 
   return comment;
+}
+export async function editAnnouncementComment(commentId: number, userId: number, body: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [existing] = await db.select({ id: communityComments.id, userId: communityComments.userId, body: communityComments.body, audioUrl: communityComments.audioUrl, createdAt: communityComments.createdAt }).from(communityComments).where(eq(communityComments.id, commentId)).limit(1);
+  if (!existing) throw new Error("Comment not found.");
+  if (existing.userId !== userId) throw new Error("You are not authorized to edit this comment.");
+  const trimmed = body.trim();
+  if (!trimmed && !existing.audioUrl) throw new Error("A comment cannot be empty.");
+  if (Date.now() - new Date(existing.createdAt).getTime() > COMMUNITY_COMMENT_EDIT_WINDOW_MS) throw new Error("Comments can only be edited within 30 minutes of posting.");
+  if ((existing.body ?? "") === trimmed) return { commentId, body: trimmed };
+  await db.update(communityComments).set({ body: trimmed || null, editedAt: new Date() }).where(eq(communityComments.id, commentId));
+  return { commentId, body: trimmed };
+}
+export async function setAnnouncementCommentPinned(commentId: number, userId: number, pinned: boolean) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [match] = await db.select({ id: communityComments.id, announcementId: communityComments.announcementId, parentId: communityComments.parentId, ownerId: communityAnnouncements.userId }).from(communityComments).innerJoin(communityAnnouncements, eq(communityComments.announcementId, communityAnnouncements.id)).where(eq(communityComments.id, commentId)).limit(1);
+  if (!match) throw new Error("Comment not found.");
+  if (match.ownerId !== userId) throw new Error("Only the post owner can pin a comment.");
+  if (match.parentId != null) throw new Error("Only top-level comments can be pinned.");
+  if (pinned) await db.update(communityComments).set({ pinnedAt: null }).where(eq(communityComments.announcementId, match.announcementId));
+  await db.update(communityComments).set({ pinnedAt: pinned ? new Date() : null }).where(eq(communityComments.id, commentId));
+  return { commentId, pinned };
+}
+export async function toggleAnnouncementCommentLike(commentId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [existing] = await db.select({ id: communityCommentLikes.id }).from(communityCommentLikes).where(and(eq(communityCommentLikes.commentId, commentId), eq(communityCommentLikes.userId, userId))).limit(1);
+  if (existing) await db.delete(communityCommentLikes).where(eq(communityCommentLikes.id, existing.id));
+  else await db.insert(communityCommentLikes).values({ commentId, userId });
+  return { viewerLiked: !existing };
 }
 
 export async function createCommunityAnnouncement(
