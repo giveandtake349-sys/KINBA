@@ -5,7 +5,7 @@
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: #050505;
+  background: var(--page-bg);
   opacity: 1;
   transition: opacity 360ms ease;
 }

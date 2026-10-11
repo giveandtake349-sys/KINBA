@@ -2193,7 +2193,7 @@ body {
 
 .media-hub .shorts-tab-panel .shorts-list-feed > .media-section-heading {
   display: flex !important;
-  background: #000 !important;
+  background: var(--page-bg) !important;
 }
 
 .media-hub .shorts-tab-panel .shorts-list-viewport {
@@ -2324,7 +2324,7 @@ body {
   gap: 16px !important;
   margin: 0 !important;
   padding: 16px !important;
-  background: #000 !important;
+  background: var(--page-bg) !important;
   position: relative !important;
   z-index: 2 !important;
 }
@@ -2367,7 +2367,7 @@ body {
   scroll-snap-type: y mandatory !important;
   touch-action: pan-y !important;
   padding: 0 0 calc(96px + env(safe-area-inset-bottom)) !important;
-  background: #000 !important;
+  background: var(--page-bg) !important;
 }
 
 .media-hub .shorts-list-feed > .shorts-list-viewport > .short-card {
