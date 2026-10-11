@@ -1264,7 +1264,7 @@ function InlineVideoPlayer({
         position: "relative",
         width: "100%",
         aspectRatio: `${displayW} / ${displayH}`,
-        background: "#08090b",
+        background: "var(--page-bg)",
         overflow: "hidden",
         borderRadius: 0,
         contain: "size layout paint style",
@@ -1293,7 +1293,7 @@ function InlineVideoPlayer({
           width: "100%",
           height: "100%",
           objectFit: "contain",
-          background: "#08090b",
+          background: "var(--page-bg)",
         }}
       />
       {!playing && !error && (
@@ -1330,7 +1330,7 @@ function InlineVideoPlayer({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: "#08090b",
+            background: "var(--page-bg)",
             color: "#aaa",
             fontSize: "0.82rem",
             textAlign: "center",
@@ -1489,7 +1489,7 @@ function ForYouVideoPlayer({
         position: "relative",
         width: "100%",
         aspectRatio: `${displayW} / ${displayH}`,
-        background: "#08090b",
+        background: "var(--page-bg)",
         overflow: "hidden",
         contain: "size layout paint style",
       }}
@@ -1520,7 +1520,7 @@ function ForYouVideoPlayer({
           width: "100%",
           height: "100%",
           objectFit: "contain",
-          background: "#08090b",
+          background: "var(--page-bg)",
         }}
       />
       {!playing && !error && (
@@ -1557,7 +1557,7 @@ function ForYouVideoPlayer({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: "#08090b",
+            background: "var(--page-bg)",
             color: "#aaa",
             fontSize: "0.82rem",
             textAlign: "center",

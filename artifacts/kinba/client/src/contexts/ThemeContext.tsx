@@ -76,6 +76,15 @@ export function ThemeProvider({
     const root = document.documentElement;
     root.dataset.theme = theme;
     root.classList.toggle("dark", theme === "dark");
+    // Browser / phone status bar follows the app surface colour.
+    const bar = theme === "dark" ? "#2b2c2f" : "#f0f2f5";
+    let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.name = "theme-color";
+      document.head.appendChild(meta);
+    }
+    meta.content = bar;
     if (switchable) {
       window.localStorage.setItem(THEME_STORAGE_KEY, theme);
       window.localStorage.setItem(THEME_MODE_STORAGE_KEY, mode);

@@ -14,7 +14,7 @@
   --feed-card-radius: 0;
   --feed-card-radius-mobile: 0;
   --feed-card-shadow: none;
-  --feed-media-bg: #08090b;
+  --feed-media-bg: var(--page-bg);
   --feed-separator: 1px solid rgba(255, 255, 255, 0.08);
   --feed-text-primary: rgba(244, 247, 255, 0.94);
   --feed-text-secondary: rgba(244, 247, 255, 0.55);
