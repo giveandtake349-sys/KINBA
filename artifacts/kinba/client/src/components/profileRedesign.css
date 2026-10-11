@@ -1437,3 +1437,306 @@
     transform: none;
   }
 }
+
+/* ============================================
+   Separate swipe pages + avatar viewer
+   ============================================ */
+
+/* Each tab page is exactly one viewport wide with a real gap between pages,
+   so one page's tiles and borders never touch the next one while swiping.
+   (ProfileView measures pages by offsetLeft, so the gap is safe.) */
+.pr-content-pages {
+  position: relative;
+  gap: 28px;
+  margin: 0 -16px;
+  padding: 0 0 16px;
+}
+.pr-content-page {
+  padding: 0 16px;
+}
+
+/* Pages ease in and out as they slide past, so the page you are leaving fades
+   back instead of sitting right next to the one arriving. */
+@supports (animation-timeline: view()) {
+  .pr-content-page {
+    animation: pr-page-focus linear both;
+    animation-timeline: view(inline);
+    animation-range: entry 0% exit 100%;
+  }
+}
+@keyframes pr-page-focus {
+  0% {
+    opacity: 0.15;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0.15;
+    transform: scale(0.94);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pr-content-page {
+    animation: none;
+  }
+}
+
+/* --- Tappable avatar --- */
+.pr-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.pr-avatar--button {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+  transition:
+    transform 0.16s var(--line),
+    filter 0.16s var(--line);
+}
+.pr-avatar--button:hover {
+  filter: brightness(1.06);
+}
+.pr-avatar--button:active {
+  transform: scale(0.97);
+}
+.pr-avatar--button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 6px;
+}
+.pr-avatar-badge {
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--blue), var(--teal));
+  box-shadow: 0 0 0 3px var(--page-bg);
+  color: var(--accent-ink);
+  pointer-events: none;
+}
+
+/* --- Full-size photo viewer --- */
+.pr-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  background: rgba(5, 6, 8, 0.86);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  animation: pr-fade-in 0.16s ease;
+}
+.pr-viewer-close {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.16s var(--line);
+}
+.pr-viewer-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.pr-viewer-stage {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  width: 100%;
+  max-width: 420px;
+  animation: pr-slide-up 0.22s var(--line);
+}
+.pr-viewer-photo {
+  display: grid;
+  place-items: center;
+  width: min(86vw, 420px, 62vh);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 28px;
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 24px 70px rgba(0, 0, 0, 0.55);
+  color: var(--muted);
+}
+.pr-viewer-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pr-viewer-name {
+  margin: 0;
+  color: #fff;
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+.pr-viewer-change {
+  flex: none;
+  min-width: 190px;
+}
+.pr-viewer-change[aria-disabled="true"] {
+  opacity: 0.6;
+  pointer-events: none;
+}
+.pr-viewer-stage .pr-message--error {
+  margin: 0;
+  text-align: center;
+}
+
+/* ============================================
+   Page content refresh — Posts, Videos, Shorts,
+   Saved: richer tiles, glass chips, softer text
+   cards and skeletons.
+   ============================================ */
+:root {
+  --pr-shelf-gap: 10px;
+}
+
+.pr-tile {
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.pr-tile-media {
+  background: var(--surface-raised);
+}
+
+/* Play badge: glass circle */
+.pr-tile-play {
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  background: rgba(10, 12, 14, 0.46);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.pr-tile-play svg {
+  height: 13px;
+  width: 13px;
+}
+
+/* Caption inside photos and Shorts: deeper fade, stat as a glass chip */
+.pr-tile-overlay {
+  align-items: flex-start;
+  gap: 5px;
+  padding: 34px 10px 10px;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.82),
+    rgba(0, 0, 0, 0.35) 55%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+.pr-tile-overlay .pr-tile-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  max-width: 100%;
+}
+.pr-tile-overlay .pr-tile-stat {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: 9.5px;
+}
+
+/* Long videos: caption block without the hairline */
+.pr-tile-body {
+  gap: 5px;
+  padding: 10px 12px 12px;
+  border-top: 0;
+}
+.pr-tile-title {
+  font-size: 13px;
+}
+.pr-tile-stat {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+/* Text posts: quote card with a brand accent bar */
+.pr-tile-text {
+  position: relative;
+  min-height: 132px;
+  padding: 16px 16px 18px 20px;
+  background: linear-gradient(
+    160deg,
+    var(--blue-soft),
+    transparent 60%
+  ),
+    var(--surface);
+}
+.pr-tile-text::before {
+  content: "";
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(var(--blue), var(--teal));
+}
+.pr-tile-text-content {
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+/* Fallback when a tile has no media */
+.pr-tile-fallback {
+  background: linear-gradient(135deg, var(--blue-soft), var(--teal-soft));
+  color: var(--blue);
+}
+
+/* Skeletons match the rounded tiles */
+.pr-skeleton-tile {
+  border-radius: 16px;
+}
+.pr-skeleton-tab {
+  border-radius: 999px;
+  height: 30px;
+  width: 72px;
+}
+.pr-skeleton-actions {
+  border-radius: 14px;
+  height: 46px;
+}
+.pr-skeleton-stat-value,
+.pr-skeleton-stat-label {
+  border-radius: 6px;
+}
+
+/* Empty / error page body keeps the same card language */
+.pr-empty-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+}
+.pr-empty--error {
+  border-color: color-mix(in srgb, var(--error) 40%, var(--border));
+}
+.pr-empty--error .pr-empty-icon {
+  background: var(--error-soft);
+  color: var(--error);
+}
