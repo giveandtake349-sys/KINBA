@@ -1,0 +1,458 @@
+/* ==========================================================================
+   FEED MODERN — post cards, reactions, comments, tabs.
+   CSS-only refresh. Imported LAST (see main.tsx) so it refines every earlier
+   feed stylesheet without touching component code. Theme tokens only, so
+   light and dark both work.
+   ========================================================================== */
+
+/* ---------- Feed tabs: floating pill switcher ---------- */
+.home-feed-tabs,
+.media-hub .home-feed-tabs {
+  gap: 4px !important;
+  padding: 5px !important;
+  margin: 8px auto 14px !important;
+  width: calc(100% - 24px) !important;
+  max-width: 560px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 999px !important;
+  background: color-mix(in srgb, var(--surface) 82%, transparent) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.14) !important;
+}
+.home-feed-tabs button,
+.media-hub .home-feed-tabs button {
+  flex: 1 1 0 !important;
+  min-height: 38px !important;
+  padding: 8px 14px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  font-family: inherit !important;
+  font-size: 12.5px !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.005em !important;
+  transition:
+    background 0.18s var(--line),
+    color 0.18s var(--line),
+    transform 0.12s var(--line) !important;
+}
+.home-feed-tabs button.active,
+.media-hub .home-feed-tabs button.active {
+  background: linear-gradient(135deg, var(--blue), var(--teal)) !important;
+  color: var(--accent-ink) !important;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--blue) 32%, transparent) !important;
+}
+
+/* ---------- Post card ---------- */
+.k-post {
+  margin-bottom: 18px;
+  border-radius: 22px;
+  border-color: color-mix(in srgb, var(--border) 85%, transparent);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 12px 32px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition:
+    border-color 0.2s var(--line),
+    box-shadow 0.2s var(--line);
+}
+.k-post:hover {
+  border-color: color-mix(in srgb, var(--blue) 28%, var(--border));
+}
+
+/* Creator row */
+.k-post__creator {
+  gap: 12px;
+  padding: 14px 16px 12px;
+}
+.k-post__avatar {
+  flex-basis: 42px;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 3.5px color-mix(in srgb, var(--blue) 70%, transparent);
+  transition: transform 0.16s var(--line);
+}
+.k-post__avatar:hover {
+  transform: scale(1.04);
+}
+.k-post__name {
+  font-size: 0.92rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.k-post__name .verified-badge {
+  color: var(--teal);
+  flex: none;
+}
+.k-post__meta-line {
+  font-size: 0.72rem;
+}
+
+/* Media: soft inner corners, subtle hover */
+.k-post__media {
+  background: var(--surface-raised);
+}
+.k-post__media--image {
+  cursor: zoom-in;
+}
+.k-post__media--image img {
+  background: var(--surface-raised);
+  transition: transform 0.5s var(--line);
+}
+@media (hover: hover) {
+  .k-post__media--image:hover img {
+    transform: scale(1.012);
+  }
+}
+
+/* Caption + stats */
+.k-post__bottom {
+  padding: 12px 16px 14px;
+}
+.k-post__caption,
+.caption-container {
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.k-post__title {
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+.k-post__stats {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 0.72rem;
+}
+
+/* Text posts: bigger serif body with an accent bar */
+.k-post--text {
+  background:
+    linear-gradient(165deg, var(--blue-soft), transparent 55%),
+    var(--surface);
+}
+.k-post--text .k-post__bottom {
+  position: relative;
+  margin: 0 16px 6px;
+  padding: 4px 0 8px 16px;
+}
+.k-post--text .k-post__bottom::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  bottom: 10px;
+  left: 0;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(var(--blue), var(--teal));
+}
+.k-post--text .k-post__caption,
+.k-post--text .caption-container {
+  font-family: "Fraunces", Georgia, serif;
+  font-size: 1.12rem;
+  line-height: 1.55;
+  letter-spacing: -0.012em;
+}
+
+/* ---------- Action row: soft pill buttons ---------- */
+.k-post__actions {
+  gap: 6px;
+  padding: 8px 12px 10px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.k-post__actions button {
+  min-height: 42px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition:
+    color 0.15s var(--line),
+    background 0.15s var(--line),
+    transform 0.12s var(--line);
+}
+.k-post__actions button:hover {
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+}
+.k-post__actions button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.k-post__actions button.is-active {
+  background: var(--reaction-accent-soft, rgba(255, 90, 110, 0.12));
+  color: var(--reaction-accent, #ff5a6e);
+}
+.k-post__actions button.is-active:hover {
+  background: var(--reaction-accent-soft, rgba(255, 90, 110, 0.18));
+}
+.k-post__actions button.is-active svg {
+  animation: feed-pop 0.28s var(--line);
+}
+@keyframes feed-pop {
+  0% {
+    transform: scale(0.7);
+  }
+  60% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (max-width: 600px) {
+  .k-post {
+    border-radius: 20px;
+    border-left: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+    border-right: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+    margin-left: 8px;
+    margin-right: 8px;
+    width: calc(100% - 16px);
+  }
+}
+
+/* ---------- Reactions ---------- */
+.reaction-count-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--reaction-accent-soft, rgba(255, 90, 110, 0.12));
+  border-color: var(--reaction-accent-border, rgba(255, 90, 110, 0.45));
+  color: var(--reaction-accent, #ff5a6e);
+}
+.conv-reaction {
+  min-height: 30px;
+  padding: 3px 9px;
+  border-color: color-mix(in srgb, var(--border) 80%, transparent);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+}
+.conv-reaction-tray {
+  padding: 7px;
+  gap: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.32);
+  animation: feed-pop-in 0.18s var(--line);
+}
+@keyframes feed-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.94);
+  }
+}
+
+/* ---------- Comments drawer ---------- */
+.comment-drawer-backdrop {
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.comment-drawer {
+  gap: 12px;
+  border-radius: 26px 26px 0 0;
+  background: var(--surface);
+  box-shadow: 0 -24px 70px rgba(0, 0, 0, 0.45);
+}
+.comment-sheet-header {
+  position: relative;
+  justify-content: center;
+  min-height: 36px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.comment-sheet-header > span {
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  width: 40px;
+  height: 4px;
+  transform: translateX(-50%);
+}
+.comment-sheet-header strong {
+  font-size: 0.98rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.comment-sheet-header button {
+  position: absolute;
+  right: 0;
+  top: 2px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  transition: background 0.15s var(--line);
+}
+.comment-sheet-header button:hover {
+  background: var(--surface-elevated);
+  color: var(--text);
+}
+.comment-drawer-list {
+  gap: 12px;
+  padding: 4px 2px 8px;
+}
+.comment-loading,
+.comment-drawer-list > .comment-loading {
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+/* Each comment is a soft bubble */
+.conv-comment {
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 18px;
+  background: var(--surface-raised);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.conv-comment-thread--reply > .conv-comment {
+  background: color-mix(in srgb, var(--surface-raised) 70%, var(--surface));
+}
+.conv-comment-author {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+}
+.conv-comment-time {
+  font-size: 11px;
+}
+.conv-comment-body {
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.conv-comment-foot {
+  gap: 6px;
+  margin-top: 2px;
+}
+.conv-comment-reply-count {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  transition:
+    background 0.15s var(--line),
+    color 0.15s var(--line);
+}
+.conv-comment-reply-count:hover {
+  background: var(--blue-soft);
+}
+.conv-comment-reply-count.conv-comment-reply-toggle {
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+.conv-comment-reply-thread {
+  margin-left: 12px;
+  padding-left: 12px;
+  border-left: 2px solid color-mix(in srgb, var(--blue) 40%, transparent);
+  border-radius: 0 0 0 4px;
+}
+
+/* Composer: floating pill with a gradient send button */
+.conv-composer-row {
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.comment-form input {
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  font-size: 0.92rem;
+  transition:
+    border-color 0.15s var(--line),
+    box-shadow 0.15s var(--line);
+}
+.comment-form input:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-soft);
+}
+.comment-form .primary-btn,
+.comment-form .voice-send-button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--blue), var(--teal));
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--blue) 30%, transparent);
+  color: var(--accent-ink);
+}
+.comment-form .primary-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.comment-form .primary-btn:disabled {
+  box-shadow: none;
+  filter: saturate(0.4);
+  opacity: 0.55;
+}
+.conv-mention-toggle {
+  border-radius: 999px;
+}
+.conv-reply-banner {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--blue-soft);
+}
+
+/* ---------- Photo viewer chrome ---------- */
+.feed-photo-lightbox-backdrop {
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.feed-photo-lightbox-close,
+.feed-photo-lightbox-nav {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  transition: background 0.15s var(--line);
+}
+.feed-photo-lightbox-close:hover,
+.feed-photo-lightbox-nav:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+.feed-photo-lightbox-counter {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ---------- Empty / loading feed states ---------- */
+.feed-empty-state,
+.media-empty {
+  padding: 40px 24px;
+  border: 1px dashed var(--border);
+  border-radius: 22px;
+  background: var(--surface);
+  color: var(--muted);
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .k-post,
+  .k-post__media--image img,
+  .k-post__avatar,
+  .k-post__actions button,
+  .conv-reaction-tray,
+  .k-post__actions button.is-active svg {
+    animation: none;
+    transition: none;
+  }
+}
