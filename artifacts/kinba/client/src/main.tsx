@@ -8,6 +8,7 @@ import superjson from "superjson";
 import App from "./App";
 import OpeningSplash from "./components/OpeningSplash";
 import "./index.css";
+import "./signalNoir.css";
 
 const queryClient = new QueryClient();
 
