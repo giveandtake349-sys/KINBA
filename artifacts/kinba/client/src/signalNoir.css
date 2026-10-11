@@ -451,3 +451,10 @@
     border-left-color: var(--sn-hairline);
   }
 }
+
+/* --- Toasts / notification banners follow the theme surfaces --------------- */
+:root [data-sonner-toaster] {
+  --normal-bg: var(--surface);
+  --normal-text: var(--text);
+  --normal-border: var(--border);
+}

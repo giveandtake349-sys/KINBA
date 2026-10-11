@@ -13,6 +13,9 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <item name="android:statusBarColor">#262729</item>
+        <item name="android:navigationBarColor">#262729</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 
 
@@ -23,8 +26,8 @@
          The window now uses the JHILIK splash colour instead, and on Android
          12+ the system splash is forced to that same colour with no icon. -->
     <style name="AppTheme.NoActionBarLaunch" parent="AppTheme.NoActionBar">
-        <item name="android:windowBackground">#050505</item>
-        <item name="android:windowSplashScreenBackground">#050505</item>
+        <item name="android:windowBackground">#262729</item>
+        <item name="android:windowSplashScreenBackground">#262729</item>
         <item name="android:windowSplashScreenAnimatedIcon">@null</item>
     </style>
 </resources>

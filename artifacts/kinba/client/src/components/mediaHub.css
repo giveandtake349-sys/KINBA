@@ -38,7 +38,7 @@
   overflow: hidden;
 }
 .media-video-frame {
-  background: #0a0a0a;
+  background: var(--page-bg);
   overflow: hidden;
   position: relative;
 }
@@ -275,7 +275,7 @@
   padding: 9px;
 }
 .media-selection video {
-  background: #0a0a0a;
+  background: var(--page-bg);
   border-radius: var(--radius-control);
   height: 55px;
   object-fit: contain;
@@ -336,7 +336,7 @@
   display: none;
 }
 .short-card {
-  background: #0a0a0a;
+  background: var(--page-bg);
   border-radius: var(--radius-surface);
   height: 100%;
   min-height: 100%;
@@ -400,7 +400,7 @@
 .announcement-selection img,
 .announcement-selection video {
   aspect-ratio: 1;
-  background: #0a0a0a;
+  background: var(--page-bg);
   border-radius: var(--radius-control);
   height: 76px;
   object-fit: cover;
@@ -464,7 +464,7 @@
 }
 .announcement-attachments img,
 .announcement-attachments video {
-  background: #0a0a0a;
+  background: var(--page-bg);
   border-radius: var(--radius-control);
   max-height: 440px;
   object-fit: cover;
@@ -1797,7 +1797,7 @@
   position: relative;
   aspect-ratio: 16 / 9;
   min-height: 0;
-  background: #050505;
+  background: var(--page-bg);
 }
 .media-fullscreen-frame video,
 .media-video-frame video {
@@ -2225,7 +2225,7 @@
   aspect-ratio: 16 / 9;
   height: auto !important;
   min-height: 0;
-  background: #050505;
+  background: var(--page-bg);
 }
 .unified-feed .media-video-frame {
   aspect-ratio: 16 / 9;
@@ -2233,7 +2233,7 @@
 }
 .unified-feed .media-video-frame video {
   object-fit: contain;
-  background: #050505;
+  background: var(--page-bg);
 }
 .unified-feed .video-card-details {
   padding: 16px;
@@ -2296,7 +2296,7 @@
   width: 100%;
   max-height: 480px;
   object-fit: cover;
-  background: #050505;
+  background: var(--page-bg);
 }
 .feed-post-attachments video {
   aspect-ratio: 16 / 9;
@@ -2548,7 +2548,7 @@
   width: 100%;
   padding: 0;
   border: 0;
-  background: #050505;
+  background: var(--page-bg);
   cursor: zoom-in;
 }
 .feed-photo-button img,
@@ -2573,7 +2573,7 @@
   justify-content: center;
   overflow: hidden;
   padding: 12px 8px;
-  background: #000;
+  background: var(--page-bg);
 }
 .feed-photo-lightbox img {
   display: block;
@@ -3009,7 +3009,7 @@
   height: auto !important;
   min-height: 0 !important;
   aspect-ratio: 16 / 9 !important;
-  background: #050505 !important;
+  background: var(--page-bg) !important;
 }
 
 .media-hub .unified-feed-list > .long-video-card .media-video-frame video {
@@ -3027,7 +3027,7 @@
   height: auto !important;
   min-height: 0 !important;
   aspect-ratio: 16 / 9 !important;
-  background: #050505 !important;
+  background: var(--page-bg) !important;
 }
 
 .media-hub .unified-feed-list > .shorts-insertion-block .short-card--compact .media-video-frame--short video {
@@ -3334,7 +3334,7 @@
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 9;
-  background: #08090b;
+  background: var(--page-bg);
   overflow: hidden;
 }
 
@@ -3432,7 +3432,7 @@
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  background-color: #000;
+  background-color: var(--page-bg);
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
