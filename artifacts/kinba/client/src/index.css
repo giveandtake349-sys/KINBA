@@ -98,15 +98,15 @@
   }
 }
 :root[data-theme="dark"] {
-  /* Foundation — Graphite / charcoal grey */
-  --page-bg: #303134;
-  --text: #ececee;
-  --muted: #b4b6bb;
-  --surface: #3a3b3f;
-  --surface-raised: #45464a;
-  --surface-elevated: #505155;
-  --border: #56575c;
-  --input: #56575c;
+  /* Foundation — Dark grey */
+  --page-bg: #28292c;
+  --text: #e8e9eb;
+  --muted: #b0b3b8;
+  --surface: #323336;
+  --surface-raised: #3c3d41;
+  --surface-elevated: #47484c;
+  --border: #4a4b4f;
+  --input: #4a4b4f;
   /* Brand — Facebook blue for main buttons and links */
   --blue: #2d88ff;
   --blue-soft: rgba(45, 136, 255, 0.18);
