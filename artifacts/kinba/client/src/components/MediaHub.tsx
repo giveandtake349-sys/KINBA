@@ -87,6 +87,12 @@ import {
 } from "@/lib/mentionParser";
 import { isAbsoluteHttpUrl, resolveMediaUrl } from "@/lib/runtimeConfig";
 import { isAndroidApp, saveImageToGallery } from "@/lib/galleryDownload";
+import {
+  attachPlaybackDiagnostics,
+  describePlaybackFailure,
+  logPlaybackEvent,
+  shouldUseHlsJs,
+} from "@/lib/mediaPlayback";
 import { useVideoReaction } from "@/hooks/useVideoReaction";
 import {
   adoptSingleReaction,
@@ -972,15 +978,25 @@ function QualityVideoPlayer({
     setPlaybackError(null);
     hlsRef.current?.destroy();
     hlsRef.current = null;
-    if (isHlsMediaUrl(sourceUrl) && Hls.isSupported()) {
+    if (!isNearViewport) {
+      element.pause();
+      element.removeAttribute("src");
+      element.load();
+      return;
+    }
+    if (shouldUseHlsJs(element, sourceUrl, Hls.isSupported())) {
       const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
       hlsRef.current = hls;
       hls.on(Hls.Events.ERROR, (_event, data) => {
+        logPlaybackEvent("hls-error", element, sourceUrl, {
+          videoId: video.id,
+          fatal: data.fatal,
+          type: data.type,
+          details: data.details,
+        });
         if (data.fatal) {
           setIsLoading(false);
-          setPlaybackError(
-            "This video stream could not be loaded. Please try again."
-          );
+          setPlaybackError(describePlaybackFailure(element, sourceUrl).message);
         }
       });
       hls.loadSource(sourceUrl);
@@ -993,7 +1009,13 @@ function QualityVideoPlayer({
       hlsRef.current?.destroy();
       hlsRef.current = null;
     };
-  }, [sourceUrl]);
+  }, [sourceUrl, isNearViewport, video.id]);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || !sourceUrl || !isNearViewport) return;
+    return attachPlaybackDiagnostics(element, sourceUrl, video.id);
+  }, [sourceUrl, isNearViewport, video.id]);
 
   const restorePlayback = () => {
     const element = ref.current;
@@ -1033,7 +1055,7 @@ function QualityVideoPlayer({
       }
     >
       <video
-        src={sourceUrl}
+        src={isNearViewport ? sourceUrl : undefined}
         poster={showPoster ? posterUrl : undefined}
         className={`w-full h-full ${vertical ? "object-contain" : "object-contain"}`}
         ref={ref}
@@ -1265,9 +1287,18 @@ function InlineVideoPlayer({
     if (!el || !sourceUrl || !isNearViewport) return;
     hlsRef.current?.destroy();
     hlsRef.current = null;
-    if (isHlsMediaUrl(sourceUrl) && Hls.isSupported()) {
+    if (shouldUseHlsJs(el, sourceUrl, Hls.isSupported())) {
       const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
       hlsRef.current = hls;
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        logPlaybackEvent("hls-error", el, sourceUrl, {
+          videoId: video.id,
+          fatal: data.fatal,
+          type: data.type,
+          details: data.details,
+        });
+        if (data.fatal) setError("The video stream failed. Please try again.");
+      });
       hls.loadSource(sourceUrl);
       hls.attachMedia(el);
     } else {
@@ -1277,7 +1308,13 @@ function InlineVideoPlayer({
       hlsRef.current?.destroy();
       hlsRef.current = null;
     };
-  }, [sourceUrl, isNearViewport]);
+  }, [sourceUrl, isNearViewport, video.id]);
+
+  useEffect(() => {
+    const element = videoRef.current;
+    if (!element || !sourceUrl || !isNearViewport) return;
+    return attachPlaybackDiagnostics(element, sourceUrl, video.id);
+  }, [sourceUrl, isNearViewport, video.id]);
 
   const handleLoadedMetadata = () => {
     const el = videoRef.current;
@@ -1327,7 +1364,9 @@ function InlineVideoPlayer({
         }}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
-        onError={() => setError("Video could not be loaded.")}
+        onError={() =>
+          setError(describePlaybackFailure(videoRef.current, sourceUrl).message)
+        }
         onLoadedMetadata={handleLoadedMetadata}
         style={{
           display: "block",
@@ -1461,11 +1500,23 @@ function ForYouVideoPlayer({
     setError(null);
     hlsRef.current?.destroy();
     hlsRef.current = null;
-    if (isHlsMediaUrl(sourceUrl) && Hls.isSupported()) {
+    if (!isNearViewport) {
+      el.pause();
+      el.removeAttribute("src");
+      el.load();
+      return;
+    }
+    if (shouldUseHlsJs(el, sourceUrl, Hls.isSupported())) {
       const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
       hlsRef.current = hls;
       hls.on(Hls.Events.ERROR, (_e, data) => {
-        if (data.fatal) setError("Stream could not be loaded.");
+        logPlaybackEvent("hls-error", el, sourceUrl, {
+          videoId: video.id,
+          fatal: data.fatal,
+          type: data.type,
+          details: data.details,
+        });
+        if (data.fatal) setError("The video stream failed. Please try again.");
       });
       hls.loadSource(sourceUrl);
       hls.attachMedia(el);
@@ -1477,7 +1528,13 @@ function ForYouVideoPlayer({
       hlsRef.current?.destroy();
       hlsRef.current = null;
     };
-  }, [sourceUrl]);
+  }, [sourceUrl, isNearViewport, video.id]);
+
+  useEffect(() => {
+    const element = videoRef.current;
+    if (!element || !sourceUrl || !isNearViewport) return;
+    return attachPlaybackDiagnostics(element, sourceUrl, video.id);
+  }, [sourceUrl, isNearViewport, video.id]);
 
   /* Auto-play/pause based on viewport */
   const shouldAutoPlay = active && isInView;
@@ -1539,7 +1596,7 @@ function ForYouVideoPlayer({
     >
       <video
         ref={videoRef}
-        src={sourceUrl}
+        src={isNearViewport ? sourceUrl : undefined}
         poster={posterUrl}
         muted={muted}
         loop
@@ -1554,7 +1611,9 @@ function ForYouVideoPlayer({
         }}
         onPause={() => setPlaying(false)}
         onEnded={() => setPlaying(false)}
-        onError={() => setError("Video could not be loaded.")}
+        onError={() =>
+          setError(describePlaybackFailure(videoRef.current, sourceUrl).message)
+        }
         onLoadedMetadata={handleLoadedMetadata}
         style={{
           display: "block",
