@@ -87,7 +87,7 @@ export default function Settings() {
       <header className="settings-header">
         <button
           type="button"
-          className="kb-icon-btn settings-header__icon"
+          className="settings-header__icon"
           onClick={goBack}
           aria-label={paneOpen && isMobile ? "Back to settings" : "Back to feed"}
           title={paneOpen && isMobile ? "Back to settings" : "Back to feed"}
@@ -147,7 +147,7 @@ export default function Settings() {
                     <li key={item.id}>
                       <button
                         type="button"
-                        className="kb-menu-item settings-index__button"
+                        className="settings-index__button"
                         aria-current={current}
                         onClick={() => openSection(item.id)}
                       >
@@ -179,7 +179,7 @@ export default function Settings() {
               {paneOpen ? (
                 <button
                   type="button"
-                  className="kb-btn settings-pane__back"
+                  className="settings-pane__back"
                   onClick={() => navigate("/settings")}
                 >
                   <ChevronLeft size={14} aria-hidden="true" /> All settings

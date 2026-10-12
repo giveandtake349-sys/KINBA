@@ -136,7 +136,7 @@ function ThemeToggle({ onClose }: { onClose?: () => void }) {
   return (
     <button
       type="button"
-      className="kb-btn theme-toggle"
+      className="theme-toggle"
       onClick={event => {
         event.preventDefault();
         event.stopPropagation();
@@ -225,7 +225,7 @@ function ProfileStatsGrid({ profile }: { profile?: ProfileSnapshot }) {
           item.mode && profileUserId > 0 ? (
             <button
               type="button"
-              className="kb-chip drawer-stat drawer-stat--link"
+              className="drawer-stat drawer-stat--link"
               key={item.label}
               aria-label={`Show ${item.label}`}
               onClick={safeClick(() => setFollowList(item.mode ?? null))}
@@ -383,7 +383,7 @@ function GetVerifiedPanel() {
           </label>
           <button
             type="submit"
-            className="kb-btn kb-btn--primary primary-btn"
+            className="primary-btn"
             disabled={submit.isPending || isPending}
           >
             {isPending
@@ -548,7 +548,7 @@ function AdminVerificationPanel() {
                           </select>
                           <button
                             type="button"
-                            className="kb-btn kb-btn--primary primary-btn"
+                            className="primary-btn"
                             disabled={isBusy}
                             onClick={() => decide(transaction.id, "approved")}
                           >
@@ -556,7 +556,7 @@ function AdminVerificationPanel() {
                           </button>
                           <button
                             type="button"
-                            className="kb-btn kb-btn--danger verification-reject-btn"
+                            className="verification-reject-btn"
                             disabled={isBusy}
                             onClick={() => decide(transaction.id, "rejected")}
                           >
@@ -677,7 +677,7 @@ function MobileDrawer({
       <aside className="mobile-drawer" aria-label="Main menu">
         <div className="drawer-head">
           <span>Menu</span>
-          <button type="button" className="kb-icon-btn" onClick={onClose} aria-label="Close menu">
+          <button type="button" onClick={onClose} aria-label="Close menu">
             <X size={20} />
           </button>
         </div>
@@ -685,7 +685,7 @@ function MobileDrawer({
           <ProfileIdentity profile={profile} />
           <button
             type="button"
-            className="kb-btn drawer-edit"
+            className="drawer-edit"
             onClick={safeClick(() => {
               onNavigate("profile");
               onClose();
@@ -708,7 +708,6 @@ function MobileDrawer({
                 return (
                   <button
                     type="button"
-                    className="kb-menu-item"
                     key={item.label}
                     onClick={safeClick(() => {
                       onNavigate(item.section);
@@ -731,7 +730,7 @@ function MobileDrawer({
             <h2 id="drawer-group-appearance">Appearance</h2>
             <ThemeToggle onClose={onClose} />
           </section>
-          <button type="button" className="kb-btn kb-btn--danger drawer-logout" onClick={safeClick(onLogout)}>
+          <button type="button" className="drawer-logout" onClick={safeClick(onLogout)}>
             <LogOut size={18} />
             <span>Log out</span>
           </button>
@@ -764,7 +763,7 @@ function AppHeader({
     <header className="topbar mobile-first-header">
       <button
         type="button"
-        className="kb-btn brand"
+        className="brand"
         onClick={safeClick(onHome)}
         aria-label="Go to Home Feed"
       >
@@ -772,14 +771,14 @@ function AppHeader({
         <span className="brand-name">JHILIK</span>
       </button>
       <nav className="desktop-nav" aria-label="Primary navigation">
-        <button type="button" className="kb-nav-item" onClick={safeClick(onHome)}>Feed</button>
-        <button type="button" className="kb-nav-item" onClick={safeClick(() => onSelectFeed("shorts"))}>Shorts</button>
-        <button type="button" className="kb-nav-item" onClick={safeClick(onProfile)}>Profile</button>
+        <button type="button" onClick={safeClick(onHome)}>Feed</button>
+        <button type="button" onClick={safeClick(() => onSelectFeed("shorts"))}>Shorts</button>
+        <button type="button" onClick={safeClick(onProfile)}>Profile</button>
       </nav>
       <div className="topbar-actions">
         <button
           type="button"
-          className="kb-icon-btn topbar-icon-button"
+          className="topbar-icon-button"
           onClick={safeClick(() => onOpenModal("search"))}
           aria-label="Search"
           title="Search"
@@ -788,7 +787,7 @@ function AppHeader({
         </button>
         <button
           type="button"
-          className="kb-icon-btn topbar-icon-button topbar-notification-button"
+          className="topbar-icon-button topbar-notification-button"
           onClick={safeClick(() => onOpenModal("notifications"))}
           aria-label="Notifications"
           title="Notifications"
@@ -802,7 +801,7 @@ function AppHeader({
         </button>
         <button
           type="button"
-          className="kb-menu-item header-profile-trigger"
+          className="header-profile-trigger"
           onClick={safeClick(onMenu)}
           aria-label="Open profile menu"
         >
@@ -810,7 +809,7 @@ function AppHeader({
           <Menu size={24} />
         </button>
         <ThemeToggle />
-        <button type="button" className="kb-btn kb-btn--danger logout-btn" onClick={safeClick(onLogout)}>
+        <button type="button" className="logout-btn" onClick={safeClick(onLogout)}>
           <LogOut size={16} />
           <span>Log out</span>
         </button>
@@ -833,12 +832,12 @@ function FeedTabs({
   ] as const;
 
   return (
-    <nav className="kb-segmented home-feed-tabs" aria-label="Home feed tabs" role="tablist">
+    <nav className="home-feed-tabs" aria-label="Home feed tabs" role="tablist">
       {tabs.map(([id, label]) => (
         <button
           type="button"
           key={id}
-          className={`kb-chip${activeSection === id ? " is-active active" : ""}`}
+          className={activeSection === id ? "active" : ""}
           onClick={safeClick(() => onSectionChange(id))}
           aria-selected={activeSection === id}
           role="tab"
@@ -874,13 +873,12 @@ function BottomNavigation({
   const isHome = ["videos", "shorts", "spotlight"].includes(activePanel);
   return (
     <nav
-      className={`kb-nav bottom-navigation fixed left-0 right-0 z-[var(--z-nav)] transition-transform duration-300 ease-in-out ${className ?? ""}`}
-      style={{ gap: "8px" }}
+      className={`bottom-navigation fixed left-0 right-0 z-[var(--z-nav)] transition-transform duration-300 ease-in-out ${className ?? ""}`}
       aria-label="Mobile navigation"
     >
       <button
         type="button"
-        className={`kb-nav-item${isHome ? " is-active active" : ""}`}
+        className={isHome ? "active" : ""}
         onClick={safeClick(onHome)}
         aria-current={isHome ? "page" : undefined}
       >
@@ -889,7 +887,7 @@ function BottomNavigation({
       </button>
       <button
         type="button"
-        className="kb-nav-item bottom-nav-hype-rooms"
+        className="bottom-nav-hype-rooms"
         onClick={safeClick(onOpenHypeRooms)}
         aria-label="Hype Rooms"
         title="Hype Rooms"
@@ -899,7 +897,7 @@ function BottomNavigation({
       </button>
       <button
         type="button"
-        className="kb-fab publish-nav"
+        className="publish-nav"
         onClick={safeClick(onPublish)}
         aria-label="Create a video"
       >
@@ -908,7 +906,7 @@ function BottomNavigation({
       </button>
       <button
         type="button"
-        className={`kb-nav-item${activePanel === "messages" ? " is-active active" : ""}`}
+        className={activePanel === "messages" ? "active" : ""}
         onClick={safeClick(onMessages)}
         aria-current={activePanel === "messages" ? "page" : undefined}
       >
@@ -920,7 +918,7 @@ function BottomNavigation({
       </button>
       <button
         type="button"
-        className={`kb-nav-item${menuOpen ? " is-active active" : ""}`}
+        className={menuOpen ? "active" : ""}
         onClick={safeClick(onMenu)}
         aria-expanded={menuOpen}
       >
@@ -945,7 +943,7 @@ function Landing({ onLogin }: { onLogin: () => void }) {
           Publish, explore, and follow the people and organizations shaping what
           comes next.
         </p>
-        <button type="button" className="kb-btn kb-btn--primary primary-btn" onClick={safeClick(onLogin)}>
+        <button type="button" className="primary-btn" onClick={safeClick(onLogin)}>
           Sign in to JHILIK
         </button>
       </div>
@@ -1081,7 +1079,7 @@ function NotificationsPanel({ enabled }: { enabled: boolean }) {
         {enabled && unreadDurable.length > 0 ? (
           <button
             type="button"
-            className="kb-btn muted-btn"
+            className="muted-btn"
             disabled={markReadMut.isPending}
             onClick={() => void markAll()}
           >
@@ -1127,7 +1125,7 @@ function NotificationsPanel({ enabled }: { enabled: boolean }) {
                       {unread ? (
                         <button
                           type="button"
-                          className="kb-btn notification-read-btn"
+                          className="notification-read-btn"
                           aria-label={`Mark "${item.title}" as read`}
                           disabled={markReadMut.isPending}
                           onClick={() => {
@@ -1139,7 +1137,7 @@ function NotificationsPanel({ enabled }: { enabled: boolean }) {
                       ) : target ? (
                         <button
                           type="button"
-                          className="kb-btn notification-read-btn"
+                          className="notification-read-btn"
                           aria-label={`Open "${item.title}"`}
                           onClick={() => navigate(target)}
                         >
@@ -1251,7 +1249,7 @@ function SettingsPanel({ onLogout }: { onLogout: () => void }) {
           ) : (
             <button
               type="button"
-              className="kb-btn kb-btn--primary settings-connect"
+              className="settings-connect"
               onClick={safeClick(google.connect)}
               disabled={google.pending}
             >
@@ -1264,7 +1262,7 @@ function SettingsPanel({ onLogout }: { onLogout: () => void }) {
             </button>
           )}
         </div>
-        <button type="button" className="kb-btn kb-btn--danger settings-logout" onClick={safeClick(onLogout)}>
+        <button type="button" className="settings-logout" onClick={safeClick(onLogout)}>
           <LogOut size={18} /> Log out
         </button>
       </div>
@@ -1300,7 +1298,7 @@ function WalletPanel() {
           <p>Try again in a moment.</p>
           <button
             type="button"
-            className="kb-btn muted-btn"
+            className="muted-btn"
             onClick={() => wallet.refetch()}
           >
             Retry
@@ -1370,7 +1368,7 @@ function WalletModal({
         <div className="wallet-modal-actions" aria-label="Wallet actions">
           <button
             type="button"
-            className="kb-btn kb-btn--primary primary-btn"
+            className="primary-btn"
             onClick={safeClick(() =>
               toast.info("Deposit requests are being prepared for your account.")
             )}
@@ -1691,10 +1689,10 @@ function UploadVideoModal({
           />
           <span className="field-hint">{textBody.length}/5000</span>
           <div className="create-uploader-form-actions">
-            <button type="button" className="kb-btn muted-btn" onClick={safeClick(() => setMode("menu"))}>Back</button>
+            <button type="button" className="muted-btn" onClick={safeClick(() => setMode("menu"))}>Back</button>
             <button
               type="button"
-              className="kb-btn kb-btn--primary primary-btn"
+              className="primary-btn"
               disabled={textBusy || !textBody.trim()}
               onClick={safeClick(submitText)}
             >
@@ -1722,7 +1720,7 @@ function UploadVideoModal({
           <label>Caption<textarea value={caption} onChange={event => setCaption(event.target.value)} placeholder={kind === "SHORT" ? "Describe your Short" : "What's on your mind?"} maxLength={2400} rows={4} required /></label>
           <input ref={inputRef} type="file" accept={mediaMode === "photo" ? "image/jpeg,image/png,image/webp" : "video/*"} className="sr-only" onChange={selectFile} />
           <button type="button" className="modal-file-button" onClick={safeClick(() => inputRef.current?.click())}>{mediaMode === "photo" ? <ImagePlus size={18} /> : <Video size={18} />} {file ? file.name : mediaMode === "photo" ? "Choose JPG, PNG, or WEBP image" : "Choose original video"}</button>
-          <div className="create-uploader-form-actions"><button type="button" className="kb-btn muted-btn" onClick={safeClick(() => setMode("menu"))}>Back</button><button className="kb-btn kb-btn--primary primary-btn" type="submit" disabled={busy}>{busy ? "Uploading…" : mediaMode === "photo" ? "Publish image" : kind === "SHORT" ? "Upload Short" : "Publish video"}</button></div>
+          <div className="create-uploader-form-actions"><button type="button" className="muted-btn" onClick={safeClick(() => setMode("menu"))}>Back</button><button className="primary-btn" type="submit" disabled={busy}>{busy ? "Uploading…" : mediaMode === "photo" ? "Publish image" : kind === "SHORT" ? "Upload Short" : "Publish video"}</button></div>
         </form>
       )}
     </ActionModal>
@@ -1824,7 +1822,7 @@ function CreatorStudioModal({
       </div>
       <button
         type="button"
-        className="kb-btn kb-btn--primary primary-btn"
+        className="primary-btn"
         onClick={event => {
           event.preventDefault();
           event.stopPropagation();
@@ -1889,7 +1887,7 @@ function QrPanel({ profile }: { profile?: ProfileSnapshot }) {
           <strong>{profileDisplayName(profile)}</strong>
           <span>{username ? `@${username}` : "Your public profile"}</span>
         </div>
-        <button type="button" className="kb-btn kb-btn--primary primary-btn" onClick={copyLink}>
+        <button type="button" className="primary-btn" onClick={copyLink}>
           {copied ? <Check size={16} /> : <Copy size={16} />}
           {copied ? "Link copied" : "Copy profile link"}
         </button>
@@ -1930,7 +1928,7 @@ function OfflineVideosPanel({ onBrowse }: { onBrowse: () => void }) {
           <p>We could not reach your saved library. Try again.</p>
           <button
             type="button"
-            className="kb-btn muted-btn"
+            className="muted-btn"
             onClick={() => saved.refetch()}
           >
             Retry
@@ -1961,7 +1959,7 @@ function OfflineVideosPanel({ onBrowse }: { onBrowse: () => void }) {
               <Play size={16} aria-hidden="true" />
             </a>
           ))}
-          <button type="button" className="kb-btn kb-btn--primary primary-btn" onClick={onBrowse}>
+          <button type="button" className="primary-btn" onClick={onBrowse}>
             Browse feed
           </button>
         </div>
@@ -1970,7 +1968,7 @@ function OfflineVideosPanel({ onBrowse }: { onBrowse: () => void }) {
           <Film size={24} />
           <h3>Nothing saved yet.</h3>
           <p>Use Save on any post, photo, or video to keep it in this library.</p>
-          <button type="button" className="kb-btn kb-btn--primary primary-btn" onClick={onBrowse}>
+          <button type="button" className="primary-btn" onClick={onBrowse}>
             Browse feed
           </button>
         </div>

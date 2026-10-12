@@ -756,7 +756,7 @@ function VoiceCommentComposer({
       {recorder.recording ? (
         <button
           type="button"
-          className="kb-chip voice-recording-button is-recording"
+          className="voice-recording-button is-recording"
           onClick={recorder.stop}
           aria-label="Stop recording"
         >
@@ -776,7 +776,7 @@ function VoiceCommentComposer({
       ) : (
         <button
           type="button"
-          className="kb-icon-btn voice-record-button"
+          className="voice-record-button"
           onClick={() => recorder.start().catch(notifyError)}
           disabled={disabled || uploading}
           aria-label="Record voice comment"
@@ -786,7 +786,7 @@ function VoiceCommentComposer({
       )}
       <button
         type="submit"
-        className="kb-btn kb-btn--primary primary-btn voice-send-button"
+        className="primary-btn voice-send-button"
         disabled={
           disabled || uploading || (!body.trim() && !recorder.audioBlob)
         }
@@ -1692,7 +1692,7 @@ function EngagementActions({
       {overlay && !shorts && owner && !isOwnVideo && (
         <button
           type="button"
-          className={`kb-chip creator-follow-action${following ? " is-following" : ""}`}
+          className={`creator-follow-action${following ? " is-following" : ""}`}
           onClick={event => {
             event.preventDefault();
             event.stopPropagation();
@@ -1717,7 +1717,7 @@ function EngagementActions({
       )}
       <button
         type="button"
-        className={`kb-chip media-engagement-actions__pookie${engagement.viewerReacted ? " is-active" : ""}`}
+        className={`media-engagement-actions__pookie${engagement.viewerReacted ? " is-active" : ""}`}
         {...longPress}
         onClick={event => {
           event.preventDefault();
@@ -1737,7 +1737,6 @@ function EngagementActions({
       </button>
       <button
         type="button"
-        className="kb-chip"
         onClick={event => {
           event.preventDefault();
           event.stopPropagation();
@@ -1750,7 +1749,7 @@ function EngagementActions({
       </button>
       <button
         type="button"
-        className={`kb-chip${engagement.viewerShared ? " is-active" : ""}`}
+        className={engagement.viewerShared ? "is-active" : ""}
         onClick={event => {
           event.preventDefault();
           event.stopPropagation();
@@ -1766,7 +1765,7 @@ function EngagementActions({
       {onBookmark && (
         <button
           type="button"
-          className={`kb-chip${bookmarked ? " is-active" : ""}`}
+          className={bookmarked ? "is-active" : ""}
           onClick={event => {
             event.preventDefault();
             event.stopPropagation();
@@ -3256,10 +3255,10 @@ function VideoCard({
           </>
         )}
 
-        <div className="kb-actions k-post__actions">
+        <div className="k-post__actions">
           <button
             type="button"
-            className={`kb-chip media-engagement-actions__pookie${current.viewerReacted ? " is-active" : ""}`}
+            className={`media-engagement-actions__pookie${current.viewerReacted ? " is-active" : ""}`}
             {...longPress}
             onClick={react}
             disabled={!!pending}
@@ -3283,7 +3282,6 @@ function VideoCard({
           />
           <button
             type="button"
-            className="kb-chip"
             onClick={() => {
               if (!auth.isAuthenticated) return auth.openAuth();
               setCommentsOpen(v => !v);
@@ -3292,13 +3290,13 @@ function VideoCard({
             <MessageCircle size={16} />
             <span>Comment</span>
           </button>
-          <button type="button" className="kb-chip" onClick={share} disabled={!!pending}>
+          <button type="button" onClick={share} disabled={!!pending}>
             <Share2 size={16} />
             <span>Share</span>
           </button>
           <button
             type="button"
-            className={`kb-chip${bookmarked ? " is-active" : ""}`}
+            className={bookmarked ? "is-active" : ""}
             onClick={toggleBookmark}
           >
             <Bookmark size={16} fill={bookmarked ? "currentColor" : "none"} />

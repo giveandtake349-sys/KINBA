@@ -188,7 +188,7 @@ export function SettingsState({
       />
       <p>{message}</p>
       {kind === "error" && onRetry ? (
-        <button type="button" className="kb-btn settings-btn settings-btn--ghost" onClick={onRetry}>
+        <button type="button" className="settings-btn settings-btn--ghost" onClick={onRetry}>
           {retryLabel}
         </button>
       ) : null}
@@ -219,7 +219,6 @@ export function SettingsButton({
     <button
       type={type}
       className={cn(
-        "kb-btn",
         "settings-btn",
         `settings-btn--${variant}`,
         busy && "settings-btn--busy"
@@ -303,7 +302,7 @@ export function SettingsSwitch({
       role="switch"
       aria-checked={checked}
       aria-label={label}
-      className={cn("kb-icon-btn settings-switch", checked && "settings-switch--on")}
+      className={cn("settings-switch", checked && "settings-switch--on")}
       disabled={disabled}
       onClick={() => onChange(!checked)}
     >
@@ -327,7 +326,7 @@ export function SettingsSegmented<T extends string>({
 }) {
   return (
     <div
-      className="kb-segmented settings-segmented"
+      className="settings-segmented"
       role="radiogroup"
       aria-label={label}
     >
@@ -339,7 +338,7 @@ export function SettingsSegmented<T extends string>({
             type="button"
             role="radio"
             aria-checked={active}
-            className={cn("kb-chip settings-segmented__item", active && "is-active")}
+            className={cn("settings-segmented__item", active && "is-active")}
             disabled={disabled}
             onClick={() => onChange(option.value)}
           >

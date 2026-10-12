@@ -347,7 +347,7 @@ export default function HypeRooms() {
   return (
     <div className="kinba-app hype-rooms-shell">
       <main className="hype-rooms-page section-shell">
-        <button type="button" className="kb-btn hype-rooms-back" onClick={goHome}>
+        <button type="button" className="hype-rooms-back" onClick={goHome}>
           <ArrowLeft size={16} />
           Back to feed
         </button>
@@ -364,7 +364,7 @@ export default function HypeRooms() {
           </div>
           <button
             type="button"
-            className="kb-btn kb-btn--primary primary-btn hype-rooms-create-cta"
+            className="primary-btn hype-rooms-create-cta"
             onClick={() => navigate("/rooms/new")}
           >
             <Plus size={16} aria-hidden="true" />
@@ -372,7 +372,7 @@ export default function HypeRooms() {
           </button>
         </header>
 
-        <nav className="kb-segmented hype-room-filters" aria-label="Hype Room filters" role="tablist">
+        <nav className="hype-room-filters" aria-label="Hype Room filters" role="tablist">
           {FILTERS.map(item => {
             const active = filter === item.id;
             return (
@@ -381,7 +381,7 @@ export default function HypeRooms() {
                 type="button"
                 role="tab"
                 aria-selected={active}
-                className={`kb-chip${active ? " is-active active" : ""}`}
+                className={active ? "active" : ""}
                 onClick={() => setFilter(item.id)}
               >
                 {item.id === "mine" ? (
@@ -414,7 +414,7 @@ export default function HypeRooms() {
                   </span>
                   <button
                     type="button"
-                    className="kb-btn kb-btn--primary primary-btn"
+                    className="primary-btn"
                     disabled={acceptInviteMut.isPending}
                     onClick={() => void handleAcceptInvite(invite.id)}
                   >
@@ -457,7 +457,7 @@ export default function HypeRooms() {
                 auth.isAuthenticated ? null : (
                   <button
                     type="button"
-                    className="kb-btn kb-btn--primary primary-btn"
+                    className="primary-btn"
                     onClick={() => auth.openAuth()}
                   >
                     Sign in
@@ -477,7 +477,7 @@ export default function HypeRooms() {
               title="Could not load Hype Rooms."
               body="Something went wrong while fetching the lobby. Try again."
               action={
-                <button type="button" className="kb-btn muted-btn" onClick={retry}>
+                <button type="button" className="muted-btn" onClick={retry}>
                   Retry
                 </button>
               }
@@ -490,7 +490,7 @@ export default function HypeRooms() {
               action={
                 <button
                   type="button"
-                  className="kb-btn kb-btn--primary primary-btn"
+                  className="primary-btn"
                   onClick={() => navigate("/rooms/new")}
                 >
                   <Plus size={16} aria-hidden="true" />
