@@ -913,3 +913,47 @@ body:has(.shorts-viewer-layer) .action-modal-layer {
     padding-inline: 9px !important;
   }
 }
+
+/* Phase 3 Shorts polish: progress, focus, and motion preferences. */
+.media-hub .shorts-tab-panel .shorts-progress,
+.media-hub .shorts-viewer-layer .shorts-progress {
+  position: absolute !important;
+  left: 16px !important;
+  right: 16px !important;
+  bottom: 12px !important;
+  z-index: 35 !important;
+  height: 3px !important;
+  overflow: hidden !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.3) !important;
+  pointer-events: none !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-progress > span,
+.media-hub .shorts-viewer-layer .shorts-progress > span {
+  display: block !important;
+  height: 100% !important;
+  border-radius: inherit !important;
+  background: #fff !important;
+  transition: width 120ms linear !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport:focus-visible,
+.media-hub .shorts-viewer-layer .shorts-viewport:focus-visible,
+.media-hub .shorts-tab-panel .short-card:focus-visible,
+.media-hub .shorts-viewer-layer .short-card:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.9) !important;
+  outline-offset: -3px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-hub .shorts-tab-panel .shorts-viewport,
+  .media-hub .shorts-viewer-layer .shorts-viewport {
+    scroll-behavior: auto !important;
+  }
+
+  .media-hub .shorts-tab-panel .shorts-progress > span,
+  .media-hub .shorts-viewer-layer .shorts-progress > span {
+    transition: none !important;
+  }
+}

@@ -237,6 +237,22 @@ function formatCount(value: number) {
     maximumFractionDigits: 1,
   }).format(value);
 }
+const SHORTS_MUTE_STORAGE_KEY = "kinba.shorts.muted";
+function readShortsMutePreference() {
+  if (typeof window === "undefined") return true;
+  try {
+    return window.localStorage.getItem(SHORTS_MUTE_STORAGE_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+function writeShortsMutePreference(muted: boolean) {
+  try {
+    window.localStorage.setItem(SHORTS_MUTE_STORAGE_KEY, String(muted));
+  } catch {
+    // Storage may be disabled; playback should still work in memory.
+  }
+}
 function relativeTime(value: Date | string) {
   const seconds = Math.max(
     0,
@@ -888,12 +904,18 @@ function QualityVideoPlayer({
   vertical = false,
   active = true,
   showPoster = true,
+  preload = "none",
+  muted: mutedProp,
+  onMutedChange,
   onFirstPlay,
 }: {
   video: VideoRecord;
   vertical?: boolean;
   active?: boolean;
   showPoster?: boolean;
+  preload?: "none" | "metadata" | "auto";
+  muted?: boolean;
+  onMutedChange?: (muted: boolean) => void;
   onFirstPlay?: () => void;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
@@ -902,7 +924,7 @@ function QualityVideoPlayer({
   const [playing, setPlaying] = useState(false);
   const [isInView, setIsInView] = useState(false);
   const [isNearViewport, setIsNearViewport] = useState(false);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(mutedProp ?? true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
@@ -934,6 +956,10 @@ function QualityVideoPlayer({
     resolveMediaUrl(video.thumbnailUrl) ?? `/api/videos/${video.id}/thumbnail`;
 
   const shouldPlay = active && isInView;
+
+  useEffect(() => {
+    if (mutedProp !== undefined) setMuted(mutedProp);
+  }, [mutedProp]);
 
   const togglePlay = () => {
     const element = ref.current;
@@ -1066,7 +1092,7 @@ function QualityVideoPlayer({
         controlsList="nofullscreen noplaybackrate"
         disablePictureInPicture
         playsInline
-        preload={isNearViewport ? "metadata" : "none"}
+        preload={isNearViewport ? (active ? "auto" : preload) : "none"}
         autoPlay={active && isInView}
         muted={muted}
         onLoadedMetadata={restorePlayback}
@@ -1081,9 +1107,7 @@ function QualityVideoPlayer({
             return;
           }
           setIsLoading(false);
-          setPlaybackError(
-            "This video stream could not be loaded. Please try again."
-          );
+          setPlaybackError(describePlaybackFailure(element, sourceUrl).message);
         }}
         onLoadedData={() => setIsLoading(false)}
         onCanPlay={() => setIsLoading(false)}
@@ -1111,6 +1135,30 @@ function QualityVideoPlayer({
       {showTapIcon && (
         <div className="media-video-tap-indicator" aria-hidden="true">
           {playing ? <Pause size={32} /> : <Play size={32} />}
+        </div>
+      )}
+      {vertical && !playbackError && (
+        <div
+          className="shorts-progress"
+          role="progressbar"
+          aria-label="Short progress"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={
+            video.durationSeconds > 0
+              ? Math.min(100, Math.round((currentTime / video.durationSeconds) * 100))
+              : 0
+          }
+        >
+          <span
+            style={{
+              width: `${
+                video.durationSeconds > 0
+                  ? Math.min(100, (currentTime / video.durationSeconds) * 100)
+                  : 0
+              }%`,
+            }}
+          />
         </div>
       )}
       <div className="media-video-controls" data-short-no-swipe>
@@ -1172,7 +1220,13 @@ function QualityVideoPlayer({
           </button>
           <button
             type="button"
-            onClick={() => setMuted(value => !value)}
+            onClick={() =>
+              setMuted(value => {
+                const next = !value;
+                onMutedChange?.(next);
+                return next;
+              })
+            }
             aria-label={muted ? "Unmute video" : "Mute video"}
           >
             {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
@@ -3966,19 +4020,23 @@ function ShortVideoCard({
   index,
   active,
   compact = false,
+  preload = "none",
   onOpenViewer,
 }: {
   video: VideoRecord;
   index: number;
   active: boolean;
   compact?: boolean;
+  preload?: "none" | "metadata" | "auto";
   onOpenViewer?: () => void;
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [description, setDescription] = useState(video.description);
   const [deleted, setDeleted] = useState(false);
-  const [shortMuted, setShortMuted] = useState(true);
+  const [shortMuted, setShortMuted] = useState(readShortsMutePreference);
   const auth = useAuth();
+  const viewMutation = trpc.videos.view.useMutation();
+  const viewedRef = useRef(false);
   const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
   const bookmarkMutation = trpc.videos.bookmark.useMutation();
   const toggleBookmark = async () => {
@@ -3994,11 +4052,24 @@ function ShortVideoCard({
     }
   };
   const { current, react, share, pending } = useOptimisticEngagement(video);
+  const setMutePreference = (muted: boolean) => {
+    setShortMuted(muted);
+    writeShortsMutePreference(muted);
+  };
+  const recordView = () => {
+    if (viewedRef.current || viewMutation.isPending) return;
+    viewedRef.current = true;
+    void viewMutation.mutateAsync({ videoId: video.id }).catch(() => {
+      viewedRef.current = false;
+    });
+  };
   if (deleted) return null;
   return (
     <article
       className={`short-card feed-card-item${compact ? " short-card--compact" : ""} snap-start h-[100dvh] w-full relative overflow-hidden box-border`}
       data-short-index={index}
+      aria-current={active ? "true" : undefined}
+      aria-label={`${displayName(video.owner.name, video.owner.username)} Short ${index + 1}`}
       role={onOpenViewer ? "button" : undefined}
       tabIndex={onOpenViewer ? 0 : undefined}
       onClick={event => {
@@ -4025,7 +4096,15 @@ function ShortVideoCard({
           alt={video.title || "Post"}
         />
       ) : (
-        <QualityVideoPlayer video={video} vertical active={active} />
+        <QualityVideoPlayer
+          video={video}
+          vertical
+          active={active}
+          preload={preload}
+          muted={shortMuted}
+          onMutedChange={setMutePreference}
+          onFirstPlay={recordView}
+        />
       )}
       <div className="absolute right-3 top-4 z-20">
         <PostManagementMenu
@@ -4104,14 +4183,9 @@ function ShortVideoCard({
             type="button"
             className="shorts-mute-btn"
             data-short-no-swipe
-            onClick={(e) => {
+            onClick={e => {
               e.stopPropagation();
-              const card = (e.currentTarget as HTMLElement).closest(".short-card");
-              const vid = card?.querySelector("video") as HTMLVideoElement | null;
-              if (vid) {
-                vid.muted = !vid.muted;
-                setShortMuted(vid.muted);
-              }
+              setMutePreference(!shortMuted);
             }}
             aria-label={shortMuted ? "Unmute video" : "Mute video"}
           >
@@ -4217,6 +4291,21 @@ export function ShortsFeed({
     }
     activeIndexRef.current = clamped;
     setActiveIndex(clamped);
+  };
+  const onViewportKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "ArrowDown" || event.key === "PageDown") {
+      event.preventDefault();
+      goTo(activeIndexRef.current + 1);
+    } else if (event.key === "ArrowUp" || event.key === "PageUp") {
+      event.preventDefault();
+      goTo(activeIndexRef.current - 1);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      goTo(0, "auto");
+    } else if (event.key === "End") {
+      event.preventDefault();
+      goTo(videos.length - 1, "auto");
+    }
   };
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === "mouse") return;
@@ -4343,6 +4432,8 @@ export function ShortsFeed({
               type="button"
               role="tab"
               aria-selected={shortsMode === "for-you"}
+              aria-controls="shorts-viewport"
+              tabIndex={shortsMode === "for-you" ? 0 : -1}
               className={shortsMode === "for-you" ? "is-active" : undefined}
               onClick={() => setShortsMode("for-you")}
             >
@@ -4352,6 +4443,8 @@ export function ShortsFeed({
               type="button"
               role="tab"
               aria-selected={shortsMode === "popular"}
+              aria-controls="shorts-viewport"
+              tabIndex={shortsMode === "popular" ? 0 : -1}
               className={shortsMode === "popular" ? "is-active" : undefined}
               onClick={() => setShortsMode("popular")}
             >
@@ -4360,10 +4453,16 @@ export function ShortsFeed({
           </div>
         </div>
       )}
-      {query.isPending ? (
+      {query.isError ? (
+        <FeedRecovery onRetry={() => void query.refetch()} />
+      ) : query.isPending ? (
         <FeedSkeleton short />
       ) : videos.length ? (
         <div
+          id="shorts-viewport"
+          tabIndex={0}
+          aria-label="Shorts video feed. Use up and down arrow keys to navigate."
+          onKeyDown={onViewportKeyDown}
           className={`shorts-viewport ${viewerMode ? "shorts-detail-viewport" : "shorts-list-viewport"} media-feed-scroll overflow-y-scroll snap-y snap-mandatory bg-black w-full max-w-full box-border relative`}
           ref={viewportRef}
           onScroll={onScroll}
@@ -4378,6 +4477,7 @@ export function ShortsFeed({
               video={video}
               index={index}
               active={active && index === activeIndex}
+              preload={index === activeIndex + 1 ? "metadata" : "none"}
             />
           ))}
         </div>
@@ -4389,6 +4489,12 @@ export function ShortsFeed({
               ? "No popular Shorts to show yet."
               : "No Shorts to show yet."}
           </h3>
+          <p>Check back soon for new vertical videos.</p>
+          {onBack && (
+            <button type="button" className="primary-btn" onClick={onBack}>
+              Browse videos
+            </button>
+          )}
         </div>
       )}
     </section>
