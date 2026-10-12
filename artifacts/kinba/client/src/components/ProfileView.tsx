@@ -660,10 +660,17 @@ function ProfileTile({
     </>
   );
 
-  if (!open) return <article className={className}>{content}</article>;
+  if (!open) {
+    return (
+      <article id={`profile-post-${video.id}`} className={className}>
+        {content}
+      </article>
+    );
+  }
 
   return (
     <article
+      id={`profile-post-${video.id}`}
       className={className}
       onClick={open}
       role="button"
@@ -951,6 +958,33 @@ export default function ProfileView({
   }));
   const tabIds = tabs.map(tab => tab.id);
   const active: ProfileTab = tabIds.includes(activeTab) ? activeTab : tabIds[0];
+  const targetPostId =
+    typeof window !== "undefined" && window.location.hash.startsWith("#post-")
+      ? Number(window.location.hash.slice(6))
+      : null;
+
+  useEffect(() => {
+    if (!targetPostId || !allVideos.length) return;
+    const target = allVideos.find(video => video.id === targetPostId);
+    if (!target) return;
+    setActiveTab(
+      target.kind === "SHORT"
+        ? "shorts"
+        : target.mediaType === "VIDEO"
+          ? "videos"
+          : "posts"
+    );
+  }, [allVideos, targetPostId]);
+
+  useEffect(() => {
+    if (!targetPostId) return;
+    const timer = window.setTimeout(() => {
+      document
+        .getElementById(`profile-post-${targetPostId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [active, targetPostId]);
 
   const displayName = profileDisplayName(profile);
   const handle = profile?.profile?.username

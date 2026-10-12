@@ -1,6 +1,7 @@
 import {
   ChangeEvent,
   FormEvent,
+  Fragment,
   useEffect,
   useMemo,
   useRef,
@@ -3733,12 +3734,26 @@ function HomeFeedPanel({
           source: video,
         }))
     : [];
+  const shortsInsertionAfter = useMemo(() => {
+    if (!useForYouPlayer || !shortsHighlights.length) return null;
+    return 8 + Math.floor(Math.random() * 3);
+  }, [useForYouPlayer, shortsHighlights.length]);
   const openForYouItem = (item: { source?: VideoRecord }) => {
     const video = item.source;
     if (!video) return;
     if (video.kind === "SHORT" && onOpenShortVideo) return onOpenShortVideo(video);
     if (video.mediaType === "IMAGE" && onOpenPhoto) return onOpenPhoto(video);
     if (video.mediaType === "VIDEO" && onOpenVideo) return onOpenVideo(video);
+  };
+  const openNewestUpdate = (item: { source?: VideoRecord }) => {
+    const video = item.source;
+    if (!video?.owner?.id) return;
+    window.history.pushState(
+      {},
+      "",
+      `/profile/${video.owner.id}#post-${video.id}`
+    );
+    window.dispatchEvent(new PopStateEvent("popstate"));
   };
   const forYouVideoRenderer = useForYouPlayer
     ? (v: VideoRecord, a: boolean, onFirstPlay: () => void) => (
@@ -3777,16 +3792,8 @@ function HomeFeedPanel({
         <div className="kf" aria-label="For You highlights">
           <NewestUpdates
             items={newestUpdates}
-            onOpen={openForYouItem}
+            onOpen={openNewestUpdate}
             onViewAll={() => undefined}
-          />
-          <ShortsRow
-            items={shortsHighlights}
-            onOpen={openForYouItem}
-            onSeeAll={() => {
-              const firstShort = shortsHighlights[0]?.source;
-              if (firstShort && onOpenShortVideo) onOpenShortVideo(firstShort);
-            }}
           />
         </div>
       )}
@@ -3794,30 +3801,42 @@ function HomeFeedPanel({
         <FeedSkeleton />
       ) : videos.length ? (
         <div className="unified-feed-list feed-video-list feed-card-list gap-6 w-full max-w-full box-border">
-          {videos.map(video => (
-            <MemoVideoCard
-              key={video.id}
-              video={video}
-              active={active}
-              showDetailsOverlay={showDetailsOverlay}
-              socialLayout
-              renderVideo={
-                useForYouPlayer && video.mediaType === "VIDEO"
-                  ? forYouVideoRenderer
-                  : undefined
-              }
-              onOpenViewer={
-                video.kind === "SHORT" && onOpenShortVideo
-                  ? () => onOpenShortVideo(video)
-                  : video.kind === "SHORT" && onOpenShort
-                    ? () => onOpenShort(video.id)
-                    : video.mediaType === "IMAGE" && onOpenPhoto
-                      ? () => onOpenPhoto(video)
-                      : video.mediaType === "VIDEO" && onOpenVideo
-                        ? () => onOpenVideo(video)
-                        : undefined
-              }
-            />
+          {videos.map((video, index) => (
+            <Fragment key={video.id}>
+              <MemoVideoCard
+                video={video}
+                active={active}
+                showDetailsOverlay={showDetailsOverlay}
+                socialLayout
+                renderVideo={
+                  useForYouPlayer && video.mediaType === "VIDEO"
+                    ? forYouVideoRenderer
+                    : undefined
+                }
+                onOpenViewer={
+                  video.kind === "SHORT" && onOpenShortVideo
+                    ? () => onOpenShortVideo(video)
+                    : video.kind === "SHORT" && onOpenShort
+                      ? () => onOpenShort(video.id)
+                      : video.mediaType === "IMAGE" && onOpenPhoto
+                        ? () => onOpenPhoto(video)
+                        : video.mediaType === "VIDEO" && onOpenVideo
+                          ? () => onOpenVideo(video)
+                          : undefined
+                }
+              />
+              {shortsInsertionAfter !== null &&
+                index + 1 === shortsInsertionAfter && (
+                  <ShortsRow
+                    items={shortsHighlights}
+                    onOpen={openForYouItem}
+                    onSeeAll={() => {
+                      const firstShort = shortsHighlights[0]?.source;
+                      if (firstShort && onOpenShortVideo) onOpenShortVideo(firstShort);
+                    }}
+                  />
+                )}
+            </Fragment>
           ))}
         </div>
       ) : (
@@ -4164,7 +4183,7 @@ export function ShortsFeed({
       {!viewerMode && (
         <div className="media-section-heading shorts-header">
           <div>
-            {source ? (
+            {onBack ? (
               <button
                 type="button"
                 className="shorts-back-btn"
