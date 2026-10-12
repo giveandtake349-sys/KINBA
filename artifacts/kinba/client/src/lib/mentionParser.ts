@@ -9,8 +9,7 @@
  * - The typed query is the full [A-Za-z0-9_]* run immediately before the
  *   caret; the token's word range extends past the caret so edits and picks
  *   never leave residue behind.
- * - Rendered mention segments only linkify @handles that match the
- *   3–64 character username pattern (shorter runs stay plain text).
+ * - Rendered mention segments linkify normal @handles and numeric @user IDs.
  */
 
 export interface MentionToken {
@@ -90,15 +89,16 @@ export interface MentionSegment {
 
 /**
  * Split text into plain-text and @mention segments for linkified rendering.
- * Matches the shared username pattern (3–64 of [A-Za-z0-9_]) and skips
- * email-style occurrences ("foo@bar") where "@" follows a non-space word
- * character. Deliberately avoids lookbehind for WebView compatibility.
+ * Matches the shared username pattern (3–64 of [A-Za-z0-9_]) plus numeric
+ * user IDs (1–64 digits), and skips email-style occurrences ("foo@bar")
+ * where "@" follows a non-space word character. Deliberately avoids
+ * lookbehind for WebView compatibility.
  */
 export function segmentTextWithMentions(
   text: string | null | undefined
 ): MentionSegment[] {
   if (!text) return [{ type: "text", content: "" }];
-  const regex = /@([A-Za-z0-9_]{3,64})(?![A-Za-z0-9_])/g;
+  const regex = /@([A-Za-z0-9_]{3,64}|\d{1,64})(?![A-Za-z0-9_])/g;
   const segments: MentionSegment[] = [];
   let lastIndex = 0;
   for (const match of text.matchAll(regex)) {

@@ -8,9 +8,8 @@ import {
  * MentionText — renders plain text with clickable @mention links.
  *
  * - Preserves original text including whitespace and punctuation
- * - Mentions become <a> links to /@username (the existing public profile
- *   route parsed by shared/username.ts rules — usernames are unique and
- *   immutable once claimed, so the handle is the stable identifier)
+ * - Username mentions become <a> links to /@username; numeric mentions are
+ *   real selected user IDs and link directly to /profile/:id.
  * - Email-style occurrences and sub-3-character handles stay plain text
  * - Uses wouter's useLocation for SPA navigation (no full page reload)
  */
@@ -33,7 +32,7 @@ export function MentionText({
   ) => {
     event.preventDefault();
     event.stopPropagation();
-    navigate(`/@${username}`);
+    navigate(/^\d+$/.test(username) ? `/profile/${username}` : `/@${username}`);
   };
 
   return (
@@ -42,10 +41,13 @@ export function MentionText({
         if (segment.type === "text") {
           return <span key={`text-${index}`}>{segment.content}</span>;
         }
+        const href = /^\d+$/.test(segment.username ?? "")
+          ? `/profile/${segment.username}`
+          : `/@${segment.username}`;
         return (
           <a
             key={`mention-${index}`}
-            href={`/@${segment.username}`}
+            href={href}
             onClick={event => handleMentionClick(event, segment.username!)}
             className="mention-link"
             rel="noopener noreferrer"

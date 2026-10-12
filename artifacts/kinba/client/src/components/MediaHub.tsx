@@ -2244,10 +2244,10 @@ function CommentDrawer({
     username: string | null;
   }) => {
     const username = user.username?.trim();
-    // Only a real username becomes a @mention token (usernames are unique
-    // and immutable, so the handle is the stable identifier). A user without
-    // a username is inserted as plain display text that never linkifies.
-    const handle = username ? `@${username}` : user.name?.trim() || "";
+    // Usernames are the normal stable mention token. When a member has no
+    // username, preserve the selected member's real ID so the saved comment
+    // remains a clickable profile mention instead of plain display text.
+    const handle = username ? `@${username}` : `@${user.id}`;
     if (!handle) return;
     const input = inputRef.current;
     const token = mentionToken;
