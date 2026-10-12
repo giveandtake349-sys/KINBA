@@ -92,7 +92,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   overflow-y: auto !important;
   overflow-x: hidden !important;
   scroll-snap-type: y mandatory !important;
-  scroll-behavior: auto !important;
+  scroll-behavior: smooth !important;
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
   touch-action: pan-y !important;
@@ -112,7 +112,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   width: 100% !important;
   max-width: 100% !important;
   height: 100% !important;
-  min-height: 0 !important;
+  min-height: 100% !important;
   max-height: none !important;
   margin: 0 !important;
   padding: 0 !important;
@@ -399,7 +399,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   overflow-y: auto !important;
   overflow-x: hidden !important;
   scroll-snap-type: y mandatory !important;
-  scroll-behavior: auto !important;
+  scroll-behavior: smooth !important;
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
   touch-action: pan-y !important;
@@ -419,7 +419,7 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   width: 100% !important;
   max-width: 100% !important;
   height: 100% !important;
-  min-height: 0 !important;
+  min-height: 100% !important;
   max-height: none !important;
   margin: 0 !important;
   padding: 0 !important;
