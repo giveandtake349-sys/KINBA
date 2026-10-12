@@ -1961,3 +1961,338 @@ a.hype-room-mention-token:hover {
     margin-left: 8px;
   }
 }
+
+/* ============================================================================
+   HYPE ROOM — refined layer.
+   1) Lobby room cards: flat, bordered.
+   2) Messages, replies and thread: borderless, Instagram/Facebook-style rows.
+   CSS-only, appended last. Light and dark both come from the theme tokens.
+   ========================================================================== */
+
+/* ---------- 1. Lobby room cards (bordered) ---------- */
+.hype-room-grid {
+  gap: 14px;
+}
+@media (min-width: 720px) {
+  .hype-room-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.hype-room-card {
+  border-radius: 14px;
+  box-shadow: none;
+}
+.hype-room-card--interactive:hover,
+.hype-room-card--interactive:focus-visible {
+  border-color: color-mix(in srgb, var(--text) 30%, var(--border));
+  transform: none;
+}
+.hype-room-card-cover {
+  aspect-ratio: 2 / 1;
+}
+.hype-room-card-cover--placeholder {
+  background: var(--surface-raised);
+  color: var(--muted);
+}
+.hype-room-card-body {
+  gap: 6px;
+  padding: 14px 16px 16px;
+}
+
+/* Status is a word with a dot, not a badge */
+.hype-room-card-top {
+  min-height: 20px;
+}
+.hype-room-card .hype-room-chip {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  padding: 0;
+  text-transform: none;
+}
+.hype-room-card .hype-room-chip--live {
+  color: #e5484d;
+  font-weight: 700;
+}
+.hype-room-card .hype-room-chip--live .hype-room-chip-dot {
+  animation: none;
+  box-shadow: none;
+}
+.hype-room-card .hype-room-host-badge {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  padding: 2px 7px;
+  text-transform: none;
+}
+.hype-room-card-body h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+.hype-room-card .hype-room-topic {
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.85rem;
+  letter-spacing: 0;
+}
+.hype-room-card .hype-room-desc.caption-container {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.hype-room-card .hype-room-countdown {
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.hype-room-card .hype-room-countdown svg {
+  color: var(--blue);
+}
+
+/* Meta: one quiet row of facts */
+.hype-room-card .hype-room-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.hype-room-card .hype-room-meta > div {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  gap: 6px;
+  padding: 0;
+}
+.hype-room-card .hype-room-meta dd {
+  font-size: 0.82rem;
+}
+
+/* ---------- 2. Messages, replies, thread: no boxes ---------- */
+.hype-room-message-list {
+  gap: 2px;
+}
+
+/* One row: avatar on the left, everything else in the right column. */
+.hype-room-message-list > li.hype-room-message-card {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  column-gap: 10px;
+  align-items: start;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 10px 2px;
+}
+.hype-room-message-list > li.hype-room-message-card > .hype-room-message-head {
+  display: contents;
+}
+.hype-room-message-list > li.hype-room-message-card > *:not(.hype-room-message-head):not(.hype-room-message-menu) {
+  grid-column: 2 / -1;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-message-avatar {
+  grid-column: 1;
+  grid-row: 1 / span 6;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: var(--surface-raised);
+  box-shadow: none;
+  color: var(--text);
+  font-size: 0.78rem;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-message-identity {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 8px;
+  min-width: 0;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-message-more {
+  grid-column: 3;
+  grid-row: 1;
+  margin: -4px -6px 0 0;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-message-more:hover {
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  color: var(--text);
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-message-name-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-message-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-message-time {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-role-badge {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  padding: 0;
+  text-transform: none;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-role--host {
+  background: transparent;
+  color: var(--blue);
+  font-weight: 600;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-role--speaker {
+  background: transparent;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-message-body {
+  font-size: 0.95rem;
+  line-height: 1.45;
+  margin: 1px 0 0;
+}
+
+/* Reply-to quote: a thin line, no box */
+.hype-room-message-list li.hype-room-message-card .hype-room-message-parent {
+  background: transparent;
+  border-left: 2px solid var(--border);
+  border-radius: 0;
+  margin: 2px 0 4px;
+  padding: 0 0 0 9px;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-message-parent-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-message-parent-body {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+/* Actions under the text: small, quiet, text-like */
+.hype-room-message-list li.hype-room-message-card .hype-room-message-foot {
+  gap: 4px 14px;
+  justify-content: flex-start;
+  margin-top: 4px;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-reactions {
+  gap: 2px;
+  margin: 0 0 0 -6px;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-reaction,
+.hype-room-message-list li.hype-room-message-card .reaction-count-pill {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 3px 6px;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-reaction:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+  color: var(--text);
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-reaction--on,
+.hype-room-message-list li.hype-room-message-card .hype-room-reaction--on:hover:not(:disabled) {
+  background: transparent;
+  color: var(--reaction-accent, #ff5a6e);
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-reaction-count {
+  font-family: inherit;
+  font-size: 0.82rem;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-reply-count {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 3px 0;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-reply-count:hover {
+  color: var(--text);
+}
+
+/* Replies: indented under the parent, smaller avatar, no side rule */
+.hype-room-message-list > li.hype-room-message-card--reply {
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  margin-left: 46px;
+  border-left: 0;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.hype-room-message-list li.hype-room-message-card--reply .hype-room-message-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 0.7rem;
+}
+@media (max-width: 560px) {
+  .hype-room-message-list > li.hype-room-message-card--reply {
+    margin-left: 40px;
+  }
+}
+
+/* Pinned / selected: a quiet tint, not a box */
+.hype-room-message-list > li.hype-room-message-card--pinned {
+  background: color-mix(in srgb, var(--blue) 7%, transparent);
+  border-radius: 10px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+.hype-room-message-list > li.hype-room-message-card--selected {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  border-radius: 10px;
+  box-shadow: none;
+}
+.hype-room-message-list li.hype-room-message-card .hype-room-message-pinned-tag {
+  background: transparent;
+  border-radius: 0;
+  color: var(--blue);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  padding: 0;
+  text-transform: none;
+}
+
+/* ---------- Composer ---------- */
+.hype-room-composer {
+  gap: 8px;
+  padding: 12px 0;
+}
+.hype-room-composer textarea {
+  background: var(--surface);
+  border-radius: 10px;
+  font-size: 0.94rem;
+  min-height: 48px;
+  padding: 11px 13px;
+}
+.hype-room-composer textarea:focus-visible {
+  border-color: var(--blue);
+}
+.hype-room-composer .primary-btn {
+  border-radius: 10px;
+  min-height: 48px;
+  padding: 0 20px;
+}
