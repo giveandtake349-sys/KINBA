@@ -109,7 +109,8 @@ import "./modernFeed.css";
 import "./shorts-stage.css";
 import "./conversation/conversation.css";
 import "./commentsUpgrade.css";
-
+// @ts-expect-error The uploaded JSX module is intentionally kept as JSX for the feed design handoff.
+import { NewestUpdates, ShortsRow } from "./FeedSections.jsx";
 type HomeTab = "videos" | "trendy" | "following" | "icons" | "spotlight";
 type VideoKind = "LONG" | "SHORT" | "WHEEL";
 type Quality = "ORIGINAL" | "1080P" | "720P" | "480P" | "240P";
@@ -3694,6 +3695,51 @@ function HomeFeedPanel({
   );
   const videos = (query.data ?? []) as VideoRecord[];
   const useForYouPlayer = tab === "videos";
+  const newestUpdates = useForYouPlayer
+    ? videos.slice(0, 6).map(video => ({
+        id: video.id,
+        user: {
+          name: displayName(video.owner.name, video.owner.username),
+          avatar: video.owner.photoUrl
+            ? resolveMediaUrl(video.owner.photoUrl, "avatars")
+            : undefined,
+        },
+        timeAgo: relativeTime(video.createdAt),
+        type:
+          video.mediaType === "IMAGE"
+            ? "photo"
+            : video.mediaType === "VIDEO"
+              ? "video"
+              : "text",
+        text: postCaption(video.title, video.description),
+        thumb:
+          video.mediaType === "TEXT"
+            ? undefined
+            : resolveMediaUrl(video.thumbnailUrl || video.videoUrl),
+        unseen: false,
+        source: video,
+      }))
+    : [];
+  const shortsHighlights = useForYouPlayer
+    ? videos
+        .filter(video => video.kind === "SHORT")
+        .slice(0, 8)
+        .map(video => ({
+          id: video.id,
+          title: video.title || postCaption(video.title, video.description),
+          thumb: resolveMediaUrl(video.thumbnailUrl || video.videoUrl),
+          likes: video.reactionCount,
+          comments: video.commentCount,
+          source: video,
+        }))
+    : [];
+  const openForYouItem = (item: { source?: VideoRecord }) => {
+    const video = item.source;
+    if (!video) return;
+    if (video.kind === "SHORT" && onOpenShortVideo) return onOpenShortVideo(video);
+    if (video.mediaType === "IMAGE" && onOpenPhoto) return onOpenPhoto(video);
+    if (video.mediaType === "VIDEO" && onOpenVideo) return onOpenVideo(video);
+  };
   const forYouVideoRenderer = useForYouPlayer
     ? (v: VideoRecord, a: boolean, onFirstPlay: () => void) => (
         <ForYouVideoPlayer video={v} active={a} onFirstPlay={onFirstPlay} />
@@ -3725,6 +3771,23 @@ function HomeFeedPanel({
               ? "Verified creators & companies"
               : "Real-time database feed"}
           </span>
+        </div>
+      )}
+      {useForYouPlayer && (newestUpdates.length > 0 || shortsHighlights.length > 0) && (
+        <div className="kf" aria-label="For You highlights">
+          <NewestUpdates
+            items={newestUpdates}
+            onOpen={openForYouItem}
+            onViewAll={() => undefined}
+          />
+          <ShortsRow
+            items={shortsHighlights}
+            onOpen={openForYouItem}
+            onSeeAll={() => {
+              const firstShort = shortsHighlights[0]?.source;
+              if (firstShort && onOpenShortVideo) onOpenShortVideo(firstShort);
+            }}
+          />
         </div>
       )}
       {query.isPending ? (

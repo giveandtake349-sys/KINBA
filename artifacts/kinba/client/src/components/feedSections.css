@@ -1,0 +1,51 @@
+/* KINBA feed: Newest updates + Shorts rows + Facebook-style posts */
+.kf { --bg:#1a1b1e; --card:#232428; --post:#1f2024; --gap:#0b0b0c; --line:#303137;
+  --text:#ececef; --muted:#8d8e94; --blue:#2b7fff; --blue-bg:#15305f; --blue-fg:#9cc4ff;
+  --purple-bg:#2f2447; --purple-fg:#c9b3f5; color:var(--text); background:var(--bg); }
+.kf svg { width:1em; height:1em; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; vertical-align:-0.15em; }
+
+.kf-head { display:flex; align-items:center; justify-content:space-between; padding:18px 16px 10px; }
+.kf-title { display:flex; align-items:center; gap:8px; font-size:16px; font-weight:500; margin:0; }
+.kf-title::before { content:""; width:3px; height:16px; border-radius:2px; background:var(--blue); }
+.kf-link { background:none; border:0; color:var(--blue); font-size:12px; cursor:pointer; }
+
+.kf-row { display:flex; gap:10px; overflow-x:auto; padding:0 16px 4px; scroll-snap-type:x mandatory; scrollbar-width:none; }
+.kf-row::-webkit-scrollbar { display:none; }
+.kf-row > * { scroll-snap-align:start; flex:none; }
+
+.kf-upd { width:160px; box-sizing:border-box; background:var(--card); border:.5px solid var(--line); border-radius:14px; padding:12px; position:relative; text-align:left; color:inherit; cursor:pointer; font:inherit; }
+.kf-upd-dot { position:absolute; top:12px; right:12px; width:8px; height:8px; border-radius:50%; background:var(--blue); }
+.kf-upd-user { display:flex; align-items:center; gap:8px; margin-bottom:10px; padding-right:12px; }
+.kf-upd-name { font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.kf-upd-time { font-size:11px; color:var(--muted); }
+.kf-upd-text { font-size:13px; line-height:1.4; height:36px; overflow:hidden; margin-bottom:10px; }
+.kf-upd-thumb { height:36px; border-radius:8px; margin-bottom:10px; background:var(--purple-bg) center/cover; }
+.kf-tag { display:inline-block; font-size:11px; padding:3px 9px; border-radius:8px; background:var(--blue-bg); color:var(--blue-fg); }
+.kf-tag.photo, .kf-tag.video { background:var(--purple-bg); color:var(--purple-fg); }
+
+.kf-av { width:30px; height:30px; border-radius:50%; background:#33343a center/cover; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:500; flex:none; }
+.kf-av.lg { width:40px; height:40px; font-size:12px; }
+
+.kf-short { width:112px; height:180px; border-radius:14px; background:#0c0d0f center/cover; border:.5px solid var(--line); position:relative; overflow:hidden; padding:0; color:inherit; cursor:pointer; text-align:left; }
+.kf-short-play { position:absolute; top:8px; left:8px; width:26px; height:26px; border-radius:50%; background:#000000b3; display:flex; align-items:center; justify-content:center; font-size:12px; }
+.kf-short-info { position:absolute; left:0; right:0; bottom:0; padding:20px 8px 8px; background:#000000b3; }
+.kf-short-title { font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.kf-short-meta { font-size:11px; color:#c8c9cd; display:flex; gap:10px; margin-top:3px; }
+
+.kf-feed { margin-top:18px; }
+.kf-post { background:var(--post); border-top:8px solid var(--gap); }
+.kf-post-head { display:flex; align-items:center; gap:10px; padding:12px 14px 8px; }
+.kf-post-who { flex:1; min-width:0; }
+.kf-post-name { font-size:15px; font-weight:500; }
+.kf-post-name svg { color:var(--blue); }
+.kf-post-sub { font-size:12px; color:var(--muted); }
+.kf-more { background:none; border:0; color:var(--muted); font-size:20px; cursor:pointer; }
+.kf-post-text { padding:0 14px 12px; font-size:16px; white-space:pre-wrap; word-break:break-word; }
+.kf-post-media { display:block; width:100%; max-height:520px; object-fit:cover; background:#0b0b0d; }
+.kf-counts { display:flex; justify-content:space-between; padding:8px 14px 6px; font-size:12px; color:var(--muted); }
+.kf-actions { display:flex; border-top:.5px solid var(--line); border-bottom:.5px solid var(--line); }
+.kf-act { flex:1; background:none; border:0; color:#b4b5ba; padding:11px 0; font-size:13px; cursor:pointer; }
+.kf-act svg { font-size:18px; margin-right:4px; }
+.kf-act.on { color:var(--blue); }
+.kf-act.on svg { fill:currentColor; }
+.kf button:focus-visible { outline:2px solid var(--blue); outline-offset:-2px; }
