@@ -13,6 +13,9 @@ import {
   ArrowLeft,
   Bookmark,
   Camera,
+  Eye,
+  Heart,
+  MessageCircle,
   Flag,
   MoreHorizontal,
   Play,
@@ -174,6 +177,22 @@ function tileStatLine(video: VideoRecord, variant: TileVariant): string {
   }
   parts.push(`${formatCount(video.viewCount)} views`);
   return parts.join(" · ");
+}
+
+/** Short age label for post chips: "now", "5m", "2h", "3d", "2w", then a date. */
+function shortAgo(value: Date | string): string {
+  const time = new Date(value).getTime();
+  if (Number.isNaN(time)) return "";
+  const seconds = Math.max(0, Math.floor((Date.now() - time) / 1000));
+  if (seconds < 60) return "now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d`;
+  if (seconds < 2592000) return `${Math.floor(seconds / 604800)}w`;
+  return new Date(time).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function formatJoinedLabel(value?: string | Date | null): string | null {
@@ -586,16 +605,27 @@ function ProfileTile({
   onOpenPhoto,
   onOpenShort,
   onOpenVideo,
+  rich = false,
+  featured = false,
 }: {
   video: VideoRecord;
   onOpenPhoto?: (video: VideoRecord) => void;
   onOpenShort?: (videoId: number) => void;
   onOpenVideo?: (video: VideoRecord) => void;
+  /** Posts shelf only: glass count chips, time chip and quote-style text posts. */
+  rich?: boolean;
+  /** The newest post, shown large above the grid. */
+  featured?: boolean;
 }) {
   const variant = tileVariant(video);
   const aspectRatio = tileAspectRatio(video);
   const isMedia = variant !== "text";
-  const hasOverlay = variant === "post" || variant === "short";
+  const richPost = rich && variant === "post";
+  const richText = rich && variant === "text";
+  const ago = shortAgo(video.createdAt);
+  const isNew =
+    featured && Date.now() - new Date(video.createdAt).getTime() < 7 * 86400000;
+  const hasOverlay = (variant === "post" || variant === "short") && !richPost;
   const stat = isMedia ? tileStatLine(video, variant) : "";
 
   // A tile only advertises itself as actionable when it can actually open
@@ -637,6 +667,46 @@ function ProfileTile({
           <span className="pr-tile-stat">{stat}</span>
         </div>
       )}
+      {richPost && (
+        <>
+          <div className="pr-tile-shade" aria-hidden="true" />
+          <div className="pr-tile-top">
+            {isNew ? <span className="pr-chip pr-chip--new">NEW</span> : <span />}
+            {ago && <span className="pr-chip">{ago}</span>}
+          </div>
+          <div className="pr-tile-bottom">
+            {video.title && <span className="pr-tile-cap">{video.title}</span>}
+            <div className="pr-chip-row">
+              <span className="pr-chip pr-chip--heart">
+                <Heart size={13} fill="currentColor" aria-hidden="true" />
+                {formatCount(video.reactionCount)}
+              </span>
+              <span className="pr-chip">
+                <MessageCircle size={13} aria-hidden="true" />
+                {formatCount(video.commentCount)}
+              </span>
+              {featured && (
+                <span className="pr-chip">
+                  <Eye size={13} aria-hidden="true" />
+                  {formatCount(video.viewCount)}
+                </span>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  ) : richText ? (
+    <div className="pr-tile-text pr-tile-text--rich">
+      <span className="pr-quote-mark" aria-hidden="true">“</span>
+      <span className="pr-tile-text-content">{video.title || video.description || ""}</span>
+      <div className="pr-quote-foot">
+        <span>{ago}</span>
+        <b>
+          <Heart size={11} fill="currentColor" aria-hidden="true" />
+          {formatCount(video.reactionCount)}
+        </b>
+      </div>
     </div>
   ) : (
     <div className="pr-tile-text">
@@ -652,7 +722,7 @@ function ProfileTile({
       </div>
     ) : null;
 
-  const className = `pr-tile pr-tile--${variant}${open ? "" : " pr-tile--static"}`;
+  const className = `pr-tile pr-tile--${variant}${open ? "" : " pr-tile--static"}${featured ? " pr-tile--featured" : ""}${rich ? " pr-tile--rich" : ""}`;
   const content = (
     <>
       {media}
@@ -660,17 +730,10 @@ function ProfileTile({
     </>
   );
 
-  if (!open) {
-    return (
-      <article id={`profile-post-${video.id}`} className={className}>
-        {content}
-      </article>
-    );
-  }
+  if (!open) return <article className={className}>{content}</article>;
 
   return (
     <article
-      id={`profile-post-${video.id}`}
       className={className}
       onClick={open}
       role="button"
@@ -958,33 +1021,6 @@ export default function ProfileView({
   }));
   const tabIds = tabs.map(tab => tab.id);
   const active: ProfileTab = tabIds.includes(activeTab) ? activeTab : tabIds[0];
-  const targetPostId =
-    typeof window !== "undefined" && window.location.hash.startsWith("#post-")
-      ? Number(window.location.hash.slice(6))
-      : null;
-
-  useEffect(() => {
-    if (!targetPostId || !allVideos.length) return;
-    const target = allVideos.find(video => video.id === targetPostId);
-    if (!target) return;
-    setActiveTab(
-      target.kind === "SHORT"
-        ? "shorts"
-        : target.mediaType === "VIDEO"
-          ? "videos"
-          : "posts"
-    );
-  }, [allVideos, targetPostId]);
-
-  useEffect(() => {
-    if (!targetPostId) return;
-    const timer = window.setTimeout(() => {
-      document
-        .getElementById(`profile-post-${targetPostId}`)
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [active, targetPostId]);
 
   const displayName = profileDisplayName(profile);
   const handle = profile?.profile?.username
@@ -1427,6 +1463,54 @@ export default function ProfileView({
                       Try again
                     </button>
                   </div>
+                ) : content.length > 0 && tab.id === "posts" ? (
+                  (() => {
+                    // Posts shelf: newest first, the latest photo shown large.
+                    const ordered = [...content].sort(
+                      (a, b) =>
+                        new Date(b.createdAt).getTime() -
+                        new Date(a.createdAt).getTime()
+                    );
+                    const featuredPost =
+                      tileVariant(ordered[0]) === "post" ? ordered[0] : null;
+                    const rest = featuredPost ? ordered.slice(1) : ordered;
+                    return (
+                      <>
+                        <div className="pr-shelf-head">
+                          <h3>Latest</h3>
+                          <span>
+                            {ordered.length} {ordered.length === 1 ? "post" : "posts"}
+                          </span>
+                        </div>
+                        {featuredPost && (
+                          <div className="pr-featured">
+                            <ProfileTile
+                              video={featuredPost}
+                              onOpenPhoto={onOpenPhoto}
+                              onOpenShort={onOpenShort}
+                              onOpenVideo={onOpenVideo}
+                              rich
+                              featured
+                            />
+                          </div>
+                        )}
+                        {rest.length > 0 && (
+                          <div className={`pr-grid ${GRID_CLASS[tab.id]}`}>
+                            {rest.map(video => (
+                              <ProfileTile
+                                key={video.id}
+                                video={video}
+                                onOpenPhoto={onOpenPhoto}
+                                onOpenShort={onOpenShort}
+                                onOpenVideo={onOpenVideo}
+                                rich
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()
                 ) : content.length > 0 ? (
                   <div className={`pr-grid ${GRID_CLASS[tab.id]}`}>
                     {content.map(video => (
