@@ -3967,12 +3967,10 @@ function ShortVideoCard({
           </div>
           <Caption text={postCaption(video.title, description)} maxLines={3} className="short-caption" />
           <p className="media-caption-tags">
-            {ownerHandle(video.owner.name, video.owner.username)} ·{" "}
             {hashtagsFromDescription(video.description)}
           </p>
           <p className="media-sound-track">
-            <Volume2 size={14} aria-hidden="true" /> Original sound ·{" "}
-            {ownerHandle(video.owner.name, video.owner.username)}
+            <Volume2 size={14} aria-hidden="true" /> Original sound
           </p>
         </div>
         <div className="shorts-overlay-actions">
