@@ -925,10 +925,11 @@ function QualityVideoPlayer({
   // manifest as a normal video source when MediaSource support is unavailable.
   const directSourceUrl = resolvePlaybackUrl(video.videoUrl);
   const originalSourceUrl = resolvePlaybackUrl(sourceMap.get("ORIGINAL"));
+  const hlsMasterSourceUrl = resolvePlaybackUrl(video.hlsMasterUrl);
   const sourceUrl =
     directSourceUrl && !isHlsMediaUrl(directSourceUrl)
       ? directSourceUrl
-      : originalSourceUrl || directSourceUrl;
+      : originalSourceUrl || hlsMasterSourceUrl || directSourceUrl;
   const posterUrl =
     resolveMediaUrl(video.thumbnailUrl) ?? `/api/videos/${video.id}/thumbnail`;
 
@@ -1254,10 +1255,11 @@ function InlineVideoPlayer({
   );
   const directUrl = resolvePlaybackUrl(video.videoUrl);
   const originalUrl = resolvePlaybackUrl(sourceMap.get("ORIGINAL"));
+  const hlsMasterUrl = resolvePlaybackUrl(video.hlsMasterUrl);
   const sourceUrl =
     directUrl && !isHlsMediaUrl(directUrl)
       ? directUrl
-      : originalUrl || directUrl;
+      : originalUrl || hlsMasterUrl || directUrl;
 
   const w = video.width || 16;
   const h = video.height || 9;
@@ -1459,10 +1461,11 @@ function ForYouVideoPlayer({
 
   const directUrl = resolvePlaybackUrl(video.videoUrl);
   const originalUrl = resolvePlaybackUrl(sourceMap.get("ORIGINAL"));
+  const hlsMasterUrl = resolvePlaybackUrl(video.hlsMasterUrl);
   const sourceUrl =
     directUrl && !isHlsMediaUrl(directUrl)
       ? directUrl
-      : originalUrl || directUrl;
+      : originalUrl || hlsMasterUrl || directUrl;
 
   const posterUrl =
     resolveMediaUrl(video.thumbnailUrl) ?? `/api/videos/${video.id}/thumbnail`;
