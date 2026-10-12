@@ -3442,7 +3442,7 @@ function FeedSkeleton({ short = false }: { short?: boolean }) {
   );
 }
 
-function FeedRecovery() {
+function FeedRecovery({ onRetry }: { onRetry?: () => void } = {}) {
   return (
     <div className="media-empty" role="status">
       <h3>This feed is temporarily empty.</h3>
@@ -3450,9 +3450,9 @@ function FeedRecovery() {
       <button
         type="button"
         className="primary-btn"
-        onClick={() => window.location.reload()}
+        onClick={() => (onRetry ? onRetry() : window.location.reload())}
       >
-        <RotateCcw size={16} /> Reload feed
+        <RotateCcw size={16} /> {onRetry ? "Try again" : "Reload feed"}
       </button>
     </div>
   );
@@ -3898,7 +3898,9 @@ function HomeFeedPanel({
           />
         </div>
       )}
-      {query.isPending ? (
+      {query.isError ? (
+        <FeedRecovery onRetry={() => void query.refetch()} />
+      ) : query.isPending ? (
         <FeedSkeleton />
       ) : videos.length ? (
         <div className="unified-feed-list feed-video-list feed-card-list gap-6 w-full max-w-full box-border">
@@ -3946,7 +3948,13 @@ function HomeFeedPanel({
           <h3>
             {tab === "following" && !auth.isAuthenticated
               ? "Sign in to see Following."
-              : "No videos to show yet."}
+              : tab === "following"
+                ? "No following posts yet."
+                : tab === "trendy"
+                  ? "No trending posts yet."
+                  : tab === "icons"
+                    ? "No trusted-voice posts yet."
+                    : "No posts to show yet."}
           </h3>
         </div>
       )}
