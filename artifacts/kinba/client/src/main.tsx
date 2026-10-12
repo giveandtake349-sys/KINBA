@@ -9,6 +9,7 @@ import App from "./App";
 import OpeningSplash from "./components/OpeningSplash";
 import "./index.css";
 import "./signalNoir.css";
+import "./modernButtons.css";
 
 const queryClient = new QueryClient();
 
