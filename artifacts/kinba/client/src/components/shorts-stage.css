@@ -794,3 +794,122 @@ body:has(.shorts-viewer-layer) .action-modal-layer {
     gap: 12px !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   9. Shorts discovery and playback feedback.
+   --------------------------------------------------------------------------- */
+
+.media-hub .shorts-tab-panel .shorts-header {
+  position: relative !important;
+  z-index: 40 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  min-height: 54px !important;
+  padding: 8px 14px !important;
+  margin: 0 !important;
+  border: 0 !important;
+  background: rgba(8, 10, 15, 0.92) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-header h2 {
+  margin: 0 !important;
+  font-size: 16px !important;
+  letter-spacing: -0.03em !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-discovery-controls {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  padding: 3px !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 999px !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-discovery-controls button {
+  min-height: 30px !important;
+  padding: 0 11px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  color: rgba(255, 255, 255, 0.62) !important;
+  background: transparent !important;
+  font-size: 11px !important;
+  font-weight: 750 !important;
+  cursor: pointer !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-discovery-controls button.is-active {
+  color: #0b1115 !important;
+  background: var(--teal) !important;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--teal) 26%, transparent) !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-discovery-controls button:focus-visible {
+  outline: 2px solid var(--teal) !important;
+  outline-offset: 2px !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-playback-state {
+  position: absolute !important;
+  inset: auto 50% 50% auto !important;
+  z-index: 35 !important;
+  transform: translate(50%, 50%) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  min-width: 142px !important;
+  padding: 10px 13px !important;
+  border-radius: 999px !important;
+  color: #fff !important;
+  background: rgba(8, 10, 15, 0.72) !important;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.24) !important;
+  font-size: 12px !important;
+  pointer-events: none !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-playback-state--error {
+  display: grid !important;
+  gap: 9px !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  border-radius: 14px !important;
+  pointer-events: auto !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-playback-state--error p {
+  margin: 0 !important;
+  color: rgba(255, 255, 255, 0.84) !important;
+  font-size: 12px !important;
+  text-align: center !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-playback-state--error button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  min-height: 32px !important;
+  border: 1px solid color-mix(in srgb, var(--teal) 55%, transparent) !important;
+  border-radius: 999px !important;
+  color: var(--teal) !important;
+  background: transparent !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+}
+
+@media (max-width: 767px) {
+  .media-hub .shorts-tab-panel .shorts-header {
+    min-height: 48px !important;
+    padding-inline: 10px !important;
+  }
+
+  .media-hub .shorts-tab-panel .shorts-discovery-controls button {
+    min-height: 28px !important;
+    padding-inline: 9px !important;
+  }
+}

@@ -898,6 +898,7 @@ function QualityVideoPlayer({
   const [isNearViewport, setIsNearViewport] = useState(false);
   const [muted, setMuted] = useState(true);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [showTapIcon, setShowTapIcon] = useState(false);
   const tapIconTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -963,9 +964,11 @@ function QualityVideoPlayer({
     if (!element) return;
 
     if (!sourceUrl) {
+      setIsLoading(false);
       setPlaybackError("This video has no playable source.");
       return;
     }
+    setIsLoading(true);
     setPlaybackError(null);
     hlsRef.current?.destroy();
     hlsRef.current = null;
@@ -973,10 +976,12 @@ function QualityVideoPlayer({
       const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
       hlsRef.current = hls;
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal)
+        if (data.fatal) {
+          setIsLoading(false);
           setPlaybackError(
             "This video stream could not be loaded. Please try again."
           );
+        }
       });
       hls.loadSource(sourceUrl);
       hls.attachMedia(element);
@@ -1048,14 +1053,19 @@ function QualityVideoPlayer({
           if (element && directSourceUrl && sourceUrl !== directSourceUrl) {
             element.src = directSourceUrl;
             element.load();
+            setIsLoading(true);
             setPlaybackError(null);
             return;
           }
+          setIsLoading(false);
           setPlaybackError(
             "This video stream could not be loaded. Please try again."
           );
         }}
+        onLoadedData={() => setIsLoading(false)}
+        onCanPlay={() => setIsLoading(false)}
         onPlay={() => {
+          setIsLoading(false);
           setPlaying(true);
           if (!viewedRef.current) {
             viewedRef.current = true;
@@ -1069,6 +1079,12 @@ function QualityVideoPlayer({
           if (el) setCurrentTime(el.currentTime);
         }}
       />
+      {vertical && isLoading && !playbackError && (
+        <div className="shorts-playback-state shorts-playback-state--loading" role="status">
+          <Loader2 className="spin" size={22} aria-hidden="true" />
+          <span>Loading Short…</span>
+        </div>
+      )}
       {showTapIcon && (
         <div className="media-video-tap-indicator" aria-hidden="true">
           {playing ? <Pause size={32} /> : <Play size={32} />}
@@ -1140,13 +1156,36 @@ function QualityVideoPlayer({
           </button>
         </div>
       </div>
-      {playbackError && (
+      {playbackError && !vertical && (
         <p
           className="media-processing-status media-processing-status--error"
           role="alert"
         >
           {playbackError}
         </p>
+      )}
+      {vertical && playbackError && (
+        <div className="shorts-playback-state shorts-playback-state--error" role="alert">
+          <p>{playbackError}</p>
+          <button
+            type="button"
+            data-short-no-swipe
+            onClick={event => {
+              event.stopPropagation();
+              setPlaybackError(null);
+              setIsLoading(true);
+              const element = ref.current;
+              if (hlsRef.current) {
+                hlsRef.current.startLoad(-1);
+                hlsRef.current.recoverMediaError();
+              } else {
+                element?.load();
+              }
+            }}
+          >
+            <RotateCcw size={14} aria-hidden="true" /> Try again
+          </button>
+        </div>
       )}
     </div>
   );
@@ -4022,6 +4061,8 @@ function ShortVideoCard({
 
 const MemoShortVideoCard = memo(ShortVideoCard);
 
+type ShortsMode = "for-you" | "popular";
+
 export function ShortsFeed({
   active = true,
   initialVideoId,
@@ -4055,19 +4096,29 @@ export function ShortsFeed({
   } | null>(null);
   const gestureLockRef = useRef(false);
   const gestureUnlockTimerRef = useRef<number | null>(null);
+  const activeIndexRef = useRef(0);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [shortsMode, setShortsMode] = useState<ShortsMode>("for-you");
   const rawVideos = (query.data ?? []) as VideoRecord[];
+  const filteredVideos = useMemo(() => {
+    if (shortsMode === "for-you") return rawVideos;
+    return [...rawVideos].sort(
+      (left, right) =>
+        right.reactionCount + right.viewCount - (left.reactionCount + left.viewCount)
+    );
+  }, [rawVideos, shortsMode]);
   const videos = useMemo(() => {
-    if (!standaloneVideo || !initialVideoId) return rawVideos;
-    if (rawVideos.some(v => v.id === initialVideoId)) return rawVideos;
-    return [standaloneVideo, ...rawVideos];
-  }, [rawVideos, standaloneVideo, initialVideoId]);
+    if (!standaloneVideo || !initialVideoId) return filteredVideos;
+    if (filteredVideos.some(v => v.id === initialVideoId)) return filteredVideos;
+    return [standaloneVideo, ...filteredVideos];
+  }, [filteredVideos, standaloneVideo, initialVideoId]);
   useEffect(() => {
     if (initialVideoId === undefined || !videos.length) return;
     const nextIndex = Math.max(
       0,
       videos.findIndex(video => video.id === initialVideoId)
     );
+    activeIndexRef.current = nextIndex;
     setActiveIndex(nextIndex);
     requestAnimationFrame(() => {
       viewportRef.current
@@ -4075,6 +4126,13 @@ export function ShortsFeed({
         ?.scrollIntoView({ behavior: "auto", block: "start" });
     });
   }, [initialVideoId, videos.length]);
+  useEffect(() => {
+    activeIndexRef.current = 0;
+    setActiveIndex(0);
+    requestAnimationFrame(() =>
+      viewportRef.current?.scrollTo({ top: 0, behavior: "auto" })
+    );
+  }, [shortsMode]);
   const goTo = (index: number, behavior: ScrollBehavior = "smooth") => {
     const viewport = viewportRef.current;
     const clamped = Math.max(
@@ -4087,6 +4145,7 @@ export function ShortsFeed({
     if (viewport && card) {
       viewport.scrollTo({ top: card.offsetTop, behavior });
     }
+    activeIndexRef.current = clamped;
     setActiveIndex(clamped);
   };
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
@@ -4095,7 +4154,7 @@ export function ShortsFeed({
     if (
       target instanceof Element &&
       target.closest(
-        "button, a, input, textarea, select, video, [data-short-no-swipe]"
+        "button, a, input, textarea, select, [data-short-no-swipe]"
       )
     )
       return;
@@ -4105,12 +4164,17 @@ export function ShortsFeed({
       startY: event.clientY,
       tracking: true,
     };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
   };
   const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const gesture = gestureRef.current;
     if (!gesture || gesture.pointerId !== event.pointerId) return;
     const deltaX = event.clientX - gesture.startX;
     const deltaY = event.clientY - gesture.startY;
+    if (Math.abs(deltaX) > 12 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      gesture.tracking = false;
+      return;
+    }
     if (Math.abs(deltaY) > 8 && Math.abs(deltaY) > Math.abs(deltaX)) {
       gesture.tracking = true;
     }
@@ -4118,6 +4182,8 @@ export function ShortsFeed({
   const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
     const gesture = gestureRef.current;
     gestureRef.current = null;
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
     if (!gesture || gesture.pointerId !== event.pointerId || !gesture.tracking)
       return;
     const deltaX = event.clientX - gesture.startX;
@@ -4127,7 +4193,7 @@ export function ShortsFeed({
     if (!isVerticalSwipe || gestureLockRef.current) return;
     event.preventDefault();
     gestureLockRef.current = true;
-    goTo(activeIndex + (deltaY < 0 ? 1 : -1));
+    goTo(activeIndexRef.current + (deltaY < 0 ? 1 : -1));
     if (gestureUnlockTimerRef.current !== null)
       window.clearTimeout(gestureUnlockTimerRef.current);
     gestureUnlockTimerRef.current = window.setTimeout(() => {
@@ -4135,7 +4201,9 @@ export function ShortsFeed({
       gestureUnlockTimerRef.current = null;
     }, 650);
   };
-  const onPointerCancel = () => {
+  const onPointerCancel = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
     gestureRef.current = null;
   };
   useEffect(
@@ -4153,15 +4221,15 @@ export function ShortsFeed({
     );
     const count = Math.max(videos.length, 1);
     const step = viewport.scrollHeight / count;
-    setActiveIndex(
-      Math.max(
-        0,
-        Math.min(
-          Math.round(viewport.scrollTop / Math.max(step, 1)),
-          Math.max(videos.length - 1, 0)
-        )
+    const indexFromScroll = Math.max(
+      0,
+      Math.min(
+        Math.round(viewport.scrollTop / Math.max(step, 1)),
+        Math.max(videos.length - 1, 0)
       )
     );
+    activeIndexRef.current = indexFromScroll;
+    setActiveIndex(indexFromScroll);
     if (!cards.length) return;
     const nextIndex = cards.reduce(
       (closest, card, index) =>
@@ -4171,6 +4239,7 @@ export function ShortsFeed({
           : closest,
       0
     );
+    activeIndexRef.current = nextIndex;
     setActiveIndex(nextIndex);
   };
   return (
@@ -4194,6 +4263,30 @@ export function ShortsFeed({
             ) : (
               <h2 id="shorts-heading">Shorts</h2>
             )}
+          </div>
+          <div
+            className="shorts-discovery-controls"
+            role="tablist"
+            aria-label="Shorts discovery"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={shortsMode === "for-you"}
+              className={shortsMode === "for-you" ? "is-active" : undefined}
+              onClick={() => setShortsMode("for-you")}
+            >
+              For You
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={shortsMode === "popular"}
+              className={shortsMode === "popular" ? "is-active" : undefined}
+              onClick={() => setShortsMode("popular")}
+            >
+              Popular
+            </button>
           </div>
         </div>
       )}
@@ -4221,7 +4314,11 @@ export function ShortsFeed({
       ) : (
         <div className="media-empty feed-empty-state">
           <Play size={18} />
-          <h3>No Shorts to show yet.</h3>
+          <h3>
+            {shortsMode === "popular"
+              ? "No popular Shorts to show yet."
+              : "No Shorts to show yet."}
+          </h3>
         </div>
       )}
     </section>
