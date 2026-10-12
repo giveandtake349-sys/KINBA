@@ -1,0 +1,76 @@
+/* Facebook-inspired dark charcoal palette — visual-only theme layer. */
+:root[data-theme="dark"] {
+  --page-bg: #18191a;
+  --text: #e4e6eb;
+  --muted: #b0b3b8;
+  --surface: #242526;
+  --surface-raised: #303031;
+  --surface-elevated: #3a3b3c;
+  --border: #3e4042;
+  --input: #3e4042;
+  --shadow-pop: 0 14px 36px rgba(0, 0, 0, 0.55);
+}
+
+:root[data-theme="dark"] body,
+:root[data-theme="dark"] .kinba-app,
+:root[data-theme="dark"] .kinba-app > main,
+:root[data-theme="dark"] .section-shell {
+  background-color: var(--page-bg);
+}
+
+:root[data-theme="dark"] .topbar,
+:root[data-theme="dark"] .top-navigation-wrapper {
+  background: #18191a !important;
+  border-bottom-color: #3e4042;
+}
+
+:root[data-theme="dark"] .bottom-navigation {
+  background: #242526 !important;
+  border-top-color: #3e4042;
+  border-bottom: 1px solid #3e4042;
+}
+
+:root[data-theme="dark"] .media-section,
+:root[data-theme="dark"] .long-video-card,
+:root[data-theme="dark"] .announcement-card,
+:root[data-theme="dark"] .short-card,
+:root[data-theme="dark"] .media-publish-panel,
+:root[data-theme="dark"] .hype-room-card,
+:root[data-theme="dark"] .settings-list,
+:root[data-theme="dark"] .drawer-profile-card,
+:root[data-theme="dark"] .notification-item {
+  background-color: var(--surface);
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] .media-engagement-actions,
+:root[data-theme="dark"] .feed-action-bar,
+:root[data-theme="dark"] .k-post__actions {
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] .home-feed-tabs,
+:root[data-theme="dark"] .hype-room-filters,
+:root[data-theme="dark"] .media-kind-switch {
+  background: #1f2021;
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] .topbar-icon-button,
+:root[data-theme="dark"] .header-profile-trigger,
+:root[data-theme="dark"] .theme-toggle,
+:root[data-theme="dark"] .logout-btn {
+  background: #242526;
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] .topbar-icon-button:hover,
+:root[data-theme="dark"] .header-profile-trigger:hover,
+:root[data-theme="dark"] .theme-toggle:hover,
+:root[data-theme="dark"] .logout-btn:hover {
+  background: #303031;
+}
+
+:root[data-theme="dark"] .bottom-navigation .publish-nav {
+  background: var(--blue);
+}
