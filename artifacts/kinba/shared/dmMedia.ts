@@ -14,11 +14,12 @@
  * members.
  */
 
-export const DM_ATTACHMENT_KINDS = ["image", "video", "document"] as const;
+export const DM_ATTACHMENT_KINDS = ["image", "video", "audio", "document"] as const;
 export type DMAttachmentKind = (typeof DM_ATTACHMENT_KINDS)[number];
 
 export const DM_MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const DM_MAX_VIDEO_BYTES = 25 * 1024 * 1024;
+export const DM_MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 export const DM_MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
 export const DM_MAX_VIDEO_DURATION_SECONDS = 30 * 60;
 
@@ -39,8 +40,16 @@ export const DM_VIDEO_MIME_TYPES = [
   "video/webm",
   "video/quicktime",
 ] as const;
+export const DM_AUDIO_MIME_TYPES = [
+  "audio/webm",
+  "audio/ogg",
+  "audio/mp4",
+  "audio/mpeg",
+  "audio/wav",
+] as const;
 export const DM_IMAGE_EXTENSIONS = ["jpg", "png", "webp", "gif"] as const;
 export const DM_VIDEO_EXTENSIONS = ["mp4", "mov", "webm"] as const;
+export const DM_AUDIO_EXTENSIONS = ["webm", "ogg", "m4a", "mp3", "wav"] as const;
 export const DM_DOCUMENT_EXTENSIONS = [
   "pdf",
   "doc",
@@ -54,6 +63,7 @@ export const DM_DOCUMENT_EXTENSIONS = [
 
 export const DM_IMAGE_ACCEPT = "image/jpeg,image/png,image/webp,image/gif";
 export const DM_VIDEO_ACCEPT = "video/mp4,video/webm,video/quicktime";
+export const DM_AUDIO_ACCEPT = "audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav";
 export const DM_DOCUMENT_ACCEPT = [
   ".pdf",
   ".doc",
@@ -80,6 +90,7 @@ export function dmIsAttachmentKind(value: string): value is DMAttachmentKind {
 export function dmMaxBytesForKind(kind: DMAttachmentKind): number {
   if (kind === "image") return DM_MAX_IMAGE_BYTES;
   if (kind === "video") return DM_MAX_VIDEO_BYTES;
+  if (kind === "audio") return DM_MAX_AUDIO_BYTES;
   return DM_MAX_DOCUMENT_BYTES;
 }
 
@@ -112,6 +123,11 @@ export function dmKindForMediaType(
   if (value.startsWith("video/")) {
     return (DM_VIDEO_MIME_TYPES as readonly string[]).includes(value)
       ? "video"
+      : null;
+  }
+  if (value.startsWith("audio/")) {
+    return (DM_AUDIO_MIME_TYPES as readonly string[]).includes(value)
+      ? "audio"
       : null;
   }
   return null;
@@ -160,6 +176,7 @@ export function dmDocumentLabel(ext: string): string {
 const KNOWN_EXTENSIONS = new Set<string>([
   ...DM_IMAGE_EXTENSIONS,
   ...DM_VIDEO_EXTENSIONS,
+  ...DM_AUDIO_EXTENSIONS,
   ...DM_DOCUMENT_EXTENSIONS,
   "jpeg",
   "jpe",

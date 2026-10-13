@@ -2142,3 +2142,116 @@
     padding-inline: 10px;
   }
 }
+
+/* Voice messaging and polished chat composer. */
+.message-media audio {
+  display: block;
+  min-width: min(280px, 100%);
+  max-width: 100%;
+  height: 40px;
+}
+
+.message-detail-messages {
+  background:
+    radial-gradient(circle at 50% 100%, color-mix(in srgb, var(--blue) 6%, transparent), transparent 38%),
+    color-mix(in srgb, var(--page-bg) 96%, var(--surface));
+}
+
+.message-body {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.composer-shell {
+  background: color-mix(in srgb, var(--surface) 96%, var(--blue));
+  padding: 10px 14px 14px;
+}
+
+.message-detail-input {
+  align-items: center;
+  background: transparent;
+  border-top: 0;
+  gap: 8px;
+  padding: 0;
+}
+
+.input-actions {
+  align-items: center;
+  padding-bottom: 0;
+}
+
+.input-action-btn,
+.voice-record-btn {
+  align-items: center;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  color: var(--muted);
+  display: inline-flex;
+  height: 42px;
+  justify-content: center;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+  width: 42px;
+}
+
+.input-action-btn:hover:not(:disabled),
+.voice-record-btn:hover:not(:disabled) {
+  background: var(--blue-soft);
+  border-color: var(--blue-border);
+  color: var(--blue);
+  transform: translateY(-1px);
+}
+
+.voice-record-btn {
+  gap: 5px;
+  flex: 0 0 auto;
+  width: 42px;
+}
+
+.voice-record-btn.is-recording {
+  background: var(--error-soft);
+  border-color: color-mix(in srgb, var(--error) 55%, var(--border));
+  color: var(--error);
+  width: 78px;
+}
+
+.voice-record-btn.is-recording span {
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.input-wrapper textarea {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  min-height: 42px !important;
+  padding-block: 0.65rem;
+}
+
+.send-btn {
+  height: 42px;
+  width: 42px;
+}
+
+.desktop-sidebar:has(.message-settings) .message-settings {
+  flex: 1;
+  overflow-y: auto;
+}
+
+@media (max-width: 760px) {
+  .composer-shell {
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+}
+
+.attach-item--audio .attach-audio-icon {
+  align-items: center;
+  background: var(--blue-soft);
+  border: 1px solid var(--blue-border);
+  border-radius: 11px;
+  color: var(--blue);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}

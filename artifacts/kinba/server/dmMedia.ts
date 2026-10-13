@@ -24,6 +24,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   DM_DOCUMENT_MEDIA_TYPE,
+  DM_AUDIO_MIME_TYPES,
   DM_MAX_VIDEO_BYTES,
   type DMAttachmentKind,
   buildDmObjectKey,
@@ -100,6 +101,22 @@ function sniffVideo(buffer: Buffer): SniffedFile | null {
     const head = buffer.subarray(0, 64).toString("latin1");
     if (head.includes("webm")) return { mime: "video/webm", ext: "webm" };
     return null;
+  }
+  return null;
+}
+
+function sniffAudio(buffer: Buffer): SniffedFile | null {
+  if (startsWithBytes(buffer, [0x1a, 0x45, 0xdf, 0xa3])) {
+    const head = buffer.subarray(0, 64).toString("latin1");
+    return head.includes("webm") ? { mime: "audio/webm", ext: "webm" } : null;
+  }
+  if (ascii(buffer, 0, 4) === "OggS") return { mime: "audio/ogg", ext: "ogg" };
+  if (ascii(buffer, 4, 4) === "ftyp") return { mime: "audio/mp4", ext: "m4a" };
+  if (ascii(buffer, 0, 3) === "ID3" || (buffer[0] === 0xff && (buffer[1] & 0xe0) === 0xe0)) {
+    return { mime: "audio/mpeg", ext: "mp3" };
+  }
+  if (ascii(buffer, 0, 4) === "RIFF" && ascii(buffer, 8, 4) === "WAVE") {
+    return { mime: "audio/wav", ext: "wav" };
   }
   return null;
 }
@@ -185,6 +202,19 @@ export function validateDmUpload(input: {
       throw new Error(
         "Attachment is not a supported video. Choose an MP4, MOV, or WebM video."
       );
+    return {
+      mediaType: sniffed.mime,
+      ext: sniffed.ext,
+      baseName,
+      contentType: sniffed.mime,
+      size,
+    };
+  }
+
+  if (kind === "audio") {
+    const sniffed = sniffAudio(buffer);
+    if (!sniffed || !(DM_AUDIO_MIME_TYPES as readonly string[]).includes(sniffed.mime))
+      throw new Error("Attachment is not a supported audio recording.");
     return {
       mediaType: sniffed.mime,
       ext: sniffed.ext,

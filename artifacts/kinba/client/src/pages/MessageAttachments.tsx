@@ -1,4 +1,4 @@
-import { FileText, Image as ImageIcon, RotateCcw, Video, X } from "lucide-react";
+import { FileText, Image as ImageIcon, Mic, RotateCcw, Video, X } from "lucide-react";
 import { dmDocumentLabel, formatDmFileSize, DM_DOCUMENT_ACCEPT } from "@shared/dmMedia";
 import type { DmPendingAttachment } from "@/lib/dmAttachment";
 import "./messages.css";
@@ -175,6 +175,24 @@ function AttachmentChip({
           <span className="attach-sub">{formatDmFileSize(item.size)}</span>
           {status}
         </div>
+      </div>
+    );
+  }
+
+  if (item.kind === "audio") {
+    return (
+      <div className="attach-item attach-item--audio" role="listitem">
+        <span className="attach-audio-icon" aria-hidden="true">
+          <Mic size={18} />
+        </span>
+        <div className="attach-meta">
+          <span className="attach-name" title={item.name}>
+            {item.name}
+          </span>
+          <span className="attach-sub">Voice message • {formatDmFileSize(item.size)}</span>
+          {status}
+        </div>
+        {removeButton}
       </div>
     );
   }

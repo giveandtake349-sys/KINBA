@@ -221,6 +221,8 @@ export function DesktopMessages() {
           </section>
         )}
 
+        {!showSettings && (
+          <>
         <div className="messages-search">
           <Search size={18} />
           <input
@@ -380,6 +382,8 @@ export function DesktopMessages() {
               ))
             )}
           </div>
+        )}
+          </>
         )}
       </aside>
       )}

@@ -11,6 +11,7 @@ import { apiUrl } from "@/lib/api";
 import { getVideoMetadata } from "@/lib/mediaUpload";
 import {
   DM_ATTACHMENT_KINDS,
+  DM_AUDIO_MIME_TYPES,
   DM_IMAGE_MIME_TYPES,
   DM_MAX_VIDEO_DURATION_SECONDS,
   type DMAttachmentKind,
@@ -69,6 +70,7 @@ function extensionOf(fileName: string) {
 function sizeErrorLabel(kind: DMAttachmentKind) {
   if (kind === "image") return "Images";
   if (kind === "video") return "Videos";
+  if (kind === "audio") return "Audio recordings";
   return "Documents";
 }
 
@@ -92,6 +94,13 @@ export function validateDmFile(kind: DMAttachmentKind, file: File): void {
     const type = (file.type || "").toLowerCase();
     if (!type.startsWith("video/")) {
       throw new Error("Choose an MP4, MOV, or WebM video.");
+    }
+    return;
+  }
+  if (kind === "audio") {
+    const type = (file.type || "").toLowerCase().split(";")[0];
+    if (!(DM_AUDIO_MIME_TYPES as readonly string[]).includes(type)) {
+      throw new Error("Choose a supported audio recording.");
     }
     return;
   }
@@ -127,6 +136,28 @@ function readImageSize(file: File): Promise<{ width: number; height: number }> {
   });
 }
 
+function readAudioDuration(file: File): Promise<number> {
+  const previewUrl = URL.createObjectURL(file);
+  const audio = document.createElement("audio");
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      URL.revokeObjectURL(previewUrl);
+      audio.remove();
+    };
+    audio.preload = "metadata";
+    audio.onloadedmetadata = () => {
+      const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+      cleanup();
+      resolve(duration);
+    };
+    audio.onerror = () => {
+      cleanup();
+      reject(new Error("This audio recording could not be read."));
+    };
+    audio.src = previewUrl;
+  });
+}
+
 /**
  * Real intrinsic media metadata used for the mediaWidth / mediaHeight /
  * mediaDuration columns. Videos are probed *before* upload so an oversized
@@ -149,6 +180,9 @@ export async function probeDmMedia(
       height: meta.height,
       duration: meta.durationSeconds,
     };
+  }
+  if (kind === "audio") {
+    return { duration: await readAudioDuration(file) };
   }
   return {};
 }

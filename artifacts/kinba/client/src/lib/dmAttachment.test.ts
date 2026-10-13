@@ -131,11 +131,11 @@ describe("parseDmMediaDisplay", () => {
 });
 
 describe("isDmAttachmentKind", () => {
-  it("only accepts the three menu kinds", () => {
+  it("accepts menu kinds and recorded voice messages", () => {
     expect(isDmAttachmentKind("image")).toBe(true);
     expect(isDmAttachmentKind("video")).toBe(true);
     expect(isDmAttachmentKind("document")).toBe(true);
-    expect(isDmAttachmentKind("audio")).toBe(false);
+    expect(isDmAttachmentKind("audio")).toBe(true);
   });
 });
 

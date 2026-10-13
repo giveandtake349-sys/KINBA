@@ -19,6 +19,8 @@ import {
   Pencil,
   Trash2,
   X,
+  Mic,
+  Square,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { nanoid } from "nanoid";
@@ -108,6 +110,7 @@ const EDIT_WINDOW_MS = 30 * 60 * 1000;
 function mediaLabel(mediaType?: string | null): string {
   if (!mediaType) return "Attachment";
   if (mediaType.startsWith("video")) return "Video";
+  if (mediaType.startsWith("audio")) return "Voice message";
   if (mediaType.startsWith("image")) return "Photo";
   if (mediaType === DM_DOCUMENT_MEDIA_TYPE) return "Document";
   return "Attachment";
@@ -134,6 +137,8 @@ export default function MessageDetail() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingText, setEditingText] = useState("");
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
@@ -143,6 +148,10 @@ export default function MessageDetail() {
     x: 0,
     y: 0,
   });
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recorderStreamRef = useRef<MediaStream | null>(null);
+  const recorderChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<number | null>(null);
 
   const attachmentsRef = useRef<DmPendingAttachment[]>([]);
   const uploadHandlesRef = useRef<Map<string, DmUploadHandle>>(new Map());
@@ -198,6 +207,9 @@ export default function MessageDetail() {
         }
       }
       pendingUrls.clear();
+      if (recordingTimerRef.current != null) window.clearInterval(recordingTimerRef.current);
+      recorderRef.current?.stop();
+      recorderStreamRef.current?.getTracks().forEach(track => track.stop());
     };
   }, []);
 
@@ -398,6 +410,63 @@ export default function MessageDetail() {
     },
     [handleFilesSelected]
   );
+
+  const stopVoiceRecording = useCallback(() => {
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      recorderRef.current.stop();
+    }
+    if (recordingTimerRef.current != null) {
+      window.clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    recorderStreamRef.current?.getTracks().forEach(track => track.stop());
+    recorderStreamRef.current = null;
+    setIsRecording(false);
+  }, []);
+
+  const startVoiceRecording = useCallback(async () => {
+    if (isRecording || sending || attachmentsRef.current.length >= DM_MAX_ATTACHMENTS) return;
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      toast.error("Voice recording is not supported in this browser.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const preferredMime = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg"]
+        .find(type => MediaRecorder.isTypeSupported(type));
+      const recorder = preferredMime
+        ? new MediaRecorder(stream, { mimeType: preferredMime })
+        : new MediaRecorder(stream);
+      recorderStreamRef.current = stream;
+      recorderRef.current = recorder;
+      recorderChunksRef.current = [];
+      recorder.ondataavailable = event => {
+        if (event.data.size > 0) recorderChunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        const mimeType = recorder.mimeType || preferredMime || "audio/webm";
+        const extension = mimeType.includes("ogg") ? "ogg" : "webm";
+        const file = new File(
+          recorderChunksRef.current,
+          `voice-message-${Date.now()}.${extension}`,
+          { type: mimeType }
+        );
+        recorderChunksRef.current = [];
+        handleFilesSelected("audio", [file]);
+        recorderRef.current = null;
+      };
+      recorder.start(250);
+      setRecordingSeconds(0);
+      setIsRecording(true);
+      recordingTimerRef.current = window.setInterval(
+        () => setRecordingSeconds(seconds => seconds + 1),
+        1000
+      );
+    } catch (error) {
+      console.error("Voice recording failed:", error);
+      toast.error("Microphone access was not available.");
+    }
+  }, [handleFilesSelected, isRecording, sending]);
 
   const handleRemoveAttachment = useCallback(
     (id: string) => {
@@ -920,6 +989,7 @@ export default function MessageDetail() {
               const displayUrl =
                 mediaUrl && /^https?:\/\//i.test(mediaUrl) ? mediaUrl : undefined;
               const isVideo = Boolean(msg.mediaType?.startsWith("video"));
+              const isAudio = Boolean(msg.mediaType?.startsWith("audio"));
               const isDocument = msg.mediaType === DM_DOCUMENT_MEDIA_TYPE;
               const documentMeta = isDocument ? parseDmMediaDisplay(mediaUrl) : null;
               const isDeleted = msg.deletedAt != null;
@@ -1010,6 +1080,8 @@ export default function MessageDetail() {
                             <span className="dm-media-unavailable">Attachment</span>
                           ) : isVideo ? (
                             <video src={displayUrl} controls preload="metadata" playsInline />
+                          ) : isAudio ? (
+                            <audio src={displayUrl} controls preload="metadata" />
                           ) : isDocument ? (
                             <a
                               className="dm-doc"
@@ -1101,6 +1173,8 @@ export default function MessageDetail() {
                                 muted
                                 playsInline
                               />
+                            ) : msg.preview.kind === "audio" && msg.preview.previewUrl ? (
+                              <audio src={msg.preview.previewUrl} controls preload="metadata" />
                             ) : (
                               <div className="dm-doc dm-doc--pending">
                                 <span className="dm-doc-icon" aria-hidden="true">
@@ -1226,6 +1300,22 @@ export default function MessageDetail() {
               onClose={() => setAttachmentMenuOpen(false)}
             />
           </div>
+          <button
+            type="button"
+            className={`voice-record-btn${isRecording ? " is-recording" : ""}`}
+            onClick={() => (isRecording ? stopVoiceRecording() : void startVoiceRecording())}
+            disabled={sending || uploadingCount > 0}
+            aria-label={isRecording ? "Stop voice recording" : "Record voice message"}
+            title={isRecording ? "Stop recording" : "Record voice message"}
+          >
+            {isRecording ? <Square size={17} fill="currentColor" /> : <Mic size={19} />}
+            {isRecording && (
+              <span aria-live="polite">
+                {String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:
+                {String(recordingSeconds % 60).padStart(2, "0")}
+              </span>
+            )}
+          </button>
           <div className="input-wrapper">
             <textarea
               ref={textareaRef}
