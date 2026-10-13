@@ -67,6 +67,7 @@ import {
   MAX_SHORT_VIDEO_DURATION_SECONDS,
   publishPhoto,
   publishVideo,
+  validatePhotoFile,
   uploadImage,
 } from "@/lib/mediaUpload";
 import { resolveMediaUrl } from "@/lib/runtimeConfig";
@@ -1613,6 +1614,12 @@ function CharacterRing({ used, max }: { used: number; max: number }) {
   );
 }
 
+type UploadImageSelection = {
+  file: File;
+  previewUrl: string;
+  dimensions: { width: number; height: number };
+};
+
 function UploadVideoModal({
   open,
   onClose,
@@ -1627,6 +1634,7 @@ function UploadVideoModal({
   const [kind, setKind] = useState<"LONG" | "SHORT">("LONG");
   const [caption, setCaption] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [selectedImages, setSelectedImages] = useState<UploadImageSelection[]>([]);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [clipSeconds, setClipSeconds] = useState<number | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -1665,17 +1673,21 @@ function UploadVideoModal({
 
   // Local preview of the chosen file (revoked when it changes or the sheet unmounts).
   useEffect(() => {
-    if (!file) {
+    if (!file || mediaMode !== "video") {
       setPreviewUrl(null);
       return;
     }
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
-  }, [file]);
+  }, [file, mediaMode]);
 
   const clearMedia = () => {
     setFile(null);
+    setSelectedImages(current => {
+      current.forEach(image => URL.revokeObjectURL(image.previewUrl));
+      return [];
+    });
     setImageDimensions(null);
     setClipSeconds(null);
   };
@@ -1707,16 +1719,25 @@ function UploadVideoModal({
   const selectFile = async (event: ChangeEvent<HTMLInputElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    const nextFile = event.target.files?.[0];
+    const nextFiles = Array.from(event.target.files ?? []);
     event.target.value = "";
-    if (!nextFile) return;
+    if (!nextFiles.length) return;
     try {
       if (mediaMode === "photo") {
-        setImageDimensions(await getImageDimensions(nextFile));
+        if (nextFiles.length > 20) throw new Error("Choose up to 20 images per post.");
+        nextFiles.forEach(validatePhotoFile);
+        const images = await Promise.all(nextFiles.map(async selected => ({
+          file: selected,
+          previewUrl: URL.createObjectURL(selected),
+          dimensions: await getImageDimensions(selected),
+        })));
+        setSelectedImages(images);
+        setImageDimensions(images[0]?.dimensions ?? null);
         setClipSeconds(null);
-        setFile(nextFile);
+        setFile(null);
         return;
       }
+      const nextFile = nextFiles[0];
       const metadata = await getVideoMetadata(nextFile, {
         maxDurationSeconds:
           kind === "LONG" ? MAX_LONG_VIDEO_DURATION_SECONDS : MAX_SHORT_VIDEO_DURATION_SECONDS,
@@ -1766,15 +1787,16 @@ function UploadVideoModal({
     event.preventDefault();
     event.stopPropagation();
     const captionText = caption.trim();
-    if (!file || !captionText || (mediaMode === "photo" && !imageDimensions)) {
+    if ((!file && !selectedImages.length) || !captionText || (mediaMode === "photo" && !selectedImages.length)) {
       toast.error(mediaMode === "photo" ? "Add a caption and image first." : "Add a caption and an original video first.");
       return;
     }
     setBusy(true);
     try {
-      if (mediaMode === "photo" && imageDimensions) {
-        await publishPhoto(file, "", captionText, imageDimensions);
+      if (mediaMode === "photo" && selectedImages.length) {
+        await publishPhoto(selectedImages.map(image => image.file), "", captionText, selectedImages.map(image => image.dimensions));
       } else {
+        if (!file) throw new Error("Please choose a video first.");
         await publishVideo(file, kind, "", captionText);
       }
       await onPublished();
@@ -1796,8 +1818,8 @@ function UploadVideoModal({
   const draftExcerpt = textBody.trim().replace(/\s+/g, " ");
   const maxClip = kind === "SHORT" ? MAX_SHORT_VIDEO_DURATION_SECONDS : MAX_LONG_VIDEO_DURATION_SECONDS;
   const limitLabel = kind === "SHORT" ? "1 min" : "30 min";
-  const mediaReady = Boolean(file) && caption.trim().length > 0;
-  const checkedSteps = file ? 1 : 0;
+  const mediaReady = (mediaMode === "photo" ? selectedImages.length > 0 : Boolean(file)) && caption.trim().length > 0;
+  const checkedSteps = (mediaMode === "photo" ? selectedImages.length : file ? 1 : 0) ? 1 : 0;
 
   const cards: Array<{
     id: string;
@@ -1928,25 +1950,35 @@ function UploadVideoModal({
               <button type="button" role="tab" aria-selected={kind === "SHORT"} className={kind === "SHORT" ? "active" : ""} onClick={safeClick(() => switchVideoKind("SHORT"))}>Short · up to 1 min</button>
             </div>
           )}
-          <input ref={inputRef} type="file" accept={mediaMode === "photo" ? "image/jpeg,image/png,image/webp" : "video/*"} className="sr-only" onChange={selectFile} />
-          {file && previewUrl ? (
+          <input ref={inputRef} type="file" multiple={mediaMode === "photo"} accept={mediaMode === "photo" ? "image/jpeg,image/png,image/webp" : "video/*"} className="sr-only" onChange={selectFile} />
+          {(mediaMode === "photo" && selectedImages.length > 0) || (mediaMode === "video" && file && previewUrl) ? (
             <div className="cp-picked">
               <div className={`cp-preview${mediaMode === "video" && kind === "SHORT" ? " is-vertical" : ""}`}>
                 {mediaMode === "photo" ? (
-                  <img src={previewUrl} alt="Selected image preview" />
+                  <img src={selectedImages[0].previewUrl} alt={`Selected image 1 of ${selectedImages.length}`} />
                 ) : (
-                  <video src={previewUrl} muted playsInline preload="metadata" />
+                  <video src={previewUrl ?? undefined} muted playsInline preload="metadata" />
                 )}
+                {mediaMode === "photo" && selectedImages.length > 1 ? <span className="cp-gallery-count">{selectedImages.length} photos · swipe after publishing</span> : null}
                 {clipSeconds != null ? <span className="cp-duration">{formatClipDuration(clipSeconds)}</span> : null}
               </div>
+              {mediaMode === "photo" ? (
+                <div className="cp-image-strip" aria-label="Selected images">
+                  {selectedImages.map((image, index) => (
+                    <button type="button" key={`${image.file.name}-${index}`} className={`cp-image-thumb${index === 0 ? " is-selected" : ""}`} onClick={safeClick(() => setSelectedImages(current => [image, ...current.filter(item => item !== image)]))} aria-label={`Move image ${index + 1} to first`}>
+                      <img src={image.previewUrl} alt="" />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               <div className="cp-picked-info">
-                <strong title={file.name}>{file.name}</strong>
-                <span>{formatFileSize(file.size)}</span>
+                <strong title={mediaMode === "photo" ? selectedImages[0].file.name : file?.name}>{mediaMode === "photo" ? `${selectedImages.length} image${selectedImages.length === 1 ? "" : "s"} selected` : file?.name}</strong>
+                <span>{formatFileSize(mediaMode === "photo" ? selectedImages.reduce((sum, image) => sum + image.file.size, 0) : file?.size ?? 0)}</span>
                 {mediaMode === "video" && clipSeconds != null && clipSeconds <= maxClip ? (
                   <span className="cp-ok"><Check size={14} /> Within the {limitLabel} limit</span>
                 ) : null}
                 <div className="cp-picked-actions">
-                  <button type="button" onClick={safeClick(() => inputRef.current?.click())} disabled={busy}><RefreshCw size={15} /> Replace</button>
+                  <button type="button" onClick={safeClick(() => inputRef.current?.click())} disabled={busy}><RefreshCw size={15} /> {mediaMode === "photo" ? "Add / replace" : "Replace"}</button>
                   <button type="button" className="is-danger" onClick={safeClick(clearMedia)} disabled={busy}><Trash2 size={15} /> Remove</button>
                 </div>
               </div>

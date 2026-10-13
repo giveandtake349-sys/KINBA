@@ -384,6 +384,8 @@ export const videos = pgTable(
     description: text("description").notNull(),
     videoUrl: varchar("videoUrl", { length: 1024 }).notNull(),
     thumbnailUrl: varchar("thumbnailUrl", { length: 1024 }),
+    // Optional ordered image gallery for IMAGE posts; legacy rows remain NULL.
+    gallery: jsonb("gallery").$type<Array<{ url: string; width: number; height: number }>>(),
     mediaType: mediaType("mediaType").default("VIDEO").notNull(),
     kind: videoKind("kind").notNull(),
     durationSeconds: integer("durationSeconds").notNull(),

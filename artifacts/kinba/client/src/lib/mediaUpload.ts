@@ -235,53 +235,45 @@ export async function getImageDimensions(
 }
 
 export async function publishPhoto(
-  file: File,
+  file: File | File[],
   title: string,
   description: string,
-  dimensions: { width: number; height: number }
-): Promise<{ postId: number; status: string; imageUrl: string }> {
-  validatePhotoFile(file);
-  const session = await getUploadSession(
-    "Please sign in before uploading a photo."
-  );
-  const extension = allowedImageTypes[file.type as AllowedImageType];
-  const objectPath = `${session.user.id}/post-${Date.now()}-${crypto.randomUUID()}.${extension}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from("post-media")
-    .upload(objectPath, file, {
-      cacheControl: "3600",
-      contentType: file.type,
-      upsert: false,
-    });
-  if (uploadError) {
-    console.error(
-      "[MediaPublish] Supabase photo storage upload failed",
-      uploadError
-    );
-    throw new Error(`Photo upload failed: ${uploadError.message}`);
+  dimensions: { width: number; height: number } | Array<{ width: number; height: number }>
+): Promise<{ postId: number; status: string; imageUrl: string; gallery: Array<{ url: string; width: number; height: number }> }> {
+  const files = Array.isArray(file) ? file : [file];
+  const imageDimensions = Array.isArray(dimensions) ? dimensions : [dimensions];
+  if (!files.length || files.length > 20) throw new Error("Choose between 1 and 20 images.");
+  if (files.length !== imageDimensions.length) throw new Error("Image metadata could not be matched.");
+  files.forEach(validatePhotoFile);
+  const session = await getUploadSession("Please sign in before uploading a photo.");
+  const gallery: Array<{ url: string; width: number; height: number }> = [];
+  for (const [index, selectedFile] of files.entries()) {
+    const extension = allowedImageTypes[selectedFile.type as AllowedImageType];
+    const objectPath = `${session.user.id}/post-${Date.now()}-${index}-${crypto.randomUUID()}.${extension}`;
+    const { error: uploadError } = await supabase.storage
+      .from("post-media")
+      .upload(objectPath, selectedFile, {
+        cacheControl: "3600",
+        contentType: selectedFile.type,
+        upsert: false,
+      });
+    if (uploadError) {
+      console.error("[MediaPublish] Supabase photo storage upload failed", uploadError);
+      throw new Error(`Photo upload failed: ${uploadError.message}`);
+    }
+    const { data: publicUrlData } = supabase.storage.from("post-media").getPublicUrl(objectPath);
+    const url = publicUrlData.publicUrl.trim();
+    if (!/^https?:\/\//i.test(url)) throw new Error("Photo upload did not return a valid public URL.");
+    gallery.push({ url, ...imageDimensions[index] });
   }
-
-  const { data: publicUrlData } = supabase.storage
-    .from("post-media")
-    .getPublicUrl(objectPath);
-  const imageUrl = publicUrlData.publicUrl.trim();
-  if (!/^https?:\/\//i.test(imageUrl)) {
-    throw new Error("Photo upload did not return a valid public URL.");
-  }
-
+  const imageUrl = gallery[0].url;
   const endpoint = apiUrl("/api/photos/create");
-  logUploadRequest(
-    "photo",
-    endpoint,
-    {
-      title,
-      description,
-      width: String(dimensions.width),
-      height: String(dimensions.height),
-    },
-    file
-  );
+  logUploadRequest("photo", endpoint, {
+    title,
+    description,
+    width: String(gallery[0].width),
+    height: String(gallery[0].height),
+  }, files[0]);
   let response: Response;
   try {
     response = await fetchUploadWithRetry(endpoint, {
@@ -291,31 +283,22 @@ export async function publishPhoto(
         "Content-Type": "application/json",
       },
       credentials: "include",
-      body: JSON.stringify({ title, description, imageUrl, ...dimensions }),
+      body: JSON.stringify({ title, description, imageUrl, ...gallery[0], gallery }),
     });
   } catch (error) {
     console.error("[MediaPublish] photo publication network failure", error);
-    throw new Error(
-      `Photo publication failed: ${error instanceof Error ? error.message : "network error"}`
-    );
+    throw new Error(`Photo publication failed: ${error instanceof Error ? error.message : "network error"}`);
   }
   const payload = await readUploadPayload(response);
-  if (
-    !response.ok ||
-    !payload.postId ||
-    !payload.imageUrl ||
-    !/^https?:\/\//i.test(payload.imageUrl)
-  ) {
-    console.error("[MediaPublish] photo publication rejected", {
-      status: response.status,
-      payload,
-    });
+  if (!response.ok || !payload.postId || !payload.imageUrl || !/^https?:\/\//i.test(payload.imageUrl)) {
+    console.error("[MediaPublish] photo publication rejected", { status: response.status, payload });
     throw new Error(uploadFailureMessage(response, payload, "Photo"));
   }
   return {
     postId: payload.postId,
     status: payload.status || "PUBLISHED",
     imageUrl: payload.imageUrl,
+    gallery,
   };
 }
 
