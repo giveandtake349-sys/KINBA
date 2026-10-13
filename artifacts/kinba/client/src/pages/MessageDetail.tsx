@@ -107,6 +107,11 @@ type ReplyTarget = {
 // Mirrors the server's DM_EDIT_WINDOW_MS — the server re-checks and rejects.
 const EDIT_WINDOW_MS = 30 * 60 * 1000;
 
+// Maximum voice message length. 5 minutes keeps uploads comfortably under the
+// 10MB server limit (DM_MAX_AUDIO_BYTES) at typical Opus bitrates, and gives
+// the recorder a deterministic auto-stop instead of recording forever.
+const VOICE_MAX_DURATION_SECONDS = 5 * 60;
+
 function mediaLabel(mediaType?: string | null): string {
   if (!mediaType) return "Attachment";
   if (mediaType.startsWith("video")) return "Video";
@@ -458,15 +463,24 @@ export default function MessageDetail() {
       recorder.start(250);
       setRecordingSeconds(0);
       setIsRecording(true);
-      recordingTimerRef.current = window.setInterval(
-        () => setRecordingSeconds(seconds => seconds + 1),
-        1000
-      );
+      // Auto-stop at the duration cap so a forgotten recording can't run
+      // forever or produce an oversized upload. Same path as a manual stop.
+      let elapsed = 0;
+      recordingTimerRef.current = window.setInterval(() => {
+        elapsed += 1;
+        setRecordingSeconds(elapsed);
+        if (elapsed >= VOICE_MAX_DURATION_SECONDS) {
+          stopVoiceRecording();
+          toast.info(
+            `Voice messages are limited to ${VOICE_MAX_DURATION_SECONDS / 60} minutes.`
+          );
+        }
+      }, 1000);
     } catch (error) {
       console.error("Voice recording failed:", error);
       toast.error("Microphone access was not available.");
     }
-  }, [handleFilesSelected, isRecording, sending]);
+  }, [handleFilesSelected, isRecording, sending, stopVoiceRecording]);
 
   const handleRemoveAttachment = useCallback(
     (id: string) => {
@@ -1081,7 +1095,12 @@ export default function MessageDetail() {
                           ) : isVideo ? (
                             <video src={displayUrl} controls preload="metadata" playsInline />
                           ) : isAudio ? (
-                            <audio src={displayUrl} controls preload="metadata" />
+                            <audio
+                              src={displayUrl}
+                              controls
+                              preload="metadata"
+                              aria-label="Voice message"
+                            />
                           ) : isDocument ? (
                             <a
                               className="dm-doc"
