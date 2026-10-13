@@ -531,6 +531,8 @@ describe("§22 writers — flag gating + payloads", () => {
         "room_message_hidden",
         "room_reply",
         "room_started",
+        "video_comment",
+        "video_reply",
       ].sort()
     );
   });

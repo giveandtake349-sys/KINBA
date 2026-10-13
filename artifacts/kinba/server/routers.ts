@@ -99,6 +99,7 @@ import {
   listUserNotifications,
   markUserNotificationsRead,
   notifyNewFollower,
+  notifyVideoComment,
 } from "./notifications";
 import {
   adminArchiveHypeRoom,
@@ -895,15 +896,17 @@ export const appRouter = router({
               "Comment text or audio is required."
             )
         )
-        .mutation(({ ctx, input }) => {
+        .mutation(async ({ ctx, input }) => {
           const options = {
             audioUrl: input.audioUrl,
             audioDuration: input.audioDuration,
             parentId: input.parentId,
           };
-          return input.audioUrl || input.parentId !== undefined
+          const comment = await (input.audioUrl || input.parentId !== undefined
             ? createVideoComment(input.videoId, ctx.user.id, input.body, options)
-            : createVideoComment(input.videoId, ctx.user.id, input.body);
+            : createVideoComment(input.videoId, ctx.user.id, input.body));
+          await notifyVideoComment(comment.id, ctx.user.id);
+          return comment;
         }),
       edit: protectedProcedure
         .input(

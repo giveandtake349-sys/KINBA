@@ -8,7 +8,13 @@
  * Flags: writers follow parent feature flags (rooms / drops); reads have none.
  */
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import { hypeRoomMembers, notifications, users } from "../drizzle/schema";
+import {
+  hypeRoomMembers,
+  notifications,
+  users,
+  videoComments,
+  videos,
+} from "../drizzle/schema";
 import { getDb } from "./db";
 import { isFeatureFlagEnabled } from "./featureFlags";
 
@@ -50,6 +56,9 @@ export const NOTIFICATION_TYPES = {
   dmMessage: "dm_message",
   dmRequest: "dm_request",
   dmRequestAccepted: "dm_request_accepted",
+  /** Video comment writers. */
+  videoComment: "video_comment",
+  videoReply: "video_reply",
 } as const;
 
 const TYPE_MAX = 64;
@@ -194,6 +203,86 @@ export async function notifyNewFollower(
   } catch (error) {
     console.warn("[Notifications] Follow writer insert failed:", error);
     return null;
+  }
+}
+
+/**
+ * Best-effort writer for video comments and threaded replies.
+ * The comment mutation is already committed before this runs, so notification
+ * failure can never make posting fail. A recipient is notified once per
+ * comment, and the actor is never notified about their own comment.
+ */
+export async function notifyVideoComment(
+  commentId: number,
+  actorId: number
+): Promise<number> {
+  try {
+    const db = await getDb();
+    if (!db || !Number.isInteger(commentId) || !Number.isInteger(actorId)) return 0;
+    const [comment] = await db
+      .select({
+        id: videoComments.id,
+        parentId: videoComments.parentId,
+        videoOwnerId: videos.userId,
+        title: videos.title,
+      })
+      .from(videoComments)
+      .innerJoin(videos, eq(videoComments.videoId, videos.id))
+      .where(eq(videoComments.id, commentId))
+      .limit(1);
+    if (!comment) return 0;
+
+    const recipients = new Set<number>();
+    if (comment.videoOwnerId !== actorId) recipients.add(comment.videoOwnerId);
+    if (comment.parentId != null) {
+      const [parent] = await db
+        .select({ userId: videoComments.userId })
+        .from(videoComments)
+        .where(eq(videoComments.id, comment.parentId))
+        .limit(1);
+      if (parent && parent.userId !== actorId) recipients.add(parent.userId);
+    }
+    if (recipients.size === 0) return 0;
+
+    const type = comment.parentId == null
+      ? NOTIFICATION_TYPES.videoComment
+      : NOTIFICATION_TYPES.videoReply;
+    const title = comment.parentId == null ? "New comment" : "New reply";
+    const body = comment.parentId == null
+      ? `Someone commented on ${comment.title || "your video"}.`
+      : `Someone replied to a comment on ${comment.title || "your video"}.`;
+    let written = 0;
+    for (const userId of recipients) {
+      const [existing] = await db
+        .select({ id: notifications.id })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.userId, userId),
+            eq(notifications.type, type),
+            eq(notifications.entityType, "video_comment"),
+            eq(notifications.entityId, commentId)
+          )
+        )
+        .limit(1);
+      if (existing) continue;
+      const created = await insertNotification(
+        {
+          userId,
+          type,
+          title,
+          body,
+          entityType: "video_comment",
+          entityId: commentId,
+        },
+        db
+      );
+      if (created) written += 1;
+    }
+    return written;
+  } catch (error) {
+    console.warn("[Notifications] Video comment writer failed:", error);
+    return 0;
   }
 }
 
@@ -729,4 +818,3 @@ export async function notifyRoomMessageHidden(
     return false;
   }
 }
-
