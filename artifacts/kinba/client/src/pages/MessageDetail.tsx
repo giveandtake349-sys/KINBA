@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useParams } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -59,6 +59,55 @@ type OptimisticMessage = {
   };
   failed: boolean;
 };
+
+/** Consecutive messages from the same sender within this window render as a joined group. */
+const MESSAGE_GROUP_WINDOW_MS = 5 * 60 * 1000;
+
+type MessageGroupPosition = "single" | "first" | "mid" | "last";
+
+function computeGroupPositions(
+  items: Array<{ senderId: number; createdAt: number }>
+): MessageGroupPosition[] {
+  return items.map((item, index) => {
+    const prev = items[index - 1];
+    const next = items[index + 1];
+    const joinPrev =
+      !!prev &&
+      prev.senderId === item.senderId &&
+      item.createdAt - prev.createdAt <= MESSAGE_GROUP_WINDOW_MS;
+    const joinNext =
+      !!next &&
+      next.senderId === item.senderId &&
+      next.createdAt - item.createdAt <= MESSAGE_GROUP_WINDOW_MS;
+    if (joinPrev && joinNext) return "mid";
+    if (joinPrev) return "last";
+    if (joinNext) return "first";
+    return "single";
+  });
+}
+
+function isSameLocalDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function formatDayDividerLabel(date: Date): string {
+  const now = new Date();
+  if (isSameLocalDay(date, now)) return "Today";
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (isSameLocalDay(date, yesterday)) return "Yesterday";
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return date.toLocaleDateString(
+    [],
+    sameYear
+      ? { month: "short", day: "numeric" }
+      : { month: "short", day: "numeric", year: "numeric" }
+  );
+}
 
 /** Structural view of the quoted parent returned by listMessages. */
 type MessageQuote = {
@@ -282,6 +331,24 @@ export default function MessageDetail() {
     () => new Map(messages.map(message => [message.id, message])),
     [messages]
   );
+
+  // Messenger-style joined groups: positions are computed over persisted
+  // messages plus pending optimistic ones (always own, sent "now"), so a
+  // just-sent message visually joins the tail of the conversation.
+  const groupPositions = useMemo(() => {
+    const items = messages.map(m => ({
+      senderId: m.senderId,
+      createdAt: new Date(m.createdAt).getTime(),
+    }));
+    const optimisticIds = Object.keys(optimisticMessages);
+    if (optimisticIds.length > 0 && user?.id != null) {
+      const now = Date.now();
+      for (let i = 0; i < optimisticIds.length; i++) {
+        items.push({ senderId: user.id, createdAt: now });
+      }
+    }
+    return computeGroupPositions(items);
+  }, [messages, optimisticMessages, user?.id]);
 
   // Determine partner from messages (the other participant, not current user)
   const partner = messages.find((m) => m.senderId !== user?.id)?.sender ?? messages[0]?.sender;
@@ -1008,6 +1075,13 @@ export default function MessageDetail() {
           <>
             {messages.map((msg, idx) => {
               const isOwn = msg.senderId === user?.id;
+              const groupPos = groupPositions[idx] ?? "single";
+              const showDayDivider =
+                idx === 0 ||
+                !isSameLocalDay(
+                  new Date(messages[idx - 1].createdAt),
+                  new Date(msg.createdAt)
+                );
               const showTime = idx === 0 || 
                 (messages[idx - 1] && new Date(msg.createdAt).getTime() - new Date(messages[idx - 1].createdAt).getTime() > 5 * 60 * 1000);
               const mediaUrl = msg.mediaUrl;
@@ -1021,9 +1095,14 @@ export default function MessageDetail() {
               const isEditing = editingId === msg.id;
               const quote = msg.replyTo;
               return (
+                <Fragment key={msg.id}>
+                  {showDayDivider && (
+                    <div className="message-day-divider" aria-hidden="true">
+                      <span>{formatDayDividerLabel(new Date(msg.createdAt))}</span>
+                    </div>
+                  )}
                 <div
-                  key={msg.id}
-                  className={`message-bubble${isOwn ? " own" : ""}${isDeleted ? " deleted" : ""}`}
+                  className={`message-bubble${isOwn ? " own" : ""}${isDeleted ? " deleted" : ""} group-${groupPos}`}
                   data-message-id={msg.id}
                   onContextMenu={(event) => {
                     if (isDeleted) return;
@@ -1183,12 +1262,14 @@ export default function MessageDetail() {
                     </div>
                   </div>
                 </div>
+                </Fragment>
               );
             })}
-            {Object.entries(optimisticMessages).map(([idStr, msg]) => {
+            {Object.entries(optimisticMessages).map(([idStr, msg], oIdx) => {
                 const id = Number(idStr);
+                const groupPos = groupPositions[messages.length + oIdx] ?? "single";
                 return (
-                  <div key={idStr} className={`message-bubble own optimistic${msg.failed ? " failed" : ""}`}>
+                  <div key={idStr} className={`message-bubble own optimistic group-${groupPos}${msg.failed ? " failed" : ""}`}>
                     <div className="message-content">
                       <div className={`message-body${msg.media ? " has-media" : ""}`}>
                         {msg.media && msg.preview && (
