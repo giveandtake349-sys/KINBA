@@ -148,7 +148,7 @@ function readAudioDuration(file: File): Promise<number> {
     audio.onloadedmetadata = () => {
       const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
       cleanup();
-      resolve(duration);
+      resolve(Math.max(1, Math.ceil(duration)));
     };
     audio.onerror = () => {
       cleanup();

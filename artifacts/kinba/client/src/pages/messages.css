@@ -2211,13 +2211,57 @@
   background: var(--error-soft);
   border-color: color-mix(in srgb, var(--error) 55%, var(--border));
   color: var(--error);
-  width: 78px;
+  gap: 6px;
+  width: 104px;
 }
 
-.voice-record-btn.is-recording span {
+.voice-record-btn.is-recording::before {
+  background: currentColor;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 28%, transparent);
+  content: "";
+  height: 6px;
+  width: 6px;
+  animation: voice-recording-pulse 1.4s ease-out infinite;
+}
+
+.voice-recording-time {
   font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
+}
+
+.voice-wave {
+  align-items: center;
+  display: inline-flex;
+  gap: 2px;
+  height: 17px;
+}
+
+.voice-wave i {
+  background: currentColor;
+  border-radius: 999px;
+  display: block;
+  height: 7px;
+  width: 2px;
+}
+
+.voice-wave i:nth-child(2) {
+  animation: voice-wave 700ms ease-in-out infinite alternate;
+  height: 14px;
+}
+
+.voice-wave i:nth-child(3) {
+  animation: voice-wave 550ms ease-in-out 120ms infinite alternate;
+  height: 10px;
+}
+
+@keyframes voice-wave {
+  to { height: 4px; }
+}
+
+@keyframes voice-recording-pulse {
+  70%, 100% { box-shadow: 0 0 0 7px transparent; }
 }
 
 .input-wrapper textarea {

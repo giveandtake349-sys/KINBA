@@ -109,6 +109,11 @@ export function dmIsVideoExtension(ext: string): boolean {
   return (DM_VIDEO_EXTENSIONS as readonly string[]).includes(normalized);
 }
 
+export function dmIsAudioExtension(ext: string): boolean {
+  const normalized = ext.toLowerCase().replace(/^\./, "");
+  return (DM_AUDIO_EXTENSIONS as readonly string[]).includes(normalized);
+}
+
 /** Which attachment family a stored `mediaType` token belongs to. */
 export function dmKindForMediaType(
   mediaType: string

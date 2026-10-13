@@ -31,6 +31,7 @@ import {
   dmDocumentContentType,
   dmIsAttachmentKind,
   dmIsDocumentExtension,
+  dmIsAudioExtension,
   dmIsImageExtension,
   dmIsVideoExtension,
   dmKindForMediaType,
@@ -390,6 +391,10 @@ function mediaTypeForExtension(ext: string): string | null {
   if (ext === "mp4") return "video/mp4";
   if (ext === "mov") return "video/quicktime";
   if (ext === "webm") return "video/webm";
+  if (ext === "ogg") return "audio/ogg";
+  if (ext === "m4a") return "audio/mp4";
+  if (ext === "mp3") return "audio/mpeg";
+  if (ext === "wav") return "audio/wav";
   return null;
 }
 
@@ -421,6 +426,7 @@ export function resolveOwnedDmMedia(
   const extensionOk =
     (kind === "image" && dmIsImageExtension(info.ext)) ||
     (kind === "video" && dmIsVideoExtension(info.ext)) ||
+    (kind === "audio" && dmIsAudioExtension(info.ext)) ||
     (kind === "document" && dmIsDocumentExtension(info.ext));
   if (!extensionOk) throw new Error("Attachment type is not allowed.");
 

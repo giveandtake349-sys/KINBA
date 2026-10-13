@@ -1306,14 +1306,18 @@ export default function MessageDetail() {
             onClick={() => (isRecording ? stopVoiceRecording() : void startVoiceRecording())}
             disabled={sending || uploadingCount > 0}
             aria-label={isRecording ? "Stop voice recording" : "Record voice message"}
+            aria-pressed={isRecording}
             title={isRecording ? "Stop recording" : "Record voice message"}
           >
             {isRecording ? <Square size={17} fill="currentColor" /> : <Mic size={19} />}
             {isRecording && (
-              <span aria-live="polite">
-                {String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:
-                {String(recordingSeconds % 60).padStart(2, "0")}
-              </span>
+              <>
+                <span className="voice-wave" aria-hidden="true"><i /><i /><i /></span>
+                <span className="voice-recording-time" aria-live="polite">
+                  {String(Math.floor(recordingSeconds / 60)).padStart(2, "0")}:
+                  {String(recordingSeconds % 60).padStart(2, "0")}
+                </span>
+              </>
             )}
           </button>
           <div className="input-wrapper">
