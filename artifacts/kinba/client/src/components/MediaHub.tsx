@@ -4010,10 +4010,6 @@ function HomeFeedPanel({
   );
   const videos = (query.data ?? []) as VideoRecord[];
   const followingVideos = (followingQuery.data ?? []) as VideoRecord[];
-  // The Videos tab is the user-facing "For You" feed. Never render the
-  // global videos query there; every post and discovery block must come from
-  // accounts the authenticated member follows.
-  const feedVideos = useForYouPlayer ? followingVideos : videos;
   const trending = trpc.hashtag.trending.useQuery({}, { staleTime: 60_000, refetchOnWindowFocus: false });
   const toggleTrendingFollow = trpc.hashtag.toggleFollow.useMutation({ onSuccess: () => void trending.refetch() });
   const newestUpdates = useForYouPlayer
@@ -4042,7 +4038,7 @@ function HomeFeedPanel({
       }))
     : [];
   const shortsHighlights = useForYouPlayer
-    ? followingVideos
+    ? videos
         .filter(video => video.kind === "SHORT")
         .slice(0, 8)
         .map(video => ({
@@ -4130,15 +4126,13 @@ function HomeFeedPanel({
           </div>
         </div>
       ) : null}
-      {(useForYouPlayer ? followingQuery.isError : query.isError) ? (
-        <FeedRecovery
-          onRetry={() => void (useForYouPlayer ? followingQuery.refetch() : query.refetch())}
-        />
-      ) : (useForYouPlayer ? followingQuery.isPending : query.isPending) ? (
+      {query.isError ? (
+        <FeedRecovery onRetry={() => void query.refetch()} />
+      ) : query.isPending ? (
         <FeedSkeleton />
-      ) : feedVideos.length ? (
+      ) : videos.length ? (
         <div className="unified-feed-list feed-video-list feed-card-list gap-6 w-full max-w-full box-border">
-          {feedVideos.map((video, index) => (
+          {videos.map((video, index) => (
             <Fragment key={video.id}>
               <MemoVideoCard
                 video={video}
