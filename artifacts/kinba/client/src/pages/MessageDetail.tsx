@@ -1073,7 +1073,7 @@ export default function MessageDetail() {
                             </span>
                           </button>
                         )}
-                        <div className={`message-body${msg.mediaUrl ? " has-media" : ""}`}>
+                        <div className={`message-body${msg.mediaUrl ? " has-media" : ""}${isAudio ? " is-voice-message" : ""}`}>
                       {msg.mediaUrl && (
                         <div className="message-media">
                           {!displayUrl ? (

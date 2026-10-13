@@ -91,6 +91,21 @@
   background: var(--page-bg);
 }
 
+/* Keep an album post stable while the user swipes between differently sized photos. */
+.k-post__carousel {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  background: var(--page-bg);
+}
+
+.k-post__carousel > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 /* ---- BOTTOM SECTION ---- */
 .k-post__bottom {
   padding: 10px 14px 12px;

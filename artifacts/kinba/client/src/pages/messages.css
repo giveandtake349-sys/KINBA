@@ -2299,3 +2299,28 @@
   justify-content: center;
   width: 38px;
 }
+
+/* Voice notes use a lightweight pill instead of a nested bordered card. */
+.message-body.is-voice-message {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.message-body.is-voice-message .message-media {
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--blue) 14%, var(--surface));
+  padding: 4px 8px;
+}
+
+.message-body.is-voice-message .message-media audio {
+  width: min(300px, 68vw);
+  min-width: 0;
+  height: 38px;
+}
+
+.message-bubble.own .message-body.is-voice-message .message-media {
+  background: color-mix(in srgb, var(--blue) 26%, transparent);
+}

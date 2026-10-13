@@ -2673,6 +2673,7 @@ export default function Home() {
             }))}
             alt={photoViewer.title || "Post"}
             owner={photoViewer.owner}
+            engagementVideo={photoViewer}
             onClose={() => setPhotoViewer(null)}
           />
         )}

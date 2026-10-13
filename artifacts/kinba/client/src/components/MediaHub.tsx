@@ -3616,6 +3616,7 @@ export function FeedPhotoLightbox({
   imageUrl,
   alt = "Expanded photo",
   owner,
+  engagementVideo,
 }: {
   attachments?: FeedAttachment[];
   index?: number;
@@ -3629,6 +3630,7 @@ export function FeedPhotoLightbox({
     username?: string | null;
     photoUrl: string | null;
   };
+  engagementVideo?: VideoRecord;
 }) {
   const auth = useAuth();
   const [sharing, setSharing] = useState(false);
@@ -3908,7 +3910,59 @@ export function FeedPhotoLightbox({
           {sharing ? "Sharing…" : "Share as post"}
         </button>
       )}
+      {engagementVideo ? (
+        <PhotoLightboxActions video={engagementVideo} />
+      ) : null}
     </div>
+  );
+}
+
+function PhotoLightboxActions({ video }: { video: VideoRecord }) {
+  const auth = useAuth();
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
+  const bookmarkMutation = trpc.videos.bookmark.useMutation();
+  const { current, react, pending } = useOptimisticEngagement(video);
+  const toggleBookmark = async () => {
+    if (!auth.isAuthenticated) return auth.openAuth();
+    if (bookmarkMutation.isPending) return;
+    try {
+      const result = await bookmarkMutation.mutateAsync({ videoId: video.id });
+      setBookmarked(result.viewerBookmarked);
+    } catch (error) {
+      notifyError(error);
+    }
+  };
+  return (
+    <>
+      <div
+        className="feed-photo-lightbox-actions"
+        onClick={event => event.stopPropagation()}
+        aria-label="Photo actions"
+      >
+        <button type="button" onClick={() => void react()} disabled={!!pending} aria-pressed={current.viewerReacted}>
+          <Heart size={17} fill={current.viewerReacted ? "currentColor" : "none"} />
+          <span>Pookie {formatCount(current.reactionCount)}</span>
+        </button>
+        <button type="button" onClick={() => {
+          if (!auth.isAuthenticated) return auth.openAuth();
+          setCommentsOpen(true);
+        }}>
+          <MessageCircle size={17} />
+          <span>Comment {formatCount(current.commentCount)}</span>
+        </button>
+        <button type="button" className={bookmarked ? "is-active" : ""} onClick={() => void toggleBookmark()}>
+          <Bookmark size={17} fill={bookmarked ? "currentColor" : "none"} />
+          <span>{bookmarked ? "Saved" : "Save"}</span>
+        </button>
+      </div>
+      <CommentDrawer
+        postId={video.id}
+        postOwnerId={video.owner.id}
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+      />
+    </>
   );
 }
 
@@ -3933,6 +3987,7 @@ function HomeFeedPanel({
 }) {
   const auth = useAuth();
   const utils = trpc.useUtils();
+  const useForYouPlayer = tab === "videos";
   const query = trpc.home.feed.useQuery(
     { tab },
     {
@@ -3943,12 +3998,22 @@ function HomeFeedPanel({
       staleTime: 30_000,
     }
   );
+  const followingQuery = trpc.home.feed.useQuery(
+    { tab: "following" },
+    {
+      enabled: useForYouPlayer && auth.isAuthenticated,
+      retry: 1,
+      throwOnError: false,
+      refetchOnWindowFocus: false,
+      staleTime: 30_000,
+    }
+  );
   const videos = (query.data ?? []) as VideoRecord[];
+  const followingVideos = (followingQuery.data ?? []) as VideoRecord[];
   const trending = trpc.hashtag.trending.useQuery({}, { staleTime: 60_000, refetchOnWindowFocus: false });
   const toggleTrendingFollow = trpc.hashtag.toggleFollow.useMutation({ onSuccess: () => void trending.refetch() });
-  const useForYouPlayer = tab === "videos";
   const newestUpdates = useForYouPlayer
-    ? videos.slice(0, 6).map(video => ({
+    ? followingVideos.slice(0, 6).map(video => ({
         id: video.id,
         user: {
           name: displayName(video.owner.name, video.owner.username),
@@ -5780,6 +5845,7 @@ export default function MediaHub({
           }))}
           alt={photoViewer.title || "Post"}
           owner={photoViewer.owner}
+          engagementVideo={photoViewer}
           onClose={() => setPhotoViewer(null)}
         />
       )}

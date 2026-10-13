@@ -1618,13 +1618,6 @@ export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
     viewerId,
     tab === "trendy" ? "trendy" : "recent"
   );
-  if (tab === "following" && filtered.length === 0) {
-    return selectVideos(
-      [eq(videos.kind, "LONG"), eq(videos.mediaType, "VIDEO")],
-      viewerId,
-      "recent"
-    );
-  }
   return filtered;
 }
 
