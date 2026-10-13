@@ -1641,6 +1641,7 @@ function UploadVideoModal({
   const [kind, setKind] = useState<"LONG" | "SHORT">("LONG");
   const [caption, setCaption] = useState("");
   const [audience, setAudience] = useState<"everyone" | "close_friends">("everyone");
+  const [recipientIds, setRecipientIds] = useState<number[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [selectedImages, setSelectedImages] = useState<UploadImageSelection[]>([]);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
@@ -1663,6 +1664,10 @@ function UploadVideoModal({
     enabled: open && auth.isAuthenticated,
     refetchOnWindowFocus: false,
     staleTime: 15_000,
+  });
+  const closeFriendsQuery = trpc.profile.closeFriends.useQuery(undefined, {
+    enabled: open && auth.isAuthenticated && audience === "close_friends",
+    staleTime: 30_000,
   });
 
   useEffect(() => {
@@ -1703,6 +1708,8 @@ function UploadVideoModal({
     setMode("menu");
     clearMedia();
     setCaption("");
+    setAudience("everyone");
+    setRecipientIds([]);
     onClose();
   };
   const chooseMode = (next: CreateUploaderMode) => {
@@ -1773,13 +1780,17 @@ function UploadVideoModal({
   };
   const submitText = async () => {
     const text = textBody.trim();
+    if (audience === "close_friends" && recipientIds.length === 0) {
+      toast.error("Select at least one close friend.");
+      return;
+    }
     if (!text) {
       toast.error("Write something to post.");
       return;
     }
     setTextBusy(true);
     try {
-      await createTextMutation.mutateAsync({ text, audience });
+      await createTextMutation.mutateAsync({ text, audience, recipientIds });
       await onPublished();
       setTextBody("");
       writeTextDraft("");
@@ -1795,6 +1806,10 @@ function UploadVideoModal({
     event.preventDefault();
     event.stopPropagation();
     const captionText = caption.trim();
+    if (audience === "close_friends" && recipientIds.length === 0) {
+      toast.error("Select at least one close friend.");
+      return;
+    }
     if ((!file && !selectedImages.length) || !captionText || (mediaMode === "photo" && !selectedImages.length)) {
       toast.error(mediaMode === "photo" ? "Add a caption and image first." : "Add a caption and an original video first.");
       return;
@@ -1802,10 +1817,10 @@ function UploadVideoModal({
     setBusy(true);
     try {
       if (mediaMode === "photo" && selectedImages.length) {
-        await publishPhoto(selectedImages.map(image => image.file), "", captionText, selectedImages.map(image => image.dimensions), audience);
+        await publishPhoto(selectedImages.map(image => image.file), "", captionText, selectedImages.map(image => image.dimensions), audience, recipientIds);
       } else {
         if (!file) throw new Error("Please choose a video first.");
-        await publishVideo(file, kind, "", captionText, undefined, audience);
+        await publishVideo(file, kind, "", captionText, undefined, audience, recipientIds);
       }
       await onPublished();
       await Promise.all([mediaHistory.refetch(), textHistory.refetch()]);
@@ -1824,6 +1839,26 @@ function UploadVideoModal({
     return name && !name.includes("@") ? name : "You";
   })();
   const draftExcerpt = textBody.trim().replace(/\s+/g, " ");
+  const closeFriendPicker = audience === "close_friends" ? (
+    <fieldset className="cp-recipient-picker">
+      <legend>Choose who can see this post</legend>
+      {closeFriendsQuery.isLoading ? <span className="cp-recipient-state">Loading close friends…</span> : closeFriendsQuery.isError ? <span className="cp-recipient-state is-error">Could not load close friends.</span> : closeFriendsQuery.data?.length ? (
+        <div className="cp-recipient-list">
+          {closeFriendsQuery.data.map(friend => {
+            const selected = recipientIds.includes(friend.id);
+            return (
+              <label key={friend.id} className={`cp-recipient${selected ? " is-selected" : ""}`}>
+                <input type="checkbox" checked={selected} onChange={() => setRecipientIds(current => selected ? current.filter(id => id !== friend.id) : [...current, friend.id])} />
+                <span className="cp-recipient-avatar">{(friend.name || friend.username || "?").charAt(0).toUpperCase()}</span>
+                <span><strong>{friend.name || friend.username || `User ${friend.id}`}</strong>{friend.username ? <small>@{friend.username}</small> : null}</span>
+              </label>
+            );
+          })}
+        </div>
+      ) : <span className="cp-recipient-state">Add close friends first, then choose recipients.</span>}
+      <small className="cp-recipient-help">{recipientIds.length} selected</small>
+    </fieldset>
+  ) : null;
   const maxClip = kind === "SHORT" ? MAX_SHORT_VIDEO_DURATION_SECONDS : MAX_LONG_VIDEO_DURATION_SECONDS;
   const limitLabel = kind === "SHORT" ? "1 min" : "30 min";
   const mediaReady = (mediaMode === "photo" ? selectedImages.length > 0 : Boolean(file)) && caption.trim().length > 0;
@@ -1941,6 +1976,7 @@ function UploadVideoModal({
               <option value="close_friends">Close Friends</option>
             </select>
           </label>
+          {closeFriendPicker}
         </div>
       ) : mode === "thread" ? (
         <div className="create-uploader-composer">
@@ -2026,6 +2062,7 @@ function UploadVideoModal({
               <option value="close_friends">Close Friends</option>
             </select>
           </label>
+          {closeFriendPicker}
           <div className="cp-footer">
             <ol className="cp-steps" aria-label="Upload progress">
               {["Checked", "Uploading", "Published"].map((label, index) => (

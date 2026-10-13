@@ -3254,35 +3254,35 @@ function PhotoCarousel({
     ? video.gallery
     : [{ url: video.videoUrl, width: video.width, height: video.height }];
   const [index, setIndex] = useState(0);
-  const touchStartRef = useRef<number | null>(null);
-  const pointerStartRef = useRef<number | null>(null);
+  const pointerStartRef = useRef<{ x: number; pointerId: number } | null>(null);
+  const suppressClickRef = useRef(false);
   const current = images[Math.min(index, images.length - 1)];
-  const move = (next: number) => {
-    setIndex((next + images.length) % images.length);
+  const moveBy = (delta: number) => {
+    setIndex(currentIndex => (currentIndex + delta + images.length) % images.length);
   };
   return (
     <div
       className="k-post__carousel"
-      onClick={event => event.stopPropagation()}
-      onTouchStart={event => {
-        touchStartRef.current = event.touches[0]?.clientX ?? null;
-      }}
-      onTouchEnd={event => {
-        const start = touchStartRef.current;
-        const end = event.changedTouches[0]?.clientX;
-        touchStartRef.current = null;
-        if (start == null || end == null || Math.abs(end - start) < 40) return;
-        move(end < start ? index + 1 : index - 1);
+      onClick={event => {
+        event.stopPropagation();
+        if (suppressClickRef.current) suppressClickRef.current = false;
       }}
       onPointerDown={event => {
-        if (event.pointerType === "touch") pointerStartRef.current = event.clientX;
+        if (event.pointerType !== "touch" || !event.isPrimary) return;
+        pointerStartRef.current = { x: event.clientX, pointerId: event.pointerId };
+        event.currentTarget.setPointerCapture?.(event.pointerId);
       }}
       onPointerUp={event => {
         const start = pointerStartRef.current;
         pointerStartRef.current = null;
-        if (event.pointerType !== "touch" || start == null || Math.abs(event.clientX - start) < 40) return;
-        move(event.clientX < start ? index + 1 : index - 1);
+        if (event.pointerType !== "touch" || !start || start.pointerId !== event.pointerId) return;
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+        const delta = event.clientX - start.x;
+        if (Math.abs(delta) < 40) return;
+        suppressClickRef.current = true;
+        moveBy(delta < 0 ? 1 : -1);
       }}
+      onPointerCancel={() => { pointerStartRef.current = null; }}
     >
       <img
         src={resolveMediaUrl(current.url) ?? current.url}
@@ -3291,18 +3291,22 @@ function PhotoCarousel({
         draggable={false}
         onClick={event => {
           event.stopPropagation();
+          if (suppressClickRef.current) {
+            suppressClickRef.current = false;
+            return;
+          }
           onOpenViewer?.();
         }}
         onKeyDown={event => {
-          if (event.key === "ArrowLeft") move(index - 1);
-          if (event.key === "ArrowRight") move(index + 1);
+          if (event.key === "ArrowLeft") moveBy(-1);
+          if (event.key === "ArrowRight") moveBy(1);
         }}
         tabIndex={0}
       />
       {images.length > 1 ? (
         <>
-          <button type="button" className="k-post__carousel-nav is-prev" onClick={() => move(index - 1)} aria-label="Previous image"><ChevronLeft size={22} /></button>
-          <button type="button" className="k-post__carousel-nav is-next" onClick={() => move(index + 1)} aria-label="Next image"><ChevronRight size={22} /></button>
+          <button type="button" className="k-post__carousel-nav is-prev" onClick={() => moveBy(-1)} aria-label="Previous image"><ChevronLeft size={22} /></button>
+          <button type="button" className="k-post__carousel-nav is-next" onClick={() => moveBy(1)} aria-label="Next image"><ChevronRight size={22} /></button>
           <span className="k-post__carousel-count" aria-live="polite">{index + 1} / {images.length}</span>
           <div className="k-post__carousel-dots" aria-label="Choose image">
             {images.map((image, imageIndex) => (
@@ -3631,7 +3635,8 @@ export function FeedPhotoLightbox({
   const [menuOpen, setMenuOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [internalIndex, setInternalIndex] = useState(0);
-  const pointerStartRef = useRef<number | null>(null);
+  const pointerStartRef = useRef<{ x: number; pointerId: number } | null>(null);
+  const suppressClickRef = useRef(false);
   const imageAttachments = attachments.filter(
     item => item.mediaType === "IMAGE"
   );
@@ -3721,16 +3726,24 @@ export function FeedPhotoLightbox({
       aria-modal="true"
       aria-label="Photo viewer"
       onPointerDown={event => {
-        if (event.pointerType === "touch") pointerStartRef.current = event.clientX;
+        if (event.pointerType !== "touch" || !event.isPrimary) return;
+        pointerStartRef.current = { x: event.clientX, pointerId: event.pointerId };
+        event.currentTarget.setPointerCapture?.(event.pointerId);
       }}
       onPointerUp={event => {
         const start = pointerStartRef.current;
         pointerStartRef.current = null;
-        if (event.pointerType !== "touch" || start == null || Math.abs(event.clientX - start) < 40) return;
+        if (event.pointerType !== "touch" || !start || start.pointerId !== event.pointerId) return;
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+        const delta = event.clientX - start.x;
+        if (Math.abs(delta) < 40) return;
         event.stopPropagation();
-        goTo(event.clientX < start ? activeIndex + 1 : activeIndex - 1);
+        suppressClickRef.current = true;
+        goTo(delta < 0 ? activeIndex + 1 : activeIndex - 1);
       }}
+      onPointerCancel={() => { pointerStartRef.current = null; }}
       onClick={() => {
+        if (suppressClickRef.current) { suppressClickRef.current = false; return; }
         setMenuOpen(false);
         onClose();
       }}

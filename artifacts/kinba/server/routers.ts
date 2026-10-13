@@ -695,7 +695,7 @@ export const appRouter = router({
     ),
     videosById: publicProcedure
       .input(z.object({ userId: z.number().int().positive() }))
-      .query(({ input }) => listPublicProfileVideos(input.userId)),
+      .query(({ ctx, input }) => listPublicProfileVideos(input.userId, ctx.user?.id)),
     verification: protectedProcedure.query(({ ctx }) =>
       getVerificationStatus(ctx.user.id)
     ),

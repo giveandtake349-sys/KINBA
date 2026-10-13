@@ -815,6 +815,19 @@ export const closeFriends = pgTable(
   ]
 );
 
+export const videoAudienceUsers = pgTable(
+  "video_audience_users",
+  {
+    videoId: integer("video_id").notNull().references(() => videos.id, { onDelete: "cascade" }),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("video_audience_users_unique").on(table.videoId, table.userId),
+    index("video_audience_users_user_idx").on(table.userId),
+  ]
+);
+
 export const transactions = pgTable(
   "transactions",
   {

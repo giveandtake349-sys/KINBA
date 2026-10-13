@@ -16,6 +16,7 @@ export const videoInput = z
     videoUrl: z.string().url().max(1024),
     thumbnailUrl: z.string().url().max(1024).nullable().optional(),
     audience: z.enum(["everyone", "close_friends"]).default("everyone"),
+    recipientIds: z.array(z.number().int().positive()).max(100).default([]),
     kind: z.enum(["LONG", "SHORT"]),
     durationSeconds: z
       .number()
@@ -69,6 +70,7 @@ const attachmentInput = z.object({
 export const textPostInput = z.object({
   text: z.string().trim().min(1, "Text post cannot be empty.").max(5000),
   audience: z.enum(["everyone", "close_friends"]).default("everyone"),
+  recipientIds: z.array(z.number().int().positive()).max(100).default([]),
 });
 
 export const communityAnnouncementInput = z

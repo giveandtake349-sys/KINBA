@@ -3520,3 +3520,15 @@
 .trending-topic small { color: #8997ba; font-size: 10px; }
 .cp-audience-picker { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #a8b2cd; font-size: 11px; }
 .cp-audience-picker select { background: rgba(11,18,30,.52); border: 1px solid rgba(161,174,255,.18); border-radius: var(--radius-control); color: #f2f5ff; padding: 8px 10px; }
+
+.k-post__carousel { touch-action: pan-y; }
+.cp-recipient-picker { display: grid; gap: 8px; margin: 12px 0 0; padding: 10px; border: 1px solid rgba(161,174,255,.16); border-radius: var(--radius-control); }
+.cp-recipient-picker legend { padding: 0 4px; color: #eef2ff; font-size: 12px; font-weight: 700; }
+.cp-recipient-list { display: grid; gap: 6px; max-height: 180px; overflow-y: auto; }
+.cp-recipient { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 8px; color: #b9c3dd; cursor: pointer; }
+.cp-recipient.is-selected { background: rgba(86,128,255,.14); color: #fff; }
+.cp-recipient input { accent-color: var(--blue); }
+.cp-recipient-avatar { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: rgba(161,174,255,.2); color: #fff; font-size: 11px; font-weight: 700; }
+.cp-recipient span:last-child { display: grid; gap: 1px; }
+.cp-recipient small, .cp-recipient-state, .cp-recipient-help { color: #8997ba; font-size: 10px; }
+.cp-recipient-state.is-error { color: #ff9c9c; }

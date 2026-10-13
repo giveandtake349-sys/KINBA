@@ -59,6 +59,7 @@ import {
   hypeRoomMessageHashtags,
   dropHashtags,
   closeFriends,
+  videoAudienceUsers,
   userFollowsHashtag,
   dailyActivities,
   userStreaks,
@@ -1058,7 +1059,7 @@ async function selectVideos(
     ? sql<boolean>`exists (select 1 from video_bookmarks where video_bookmarks."videoId" = ${videos.id} and video_bookmarks."userId" = ${viewerId})`
     : sql<boolean>`false`;
   const audienceVisible = viewerId
-    ? sql<boolean>`(${videos.audience} = 'everyone' OR ${videos.userId} = ${viewerId} OR exists (select 1 from close_friends where close_friends.owner_id = ${videos.userId} and close_friends.friend_id = ${viewerId}))`
+    ? sql<boolean>`(${videos.audience} = 'everyone' OR ${videos.userId} = ${viewerId} OR exists (select 1 from video_audience_users where video_audience_users.video_id = ${videos.id} and video_audience_users.user_id = ${viewerId}) OR (not exists (select 1 from video_audience_users where video_audience_users.video_id = ${videos.id}) and exists (select 1 from close_friends where close_friends.owner_id = ${videos.userId} and close_friends.friend_id = ${viewerId})))`
     : sql<boolean>`${videos.audience} = 'everyone'`;
   const rows = await db
     .select({
@@ -1236,8 +1237,8 @@ export async function listProfileVideos(userId: number) {
   return selectVideos([eq(videos.userId, userId)], userId, "recent");
 }
 
-export async function listPublicProfileVideos(userId: number) {
-  return selectVideos([eq(videos.userId, userId)], undefined, "recent");
+export async function listPublicProfileVideos(userId: number, viewerId?: number) {
+  return selectVideos([eq(videos.userId, userId)], viewerId, "recent");
 }
 
 export async function searchVideos(term: string, viewerId?: number) {
@@ -1755,6 +1756,32 @@ function safeAudience(value: string | null | undefined): "everyone" | "close_fri
   return value === "close_friends" ? "close_friends" : "everyone";
 }
 
+async function validatePostAudienceRecipients(
+  db: Awaited<ReturnType<typeof getDb>>,
+  ownerId: number,
+  audience: "everyone" | "close_friends" | undefined,
+  recipientIds: number[] | undefined
+) {
+  if (!db || audience !== "close_friends") return;
+  const requested = [...new Set((recipientIds ?? []).filter(id => Number.isInteger(id) && id > 0))];
+  if (!requested.length) throw new Error("Select at least one close friend before publishing.");
+  const allowed = await db.select({ id: closeFriends.friendId }).from(closeFriends).where(and(eq(closeFriends.ownerId, ownerId), inArray(closeFriends.friendId, requested)));
+  if (allowed.length !== requested.length) throw new Error("One or more selected users are not in your close-friends list.");
+}
+
+async function savePostAudienceRecipients(
+  db: Awaited<ReturnType<typeof getDb>>,
+  videoId: number,
+  ownerId: number,
+  audience: "everyone" | "close_friends" | undefined,
+  recipientIds: number[] | undefined
+) {
+  if (!db || audience !== "close_friends") return;
+  await validatePostAudienceRecipients(db, ownerId, audience, recipientIds);
+  const requested = [...new Set((recipientIds ?? []).filter(id => Number.isInteger(id) && id > 0))];
+  await db.insert(videoAudienceUsers).values(requested.map(userId => ({ videoId, userId })));
+}
+
 async function localActivityDate(userId: number): Promise<string> {
   const db = await getDb();
   if (!db) return new Date().toISOString().slice(0, 10);
@@ -1838,6 +1865,7 @@ export async function createVideo(
     height: number;
     sources: VideoSourceInput[];
     audience?: "everyone" | "close_friends";
+    recipientIds?: number[];
   }
 ) {
   if (!Number.isInteger(userId) || userId < 1)
@@ -1845,6 +1873,7 @@ export async function createVideo(
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
+  await validatePostAudienceRecipients(db, userId, input.audience, input.recipientIds);
   const title = requiredText(input.title, "Untitled video");
   const description = optionalText(input.description) ?? "";
 
@@ -1887,6 +1916,7 @@ export async function createVideo(
       console.error("[MediaPublish] Optional video source insert failed:", error);
     }
   }
+  await savePostAudienceRecipients(db, created.id, userId, input.audience, input.recipientIds);
   await recordDailyActivity(userId);
   return created;
 }
@@ -1901,6 +1931,7 @@ export async function createPhotoPost(
     height: number;
     gallery?: Array<{ url: string; width: number; height: number }>;
     audience?: "everyone" | "close_friends";
+    recipientIds?: number[];
   }
 ) {
   if (!Number.isInteger(userId) || userId < 1)
@@ -1908,6 +1939,7 @@ export async function createPhotoPost(
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
+  await validatePostAudienceRecipients(db, userId, input.audience, input.recipientIds);
   const title = requiredText(input.title, "Untitled photo");
   const description = optionalText(input.description) ?? "";
 
@@ -1938,18 +1970,24 @@ export async function createPhotoPost(
     return [photo];
   });
 
+  await savePostAudienceRecipients(db, created.id, userId, input.audience, input.recipientIds);
   await recordDailyActivity(userId);
   return created;
 }
 
 export async function createTextPost(
   userId: number,
-  input: { text: string; audience?: "everyone" | "close_friends" }
+  input: {
+    text: string;
+    audience?: "everyone" | "close_friends";
+    recipientIds?: number[];
+  }
 ) {
   if (!Number.isInteger(userId) || userId < 1)
     throw new Error("Authenticated application user ID is invalid.");
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
+  await validatePostAudienceRecipients(db, userId, input.audience, input.recipientIds);
   const text = input.text.trim();
   if (!text) throw new Error("Text post cannot be empty.");
 
@@ -1982,6 +2020,7 @@ export async function createTextPost(
     return [post];
   });
 
+  await savePostAudienceRecipients(db, created.id, userId, input.audience, input.recipientIds);
   await recordDailyActivity(userId);
   return created;
 }
