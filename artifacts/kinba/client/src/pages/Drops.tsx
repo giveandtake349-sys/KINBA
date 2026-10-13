@@ -5,6 +5,7 @@ import {
   Clock3,
   Package,
   RefreshCw,
+  Search,
   Tag,
   Users,
 } from "lucide-react";
@@ -45,6 +46,17 @@ const FILTERS: ReadonlyArray<{ id: DropListFilter; label: string }> = [
   { id: "upcoming", label: "Upcoming" },
   { id: "mine", label: "Mine" },
 ];
+
+type QuickFilter = "all" | "live_now" | "ending_soon" | "mine";
+
+const QUICK_FILTERS: ReadonlyArray<{ id: QuickFilter; label: string }> = [
+  { id: "all", label: "All" },
+  { id: "live_now", label: "Live now" },
+  { id: "ending_soon", label: "Ending soon" },
+  { id: "mine", label: "Mine" },
+];
+
+const ENDING_SOON_MS = 24 * 60 * 60 * 1000;
 
 const EMPTY_COPY: Record<DropListFilter, { title: string; body: string }> = {
   live: {
@@ -161,6 +173,20 @@ function DropCard({
 }) {
   const countdown = countdownFor(drop, nowMs);
   const soldOut = drop.status === "sold_out" || drop.remainingQuantity <= 0;
+  const original = Number(drop.originalPrice);
+  const discounted = Number(drop.discountedPrice);
+  const salePct =
+    Number.isFinite(original) &&
+    Number.isFinite(discounted) &&
+    original > 0 &&
+    discounted < original
+      ? Math.round((1 - discounted / original) * 100)
+      : 0;
+  const claimed = Math.max(0, drop.quantity - drop.remainingQuantity);
+  const claimedPct =
+    drop.quantity > 0
+      ? Math.min(100, Math.round((claimed / drop.quantity) * 100))
+      : 0;
   return (
     <article
       className="drop-card drop-card--interactive"
@@ -178,10 +204,20 @@ function DropCard({
       {drop.mediaUrl ? (
         <div className="drop-card-cover">
           <img src={drop.mediaUrl} alt="" loading="lazy" />
+          {salePct > 0 ? (
+            <span className="drop-sale-badge" aria-label={`${salePct} percent off`}>
+              -{salePct}%
+            </span>
+          ) : null}
         </div>
       ) : (
         <div className="drop-card-cover drop-card-cover--placeholder" aria-hidden="true">
           <Package size={32} strokeWidth={1.6} />
+          {salePct > 0 ? (
+            <span className="drop-sale-badge" aria-label={`${salePct} percent off`}>
+              -{salePct}%
+            </span>
+          ) : null}
         </div>
       )}
       <div className="drop-card-body">
@@ -226,6 +262,16 @@ function DropCard({
             </div>
           ) : null}
         </dl>
+        <div
+          className="drop-stockbar"
+          role="progressbar"
+          aria-valuenow={claimedPct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`${claimedPct} percent claimed`}
+        >
+          <span style={{ width: `${claimedPct}%` }} />
+        </div>
       </div>
     </article>
   );
@@ -303,6 +349,41 @@ export default function Drops() {
     });
   }, [rawDrops, filter, auth.user?.id]);
 
+  const [search, setSearch] = useState("");
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
+
+  const visibleDrops = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const userId = auth.user?.id ?? null;
+    return drops.filter(drop => {
+      if (q && !drop.title.toLowerCase().includes(q)) return false;
+      if (quickFilter === "live_now") return drop.status === "live";
+      if (quickFilter === "ending_soon") {
+        if (drop.status !== "live" || !drop.endsAt) return false;
+        const ms = new Date(drop.endsAt).getTime() - nowMs;
+        return ms > 0 && ms <= ENDING_SOON_MS;
+      }
+      if (quickFilter === "mine") {
+        return userId != null && drop.sellerId === userId;
+      }
+      return true;
+    });
+  }, [drops, search, quickFilter, nowMs, auth.user?.id]);
+
+  const heroDrop = useMemo(() => {
+    if (filter !== "live" || search.trim() || quickFilter !== "all") {
+      return null;
+    }
+    return (
+      visibleDrops.find(drop => drop.featured && drop.status === "live") ??
+      visibleDrops.find(drop => drop.status === "live") ??
+      null
+    );
+  }, [visibleDrops, filter, search, quickFilter]);
+
+  const heroCountdown =
+    heroDrop != null ? countdownFor(heroDrop, nowMs) : null;
+
   const authReady = !needsAuth || !auth.loading;
   const isLoading = authReady && query.isPending && !blockedByAuth;
   const errorCode = query.isError ? getTrpcCode(query.error) : undefined;
@@ -357,6 +438,54 @@ export default function Drops() {
             );
           })}
         </nav>
+
+        <div className="drop-search" role="search">
+          <Search size={16} aria-hidden="true" />
+          <input
+            type="search"
+            value={search}
+            onChange={event => setSearch(event.target.value)}
+            placeholder="Search drops…"
+            aria-label="Search drops by title"
+          />
+        </div>
+
+        <div className="drop-quick-chips" aria-label="Quick filters">
+          {QUICK_FILTERS.map(item => {
+            const active = quickFilter === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                aria-pressed={active}
+                className={active ? "active" : ""}
+                onClick={() => setQuickFilter(item.id)}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {heroDrop != null && heroCountdown != null ? (
+          <button
+            type="button"
+            className="drop-hero"
+            onClick={() => openDrop(heroDrop.id)}
+            aria-label={`Featured live drop: ${heroDrop.title}, ${heroCountdown.label} ${heroCountdown.remaining}`}
+          >
+            <span className="drop-hero-badge">
+              <span className="drop-chip-dot" aria-hidden="true" />
+              Live drop
+            </span>
+            <span className="drop-hero-title">{heroDrop.title}</span>
+            <span className="drop-hero-countdown">
+              <Clock3 size={14} aria-hidden="true" />
+              {heroCountdown.label} {heroCountdown.remaining}
+            </span>
+            <span className="drop-hero-cta">Shop now</span>
+          </button>
+        ) : null}
 
         <section
           className="drop-results"
@@ -414,15 +543,35 @@ export default function Drops() {
                 </button>
               }
             />
-          ) : drops.length === 0 ? (
-            <DropsState
-              icon={<Package size={24} />}
-              title={EMPTY_COPY[filter].title}
-              body={EMPTY_COPY[filter].body}
-            />
+          ) : visibleDrops.length === 0 ? (
+            search.trim() || quickFilter !== "all" ? (
+              <DropsState
+                icon={<Search size={24} />}
+                title="No drops match."
+                body="Try a different search or quick filter."
+                action={
+                  <button
+                    type="button"
+                    className="muted-btn"
+                    onClick={() => {
+                      setSearch("");
+                      setQuickFilter("all");
+                    }}
+                  >
+                    Clear filters
+                  </button>
+                }
+              />
+            ) : (
+              <DropsState
+                icon={<Package size={24} />}
+                title={EMPTY_COPY[filter].title}
+                body={EMPTY_COPY[filter].body}
+              />
+            )
           ) : (
             <div className="drop-grid">
-              {drops.map(drop => (
+              {visibleDrops.map(drop => (
                 <DropCard
                   key={drop.id}
                   drop={drop}

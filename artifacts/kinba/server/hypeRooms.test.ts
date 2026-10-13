@@ -382,8 +382,25 @@ describe("hypeRooms procedures — enabled flag wiring", () => {
       durationHours: 6,
       visibility: "public",
       startsAt: createInput.startsAt,
+      dropId: null,
     });
     expect(databaseMocks.ensureProfile).toHaveBeenCalledWith(user.id);
+  });
+
+  it("forwards an optional dropId when attaching a drop", async () => {
+    hypeRoomsMocks.createHypeRoom.mockResolvedValue({ id: 12 });
+    await appRouter
+      .createCaller(context())
+      .hypeRooms.create({ ...createInput, dropId: 7 });
+    expect(hypeRoomsMocks.createHypeRoom).toHaveBeenCalledWith(user.id, {
+      title: createInput.title,
+      topic: createInput.topic,
+      description: createInput.description,
+      durationHours: 6,
+      visibility: "public",
+      startsAt: createInput.startsAt,
+      dropId: 7,
+    });
   });
 
   it("rejects invalid duration literals at the API boundary", async () => {

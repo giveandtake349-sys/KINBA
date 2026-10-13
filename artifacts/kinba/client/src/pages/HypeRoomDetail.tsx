@@ -224,16 +224,9 @@ export default function HypeRoomDetail({
     }
   );
 
-  const dropId = room?.dropId ?? null;
-  const dropQuery = trpc.drops.byId.useQuery(
-    { dropId: dropId ?? -1 },
-    {
-      enabled: dropId != null && roomReady && room != null,
-      retry: false,
-      refetchOnWindowFocus: false,
-      staleTime: 30_000,
-    }
-  );
+  // Attached drop fields now ride on the room detail response (getHypeRoom),
+  // so no separate drops.byId fetch is needed.
+  const attachedDrop = room?.attachedDrop ?? null;
 
   const utils = trpc.useUtils();
   const joinMut = trpc.hypeRooms.join.useMutation();
@@ -766,7 +759,7 @@ export default function HypeRoomDetail({
     return messages.find(row => row.message.id === pinnedMessageId) ?? null;
   }, [pinnedMessageId, messages]);
 
-  const dropData = dropQuery.data?.drop ?? null;
+  const dropData = attachedDrop;
 
   return (
     <div className="kinba-app hype-rooms-shell">
@@ -1030,26 +1023,22 @@ export default function HypeRoomDetail({
                   onRemove={id => void handleRemoveMember(id)}
                 />
 
-                {dropId != null ? (
+                {dropData != null ? (
                   <DropPanel
-                    drop={
-                      dropData
-                        ? {
-                            id: dropData.id,
-                            title: dropData.title,
-                            status: dropData.status,
-                            discountedPrice: dropData.discountedPrice,
-                            originalPrice: dropData.originalPrice,
-                            currency: dropData.currency,
-                            remainingQuantity: dropData.remainingQuantity,
-                            startsAt: dropData.startsAt,
-                            endsAt: dropData.endsAt,
-                          }
-                        : null
-                    }
-                    loading={dropQuery.isPending}
-                    error={dropQuery.isError}
-                    onRetry={() => void dropQuery.refetch()}
+                    drop={{
+                      id: dropData.id,
+                      title: dropData.title,
+                      mediaUrl: dropData.mediaUrl,
+                      status: dropData.status,
+                      discountedPrice: dropData.discountedPrice,
+                      originalPrice: dropData.originalPrice,
+                      currency: dropData.currency,
+                      remainingQuantity: dropData.remainingQuantity,
+                      endsAt: dropData.endsAt,
+                    }}
+                    loading={false}
+                    error={false}
+                    onRetry={() => void roomQuery.refetch()}
                   />
                 ) : null}
               </div>

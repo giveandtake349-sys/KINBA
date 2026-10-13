@@ -259,6 +259,14 @@ function mapHypeRoomMemberError(error: unknown, _op: string): TRPCError {
   if (message.startsWith("Only verified company/creator")) {
     return new TRPCError({ code: "FORBIDDEN", message });
   }
+  // Room↔drop attach validation (createHypeRoom).
+  if (
+    message === "Selected drop not found." ||
+    message === "You can only attach your own drop to a room." ||
+    message === "Archived drops cannot be attached to a room."
+  ) {
+    return new TRPCError({ code: "BAD_REQUEST", message });
+  }
   // M-A1/M-A2 — chat depth, roles, settings, invites.
   if (message === "Invite not found." || message === "Invite target not found.") {
     return new TRPCError({ code: "NOT_FOUND", message });
@@ -571,6 +579,7 @@ const hypeRoomCreateInput = z.object({
   ]),
   visibility: z.enum(["public", "link_only"]).default("public"),
   startsAt: z.string().datetime({ offset: true }).optional(),
+  dropId: z.number().int().positive().nullable().optional(),
 });
 
 const dropIdInput = z.object({ dropId: z.number().int().positive() });
@@ -1345,6 +1354,7 @@ export const appRouter = router({
             durationHours: input.durationHours,
             visibility: input.visibility,
             startsAt: input.startsAt ?? null,
+            dropId: input.dropId ?? null,
           });
         } catch (error) {
           throw mapHypeRoomMemberError(error, "create");

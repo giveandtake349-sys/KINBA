@@ -14,6 +14,7 @@
 import { and, asc, eq, inArray, isNull, isNotNull, ne, sql } from "drizzle-orm";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import {
+  drops,
   hypeRoomInvites,
   hypeRoomMembers,
   hypeRoomMessageMentions,
@@ -108,6 +109,25 @@ export type CreateHypeRoomInput = {
   durationHours: number;
   visibility?: "public" | "link_only";
   startsAt?: Date | string | null;
+  dropId?: number | null;
+};
+
+/** Public drop fields embedded on the room detail when a drop is attached. */
+export type HypeRoomAttachedDrop = {
+  id: number;
+  title: string;
+  mediaUrl: string;
+  currency: string;
+  originalPrice: string;
+  discountedPrice: string;
+  remainingQuantity: number;
+  status: string;
+  endsAt: Date | null;
+};
+
+/** getHypeRoom detail shape: room row plus the attached drop, if any. */
+export type HypeRoomDetail = HypeRoomRow & {
+  attachedDrop: HypeRoomAttachedDrop | null;
 };
 
 export function isValidDurationHours(
@@ -569,6 +589,28 @@ export async function createHypeRoom(
     }
   }
 
+  // Optional attached drop: must exist, belong to the host, and not be archived.
+  let resolvedDropId: number | null = null;
+  if (input.dropId != null) {
+    const [drop] = await db
+      .select({
+        id: drops.id,
+        sellerId: drops.sellerId,
+        archivedAt: drops.archivedAt,
+      })
+      .from(drops)
+      .where(eq(drops.id, input.dropId))
+      .limit(1);
+    if (!drop) throw new Error("Selected drop not found.");
+    if (drop.sellerId !== hostId) {
+      throw new Error("You can only attach your own drop to a room.");
+    }
+    if (drop.archivedAt != null) {
+      throw new Error("Archived drops cannot be attached to a room.");
+    }
+    resolvedDropId = drop.id;
+  }
+
   const [created] = await db.transaction(async (tx) => {
     const [room] = await tx
       .insert(hypeRooms)
@@ -582,8 +624,7 @@ export async function createHypeRoom(
         startsAt,
         endsAt,
         visibility: input.visibility ?? "public",
-        // dropId intentionally left null — no safe room↔drop mutation is wired yet.
-        dropId: null,
+        dropId: resolvedDropId,
         pinnedMessageId: null,
         createdAt: now,
         updatedAt: now,
@@ -605,7 +646,7 @@ export async function createHypeRoom(
 /** Fetch one room, lazily persisting any due lifecycle advance. */
 export async function getHypeRoom(
   roomId: number
-): Promise<HypeRoomRow | null> {
+): Promise<HypeRoomDetail | null> {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   const [room] = await db
@@ -614,7 +655,40 @@ export async function getHypeRoom(
     .where(eq(hypeRooms.id, roomId))
     .limit(1);
   if (!room) return null;
-  return persistResolvedRoom(db, room, new Date());
+  const resolved = await persistResolvedRoom(db, room, new Date());
+
+  let attachedDrop: HypeRoomAttachedDrop | null = null;
+  if (resolved.dropId != null) {
+    const [drop] = await db
+      .select({
+        id: drops.id,
+        title: drops.title,
+        mediaUrl: drops.mediaUrl,
+        currency: drops.currency,
+        originalPrice: drops.originalPrice,
+        discountedPrice: drops.discountedPrice,
+        remainingQuantity: drops.remainingQuantity,
+        status: drops.status,
+        endsAt: drops.endsAt,
+      })
+      .from(drops)
+      .where(eq(drops.id, resolved.dropId))
+      .limit(1);
+    if (drop) {
+      attachedDrop = {
+        id: drop.id,
+        title: drop.title,
+        mediaUrl: drop.mediaUrl ?? "",
+        currency: drop.currency,
+        originalPrice: drop.originalPrice,
+        discountedPrice: drop.discountedPrice,
+        remainingQuantity: drop.remainingQuantity,
+        status: drop.status,
+        endsAt: drop.endsAt ?? null,
+      };
+    }
+  }
+  return { ...resolved, attachedDrop };
 }
 
 /**

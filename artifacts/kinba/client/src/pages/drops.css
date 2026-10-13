@@ -500,3 +500,142 @@
     animation: none;
   }
 }
+
+/* Commerce loop phase 1 — search, quick chips, hero, sale badge, stock bar */
+.drop-search {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--muted);
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 11px 14px;
+}
+
+.drop-search input {
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  flex: 1;
+  font-size: 14px;
+  outline: none;
+}
+
+.drop-search input::placeholder {
+  color: var(--muted);
+}
+
+.drop-quick-chips {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.drop-quick-chips button {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  padding: 8px 15px;
+}
+
+.drop-quick-chips button.active {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+  color: var(--blue);
+}
+
+.drop-hero {
+  align-items: flex-start;
+  background:
+    linear-gradient(120deg, color-mix(in srgb, var(--blue) 14%, transparent), transparent),
+    var(--surface);
+  border: 1px solid var(--accent-border);
+  border-radius: 16px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 16px;
+  text-align: left;
+  width: 100%;
+}
+
+.drop-hero-badge {
+  align-items: center;
+  background: #e5484d;
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 800;
+  gap: 6px;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+.drop-hero-title {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.drop-hero-countdown {
+  align-items: center;
+  color: var(--amber, #f5a623);
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.drop-hero-cta {
+  background: var(--blue);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  margin-top: 2px;
+  padding: 10px 20px;
+  width: fit-content;
+}
+
+.drop-sale-badge {
+  background: #e5484d;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  left: 10px;
+  padding: 4px 9px;
+  position: absolute;
+  top: 10px;
+}
+
+.drop-stockbar {
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
+  border-radius: 999px;
+  height: 5px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.drop-stockbar span {
+  background: linear-gradient(90deg, var(--amber, #f5a623), #e5484d);
+  border-radius: 999px;
+  display: block;
+  height: 100%;
+  transition: width 0.3s var(--line);
+}
