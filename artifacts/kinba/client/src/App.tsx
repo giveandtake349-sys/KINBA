@@ -38,6 +38,8 @@ function AppRoutes() {
       <Route path="/settings/:section" component={Settings} />
       {/* /rooms/new must be registered before /rooms/:id so "new" is not captured as an id. */}
       <Route path="/rooms/new" component={CreateHypeRoom} />
+      {/* Backward-compatible alias for older drop-creation return URLs. */}
+      <Route path="/hype-rooms/new" component={CreateHypeRoom} />
       <Route path="/rooms/:id" component={HypeRoomDetail} />
       <Route path="/rooms" component={HypeRooms} />
       <Route path="/drops/new" component={CreateDrop} />

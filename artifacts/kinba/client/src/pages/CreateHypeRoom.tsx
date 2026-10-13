@@ -112,7 +112,8 @@ export default function CreateHypeRoom() {
     { filter: "mine" },
     {
       enabled: auth.isAuthenticated && roomType === "selling",
-      retry: false,
+      retry: 2,
+      retryDelay: attempt => Math.min(1000 * 2 ** attempt, 4000),
       refetchOnWindowFocus: false,
       staleTime: 15_000,
     }
@@ -299,7 +300,9 @@ export default function CreateHypeRoom() {
                 <p className="hype-attach-status">Loading your drops…</p>
               ) : myDropsQuery.isError ? (
                 <p className="hype-attach-status">
-                  Could not load your drops.{" "}
+                  Could not load your drops. {myDropsQuery.error instanceof Error
+                    ? myDropsQuery.error.message
+                    : "Please try again."}{" "}
                   <button
                     type="button"
                     className="hype-attach-retry"
@@ -355,7 +358,7 @@ export default function CreateHypeRoom() {
               <button
                 type="button"
                 className="hype-attach-new"
-                onClick={() => navigate("/drops/new?returnTo=/hype-rooms/new")}
+                onClick={() => navigate("/drops/new?returnTo=/rooms/new")}
               >
                 <Plus size={16} aria-hidden="true" /> Create new drop
               </button>
