@@ -16,7 +16,18 @@ setInterval(() => {
 
 function getClientIp(req: Request): string {
   const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string") return forwarded.split(",")[0].trim();
+  if (typeof forwarded === "string") {
+    // Proxies APPEND to X-Forwarded-For, so only the LAST hop is trustworthy:
+    // a client can prepend fake entries but cannot forge what a proxy appends
+    // after their position. Taking [0] lets attackers rotate spoofed IPs and
+    // dodge (or poison) IP-keyed rate limits and dedup.
+    const hops = forwarded
+      .split(",")
+      .map(hop => hop.trim())
+      .filter(Boolean);
+    const lastHop = hops[hops.length - 1];
+    if (lastHop) return lastHop;
+  }
   return req.socket.remoteAddress ?? "unknown";
 }
 

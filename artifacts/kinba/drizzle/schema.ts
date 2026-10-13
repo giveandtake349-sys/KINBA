@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  char,
   check,
   date,
   foreignKey,
@@ -128,6 +129,41 @@ export const verificationClass = pgEnum("verification_class", [
   "verified",
   "business_verified",
   "official",
+]);
+
+/* ---- JHILIK Brand Advertising & Creator Campaign System (Phase 1) ---- */
+export const brandApplicationStatus = pgEnum("brand_application_status", [
+  "draft",
+  "submitted",
+  "pending",
+  "info_requested",
+  "approved",
+  "rejected",
+]);
+export const campaignStatus = pgEnum("campaign_status", [
+  "draft",
+  "active",
+  "paused",
+  "ended",
+]);
+export const campaignInvitationStatus = pgEnum("campaign_invitation_status", [
+  "pending",
+  "accepted",
+  "declined",
+  "expired",
+]);
+export const campaignSubmissionStatus = pgEnum("campaign_submission_status", [
+  "draft",
+  "in_review",
+  "approved",
+  "rejected",
+  "live",
+]);
+export const campaignEarningsStatus = pgEnum("campaign_earnings_status", [
+  "estimated",
+  "approved",
+  "reversed",
+  "paid_recorded",
 ]);
 
 const createdAt = () =>
@@ -394,6 +430,12 @@ export const videos = pgTable(
     width: integer("width").notNull(),
     height: integer("height").notNull(),
     viewCount: integer("viewCount").default(0).notNull(),
+    // JHILIK Ads Phase 1: nullable link to a campaign (Sponsored badge source).
+    // NULL = organic content. ON DELETE SET NULL keeps content live if a
+    // campaign row is removed; the badge rule (stays forever) is enforced in app code.
+    campaignId: integer("campaignId").references(() => campaigns.id, {
+      onDelete: "set null",
+    }),
     hlsMasterUrl: varchar("hlsMasterUrl", { length: 1024 }),
     processingStatus: videoProcessingStatus("processingStatus")
       .default("PENDING")
@@ -405,6 +447,7 @@ export const videos = pgTable(
   table => [
     index("videos_user_idx").on(table.userId),
     index("videos_kind_created_idx").on(table.kind, table.createdAt),
+    index("videos_campaign_idx").on(table.campaignId),
   ]
 );
 
@@ -1837,6 +1880,421 @@ export const userBadges = pgTable(
   table => [uniqueIndex("user_badges_unique").on(table.userId, table.badgeId)]
 );
 
+/* ------------------------------------------------------------------ */
+/* JHILIK Brand Advertising & Creator Campaign System — Phase 1 tables  */
+/* Additive only. Money = numeric(12,2) + explicit currency, never float. */
+/* Privacy: event tables store salted hashes (viewerHash/ipHash), never raw IPs. */
+/* ------------------------------------------------------------------ */
+
+export const brands = pgTable(
+  "brands",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 160 }).notNull(),
+    category: varchar("category", { length: 80 }),
+    contactPerson: varchar("contactPerson", { length: 120 }),
+    email: varchar("email", { length: 320 }),
+    phone: varchar("phone", { length: 32 }),
+    country: varchar("country", { length: 64 }),
+    website: varchar("website", { length: 2048 }),
+    socials: jsonb("socials"),
+    productDetails: text("productDetails"),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  table => [index("brands_user_idx").on(table.userId)]
+);
+
+export const brandApplications = pgTable(
+  "brand_applications",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    brandName: varchar("brandName", { length: 160 }).notNull(),
+    category: varchar("category", { length: 80 }),
+    contactPerson: varchar("contactPerson", { length: 120 }),
+    email: varchar("email", { length: 320 }),
+    phone: varchar("phone", { length: 32 }),
+    country: varchar("country", { length: 64 }),
+    targetMarket: varchar("targetMarket", { length: 64 }),
+    website: varchar("website", { length: 2048 }),
+    socials: jsonb("socials"),
+    productDetails: text("productDetails"),
+    objectives: text("objectives").array(),
+    formats: text("formats").array(),
+    budgetAmount: numeric("budgetAmount", { precision: 12, scale: 2 }),
+    budgetCurrency: char("budgetCurrency", { length: 3 }),
+    // Split is set by admins, never by the brand (visibility rule).
+    serviceFee: numeric("serviceFee", { precision: 12, scale: 2 }),
+    creatorPool: numeric("creatorPool", { precision: 12, scale: 2 }),
+    startsAt: timestamp("startsAt", { withTimezone: true }),
+    endsAt: timestamp("endsAt", { withTimezone: true }),
+    audience: jsonb("audience"),
+    status: brandApplicationStatus("status").default("draft").notNull(),
+    reviewedBy: integer("reviewedBy").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    reviewedAt: timestamp("reviewedAt", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  table => [
+    index("brand_applications_user_idx").on(table.userId),
+    index("brand_applications_status_idx").on(table.status),
+  ]
+);
+
+export const brandLinks = pgTable(
+  "brand_links",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    applicationId: integer("applicationId")
+      .notNull()
+      .references(() => brandApplications.id, { onDelete: "cascade" }),
+    kind: varchar("kind", { length: 32 }),
+    label: varchar("label", { length: 160 }),
+    url: varchar("url", { length: 2048 }).notNull(),
+    productName: varchar("productName", { length: 200 }),
+    price: numeric("price", { precision: 12, scale: 2 }),
+    imageUrl: varchar("imageUrl", { length: 1024 }),
+    createdAt: createdAt(),
+  },
+  table => [index("brand_links_application_idx").on(table.applicationId)]
+);
+
+export const campaigns = pgTable(
+  "campaigns",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    applicationId: integer("applicationId").references(
+      () => brandApplications.id,
+      { onDelete: "set null" }
+    ),
+    title: varchar("title", { length: 200 }).notNull(),
+    brief: text("brief"),
+    concepts: jsonb("concepts"),
+    validationQuestions: jsonb("validationQuestions"),
+    startsAt: timestamp("startsAt", { withTimezone: true }),
+    endsAt: timestamp("endsAt", { withTimezone: true }),
+    status: campaignStatus("status").default("draft").notNull(),
+    budgetTotal: numeric("budgetTotal", { precision: 12, scale: 2 }),
+    budgetCurrency: char("budgetCurrency", { length: 3 }),
+    serviceFee: numeric("serviceFee", { precision: 12, scale: 2 }),
+    creatorPool: numeric("creatorPool", { precision: 12, scale: 2 }),
+    dropId: integer("dropId").references(() => drops.id, {
+      onDelete: "set null",
+    }),
+    createdBy: integer("createdBy").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  table => [
+    index("campaigns_application_idx").on(table.applicationId),
+    index("campaigns_status_idx").on(table.status),
+    index("campaigns_drop_idx").on(table.dropId),
+  ]
+);
+
+export const campaignInvitations = pgTable(
+  "campaign_invitations",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    campaignId: integer("campaignId")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: campaignInvitationStatus("status").default("pending").notNull(),
+    // Only the invited creator ever sees this (visibility rule).
+    rewardAmount: numeric("rewardAmount", { precision: 12, scale: 2 }),
+    rewardCurrency: char("rewardCurrency", { length: 3 }),
+    invitedAt: timestamp("invitedAt", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    respondedAt: timestamp("respondedAt", { withTimezone: true }),
+    expiresAt: timestamp("expiresAt", { withTimezone: true }),
+  },
+  table => [
+    uniqueIndex("campaign_invitations_unique").on(table.campaignId, table.userId),
+    index("campaign_invitations_campaign_idx").on(table.campaignId),
+    index("campaign_invitations_user_idx").on(table.userId),
+  ]
+);
+
+export const campaignSubmissions = pgTable(
+  "campaign_submissions",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    campaignId: integer("campaignId")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    creatorId: integer("creatorId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    videoId: integer("videoId").references(() => videos.id, {
+      onDelete: "set null",
+    }),
+    answers: jsonb("answers"),
+    autoChecks: jsonb("autoChecks"),
+    reviewStatus: campaignSubmissionStatus("reviewStatus")
+      .default("draft")
+      .notNull(),
+    rewardEligible: boolean("rewardEligible").default(false).notNull(),
+    submittedAt: timestamp("submittedAt", { withTimezone: true }),
+    reviewedAt: timestamp("reviewedAt", { withTimezone: true }),
+  },
+  table => [
+    index("campaign_submissions_campaign_idx").on(table.campaignId),
+    index("campaign_submissions_creator_idx").on(table.creatorId),
+    index("campaign_submissions_video_idx").on(table.videoId),
+  ]
+);
+
+export const campaignLinks = pgTable(
+  "campaign_links",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    campaignId: integer("campaignId")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    kind: varchar("kind", { length: 32 }),
+    label: varchar("label", { length: 160 }),
+    url: varchar("url", { length: 2048 }).notNull(),
+    createdAt: createdAt(),
+  },
+  table => [index("campaign_links_campaign_idx").on(table.campaignId)]
+);
+
+/**
+ * FIAT earnings ledger (USD/BDT). Deliberately NOT the integer-coin
+ * rewardLedgerEntries — copies its mechanics instead: idempotency key,
+ * assertTransition-guarded status flow, compensating reversals.
+ */
+export const campaignEarnings = pgTable(
+  "campaign_earnings",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    campaignId: integer("campaignId")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    submissionId: integer("submissionId").references(
+      () => campaignSubmissions.id,
+      { onDelete: "set null" }
+    ),
+    creatorId: integer("creatorId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    currency: char("currency", { length: 3 }).notNull(),
+    status: campaignEarningsStatus("status").default("estimated").notNull(),
+    idempotencyKey: varchar("idempotencyKey", { length: 200 })
+      .notNull()
+      .unique(),
+    adminId: integer("adminId").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    reason: text("reason"),
+    createdAt: createdAt(),
+    decidedAt: timestamp("decidedAt", { withTimezone: true }),
+  },
+  table => [
+    check(
+      "campaign_earnings_currency_check",
+      sql`${table.currency} IN ('USD', 'BDT')`
+    ),
+    // One live earning per submission: dup-proof at the DB level.
+    uniqueIndex("campaign_earnings_submission_unique")
+      .on(table.campaignId, table.submissionId)
+      .where(sql`${table.status} IN ('estimated', 'approved', 'paid_recorded')`),
+    index("campaign_earnings_campaign_idx").on(table.campaignId),
+    index("campaign_earnings_creator_idx").on(table.creatorId),
+    index("campaign_earnings_status_idx").on(table.status),
+  ]
+);
+
+/** Append-only admin action log for everything money-adjacent. */
+export const campaignAuditLog = pgTable(
+  "campaign_audit_log",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    campaignId: integer("campaignId").references(() => campaigns.id, {
+      onDelete: "set null",
+    }),
+    applicationId: integer("applicationId").references(
+      () => brandApplications.id,
+      { onDelete: "set null" }
+    ),
+    actorId: integer("actorId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    action: varchar("action", { length: 64 }).notNull(),
+    details: jsonb("details"),
+    createdAt: createdAt(),
+  },
+  table => [
+    index("campaign_audit_log_campaign_idx").on(table.campaignId),
+    index("campaign_audit_log_application_idx").on(table.applicationId),
+    index("campaign_audit_log_created_idx").on(table.createdAt),
+  ]
+);
+
+/* ---- Real analytics event tables (Phase 1 schema; writers land in Phase 5) ---- */
+
+export const videoViewEvents = pgTable(
+  "video_view_events",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    videoId: integer("videoId")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    campaignId: integer("campaignId").references(() => campaigns.id, {
+      onDelete: "set null",
+    }),
+    // sha256(ip + daily_salt); NEVER a raw IP.
+    viewerHash: char("viewerHash", { length: 64 }).notNull(),
+    userId: integer("userId").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    userAgent: varchar("userAgent", { length: 512 }),
+    source: varchar("source", { length: 32 }),
+    day: date("day").notNull(),
+    createdAt: createdAt(),
+  },
+  table => [
+    // DB-enforced dedup: survives restarts, works multi-instance.
+    uniqueIndex("video_view_events_dedup").on(
+      table.videoId,
+      table.viewerHash,
+      table.day
+    ),
+    index("video_view_events_video_created_idx").on(
+      table.videoId,
+      table.createdAt
+    ),
+    index("video_view_events_campaign_created_idx").on(
+      table.campaignId,
+      table.createdAt
+    ),
+  ]
+);
+
+export const videoImpressions = pgTable(
+  "video_impressions",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    videoId: integer("videoId")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    campaignId: integer("campaignId").references(() => campaigns.id, {
+      onDelete: "set null",
+    }),
+    viewerHash: char("viewerHash", { length: 64 }).notNull(),
+    userId: integer("userId").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    day: date("day").notNull(),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("video_impressions_dedup").on(
+      table.videoId,
+      table.viewerHash,
+      table.day
+    ),
+    index("video_impressions_video_created_idx").on(
+      table.videoId,
+      table.createdAt
+    ),
+  ]
+);
+
+export const linkClicks = pgTable(
+  "link_clicks",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    linkId: integer("linkId").references(() => campaignLinks.id, {
+      onDelete: "set null",
+    }),
+    videoId: integer("videoId").references(() => videos.id, {
+      onDelete: "set null",
+    }),
+    campaignId: integer("campaignId").references(() => campaigns.id, {
+      onDelete: "set null",
+    }),
+    userId: integer("userId").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    ipHash: char("ipHash", { length: 64 }),
+    userAgent: varchar("userAgent", { length: 512 }),
+    referrer: varchar("referrer", { length: 1024 }),
+    createdAt: createdAt(),
+  },
+  table => [
+    index("link_clicks_link_created_idx").on(table.linkId, table.createdAt),
+    index("link_clicks_campaign_created_idx").on(
+      table.campaignId,
+      table.createdAt
+    ),
+  ]
+);
+
+export const dailyContentStats = pgTable(
+  "daily_content_stats",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    videoId: integer("videoId")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    day: date("day").notNull(),
+    views: integer("views").default(0).notNull(),
+    impressions: integer("impressions").default(0).notNull(),
+    clicks: integer("clicks").default(0).notNull(),
+    uniqueViewers: integer("uniqueViewers").default(0).notNull(),
+  },
+  table => [
+    uniqueIndex("daily_content_stats_unique").on(table.videoId, table.day),
+  ]
+);
+
+export const dailyCampaignStats = pgTable(
+  "daily_campaign_stats",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    campaignId: integer("campaignId")
+      .notNull()
+      .references(() => campaigns.id, { onDelete: "cascade" }),
+    day: date("day").notNull(),
+    views: integer("views").default(0).notNull(),
+    impressions: integer("impressions").default(0).notNull(),
+    clicks: integer("clicks").default(0).notNull(),
+    spend: numeric("spend", { precision: 12, scale: 2 }).default("0").notNull(),
+  },
+  table => [
+    uniqueIndex("daily_campaign_stats_unique").on(table.campaignId, table.day),
+  ]
+);
+
+/** DB-backed rate-limit buckets for tRPC procedures (works multi-instance). */
+export const rateLimitBuckets = pgTable(
+  "rate_limit_buckets",
+  {
+    key: varchar("key", { length: 200 }).notNull(),
+    windowStart: timestamp("windowStart", { withTimezone: true }).notNull(),
+    count: integer("count").default(0).notNull(),
+  },
+  table => [
+    uniqueIndex("rate_limit_buckets_unique").on(table.key, table.windowStart),
+  ]
+);
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type FeatureFlagRow = typeof featureFlags.$inferSelect;
@@ -1857,3 +2315,18 @@ export type CommunityCommentHashtagRow = typeof communityCommentHashtags.$inferS
 export type HypeRoomHashtagRow = typeof hypeRoomHashtags.$inferSelect;
 export type HypeRoomMessageHashtagRow = typeof hypeRoomMessageHashtags.$inferSelect;
 export type DropHashtagRow = typeof dropHashtags.$inferSelect;
+export type BrandRow = typeof brands.$inferSelect;
+export type BrandApplicationRow = typeof brandApplications.$inferSelect;
+export type BrandLinkRow = typeof brandLinks.$inferSelect;
+export type CampaignRow = typeof campaigns.$inferSelect;
+export type CampaignInvitationRow = typeof campaignInvitations.$inferSelect;
+export type CampaignSubmissionRow = typeof campaignSubmissions.$inferSelect;
+export type CampaignLinkRow = typeof campaignLinks.$inferSelect;
+export type CampaignEarningRow = typeof campaignEarnings.$inferSelect;
+export type CampaignAuditLogRow = typeof campaignAuditLog.$inferSelect;
+export type VideoViewEventRow = typeof videoViewEvents.$inferSelect;
+export type VideoImpressionRow = typeof videoImpressions.$inferSelect;
+export type LinkClickRow = typeof linkClicks.$inferSelect;
+export type DailyContentStatRow = typeof dailyContentStats.$inferSelect;
+export type DailyCampaignStatRow = typeof dailyCampaignStats.$inferSelect;
+export type RateLimitBucketRow = typeof rateLimitBuckets.$inferSelect;

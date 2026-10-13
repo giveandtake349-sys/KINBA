@@ -72,6 +72,49 @@ export const MILESTONE_AWARD_STATUSES = [
 ] as const;
 export type MilestoneAwardStatus = (typeof MILESTONE_AWARD_STATUSES)[number];
 
+/* ---- JHILIK Brand Advertising & Creator Campaign System (Phase 1) ---- */
+
+export const BRAND_APPLICATION_STATUSES = [
+  "draft",
+  "submitted",
+  "pending",
+  "info_requested",
+  "approved",
+  "rejected",
+] as const;
+export type BrandApplicationStatus = (typeof BRAND_APPLICATION_STATUSES)[number];
+
+export const CAMPAIGN_STATUSES = ["draft", "active", "paused", "ended"] as const;
+export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
+
+export const CAMPAIGN_INVITATION_STATUSES = [
+  "pending",
+  "accepted",
+  "declined",
+  "expired",
+] as const;
+export type CampaignInvitationStatus =
+  (typeof CAMPAIGN_INVITATION_STATUSES)[number];
+
+export const CAMPAIGN_SUBMISSION_STATUSES = [
+  "draft",
+  "in_review",
+  "approved",
+  "rejected",
+  "live",
+] as const;
+export type CampaignSubmissionStatus =
+  (typeof CAMPAIGN_SUBMISSION_STATUSES)[number];
+
+export const CAMPAIGN_EARNINGS_STATUSES = [
+  "estimated",
+  "approved",
+  "reversed",
+  "paid_recorded",
+] as const;
+export type CampaignEarningsStatus =
+  (typeof CAMPAIGN_EARNINGS_STATUSES)[number];
+
 /** allowed next states from each current state (terminal states → []). */
 export type TransitionMap<T extends string> = Readonly<Record<T, readonly T[]>>;
 
@@ -118,6 +161,59 @@ export const VERIFICATION_APPLICATION_TRANSITIONS: TransitionMap<VerificationApp
     approved: [],
     rejected: [],
     withdrawn: [],
+  };
+
+/**
+ * Brand application lifecycle. `submitted` is the brand's handoff;
+ * `pending` means an admin has picked it up for review.
+ */
+export const BRAND_APPLICATION_TRANSITIONS: TransitionMap<BrandApplicationStatus> =
+  {
+    draft: ["submitted"],
+    submitted: ["pending", "info_requested", "approved", "rejected"],
+    pending: ["info_requested", "approved", "rejected"],
+    info_requested: ["pending", "approved", "rejected"],
+    approved: [],
+    rejected: [],
+  };
+
+/** Campaign lifecycle. MVP: activation/expiry is a manual admin action. */
+export const CAMPAIGN_TRANSITIONS: TransitionMap<CampaignStatus> = {
+  draft: ["active"],
+  active: ["paused", "ended"],
+  paused: ["active", "ended"],
+  ended: [],
+};
+
+/** Invitation lifecycle. Only the invited creator (or expiry) moves it. */
+export const CAMPAIGN_INVITATION_TRANSITIONS: TransitionMap<CampaignInvitationStatus> =
+  {
+    pending: ["accepted", "declined", "expired"],
+    accepted: [],
+    declined: [],
+    expired: [],
+  };
+
+/** Submission review lifecycle. `live` = published as a normal video row. */
+export const CAMPAIGN_SUBMISSION_TRANSITIONS: TransitionMap<CampaignSubmissionStatus> =
+  {
+    draft: ["in_review"],
+    in_review: ["approved", "rejected"],
+    approved: ["live"],
+    rejected: [],
+    live: [],
+  };
+
+/**
+ * Fiat earnings lifecycle. `paid_recorded` is a manual bookkeeping marker —
+ * actual payouts stay out of scope until a payment system is approved.
+ */
+export const CAMPAIGN_EARNINGS_TRANSITIONS: TransitionMap<CampaignEarningsStatus> =
+  {
+    estimated: ["approved"],
+    approved: ["paid_recorded", "reversed"],
+    paid_recorded: ["reversed"],
+    reversed: [],
   };
 
 export function canTransition<T extends string>(
