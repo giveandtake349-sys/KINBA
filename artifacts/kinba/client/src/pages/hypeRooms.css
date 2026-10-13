@@ -2301,7 +2301,16 @@ a.hype-room-mention-token:hover {
 .hype-type-fieldset {
   border: 0;
   margin: 0;
+  min-width: 0;
   padding: 0;
+}
+
+/* Fix: fieldset defaults to min-width: min-content, which pushed the whole
+   create-room form off-screen on narrow phones. Grid children also need
+   min-width: 0 to shrink properly. */
+.hype-rooms-page > *,
+.hype-create-form > * {
+  min-width: 0;
 }
 
 .hype-type-fieldset legend {
