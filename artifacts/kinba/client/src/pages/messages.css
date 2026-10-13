@@ -143,6 +143,46 @@
   color: var(--muted);
 }
 
+/* Shimmer skeleton rows for conversation/request lists. */
+.messages-skeleton {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+.messages-skeleton > span {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: var(--surface, transparent);
+}
+
+.messages-skeleton > span::before {
+  content: "";
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(90deg, var(--surface-raised) 25%, var(--border) 50%, var(--surface-raised) 75%);
+  background-size: 200% 100%;
+  animation: messages-skeleton-shimmer 1.4s linear infinite;
+}
+
+.messages-skeleton > span::after {
+  content: "";
+  height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(90deg, var(--surface-raised) 25%, var(--border) 50%, var(--surface-raised) 75%);
+  background-size: 200% 100%;
+  animation: messages-skeleton-shimmer 1.4s linear infinite;
+}
+
+@keyframes messages-skeleton-shimmer {
+  to { background-position: -200% 0; }
+}
+
 .messages-loading .spin {
   animation: spin 1s linear infinite;
 }

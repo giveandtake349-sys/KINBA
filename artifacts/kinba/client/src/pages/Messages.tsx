@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useLocation, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { MessageCircle, Bell, Search, UserPlus, ChevronLeft, MoreVertical, Loader2, AlertCircle, Settings, X } from "lucide-react";
+import { MessageCircle, Bell, Search, UserPlus, ChevronLeft, MoreVertical, AlertCircle, Settings, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { dmConversationPreview } from "@shared/dmMedia";
 import "./messages.css";
@@ -172,9 +172,10 @@ export default function Messages() {
       {showRequests ? (
         <div className="messages-list requests-list" role="list" aria-label="Message requests">
           {requestsQuery.isPending ? (
-            <div className="messages-loading">
-              <Loader2 size={24} className="spin" />
-              <span>Loading requests...</span>
+            <div className="messages-skeleton" aria-busy="true" aria-label="Loading requests">
+              <span />
+              <span />
+              <span />
             </div>
           ) : requests.length === 0 ? (
             <div className="messages-empty">
@@ -225,9 +226,11 @@ export default function Messages() {
       ) : (
         <div className="messages-list conversations-list" role="list" aria-label="Conversations">
           {conversationsQuery.isPending ? (
-            <div className="messages-loading">
-              <Loader2 size={24} className="spin" />
-              <span>Loading conversations...</span>
+            <div className="messages-skeleton" aria-busy="true" aria-label="Loading conversations">
+              <span />
+              <span />
+              <span />
+              <span />
             </div>
           ) : conversationsQuery.isError ? (
             <div className="messages-empty">

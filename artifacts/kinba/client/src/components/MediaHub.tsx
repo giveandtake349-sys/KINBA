@@ -1286,10 +1286,13 @@ function InlineVideoPlayer({
   video,
   active = true,
   onFirstPlay,
+  autoplayOnVisible = false,
 }: {
   video: VideoRecord;
   active?: boolean;
   onFirstPlay?: () => void;
+  /** When true, play muted once ≥50% visible and pause when scrolled away. */
+  autoplayOnVisible?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1297,6 +1300,10 @@ function InlineVideoPlayer({
   const [error, setError] = useState("");
   const hlsRef = useRef<Hls | null>(null);
   const viewedRef = useRef(false);
+  // Autoplay bookkeeping: never override an explicit user pause.
+  const userPausedRef = useRef(false);
+  const [inAutoplayView, setInAutoplayView] = useState(false);
+  const [autoPlayBadge, setAutoPlayBadge] = useState(false);
 
   const sourceMap = useMemo(
     () =>
@@ -1388,9 +1395,56 @@ function InlineVideoPlayer({
     e.stopPropagation();
     const el = videoRef.current;
     if (!el) return;
-    if (el.paused) el.play().catch(() => undefined);
-    else el.pause();
+    if (el.paused) {
+      userPausedRef.current = false;
+      setAutoPlayBadge(false);
+      el.play().catch(() => undefined);
+    } else {
+      userPausedRef.current = true;
+      setAutoPlayBadge(false);
+      el.pause();
+    }
   };
+
+  // Muted autoplay: play once at least half the player is on screen, pause
+  // when it scrolls away. A manual pause always wins over autoplay.
+  useEffect(() => {
+    if (!autoplayOnVisible) return;
+    const el = containerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setInAutoplayView(entry.isIntersecting),
+      { threshold: 0.5 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [autoplayOnVisible]);
+
+  useEffect(() => {
+    if (!autoplayOnVisible || !isNearViewport) return;
+    const el = videoRef.current;
+    if (!el) return;
+    if (!inAutoplayView) {
+      if (!el.paused) {
+        el.pause();
+        setAutoPlayBadge(false);
+      }
+      return;
+    }
+    if (userPausedRef.current || !el.paused) return;
+    const tryPlay = () => {
+      if (userPausedRef.current || !el.paused) return;
+      el.play()
+        .then(() => setAutoPlayBadge(true))
+        .catch(() => undefined);
+    };
+    if (el.readyState >= 1) {
+      tryPlay();
+      return;
+    }
+    el.addEventListener("canplay", tryPlay, { once: true });
+    return () => el.removeEventListener("canplay", tryPlay);
+  }, [autoplayOnVisible, inAutoplayView, isNearViewport]);
 
   return (
     <div
@@ -1433,6 +1487,16 @@ function InlineVideoPlayer({
           background: "var(--page-bg)",
         }}
       />
+      {autoPlayBadge && playing && !error && (
+        <div className="k-autoplay-badge" aria-hidden="true">
+          <span className="k-autoplay-eq">
+            <i />
+            <i />
+            <i />
+          </span>
+          Autoplay · muted
+        </div>
+      )}
       {!playing && !error && (
         <div
           style={{
@@ -3363,6 +3427,46 @@ function VideoCard({
   const longPress = useLongPress({
     onLongPress: () => setReactorsOpen(true),
   });
+  // Double-tap to like: the first tap arms a short window; a second tap inside
+  // it shows a heart burst and likes (without opening the viewer). Otherwise
+  // the single tap opens the viewer after the window elapses.
+  const tapTimerRef = useRef<number | null>(null);
+  const lastTapRef = useRef(0);
+  const [heartBurstKey, setHeartBurstKey] = useState(0);
+  useEffect(
+    () => () => {
+      if (tapTimerRef.current != null) window.clearTimeout(tapTimerRef.current);
+    },
+    []
+  );
+  const handleMediaTap = (event: MouseEvent<HTMLElement>) => {
+    if (!onOpenViewer) {
+      openViewer(event);
+      return;
+    }
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      lastTapRef.current = 0;
+      if (tapTimerRef.current != null) {
+        window.clearTimeout(tapTimerRef.current);
+        tapTimerRef.current = null;
+      }
+      setHeartBurstKey(key => key + 1);
+      if (!current.viewerReacted && !pending) void react();
+      return;
+    }
+    lastTapRef.current = now;
+    const target = event.target;
+    tapTimerRef.current = window.setTimeout(() => {
+      tapTimerRef.current = null;
+      if (
+        target instanceof HTMLElement &&
+        target.closest("button, a, input, textarea, select")
+      )
+        return;
+      onOpenViewer();
+    }, 300);
+  };
   const openViewer = (event: MouseEvent<HTMLElement>) => {
     if (!onOpenViewer) return;
     const target = event.target;
@@ -3460,19 +3564,28 @@ function VideoCard({
               role={onOpenViewer ? "button" : undefined}
               tabIndex={onOpenViewer ? 0 : undefined}
               aria-label={onOpenViewer ? "Open post" : undefined}
-              onClick={openViewer}
+              onClick={handleMediaTap}
               onKeyDown={event => {
                 if (!onOpenViewer || (event.key !== "Enter" && event.key !== " ")) return;
                 event.preventDefault();
                 onOpenViewer();
               }}
             >
+              {heartBurstKey > 0 && (
+                <span
+                  key={heartBurstKey}
+                  className="k-post__heart-burst"
+                  aria-hidden="true"
+                >
+                  <Heart size={76} fill="currentColor" />
+                </span>
+              )}
               {isImage ? (
                 <PhotoCarousel video={video} onOpenViewer={onOpenViewer} />
               ) : renderVideo ? (
                 renderVideo(video, active, recordView)
               ) : (
-                <InlineVideoPlayer video={video} active={active} onFirstPlay={recordView} />
+                <InlineVideoPlayer video={video} active={active} onFirstPlay={recordView} autoplayOnVisible />
               )}
             </div>
             <div className="k-post__bottom">
@@ -4016,6 +4129,41 @@ function HomeFeedPanel({
   );
   const videos = (query.data ?? []) as VideoRecord[];
   const followingVideos = (followingQuery.data ?? []) as VideoRecord[];
+  // Pull-to-refresh: drag down from the very top of the feed, release past
+  // the threshold to refetch. Purely additive — no change to query config.
+  const pullStartYRef = useRef<number | null>(null);
+  const [pullY, setPullY] = useState(0);
+  const [pullRefreshing, setPullRefreshing] = useState(false);
+  const handleFeedTouchStart = (event: React.TouchEvent<HTMLElement>) => {
+    if (window.scrollY <= 0 && !query.isPending && !query.isFetching && !pullRefreshing) {
+      pullStartYRef.current = event.touches[0].clientY;
+    }
+  };
+  const handleFeedTouchMove = (event: React.TouchEvent<HTMLElement>) => {
+    if (pullStartYRef.current == null) return;
+    const dy = event.touches[0].clientY - pullStartYRef.current;
+    if (dy > 0 && window.scrollY <= 0) {
+      setPullY(Math.min(dy * 0.5, 110));
+    } else {
+      pullStartYRef.current = null;
+      setPullY(0);
+    }
+  };
+  const handleFeedTouchEnd = () => {
+    if (pullStartYRef.current == null) return;
+    pullStartYRef.current = null;
+    if (pullY >= 45) {
+      setPullRefreshing(true);
+      void query
+        .refetch()
+        .finally(() => {
+          setPullRefreshing(false);
+          setPullY(0);
+        });
+    } else {
+      setPullY(0);
+    }
+  };
   const trending = trpc.hashtag.trending.useQuery({}, { staleTime: 60_000, refetchOnWindowFocus: false });
   const toggleTrendingFollow = trpc.hashtag.toggleFollow.useMutation({ onSuccess: () => void trending.refetch() });
   const newestUpdates = useForYouPlayer
@@ -4086,7 +4234,20 @@ function HomeFeedPanel({
     <section
       className="media-section home-feed-section w-full max-w-full overflow-hidden box-border"
       aria-labelledby="home-feed-heading"
+      onTouchStart={handleFeedTouchStart}
+      onTouchMove={handleFeedTouchMove}
+      onTouchEnd={handleFeedTouchEnd}
     >
+      <div
+        className="feed-pull-indicator"
+        style={{ height: pullRefreshing ? 46 : pullY }}
+        aria-hidden={pullY <= 8 && !pullRefreshing}
+      >
+        <RotateCcw size={18} className={pullRefreshing ? "spin" : undefined} />
+        <span>
+          {pullRefreshing ? "Refreshing…" : pullY >= 45 ? "Release to refresh" : "Pull to refresh"}
+        </span>
+      </div>
       {showHeader && (
         <div className="media-section-heading">
           <div>

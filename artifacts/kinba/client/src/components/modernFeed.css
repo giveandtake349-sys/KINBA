@@ -81,6 +81,82 @@
   overflow: hidden;
 }
 
+/* Pull-to-refresh indicator at the top of the home feed. */
+.feed-pull-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  overflow: hidden;
+  height: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: height 0.15s ease-out;
+}
+
+.feed-pull-indicator .spin {
+  color: var(--teal, #38bdf8);
+}
+
+/* Muted autoplay badge on feed videos. */
+.k-autoplay-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #e7eef5;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 5px 10px;
+  border-radius: 99px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.k-autoplay-eq {
+  display: inline-flex;
+  gap: 2px;
+  align-items: flex-end;
+  height: 12px;
+}
+
+.k-autoplay-eq i {
+  width: 3px;
+  background: #38bdf8;
+  border-radius: 2px;
+  animation: k-autoplay-eq 0.9s ease-in-out infinite;
+}
+
+.k-autoplay-eq i:nth-child(1) { height: 8px; }
+.k-autoplay-eq i:nth-child(2) { height: 12px; animation-delay: 0.15s; }
+.k-autoplay-eq i:nth-child(3) { height: 6px; animation-delay: 0.3s; }
+
+@keyframes k-autoplay-eq {
+  50% { transform: scaleY(0.4); }
+}
+.k-post__heart-burst {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #ff5b6a;
+  pointer-events: none;
+  z-index: 3;
+  filter: drop-shadow(0 4px 20px rgba(255, 91, 106, 0.5));
+  animation: k-heart-pop 0.8s ease-out forwards;
+}
+
+@keyframes k-heart-pop {
+  0% { transform: scale(0); opacity: 0; }
+  25% { transform: scale(1.25); opacity: 1; }
+  55% { transform: scale(0.95); opacity: 1; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
 /* Full-width, natural ratio: no max-height clamp, so `object-fit: contain`
    never letterboxes left/right bars beside the photo. */
 .k-post__media img {

@@ -19,6 +19,7 @@ import Settings from "./pages/settings/Settings";
 import NotFound from "./pages/NotFound";
 import { DesktopMessages } from "./pages/DesktopMessages";
 import HashtagPage from "./pages/HashtagPage";
+import { OfflineBanner } from "./components/OfflineBanner";
 
 function ThemedToaster() {
   const { theme } = useTheme();
@@ -67,6 +68,7 @@ export default function App() {
         <TooltipProvider>
           <SupabaseAuthProvider>
             <ThemedToaster />
+            <OfflineBanner />
             <AppRoutes />
           </SupabaseAuthProvider>
         </TooltipProvider>

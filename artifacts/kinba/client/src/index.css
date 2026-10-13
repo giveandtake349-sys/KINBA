@@ -2425,3 +2425,33 @@ html[data-motion="reduced"] *::after {
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
 }
+
+/* ---- Offline banner (global, mounted once in App) ---- */
+.offline-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  background: #3a2b12;
+  border-bottom: 1px solid #e9a63a;
+  color: #f5c86e;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.offline-banner button {
+  margin-left: auto;
+  background: #e9a63a;
+  border: none;
+  color: #1a1206;
+  font-weight: 800;
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
