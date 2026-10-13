@@ -982,11 +982,24 @@ function publicMediaUrl(value: string | null | undefined) {
 }
 
 function shapeVideoRow(row: any) {
+  const legacyImage = row.video.mediaType === "IMAGE" && row.video.videoUrl
+    ? [{ url: row.video.videoUrl, width: row.video.width, height: row.video.height }]
+    : [];
+  const rawGallery = Array.isArray(row.video.gallery) ? row.video.gallery : legacyImage;
+  const gallery = rawGallery
+    .filter((item: any) => item && typeof item.url === "string")
+    .map((item: any) => ({
+      url: publicMediaUrl(item.url) ?? "",
+      width: Number(item.width) || row.video.width,
+      height: Number(item.height) || row.video.height,
+    }))
+    .filter((item: { url: string }) => Boolean(item.url));
   return {
     ...row.video,
     description: captionText(row.video.description),
     videoUrl: publicMediaUrl(row.video.videoUrl) ?? "",
     thumbnailUrl: publicMediaUrl(row.video.thumbnailUrl),
+    gallery,
     hlsMasterUrl: publicMediaUrl(row.video.hlsMasterUrl),
     mediaType: row.video.mediaType === "IMAGE" ? "IMAGE" : row.video.mediaType === "TEXT" ? "TEXT" : "VIDEO",
     processingStatus: row.video.processingStatus ?? "READY",
@@ -1785,6 +1798,7 @@ export async function createPhotoPost(
     imageUrl: string;
     width: number;
     height: number;
+    gallery?: Array<{ url: string; width: number; height: number }>;
   }
 ) {
   if (!Number.isInteger(userId) || userId < 1)
@@ -1804,6 +1818,7 @@ export async function createPhotoPost(
         description,
         videoUrl: requiredText(input.imageUrl, "about:blank"),
         thumbnailUrl: optionalText(input.imageUrl),
+        gallery: input.gallery?.length ? input.gallery : null,
         mediaType: "IMAGE",
         kind: "LONG",
         durationSeconds: 1,

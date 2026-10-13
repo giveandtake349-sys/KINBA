@@ -282,9 +282,15 @@ export function registerVideoUploadRoute(app: Express) {
       }
       const title = String(req.body?.title ?? "").trim();
       const description = String(req.body?.description ?? "").trim();
-      const imageUrl = String(req.body?.imageUrl ?? "").trim();
-      const width = Number(req.body?.width);
-      const height = Number(req.body?.height);
+      const rawGallery = Array.isArray(req.body?.gallery) ? req.body.gallery : [];
+      const gallery = rawGallery.map((item: any) => ({
+        url: String(item?.url ?? "").trim(),
+        width: Number(item?.width),
+        height: Number(item?.height),
+      }));
+      const imageUrl = String(req.body?.imageUrl ?? gallery[0]?.url ?? "").trim();
+      const width = Number(req.body?.width ?? gallery[0]?.width);
+      const height = Number(req.body?.height ?? gallery[0]?.height);
       if ((title.length > 0 && title.length < 3) || title.length > 180) {
         res
           .status(400)
@@ -297,6 +303,12 @@ export function registerVideoUploadRoute(app: Express) {
       }
       if (!/^https?:\/\//i.test(imageUrl)) {
         res.status(400).json({ error: "The uploaded image URL is invalid." });
+        return;
+      }
+      if (gallery.length > 20 || gallery.some((item: { url: string; width: number; height: number }) =>
+        !/^https?:\/\//i.test(item.url) || !Number.isInteger(item.width) || !Number.isInteger(item.height) || item.width < 1 || item.height < 1
+      )) {
+        res.status(400).json({ error: "Choose between 1 and 20 valid images." });
         return;
       }
       if (
@@ -316,12 +328,14 @@ export function registerVideoUploadRoute(app: Express) {
         imageUrl,
         width,
         height,
+        gallery: gallery.length ? gallery : [{ url: imageUrl, width, height }],
       });
       res.status(201).json({
         postId: post.id,
         mediaType: "IMAGE",
         status: "PUBLISHED",
         imageUrl,
+        gallery: gallery.length ? gallery : [{ url: imageUrl, width, height }],
       });
     } catch (error) {
       logUploadFailure("photo-create", req, error);

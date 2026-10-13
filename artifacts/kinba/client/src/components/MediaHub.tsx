@@ -153,6 +153,7 @@ export type VideoRecord = {
   description: string;
   videoUrl: string;
   thumbnailUrl: string | null;
+  gallery?: Array<{ url: string; width: number; height: number }>;
   mediaType: "VIDEO" | "IMAGE" | "TEXT";
   kind: VideoKind;
   durationSeconds: number;
@@ -3242,6 +3243,68 @@ function PostManagementMenu({
   );
 }
 
+function PhotoCarousel({
+  video,
+  onOpenViewer,
+}: {
+  video: VideoRecord;
+  onOpenViewer?: () => void;
+}) {
+  const images = video.gallery?.length
+    ? video.gallery
+    : [{ url: video.videoUrl, width: video.width, height: video.height }];
+  const [index, setIndex] = useState(0);
+  const touchStartRef = useRef<number | null>(null);
+  const current = images[Math.min(index, images.length - 1)];
+  const move = (next: number) => {
+    setIndex((next + images.length) % images.length);
+  };
+  return (
+    <div
+      className="k-post__carousel"
+      onClick={event => event.stopPropagation()}
+      onTouchStart={event => {
+        touchStartRef.current = event.touches[0]?.clientX ?? null;
+      }}
+      onTouchEnd={event => {
+        const start = touchStartRef.current;
+        const end = event.changedTouches[0]?.clientX;
+        touchStartRef.current = null;
+        if (start == null || end == null || Math.abs(end - start) < 40) return;
+        move(end < start ? index + 1 : index - 1);
+      }}
+    >
+      <img
+        src={resolveMediaUrl(current.url) ?? current.url}
+        alt={`${video.title || "Post"} · image ${index + 1} of ${images.length}`}
+        loading="lazy"
+        draggable={false}
+        onClick={event => {
+          event.stopPropagation();
+          onOpenViewer?.();
+        }}
+        onKeyDown={event => {
+          if (event.key === "ArrowLeft") move(index - 1);
+          if (event.key === "ArrowRight") move(index + 1);
+        }}
+        tabIndex={0}
+      />
+      {images.length > 1 ? (
+        <>
+          <button type="button" className="k-post__carousel-nav is-prev" onClick={() => move(index - 1)} aria-label="Previous image"><ChevronLeft size={22} /></button>
+          <button type="button" className="k-post__carousel-nav is-next" onClick={() => move(index + 1)} aria-label="Next image"><ChevronRight size={22} /></button>
+          <span className="k-post__carousel-count" aria-live="polite">{index + 1} / {images.length}</span>
+          <div className="k-post__carousel-dots" aria-label="Choose image">
+            {images.map((image, imageIndex) => (
+              <button type="button" key={image.url} className={imageIndex === index ? "is-active" : ""} onClick={() => setIndex(imageIndex)} aria-label={`Show image ${imageIndex + 1}`} />
+            ))}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function VideoCard({
   video,
   active = true,
@@ -3385,12 +3448,7 @@ function VideoCard({
               }}
             >
               {isImage ? (
-                <img
-                  src={isAbsoluteHttpUrl(video.videoUrl) ? video.videoUrl : ""}
-                  alt={video.title || "Post"}
-                  loading="lazy"
-                  draggable={false}
-                />
+                <PhotoCarousel video={video} onOpenViewer={onOpenViewer} />
               ) : renderVideo ? (
                 renderVideo(video, active, recordView)
               ) : (
