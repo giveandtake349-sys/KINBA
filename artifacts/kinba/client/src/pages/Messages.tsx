@@ -76,9 +76,8 @@ export default function Messages() {
 
   return (
     <div className="messages-shell">
-      <header className="messages-header">
-        <div className="messages-title-block">
-          <span className="messages-eyebrow">KINBA / INBOX</span>
+        <header className="messages-header">
+          <div className="messages-title-block">
           <h1>Messages</h1>
         </div>
         <button

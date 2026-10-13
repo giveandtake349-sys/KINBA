@@ -70,7 +70,6 @@ export function DesktopMessages() {
               </button>
             )}
             <div className="messages-title-block">
-              <span className="messages-eyebrow">KINBA / INBOX</span>
               <h1>Messages</h1>
             </div>
           </header>
@@ -142,7 +141,6 @@ export function DesktopMessages() {
             </button>
           )}
           <div className="messages-title-block">
-            <span className="messages-eyebrow">KINBA / INBOX</span>
             <h1>Messages</h1>
           </div>
           <button
