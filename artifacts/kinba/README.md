@@ -64,7 +64,7 @@ The managed Manus environment injects its configured values. External deployment
 | `VITE_SUPABASE_ANON_KEY`                            | Supabase publishable/anon key exposed to browser Auth.                                                            |
 | `SUPABASE_SERVICE_ROLE_KEY`                         | Server-only privileged Supabase credential, when required by configured server features.                          |
 | `CORS_ORIGIN`                                       | Comma-separated allowed frontend origins when the frontend is hosted separately.                                  |
-| `VITE_API_BASE_URL`                                 | Optional absolute HTTPS API base URL for separately hosted client builds.                                         |
+| `VITE_API_BASE_URL`                                 | Currently unused by `client/src/lib/api.ts`, which hardcodes the Render API origin.                               |
 | `R2_ENDPOINT`                                       | Server-side S3-compatible R2 endpoint.                                                                            |
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`         | Server-only R2 write credentials.                                                                                 |
 | `R2_BUCKET_NAME`                                    | R2 bucket for uploaded media and generated HLS assets.                                                            |
@@ -75,7 +75,9 @@ The managed Manus environment injects its configured values. External deployment
 | `CROSS_SITE_SESSION`                                | Legacy cookie option; Supabase browser sessions normally do not require it.                                       |
 | `BUILT_IN_FORGE_API_URL` / `BUILT_IN_FORGE_API_KEY` | Optional legacy integration settings for unrelated built-in features.                                             |
 
-The Render Blueprint is `render.yaml` and uses the full-stack server entry point `artifacts/kinba/server/_core/index.ts` through the package build scripts. The Vercel configuration at the repository root is a separate routing configuration; verify the target deployment and domain before treating it as the canonical public app URL.
+The workspace pins `pnpm@10.34.5` in the root `package.json`; CI and Render use that same version. The Render Blueprint is `render.yaml` and builds the full-stack server entry point through the package scripts.
+
+**Verified hosting snapshot (2026-10-14):** `https://kinba.onrender.com/` and `/api/health` returned HTTP 200, so Render is the verified production source of truth. `https://ba.onrender.com/` and `https://upbids.vercel.app/` returned HTTP 404 at that check. The root `vercel.json` is an optional static-client/API-proxy configuration; `artifacts/kinba/vercel.json` is a separate SPA-only configuration for a Vercel project rooted in that subdirectory. The current browser API helper hardcodes the Render origin, so the root Vercel `/api` rewrite is not used by the app code. Recheck domains before any future host switch; neither Vercel configuration was removed or deployed as part of this audit.
 
 ## Development and verification commands
 

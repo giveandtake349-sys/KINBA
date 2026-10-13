@@ -2,7 +2,7 @@ services:
   - type: web
     name: kinba
     runtime: node
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
+    buildCommand: npm install --global pnpm@10.34.5 && pnpm install --frozen-lockfile && pnpm build
     startCommand: pnpm start
     healthCheckPath: /api/health
     autoDeploy: true

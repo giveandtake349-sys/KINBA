@@ -213,7 +213,7 @@ body {
 .media-hub .home-feed-tabs button {
   position: relative;
   flex: 1 0 116px !important;
-  min-height: 42px;
+  min-height: 44px;
   border: 0 !important;
   border-bottom: 2px solid transparent !important;
   border-radius: var(--radius-control) var(--radius-control) 2px 2px !important;

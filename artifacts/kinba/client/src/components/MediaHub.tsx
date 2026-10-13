@@ -110,7 +110,6 @@ import type { ReactionType } from "@shared/reactions";
 import { postCaption } from "@/lib/postCaption";
 import { Caption } from "./Caption";
 import "./mediaHub.css";
-import "./kinbaModern.css";
 import "./feedUi.css";
 import "./modernFeed.css";
 import "./shorts-stage.css";
@@ -5951,6 +5950,30 @@ export default function MediaHub({
           className="home-feed-tabs"
           aria-label="Home feed tabs"
           role="tablist"
+          onKeyDown={event => {
+            const tabButtons = Array.from(
+              event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+            );
+            const currentIndex = tabButtons.indexOf(event.target as HTMLButtonElement);
+            if (currentIndex < 0 || tabButtons.length === 0) return;
+
+            let nextIndex: number;
+            if (event.key === "ArrowRight") {
+              nextIndex = (currentIndex + 1) % tabButtons.length;
+            } else if (event.key === "ArrowLeft") {
+              nextIndex = (currentIndex - 1 + tabButtons.length) % tabButtons.length;
+            } else if (event.key === "Home") {
+              nextIndex = 0;
+            } else if (event.key === "End") {
+              nextIndex = tabButtons.length - 1;
+            } else {
+              return;
+            }
+
+            event.preventDefault();
+            tabButtons[nextIndex].focus();
+            tabButtons[nextIndex].click();
+          }}
         >
           {(
             [
@@ -5970,6 +5993,7 @@ export default function MediaHub({
                 select(id);
               }}
               aria-selected={activeSection === id}
+              tabIndex={activeSection === id ? 0 : -1}
               role="tab"
             >
               {label}

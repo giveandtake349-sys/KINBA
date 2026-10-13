@@ -92,6 +92,7 @@
   font-weight: 800;
   gap: 6px;
   letter-spacing: 0.04em;
+  min-height: 44px;
   padding: 10px 16px;
   text-transform: uppercase;
   transition:
@@ -333,6 +334,13 @@
 
 .hype-room-state-action {
   margin-top: 8px;
+}
+
+.hype-room-state-action .muted-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 14px;
 }
 
 .hype-room-card--skeleton .hype-room-card-body {

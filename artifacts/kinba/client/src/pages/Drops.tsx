@@ -418,15 +418,14 @@ export default function Drops() {
           </div>
         </header>
 
-        <nav className="drop-filters" aria-label="Drop filters" role="tablist">
+        <div className="drop-filters" role="group" aria-label="Drop filters">
           {FILTERS.map(item => {
             const active = filter === item.id;
             return (
               <button
                 key={item.id}
                 type="button"
-                role="tab"
-                aria-selected={active}
+                aria-pressed={active}
                 className={active ? "active" : ""}
                 onClick={() => setFilter(item.id)}
               >
@@ -437,7 +436,7 @@ export default function Drops() {
               </button>
             );
           })}
-        </nav>
+        </div>
 
         <div className="drop-search" role="search">
           <Search size={16} aria-hidden="true" />

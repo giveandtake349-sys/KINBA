@@ -2072,6 +2072,14 @@ a:focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 2px;
 }
+.route-loading {
+  display: grid;
+  min-height: 50vh;
+  place-items: center;
+  padding: 24px;
+  color: var(--muted);
+  text-align: center;
+}
 .topbar {
   background: color-mix(in srgb, var(--page-bg) 92%, transparent);
   height: var(--header-h);

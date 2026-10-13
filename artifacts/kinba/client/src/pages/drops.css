@@ -76,6 +76,7 @@
   font-weight: 800;
   gap: 6px;
   letter-spacing: 0.04em;
+  min-height: 44px;
   padding: 10px 16px;
   text-transform: uppercase;
   transition:
@@ -336,6 +337,13 @@
 
 .drop-state-action {
   margin-top: 8px;
+}
+
+.drop-state-action .muted-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px 12px;
+  font-size: 14px;
 }
 
 .drop-card--skeleton .drop-card-body {

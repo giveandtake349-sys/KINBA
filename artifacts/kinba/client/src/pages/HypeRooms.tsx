@@ -372,15 +372,14 @@ export default function HypeRooms() {
           </button>
         </header>
 
-        <nav className="hype-room-filters" aria-label="Hype Room filters" role="tablist">
+        <div className="hype-room-filters" role="group" aria-label="Hype Room filters">
           {FILTERS.map(item => {
             const active = filter === item.id;
             return (
               <button
                 key={item.id}
                 type="button"
-                role="tab"
-                aria-selected={active}
+                aria-pressed={active}
                 className={active ? "active" : ""}
                 onClick={() => setFilter(item.id)}
               >
@@ -391,7 +390,7 @@ export default function HypeRooms() {
               </button>
             );
           })}
-        </nav>
+        </div>
 
         {auth.isAuthenticated && myInvites.length > 0 ? (
           <section
