@@ -3931,6 +3931,8 @@ function HomeFeedPanel({
     }
   );
   const videos = (query.data ?? []) as VideoRecord[];
+  const trending = trpc.hashtag.trending.useQuery({}, { staleTime: 60_000, refetchOnWindowFocus: false });
+  const toggleTrendingFollow = trpc.hashtag.toggleFollow.useMutation({ onSuccess: () => void trending.refetch() });
   const useForYouPlayer = tab === "videos";
   const newestUpdates = useForYouPlayer
     ? videos.slice(0, 6).map(video => ({
@@ -4033,6 +4035,19 @@ function HomeFeedPanel({
           />
         </div>
       )}
+      {tab === "videos" && trending.data?.length ? (
+        <div className="trending-topics" aria-label="Trending now">
+          <strong>Trending now</strong>
+          <div className="trending-topics__list">
+            {trending.data.slice(0, 6).map(topic => (
+              <button key={topic.id} type="button" className="trending-topic" onClick={() => void toggleTrendingFollow.mutateAsync({ tag: topic.tag })}>
+                <span>#{topic.displayTag || topic.tag}</span>
+                <small>{topic.postCount} posts · {topic.following ? "Following" : "Follow"}</small>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {query.isError ? (
         <FeedRecovery onRetry={() => void query.refetch()} />
       ) : query.isPending ? (

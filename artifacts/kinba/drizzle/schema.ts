@@ -363,6 +363,7 @@ export const profiles = pgTable(
       .notNull(),
     displayName: text("display_name"),
     birthday: date("birthday"),
+    timezone: varchar("timezone", { length: 64 }).default("UTC").notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -386,6 +387,7 @@ export const videos = pgTable(
     thumbnailUrl: varchar("thumbnailUrl", { length: 1024 }),
     // Optional ordered image gallery for IMAGE posts; legacy rows remain NULL.
     gallery: jsonb("gallery").$type<Array<{ url: string; width: number; height: number }>>(),
+    audience: varchar("audience", { length: 32 }).default("everyone").notNull(),
     mediaType: mediaType("mediaType").default("VIDEO").notNull(),
     kind: videoKind("kind").notNull(),
     durationSeconds: integer("durationSeconds").notNull(),
@@ -796,6 +798,20 @@ export const follows = pgTable(
     uniqueIndex("follows_pair_unique").on(table.followerId, table.followedId),
     index("follows_follower_idx").on(table.followerId),
     index("follows_followed_idx").on(table.followedId),
+  ]
+);
+
+export const closeFriends = pgTable(
+  "close_friends",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    ownerId: integer("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    friendId: integer("friend_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("close_friends_pair_unique").on(table.ownerId, table.friendId),
+    index("close_friends_owner_idx").on(table.ownerId),
   ]
 );
 
@@ -1750,6 +1766,62 @@ export const moderationActions = pgTable(
       table.createdAt
     ),
   ]
+);
+
+export const userFollowsHashtag = pgTable(
+  "user_follows_hashtag",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    hashtagId: integer("hashtag_id").notNull().references(() => hashtags.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("user_follows_hashtag_unique").on(table.userId, table.hashtagId),
+    index("user_follows_hashtag_user_idx").on(table.userId),
+    index("user_follows_hashtag_tag_idx").on(table.hashtagId),
+  ]
+);
+
+export const dailyActivities = pgTable(
+  "daily_activities",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    activityDate: varchar("activity_date", { length: 10 }).notNull(),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("daily_activities_user_date_unique").on(table.userId, table.activityDate),
+    index("daily_activities_user_date_idx").on(table.userId, table.activityDate),
+  ]
+);
+
+export const userStreaks = pgTable("user_streaks", {
+  userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  currentStreak: integer("current_streak").default(0).notNull(),
+  longestStreak: integer("longest_streak").default(0).notNull(),
+  lastActivityDate: varchar("last_activity_date", { length: 10 }),
+  updatedAt: updatedAt(),
+});
+
+export const badges = pgTable("badges", {
+  id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+  key: varchar("key", { length: 64 }).notNull().unique(),
+  title: varchar("title", { length: 120 }).notNull(),
+  description: text("description").notNull(),
+  requirement: integer("requirement").notNull(),
+});
+
+export const userBadges = pgTable(
+  "user_badges",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    badgeId: integer("badge_id").notNull().references(() => badges.id, { onDelete: "cascade" }),
+    awardedAt: createdAt(),
+  },
+  table => [uniqueIndex("user_badges_unique").on(table.userId, table.badgeId)]
 );
 
 export type User = typeof users.$inferSelect;

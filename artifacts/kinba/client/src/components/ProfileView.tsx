@@ -71,6 +71,7 @@ export type ProfileSnapshot = {
     iconsCount: number;
     followingCount: number;
     followersCount: number;
+    streak?: number;
   };
 };
 
@@ -1256,8 +1257,8 @@ export default function ProfileView({
 
         <div className="pr-stats">
           <div className="pr-stat">
-            <span className="pr-stat-value">{formatCount(stats?.iconsCount ?? 0)}</span>
-            <span className="pr-stat-label">Icons</span>
+            <span className="pr-stat-value">{formatCount(stats?.streak ?? 0)}</span>
+            <span className="pr-stat-label">Streak</span>
           </div>
           <button
             type="button"
