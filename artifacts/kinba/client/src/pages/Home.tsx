@@ -4,9 +4,11 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type DragEvent as ReactDragEvent,
   type FormEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
+  type SyntheticEvent as ReactSyntheticEvent,
 } from "react";
 import {
   BadgeCheck,
@@ -1625,7 +1627,45 @@ type UploadImageSelection = {
   file: File;
   previewUrl: string;
   dimensions: { width: number; height: number };
+  /** CSS filter chosen in the edit sheet; baked into the file at publish. */
+  filter?: string;
 };
+
+/** Filters offered in the media edit sheet (mirrors the approved preview). */
+const MEDIA_FILTERS: ReadonlyArray<{ id: string; label: string; css: string }> = [
+  { id: "none", label: "Original", css: "none" },
+  { id: "mono", label: "Mono", css: "grayscale(1)" },
+  { id: "sepia", label: "Sepia", css: "sepia(.7)" },
+  { id: "vivid", label: "Vivid", css: "saturate(1.7) contrast(1.1)" },
+  { id: "cool", label: "Cool", css: "hue-rotate(-20deg) saturate(1.2)" },
+  { id: "warm", label: "Warm", css: "sepia(.35) saturate(1.5)" },
+];
+
+/** Applies a CSS filter to an image via canvas; falls back to the original. */
+async function applyFilterToImage(file: File, cssFilter: string): Promise<File> {
+  if (!cssFilter || cssFilter === "none") return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close();
+      return file;
+    }
+    ctx.filter = cssFilter;
+    ctx.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>(resolve =>
+      canvas.toBlob(resolve, file.type)
+    );
+    if (!blob) return file;
+    return new File([blob], file.name, { type: file.type });
+  } catch {
+    return file;
+  }
+}
 
 function UploadVideoModal({
   open,
@@ -1651,6 +1691,14 @@ function UploadVideoModal({
   const [textBody, setTextBody] = useState(() => readTextDraft());
   const [draftSaved, setDraftSaved] = useState(true);
   const [textBusy, setTextBusy] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  // Media edit sheet (Facebook-style): trim for video, filters for both.
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [editingVideo, setEditingVideo] = useState(true);
+  const [editingPhotoIndex, setEditingPhotoIndex] = useState(0);
+  const [videoFilter, setVideoFilter] = useState("none");
+  const [trimStart, setTrimStart] = useState(0);
+  const [trimEnd, setTrimEnd] = useState<number | null>(null);
   const auth = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const textRef = useRef<HTMLTextAreaElement>(null);
@@ -1703,6 +1751,38 @@ function UploadVideoModal({
     });
     setImageDimensions(null);
     setClipSeconds(null);
+    setVideoFilter("none");
+    setTrimStart(0);
+    setTrimEnd(null);
+    setEditSheetOpen(false);
+  };
+  /** Removes a single photo from the selection (revokes its preview URL). */
+  const removeSelectedImage = (index: number) => {
+    setSelectedImages(current => {
+      const target = current[index];
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return current.filter((_, i) => i !== index);
+    });
+  };
+  /** Opens the Facebook-style edit sheet for the video. */
+  const openVideoEditor = () => {
+    setTrimStart(0);
+    setTrimEnd(clipSeconds);
+    setEditingVideo(true);
+    setEditSheetOpen(true);
+  };
+  /** Opens the Facebook-style edit sheet for one photo. */
+  const openPhotoEditor = (index: number) => {
+    setEditingPhotoIndex(index);
+    setEditingVideo(false);
+    setEditSheetOpen(true);
+  };
+  /** Clamps preview playback inside the chosen trim range. */
+  const clampTrimPlayback = (event: ReactSyntheticEvent<HTMLVideoElement>) => {
+    const el = event.currentTarget;
+    const end = trimEnd ?? clipSeconds ?? el.duration;
+    if (trimStart > 0 && el.currentTime < trimStart) el.currentTime = trimStart;
+    else if (Number.isFinite(end) && end > 0 && el.currentTime > end) el.currentTime = trimStart;
   };
   const close = () => {
     setMode("menu");
@@ -1731,11 +1811,7 @@ function UploadVideoModal({
     // The duration limit differs per kind, so the chosen clip must be re-checked.
     clearMedia();
   };
-  const selectFile = async (event: ChangeEvent<HTMLInputElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const nextFiles = Array.from(event.target.files ?? []);
-    event.target.value = "";
+  const ingestFiles = async (nextFiles: File[]) => {
     if (!nextFiles.length) return;
     try {
       if (mediaMode === "photo") {
@@ -1763,6 +1839,19 @@ function UploadVideoModal({
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "This media cannot be uploaded.");
     }
+  };
+  const selectFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const nextFiles = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    await ingestFiles(nextFiles);
+  };
+  const handleDropFiles = async (event: ReactDragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragging(false);
+    await ingestFiles(Array.from(event.dataTransfer?.files ?? []));
   };
   const insertIntoText = (symbol: "#" | "@") => {
     const area = textRef.current;
@@ -1817,7 +1906,15 @@ function UploadVideoModal({
     setBusy(true);
     try {
       if (mediaMode === "photo" && selectedImages.length) {
-        await publishPhoto(selectedImages.map(image => image.file), "", captionText, selectedImages.map(image => image.dimensions), audience, recipientIds);
+        // Bake any chosen edit-sheet filters into the files via canvas.
+        const processed = await Promise.all(
+          selectedImages.map(async image =>
+            image.filter && image.filter !== "none"
+              ? { ...image, file: await applyFilterToImage(image.file, image.filter) }
+              : image
+          )
+        );
+        await publishPhoto(processed.map(image => image.file), "", captionText, processed.map(image => image.dimensions), audience, recipientIds);
       } else {
         if (!file) throw new Error("Please choose a video first.");
         await publishVideo(file, kind, "", captionText, undefined, audience, recipientIds);
@@ -1863,6 +1960,90 @@ function UploadVideoModal({
   const limitLabel = kind === "SHORT" ? "1 min" : "30 min";
   const mediaReady = (mediaMode === "photo" ? selectedImages.length > 0 : Boolean(file)) && caption.trim().length > 0;
   const checkedSteps = (mediaMode === "photo" ? selectedImages.length : file ? 1 : 0) ? 1 : 0;
+
+  // Facebook-style media edit sheet (trim for video, filters for both).
+  const trimDuration = clipSeconds ?? 0;
+  const effectiveTrimEnd = trimEnd ?? trimDuration;
+  const activeFilter = editingVideo
+    ? videoFilter
+    : (selectedImages[editingPhotoIndex]?.filter ?? "none");
+  const editSheet = !editSheetOpen ? null : (
+    <div className="cp-edit-sheet-backdrop" onClick={() => setEditSheetOpen(false)}>
+      <div
+        className="cp-edit-sheet"
+        role="dialog"
+        aria-label={editingVideo ? "Edit video" : "Edit photo"}
+        onClick={event => event.stopPropagation()}
+      >
+        <div className="cp-edit-sheet-head">
+          <strong>{editingVideo ? "Edit video" : "Edit photo"}</strong>
+          <button type="button" className="cp-edit-sheet-close" onClick={() => setEditSheetOpen(false)} aria-label="Close editor">
+            <X size={18} />
+          </button>
+        </div>
+        {editingVideo && trimDuration > 0 ? (
+          <div className="cp-trim">
+            <div className="cp-trim-row">
+              <span>Start</span>
+              <input
+                type="range" min={0} max={Math.round(trimDuration)} step={1}
+                value={Math.min(trimStart, Math.round(trimDuration))}
+                onChange={event => setTrimStart(Math.min(Number(event.target.value), effectiveTrimEnd))}
+                aria-label="Trim start"
+              />
+              <b>{formatClipDuration(trimStart)}</b>
+            </div>
+            <div className="cp-trim-row">
+              <span>End</span>
+              <input
+                type="range" min={0} max={Math.round(trimDuration)} step={1}
+                value={Math.round(effectiveTrimEnd)}
+                onChange={event => setTrimEnd(Math.max(Number(event.target.value), trimStart))}
+                aria-label="Trim end"
+              />
+              <b>{formatClipDuration(effectiveTrimEnd)}</b>
+            </div>
+            <div className="cp-trim-bar" aria-hidden="true">
+              <div
+                className="cp-trim-seg"
+                style={{
+                  left: `${(trimStart / trimDuration) * 100}%`,
+                  width: `${(Math.max(0, effectiveTrimEnd - trimStart) / trimDuration) * 100}%`,
+                }}
+              />
+            </div>
+          </div>
+        ) : null}
+        <div className="cp-filter-label">Filters</div>
+        <div className="cp-filters" role="radiogroup" aria-label="Filters">
+          {MEDIA_FILTERS.map(option => (
+            <button
+              key={option.id}
+              type="button"
+              role="radio"
+              aria-checked={activeFilter === option.css}
+              className={`cp-fchip${activeFilter === option.css ? " is-on" : ""}`}
+              onClick={() => {
+                if (editingVideo) {
+                  setVideoFilter(option.css);
+                } else {
+                  const target = editingPhotoIndex;
+                  setSelectedImages(current =>
+                    current.map((image, i) => (i === target ? { ...image, filter: option.css } : image))
+                  );
+                }
+              }}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <button type="button" className="cp-submit" onClick={() => setEditSheetOpen(false)}>
+          Done
+        </button>
+      </div>
+    </div>
+  );
 
   const cards: Array<{
     id: string;
@@ -1984,7 +2165,8 @@ function UploadVideoModal({
           <CommunityAnnouncements />
         </div>
       ) : (
-        <form className="cp-media" onSubmit={submit}>
+        <>
+          <form className="cp-media" onSubmit={submit}>
           <div className="cp-bar">
             <button type="button" className="cp-back" onClick={safeClick(() => setMode("menu"))} aria-label="Back to create menu">
               <ChevronLeft size={22} />
@@ -2005,19 +2187,51 @@ function UploadVideoModal({
             <div className="cp-picked">
               <div className={`cp-preview${mediaMode === "video" && kind === "SHORT" ? " is-vertical" : ""}`}>
                 {mediaMode === "photo" ? (
-                  <img src={selectedImages[0].previewUrl} alt={`Selected image 1 of ${selectedImages.length}`} />
+                  <img
+                    src={selectedImages[0].previewUrl}
+                    alt={`Selected image 1 of ${selectedImages.length}`}
+                    style={selectedImages[0].filter && selectedImages[0].filter !== "none" ? { filter: selectedImages[0].filter } : undefined}
+                  />
                 ) : (
-                  <video src={previewUrl ?? undefined} muted playsInline preload="metadata" />
+                  <video
+                    src={previewUrl ?? undefined}
+                    muted
+                    playsInline
+                    preload="metadata"
+                    style={videoFilter !== "none" ? { filter: videoFilter } : undefined}
+                    onTimeUpdate={clampTrimPlayback}
+                  />
                 )}
                 {mediaMode === "photo" && selectedImages.length > 1 ? <span className="cp-gallery-count">{selectedImages.length} photos · swipe after publishing</span> : null}
                 {clipSeconds != null ? <span className="cp-duration">{formatClipDuration(clipSeconds)}</span> : null}
+                {mediaMode === "video" && file ? <span className="cp-size-badge">{formatFileSize(file.size)}</span> : null}
+                <button type="button" className="cp-thumb-remove" onClick={safeClick(clearMedia)} disabled={busy} aria-label={mediaMode === "photo" ? "Remove all images" : "Remove video"}>
+                  <X size={14} />
+                </button>
+                <button
+                  type="button"
+                  className="cp-editbtn"
+                  onClick={safeClick(() => (mediaMode === "video" ? openVideoEditor() : openPhotoEditor(0)))}
+                  disabled={busy}
+                  aria-label={mediaMode === "photo" ? "Edit first photo" : "Edit video"}
+                >
+                  <PenLine size={14} /> Edit
+                </button>
               </div>
               {mediaMode === "photo" ? (
                 <div className="cp-image-strip" aria-label="Selected images">
                   {selectedImages.map((image, index) => (
-                    <button type="button" key={`${image.file.name}-${index}`} className={`cp-image-thumb${index === 0 ? " is-selected" : ""}`} onClick={safeClick(() => setSelectedImages(current => [image, ...current.filter(item => item !== image)]))} aria-label={`Move image ${index + 1} to first`}>
-                      <img src={image.previewUrl} alt="" />
-                    </button>
+                    <span className="cp-image-thumb-wrap" key={`${image.file.name}-${index}`}>
+                      <button type="button" className={`cp-image-thumb${index === 0 ? " is-selected" : ""}`} onClick={safeClick(() => setSelectedImages(current => [image, ...current.filter(item => item !== image)]))} aria-label={`Move image ${index + 1} to first`}>
+                        <img src={image.previewUrl} alt="" style={image.filter && image.filter !== "none" ? { filter: image.filter } : undefined} />
+                      </button>
+                      <button type="button" className="cp-thumb-remove cp-thumb-remove--sm" onClick={safeClick(() => removeSelectedImage(index))} disabled={busy} aria-label={`Remove image ${index + 1}`}>
+                        <X size={12} />
+                      </button>
+                      <button type="button" className="cp-editbtn cp-editbtn--sm" onClick={safeClick(() => openPhotoEditor(index))} disabled={busy} aria-label={`Edit image ${index + 1}`}>
+                        <PenLine size={12} />
+                      </button>
+                    </span>
                   ))}
                 </div>
               ) : null}
@@ -2034,10 +2248,23 @@ function UploadVideoModal({
               </div>
             </div>
           ) : (
-            <button type="button" className="cp-drop" onClick={safeClick(() => inputRef.current?.click())}>
-              {mediaMode === "photo" ? <ImagePlus size={26} /> : <Video size={26} />}
-              <strong>{mediaMode === "photo" ? "Choose JPG, PNG, or WEBP image" : "Choose original video"}</strong>
-              <span>{mediaMode === "photo" ? "Up to 5 MB" : `Up to ${limitLabel}`}</span>
+            <button
+              type="button"
+              className={`cp-drop${isDragging ? " is-dragging" : ""}`}
+              onClick={safeClick(() => inputRef.current?.click())}
+              onDragOver={event => { event.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={event => void handleDropFiles(event)}
+              aria-label={mediaMode === "photo" ? "Drop photos here or browse" : "Drop a video here or browse"}
+            >
+              <span className="cp-drop-icon" aria-hidden="true">
+                {mediaMode === "photo" ? <ImagePlus size={20} /> : <Video size={20} />}
+              </span>
+              <span className="cp-drop-text">
+                <strong>{mediaMode === "photo" ? (<>Drop photos here or <b>browse</b></>) : (<>Drop video here or <b>browse</b></>)}</strong>
+                <span>{mediaMode === "photo" ? "JPG, PNG, WEBP · up to 20" : `Video · up to ${limitLabel}`}</span>
+              </span>
+              <span className="cp-drop-arrow" aria-hidden="true">→</span>
             </button>
           )}
           <div className="cp-field">
@@ -2077,6 +2304,8 @@ function UploadVideoModal({
             </button>
           </div>
         </form>
+          {editSheet}
+        </>
       )}
     </ActionModal>
   );

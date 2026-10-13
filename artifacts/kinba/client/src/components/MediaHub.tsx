@@ -3177,6 +3177,7 @@ function PostManagementMenu({
             onChange={event => setCaption(event.target.value)}
             autoFocus
           />
+          <span className="post-management__count">{caption.length} / 2000</span>
           <div className="post-management__dialog-actions">
             <button
               type="button"
@@ -3337,6 +3338,7 @@ function VideoCard({
 }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [description, setDescription] = useState(video.description);
+  const [isEdited, setIsEdited] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const auth = useAuth();
   const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
@@ -3426,11 +3428,15 @@ function VideoCard({
             <span className="k-post__meta-line">
               {relativeTime(video.createdAt)}
               {!isText && ` · ${isImage ? "Photo" : "Video"}`}
+              {isEdited ? <em className="cp-edited-badge"> · Edited</em> : null}
             </span>
           </div>
           <PostManagementMenu
             video={video}
-            onUpdated={setDescription}
+            onUpdated={nextDescription => {
+              setDescription(nextDescription);
+              setIsEdited(true);
+            }}
             onDeleted={() => setDeleted(true)}
           />
         </div>

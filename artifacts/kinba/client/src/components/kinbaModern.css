@@ -1948,6 +1948,7 @@ body {
 .post-management__dialog p { margin: 0 4px 11px; color: var(--kinba-muted-modern); font-size: 12px; line-height: 1.4; }
 .post-management__dialog textarea { display: block; width: 100%; min-height: 90px; resize: vertical; padding: 9px; border: 1px solid var(--kinba-line-modern); border-radius: var(--radius-control); color: var(--text); background: color-mix(in srgb, var(--text) 6%, transparent); outline: none; }
 .post-management__dialog textarea:focus { border-color: var(--blue); }
+.post-management__count { display: block; text-align: right; font-size: 11px; color: var(--kinba-muted-modern); font-variant-numeric: tabular-nums; margin: 2px 4px 0; }
 .post-management__dialog-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
 .post-management__dialog-actions button { width: auto; padding: 8px 10px; color: var(--kinba-muted-modern); }
 .post-management__dialog-actions .is-primary { color: var(--accent-ink); background: var(--blue); }
