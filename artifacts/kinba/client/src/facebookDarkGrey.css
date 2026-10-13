@@ -49,8 +49,6 @@
   border-color: var(--border);
 }
 
-:root[data-theme="dark"] .home-feed-tabs,
-:root[data-theme="dark"] .hype-room-filters,
 :root[data-theme="dark"] .media-kind-switch {
   background: #1f2021;
   border-color: var(--border);
