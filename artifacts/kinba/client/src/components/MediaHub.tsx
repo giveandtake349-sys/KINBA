@@ -3255,6 +3255,7 @@ function PhotoCarousel({
     : [{ url: video.videoUrl, width: video.width, height: video.height }];
   const [index, setIndex] = useState(0);
   const touchStartRef = useRef<number | null>(null);
+  const pointerStartRef = useRef<number | null>(null);
   const current = images[Math.min(index, images.length - 1)];
   const move = (next: number) => {
     setIndex((next + images.length) % images.length);
@@ -3272,6 +3273,15 @@ function PhotoCarousel({
         touchStartRef.current = null;
         if (start == null || end == null || Math.abs(end - start) < 40) return;
         move(end < start ? index + 1 : index - 1);
+      }}
+      onPointerDown={event => {
+        if (event.pointerType === "touch") pointerStartRef.current = event.clientX;
+      }}
+      onPointerUp={event => {
+        const start = pointerStartRef.current;
+        pointerStartRef.current = null;
+        if (event.pointerType !== "touch" || start == null || Math.abs(event.clientX - start) < 40) return;
+        move(event.clientX < start ? index + 1 : index - 1);
       }}
     >
       <img

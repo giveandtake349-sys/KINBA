@@ -3502,7 +3502,7 @@
   }
 }
 
-.k-post__carousel { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.k-post__carousel { position: relative; width: 100%; height: 100%; overflow: hidden; touch-action: pan-y; }
 .k-post__carousel > img { width: 100%; height: 100%; object-fit: contain; background: #080808; cursor: zoom-in; }
 .k-post__carousel-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 50%; color: white; background: rgba(0,0,0,.58); z-index: 2; }
 .k-post__carousel-nav.is-prev { left: 10px; }
