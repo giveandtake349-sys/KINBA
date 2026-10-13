@@ -2231,6 +2231,20 @@
   font-weight: 700;
 }
 
+/* Final stretch before the auto-stop cap: blink the timer so the
+   approaching limit is impossible to miss. */
+.voice-record-btn.is-warning {
+  border-color: var(--error);
+}
+
+.voice-record-btn.is-warning .voice-recording-time {
+  animation: voice-recording-blink 1s ease-in-out infinite;
+}
+
+@keyframes voice-recording-blink {
+  50% { opacity: 0.4; }
+}
+
 .voice-wave {
   align-items: center;
   display: inline-flex;

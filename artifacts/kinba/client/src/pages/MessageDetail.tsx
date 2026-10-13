@@ -111,6 +111,8 @@ const EDIT_WINDOW_MS = 30 * 60 * 1000;
 // 10MB server limit (DM_MAX_AUDIO_BYTES) at typical Opus bitrates, and gives
 // the recorder a deterministic auto-stop instead of recording forever.
 const VOICE_MAX_DURATION_SECONDS = 5 * 60;
+// Warn shortly before the cap so the auto-stop isn't a surprise.
+const VOICE_RECORDING_WARN_SECONDS = 30;
 
 function mediaLabel(mediaType?: string | null): string {
   if (!mediaType) return "Attachment";
@@ -469,6 +471,9 @@ export default function MessageDetail() {
       recordingTimerRef.current = window.setInterval(() => {
         elapsed += 1;
         setRecordingSeconds(elapsed);
+        if (elapsed === VOICE_MAX_DURATION_SECONDS - VOICE_RECORDING_WARN_SECONDS) {
+          toast.info("30 seconds of voice recording left.");
+        }
         if (elapsed >= VOICE_MAX_DURATION_SECONDS) {
           stopVoiceRecording();
           toast.info(
@@ -874,6 +879,12 @@ export default function MessageDetail() {
     target.classList.add("message-bubble--flash");
     window.setTimeout(() => target.classList.remove("message-bubble--flash"), 1200);
   }, []);
+
+  // True during the final stretch of a voice recording, so the timer can
+  // visually warn before the auto-stop cap.
+  const isRecordingWarning =
+    isRecording &&
+    recordingSeconds >= VOICE_MAX_DURATION_SECONDS - VOICE_RECORDING_WARN_SECONDS;
 
   if (!isAuthenticated) {
     return (
@@ -1321,7 +1332,7 @@ export default function MessageDetail() {
           </div>
           <button
             type="button"
-            className={`voice-record-btn${isRecording ? " is-recording" : ""}`}
+            className={`voice-record-btn${isRecording ? " is-recording" : ""}${isRecordingWarning ? " is-warning" : ""}`}
             onClick={() => (isRecording ? stopVoiceRecording() : void startVoiceRecording())}
             disabled={sending || uploadingCount > 0}
             aria-label={isRecording ? "Stop voice recording" : "Record voice message"}
