@@ -218,7 +218,7 @@ export default function SecurityPane() {
           kind="unavailable"
           label="Blocked accounts"
           description="Review and unblock people you have blocked"
-          note="The blocks table exists, but no API reads it yet — so there is nothing honest to list."
+          note="You can block a conversation from its menu, but KINBA has no account-wide blocked-people list or unblock control yet."
         />
       </SettingsGroup>
 

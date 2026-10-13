@@ -4094,6 +4094,7 @@ function HomeFeedPanel({
   onOpenShortVideo,
   onOpenPhoto,
   onOpenVideo,
+  onBrowseForYou,
 }: {
   tab: Exclude<HomeTab, "spotlight">;
   active?: boolean;
@@ -4103,6 +4104,7 @@ function HomeFeedPanel({
   onOpenShortVideo?: (video: VideoRecord) => void;
   onOpenPhoto?: (video: VideoRecord) => void;
   onOpenVideo?: (video: VideoRecord) => void;
+  onBrowseForYou?: () => void;
 }) {
   const auth = useAuth();
   const utils = trpc.useUtils();
@@ -4295,6 +4297,15 @@ function HomeFeedPanel({
       ) : null}
       {query.isError ? (
         <FeedRecovery onRetry={() => void query.refetch()} />
+      ) : tab === "following" && !auth.isAuthenticated ? (
+        <div className="media-empty feed-empty-state" role="status">
+          <Play size={18} />
+          <h3>Sign in to see Following.</h3>
+          <p>Follow creators to see their new posts here.</p>
+          <button type="button" className="primary-btn" onClick={auth.openAuth}>
+            Sign in or create an account
+          </button>
+        </div>
       ) : query.isPending ? (
         <FeedSkeleton />
       ) : videos.length ? (
@@ -4341,16 +4352,24 @@ function HomeFeedPanel({
         <div className="media-empty feed-empty-state">
           <Play size={18} />
           <h3>
-            {tab === "following" && !auth.isAuthenticated
-              ? "Sign in to see Following."
-              : tab === "following"
-                ? "No following posts yet."
-                : tab === "trendy"
-                  ? "No trending posts yet."
-                  : tab === "icons"
-                    ? "No trusted-voice posts yet."
-                    : "No posts to show yet."}
+            {tab === "following"
+              ? "No posts from people you follow yet."
+              : tab === "trendy"
+                ? "No trending posts yet."
+                : tab === "icons"
+                  ? "No trusted-voice posts yet."
+                  : "No posts to show yet."}
           </h3>
+          {tab === "following" ? (
+            <>
+              <p>Follow creators from their profiles, or explore public posts in For You.</p>
+              {onBrowseForYou ? (
+                <button type="button" className="primary-btn" onClick={onBrowseForYou}>
+                  Explore For You
+                </button>
+              ) : null}
+            </>
+          ) : null}
         </div>
       )}
     </section>
@@ -5936,6 +5955,7 @@ export default function MediaHub({
           {(
             [
               ["videos", "For You"],
+              ["following", "Following"],
               ["spotlight", "Spotlight"],
               ["shorts", "Shorts"],
             ] as const
@@ -5978,6 +5998,28 @@ export default function MediaHub({
               onOpenPhoto={setPhotoViewer}
               onOpenVideo={(v) => {
                 if (onOpenShort) onOpenShort(v);
+                select("shorts");
+              }}
+            />
+          </ErrorBoundary>
+        </div>
+      )}
+      {activeSection === "following" && (
+        <div className="media-tab-panel">
+          <ErrorBoundary fallback={<FeedRecovery />}>
+            <HomeFeedPanel
+              tab="following"
+              active
+              showDetailsOverlay={false}
+              showHeader={false}
+              onBrowseForYou={() => select("videos")}
+              onOpenPhoto={setPhotoViewer}
+              onOpenVideo={video => {
+                if (onOpenShort) onOpenShort(video);
+                select("shorts");
+              }}
+              onOpenShortVideo={video => {
+                if (onOpenShort) onOpenShort(video);
                 select("shorts");
               }}
             />

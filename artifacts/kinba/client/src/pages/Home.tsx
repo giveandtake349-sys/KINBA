@@ -844,6 +844,7 @@ function FeedTabs({
 }) {
   const tabs = [
     ["videos", "For You"],
+    ["following", "Following"],
     ["spotlight", "Spotlight"],
     ["shorts", "Shorts"],
   ] as const;
@@ -957,13 +958,30 @@ function Landing({ onLogin }: { onLogin: () => void }) {
           Ideas with a <em>signal.</em>
         </h1>
         <p>
-          Publish, explore, and follow the people and organizations shaping what
-          comes next.
+          Discover videos, follow creators, and join conversations with the
+          people and organizations shaping what comes next.
         </p>
         <button type="button" className="primary-btn" onClick={safeClick(onLogin)}>
-          Sign in to JHILIK
+          Sign in or create an account
         </button>
       </div>
+      <section className="landing-guide" aria-label="How to get started">
+        <article>
+          <span>01</span>
+          <h2>Explore</h2>
+          <p>Start with For You, Spotlight, or Shorts. Search for people and topics that interest you.</p>
+        </article>
+        <article>
+          <span>02</span>
+          <h2>Connect</h2>
+          <p>Follow creators to build a Following feed, or join a Hype Room to take part in a community.</p>
+        </article>
+        <article>
+          <span>03</span>
+          <h2>Share safely</h2>
+          <p>Post when you are ready. Report a profile, Hype Room, room message, or Drop if something needs review.</p>
+        </article>
+      </section>
       <div className="landing-proof">
         <span>Videos</span>
         <span>Shorts</span>

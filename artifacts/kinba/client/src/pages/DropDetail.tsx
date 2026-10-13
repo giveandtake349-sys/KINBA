@@ -357,7 +357,7 @@ export default function DropDetail({
                   >
                     {claiming || claimMut.isPending
                       ? "Reserving…"
-                      : "Claim drop"}
+                      : "Reserve this drop"}
                   </button>
                 ) : null}
                 {!auth.isAuthenticated && drop.status === "live" && !soldOut ? (
@@ -367,7 +367,7 @@ export default function DropDetail({
                     onClick={() => auth.openAuth()}
                   >
                     <Lock size={14} aria-hidden="true" />
-                    Sign in to claim
+                    Sign in to reserve
                   </button>
                 ) : null}
                 {drop.status === "sold_out" || drop.remainingQuantity <= 0 ? (
@@ -399,7 +399,7 @@ export default function DropDetail({
               <div className="drop-panel-body">
                 <p className="drop-terms">{drop.terms}</p>
                 <p className="drop-disclaimer">
-                  Social reservation only — no payment or checkout is involved.
+                  Reserving records a reservation only. KINBA does not charge you or complete a purchase; read the seller’s terms for availability and fulfillment details.
                   {serverNow
                     ? ` Server time: ${formatDropTime(serverNow)}.`
                     : ""}

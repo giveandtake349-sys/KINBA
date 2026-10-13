@@ -413,7 +413,7 @@ export default function Drops() {
             </p>
             <h1>Drops</h1>
             <p className="drops-lede">
-              Time-limited product drops with social reservations — no checkout.
+              Time-limited offers. Reserving records your place; it does not charge you or complete a purchase. Read the seller’s terms before reserving.
             </p>
           </div>
         </header>
@@ -466,6 +466,10 @@ export default function Drops() {
             );
           })}
         </div>
+
+        <p className="drop-reservation-note" role="note">
+          KINBA does not process Drop payments or checkout. Offer terms explain availability and what to do after reserving.
+        </p>
 
         {heroDrop != null && heroCountdown != null ? (
           <button

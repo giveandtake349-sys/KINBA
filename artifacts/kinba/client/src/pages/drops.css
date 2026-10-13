@@ -453,6 +453,17 @@
   opacity: 0.85;
 }
 
+.drop-reservation-note {
+  background: color-mix(in srgb, var(--blue-soft) 58%, var(--surface));
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-component);
+  color: var(--text);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin: 0;
+  padding: 12px 14px;
+}
+
 @keyframes drop-pulse {
   0% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--teal) 55%, transparent);

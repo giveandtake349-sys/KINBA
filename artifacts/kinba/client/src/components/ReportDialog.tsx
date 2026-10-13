@@ -110,7 +110,7 @@ export function ReportDialog({
         </div>
         <form className="modal-form report-dialog-form" onSubmit={handleSubmit}>
           <p className="report-dialog-hint">
-            Tell us what looks wrong. Reports are reviewed by moderators.
+            Tell us what looks wrong so the moderation team can review it. Include only details relevant to this report; never include passwords or payment information.
           </p>
           <label htmlFor="report-reason">
             Reason <span className="report-dialog-req">(required)</span>

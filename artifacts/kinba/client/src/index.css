@@ -2152,7 +2152,10 @@ h3 {
   background:
     radial-gradient(circle at 76% 22%, var(--gold-soft), transparent 23rem),
     radial-gradient(circle at 18% 72%, var(--teal-soft), transparent 22rem);
+  gap: 30px;
   min-height: 100dvh;
+  overflow: visible;
+  padding-bottom: 42px;
 }
 .landing-copy {
   max-width: 710px;
@@ -2170,11 +2173,46 @@ h3 {
   font-size: 15px;
   max-width: 420px;
 }
+.landing-guide {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 960px;
+  position: relative;
+  width: min(100%, 960px);
+  z-index: 1;
+}
+.landing-guide article {
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-component);
+  padding: 18px;
+}
+.landing-guide article > span {
+  color: var(--gold);
+  font-family: "DM Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.landing-guide h2 {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  margin: 8px 0 6px;
+}
+.landing-guide p {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin: 0;
+}
 .landing-proof {
   border-top: 1px solid var(--border);
-  bottom: 28px;
   gap: 28px;
+  margin-top: 4px;
   padding-top: 14px;
+  position: relative;
 }
 .landing-orb {
   border-color: var(--gold-border);
@@ -2184,6 +2222,24 @@ h3 {
 .landing-orb--two {
   border-color: color-mix(in srgb, var(--teal) 65%, transparent);
   transform: rotate(-12deg);
+}
+@media (max-width: 700px) {
+  .landing-shell {
+    gap: 24px;
+    padding: 64px 18px 34px;
+  }
+  .landing-guide {
+    grid-template-columns: 1fr;
+    max-width: 460px;
+  }
+  .landing-guide article {
+    padding: 15px 16px;
+  }
+  .landing-proof {
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 360px;
+  }
 }
 .drawer-profile-card,
 .settings-list,

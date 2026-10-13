@@ -1,100 +1,96 @@
-# KINBA — Connect What Matters
+# KINBA — repository guide
 
-KINBA is a mobile-first human matching platform organized around a simple product loop: **I NEED ↔ I CAN**. Members publish real needs or capabilities, browse the live network, create private connection requests, and message only after both people accept a connection.
+This repository contains a mobile-first social video and community application in `artifacts/kinba`. The current app UI uses the **JHILIK** product label in several places; the package and repository are named KINBA. This guide describes the code that is actually present rather than the older “I NEED ↔ I CAN” product draft.
 
-## MVP capabilities
+## Product capabilities in the current code
 
-| Capability        | Implementation                                                                                                                                              |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Authentication    | Supabase Auth Email/Password sign-up, sign-in, sign-out, and persistent browser sessions. Private routes open the KINBA auth dialog for anonymous visitors. |
-| Member profiles   | Persistent editable profile data, including country, languages, about, skills, interests, and profile image URL.                                            |
-| Signals           | Authenticated members can publish NEED and CAN signals with category, language, and optional location.                                                      |
-| Discovery         | Public, database-backed browsing with signal type and category filters.                                                                                     |
-| Connections       | Private requests, acceptance, decline, cancellation, and an explicit accepted state.                                                                        |
-| Private messaging | Persistent messages available only to participants in an accepted, unblocked connection.                                                                    |
-| Trust and safety  | Report and block actions, plus server-side block enforcement on discovery, connections, and messaging.                                                      |
+| Area                      | Current implementation                                                                                                                                                                                                                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Authentication            | Supabase Auth sign-in/sign-up and persistent browser sessions.                                                                                                                                                                                                                                               |
+| Profiles and social graph | Public member profiles, profile editing, follows, follower/following lists, and profile media.                                                                                                                                                                                                               |
+| Feed and discovery        | For You, Following, Spotlight, Shorts, hashtag pages, and search across people and posts.                                                                                                                                                                                                                    |
+| Publishing                | Text, photo, and video posts; captions, hashtags, mentions, comments, reactions, and saved media.                                                                                                                                                                                                            |
+| Hype Rooms                | Community rooms with messages, threads, mentions, reactions, membership and room moderation/report actions.                                                                                                                                                                                                  |
+| Drops                     | Time-limited offers with a social reservation/claim flow. **KINBA does not process Drop payments or checkout.**                                                                                                                                                                                              |
+| Direct messages           | Conversations, message requests, media/document attachments, and message actions. Conversation blocking is available; there is no account-wide blocked-people list or unblock control.                                                                                                                       |
+| Trust and safety          | Users can report supported profiles, rooms, room messages, and Drops. Admin moderation endpoints and account-security controls are present. Private-account/follow-approval settings and several other privacy controls are not implemented; the UI marks them unavailable rather than pretending they work. |
 
-## Stack
+Some server capabilities are feature-flagged. Availability in a deployment therefore depends on its server-side flags and configuration.
 
-The project uses **React 19**, **TypeScript**, **Vite**, **Tailwind CSS**, **Express**, **tRPC**, **Drizzle ORM**, and **PostgreSQL on Supabase**. The client uses URL-based screens for `/`, `/discover`, `/connections`, `/profile`, `/members/:id`, and `/chat/:id`.
+## Stack and source map
 
-## Kinba logo
+- **Client:** React 19, TypeScript, Vite, Tailwind CSS, Wouter, TanStack Query, and tRPC.
+- **Server:** Express, tRPC, PostgreSQL, Drizzle ORM, and Supabase Auth.
+- **Media:** S3-compatible R2 storage and server-side video/HLS processing.
+- **Mobile wrapper:** Capacitor Android configuration is included.
+- Main client and server: `artifacts/kinba/client/src` and `artifacts/kinba/server`.
+- Database schema/migrations: `artifacts/kinba/drizzle`.
+- Shared product types: `artifacts/kinba/shared`.
+- Workspace helpers: `lib/`.
 
-The application uses the official Kinba logo at `client/public/logo.png` and exposes it at `/logo.png` for the header, landing page, authentication screen, favicon, and social metadata.
+Primary routes include `/`, `/login`, `/profile`, `/profile/:id`, `/@:username`, `/tag/:tag`, `/drops`, `/drops/:id`, `/rooms`, `/rooms/:id`, `/messages`, `/messages/:id`, and `/settings/:section`.
 
 ## Local setup
 
-Install Node.js 22+ and pnpm 10+, then install dependencies:
+Use Node.js 22+ and the repository-pinned pnpm version (the lockfile records pnpm 10.34.5):
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 ```
 
-Configure the environment values below through your deployment platform or local secret manager. Never commit a `.env` file or copy production credentials into the repository.
-
-Apply the approved schema to a development Supabase PostgreSQL database:
+Set development environment variables through a local secret manager or an untracked `.env` file. Never commit production credentials. Apply schema changes only to an authorized development database:
 
 ```bash
-pnpm db:push
+pnpm --filter @workspace/kinba db:push
 ```
 
-Start the development server:
+Start the KINBA app service from the workspace root:
 
 ```bash
-pnpm dev
+pnpm --filter @workspace/kinba dev
 ```
 
-## Required environment variables
+## Environment variables
 
-The managed Manus environment injects these values automatically. External deployments must configure them securely; do not commit their values.
+The managed Manus environment injects its configured values. External deployments must set their own secrets securely. Never put a Supabase service-role key or R2 write credentials in browser code.
 
-| Variable                 | Purpose                                                                                                                                  |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `SUPABASE_DATABASE_URL`  | Preferred server-side Supabase PostgreSQL Session Pooler connection used by Drizzle.                                                     |
-| `DATABASE_URL`           | Supported PostgreSQL fallback for hosts such as Render; must begin with `postgres://` or `postgresql://`.                                |
-| `CORS_ORIGIN`            | Optional comma-separated HTTPS origins for a separately hosted frontend. Omit when the KINBA client and API share one Render service.    |
-| `VITE_API_BASE_URL`      | Optional absolute HTTPS URL of the backend used by the browser build, such as `https://kinba-api.onrender.com`. Leave empty when frontend and API share one origin. |
-| `CROSS_SITE_SESSION`     | Legacy cookie option; Supabase Auth normally persists sessions in the browser and does not require this value.                           |
-| `SUPABASE_URL`           | Supabase project URL used by browser Auth and server access-token verification.                                                          |
-| `SUPABASE_ANON_KEY`      | Supabase publishable/anon key used by browser Auth and server token verification. Never use a service-role key in the browser.           |
-| `R2_ENDPOINT`            | Cloudflare R2 S3-compatible endpoint, for example `https://<account-id>.r2.cloudflarestorage.com`.                                       |
-| `R2_ACCESS_KEY_ID`       | Server-only R2 access key used by the Render Node process.                                                                               |
-| `R2_SECRET_ACCESS_KEY`   | Server-only R2 secret key used by the Render Node process.                                                                               |
-| `R2_BUCKET_NAME`         | R2 bucket for source videos and generated HLS assets, such as `kinba-media`.                                                             |
-| `R2_PUBLIC_BASE_URL`     | Public HTTPS base URL for the R2 bucket or its custom domain. HLS master playlists, variant playlists, and segments use this stable URL. For the current `kinba-media` bucket, use `https://pub-70b81b5880fc4021aec379e9320a0260.r2.dev`; do not use an account-ID hostname such as `pub-740da42d666d48c886a704aba4fde78c.r2.dev`. |
-| `OWNER_OPEN_ID`          | Project owner identifier used for the owner admin role.                                                                                  |
-| `OWNER_NAME`             | Project owner display name.                                                                                                              |
-| `BUILT_IN_FORGE_API_URL` | Optional legacy integration endpoint for unrelated built-in features. Video and HLS storage do not use this variable.                    |
-| `BUILT_IN_FORGE_API_KEY` | Optional legacy credential for unrelated built-in features. Video and HLS storage do not use this variable.                              |
+| Variable                                            | Purpose                                                                                                           |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `SUPABASE_DATABASE_URL`                             | Preferred server-side PostgreSQL connection (Supabase Session Pooler).                                            |
+| `DATABASE_URL`                                      | PostgreSQL fallback for hosts such as Render.                                                                     |
+| `SUPABASE_URL`                                      | Supabase project URL used by server-side auth verification.                                                       |
+| `SUPABASE_ANON_KEY`                                 | Public/anon key used by the server auth integration; never substitute a service-role key in client configuration. |
+| `VITE_SUPABASE_URL`                                 | Supabase URL exposed to the browser Auth client.                                                                  |
+| `VITE_SUPABASE_ANON_KEY`                            | Supabase publishable/anon key exposed to browser Auth.                                                            |
+| `SUPABASE_SERVICE_ROLE_KEY`                         | Server-only privileged Supabase credential, when required by configured server features.                          |
+| `CORS_ORIGIN`                                       | Comma-separated allowed frontend origins when the frontend is hosted separately.                                  |
+| `VITE_API_BASE_URL`                                 | Optional absolute HTTPS API base URL for separately hosted client builds.                                         |
+| `R2_ENDPOINT`                                       | Server-side S3-compatible R2 endpoint.                                                                            |
+| `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`         | Server-only R2 write credentials.                                                                                 |
+| `R2_BUCKET_NAME`                                    | R2 bucket for uploaded media and generated HLS assets.                                                            |
+| `R2_PUBLIC_BASE_URL`                                | HTTPS public base URL for browser playback of stored media.                                                       |
+| `VITE_R2_PUBLIC_BASE_URL`                           | Optional browser build override for the public R2 media base URL.                                                |
+| `OWNER_OPEN_ID` / `OWNER_NAME`                      | Owner/admin identity configuration.                                                                               |
+| `JWT_SECRET`                                        | Server authentication/runtime secret where required by the deployment.                                            |
+| `CROSS_SITE_SESSION`                                | Legacy cookie option; Supabase browser sessions normally do not require it.                                       |
+| `BUILT_IN_FORGE_API_URL` / `BUILT_IN_FORGE_API_KEY` | Optional legacy integration settings for unrelated built-in features.                                             |
 
-## Development commands
+The Render Blueprint is `render.yaml` and uses the full-stack server entry point `artifacts/kinba/server/_core/index.ts` through the package build scripts. The Vercel configuration at the repository root is a separate routing configuration; verify the target deployment and domain before treating it as the canonical public app URL.
 
-| Command        | Description                                                                                     |
-| -------------- | ----------------------------------------------------------------------------------------------- |
-| `pnpm dev`     | Start the full-stack development server.                                                        |
-| `pnpm check`   | Run TypeScript validation.                                                                      |
-| `pnpm test`    | Run the Vitest suite.                                                                           |
-| `pnpm build`   | Generate the production client and server bundles.                                              |
-| `pnpm db:push` | Compare the Drizzle PostgreSQL schema with Supabase and apply approved non-destructive changes. |
+## Development and verification commands
 
-## Validation
+| Command                                  | Description                                                           |
+| ---------------------------------------- | --------------------------------------------------------------------- |
+| `pnpm run typecheck`                     | Typecheck workspace libraries and packages with a `typecheck` script; run the KINBA `check` command separately. |
+| `pnpm --filter @workspace/kinba check`   | Typecheck the KINBA app package.                                      |
+| `pnpm --filter @workspace/kinba test`    | Run the KINBA Vitest suite.                                           |
+| `pnpm build`                             | Typecheck and build the workspace packages.                           |
+| `pnpm --filter @workspace/kinba db:push` | Push Drizzle schema to the configured database; development use only. |
 
-Before a release, run:
+Before release, run the applicable typecheck, tests, and production build. Test real account workflows only in an authorized development or staging environment; do not seed or submit fabricated production member data.
 
-```bash
-pnpm check
-pnpm test
-pnpm build
-```
+## Deployment and data safety
 
-The project does not seed fake members, reviews, or signals. Test real account workflows only in an authorized development or staging environment. Verify profile saving, signal creation, discovery filters, connection acceptance, message sending, blocking, and reporting with two authenticated test accounts.
+`render.yaml` is the repository’s Render Blueprint and defines `/api/health` as its health check. Keep database, Supabase service-role, and R2 write credentials in the hosting provider’s secret store. The browser uses Supabase Auth sessions and sends access tokens to the API; the server validates them before user-scoped operations. Configure the R2 bucket for browser `GET`/`HEAD` playback while keeping writes private.
 
-## Deployment
-
-For the managed Manus environment, configure production secrets through the project settings, create a checkpoint, and use the **Publish** control. The platform builds with `pnpm build` and starts the resulting server with `pnpm start`.
-
-For another host, provision a PostgreSQL database compatible with Supabase. On Render, use the repository `render.yaml` Blueprint or set the service commands explicitly to `corepack enable && pnpm install --frozen-lockfile && pnpm build` for the build command and `pnpm start` for the start command. These commands compile `server/_core/index.ts`, which registers the upload routes and resumes unfinished HLS jobs; do not build or start the legacy static-only `server/index.ts`. Configure either `SUPABASE_DATABASE_URL` (preferred) or a PostgreSQL `DATABASE_URL` using the Supabase **Session Pooler** URL, together with `SUPABASE_URL`, `SUPABASE_ANON_KEY`, the five R2 variables above, and the existing owner/database variables. The R2 credentials are server-only: the Node process uses them to upload source videos and generated HLS assets, while Supabase remains the source of truth for users, transactions, videos, and stream metadata. Configure the R2 bucket for public read access through an R2 custom domain or public bucket URL, while keeping write credentials private; `R2_PUBLIC_BASE_URL` must be an HTTPS URL reachable by browsers. For `kinba-media`, the verified public domain is `https://pub-70b81b5880fc4021aec379e9320a0260.r2.dev`; the account-ID-derived hostname returns 401. The bucket also needs browser CORS allowing `GET` and `HEAD` for media playback. The browser uses Supabase Auth’s persisted session storage and sends the current access token as `Authorization: Bearer <token>` to `/api/trpc`; the server verifies that token with Supabase Auth before resolving the PostgreSQL user row. If your frontend is deployed separately, set `VITE_API_BASE_URL` in the frontend build environment to the backend’s absolute HTTPS URL and set backend `CORS_ORIGIN` to the frontend’s exact HTTPS origin; otherwise leave both unset and serve the KINBA client and `/api/trpc` from the same Render service. Enable Email/Password under Supabase Authentication → Sign-in methods, apply migrations through `0012_supabase_video_storage.sql`, and deploy the Node application. Do not use placeholder secrets in any public or production environment.
-
-## Repository hygiene
-
-`.gitignore` excludes dependencies, build outputs, environment files, logs, coverage, and runtime artifacts. `.env.example` documents names only; it contains no tokens or passwords.
+Do not run schema push against production without an explicit migration review and backup. Use the production Publish/deploy workflow for the selected host and check health, sign-in, feed, media playback, reporting, and Drop reservation behavior after deployment.
