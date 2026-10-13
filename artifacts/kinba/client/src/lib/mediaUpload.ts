@@ -126,7 +126,10 @@ async function fetchUploadWithRetry(
         return response;
     } catch (error) {
       lastError = error;
-      if (attempt === attempts - 1) throw lastError;
+      if (attempt === attempts - 1) {
+        console.warn("[MediaPublish] upload request unavailable", error);
+        throw new Error("The media service is temporarily unavailable. Please try again.");
+      }
     }
     await new Promise(resolve =>
       window.setTimeout(resolve, 500 * (attempt + 1))
@@ -174,10 +177,11 @@ function uploadFailureMessage(
       " upload endpoint was not found. Check that the Render domain is attached to the JHILIK API service, not a static-only deployment."
     );
   }
-  return (
-    payload.error ||
-    resource + " publish failed with HTTP " + response.status + "."
-  );
+  const serverMessage = payload.error?.trim();
+  const looksInternal = serverMessage && /failed query|insert into|user_badges|sqlstate|relation .* does not exist|syntax error/i.test(serverMessage);
+  return looksInternal
+    ? `${resource} could not be published right now. Please try again.`
+    : serverMessage || resource + " publish failed with HTTP " + response.status + ".";
 }
 
 async function getUploadSession(message: string) {
@@ -289,7 +293,7 @@ export async function publishPhoto(
     });
   } catch (error) {
     console.error("[MediaPublish] photo publication network failure", error);
-    throw new Error(`Photo publication failed: ${error instanceof Error ? error.message : "network error"}`);
+    throw new Error("Photo publication is temporarily unavailable. Please try again.");
   }
   const payload = await readUploadPayload(response);
   if (!response.ok || !payload.postId || !payload.imageUrl || !/^https?:\/\//i.test(payload.imageUrl)) {

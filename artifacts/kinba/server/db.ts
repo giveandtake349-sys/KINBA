@@ -1789,21 +1789,31 @@ async function localActivityDate(userId: number): Promise<string> {
 export async function recordDailyActivity(userId: number) {
   const db = await getDb();
   if (!db) return { currentStreak: 0, longestStreak: 0 };
-  const activityDate = await localActivityDate(userId);
-  const [streak] = await db.select().from(userStreaks).where(eq(userStreaks.userId, userId)).limit(1);
-  const previousDate = streak?.lastActivityDate;
-  const currentStreak = previousDate === activityDate ? (streak?.currentStreak ?? 1) : previousDate === new Date(Date.parse(`${activityDate}T00:00:00Z`) - 86400000).toISOString().slice(0, 10) ? (streak?.currentStreak ?? 0) + 1 : 1;
-  const longestStreak = Math.max(streak?.longestStreak ?? 0, currentStreak);
-  await db.insert(dailyActivities).values({ userId, activityDate }).onConflictDoNothing();
-  await db.insert(userStreaks).values({ userId, currentStreak, longestStreak, lastActivityDate: activityDate }).onConflictDoUpdate({ target: userStreaks.userId, set: { currentStreak, longestStreak, lastActivityDate: activityDate, updatedAt: new Date() } });
-  const [postCount] = await db.select({ count: sql<number>`count(*)` }).from(videos).where(eq(videos.userId, userId));
-  const [pookieCount] = await db.select({ count: sql<number>`count(*)` }).from(videoReactions).innerJoin(videos, eq(videoReactions.videoId, videos.id)).where(eq(videos.userId, userId));
-  const qualifying = [Number(postCount?.count ?? 0) >= 1 ? "first_post" : null, Number(pookieCount?.count ?? 0) >= 10 ? "ten_pookies" : null, currentStreak >= 7 ? "seven_day_streak" : null].filter((key): key is string => Boolean(key));
-  if (qualifying.length) {
-    const badgeRows = await db.select({ id: badges.id }).from(badges).where(inArray(badges.key, qualifying));
-    await db.insert(userBadges).values(badgeRows.map(badge => ({ userId, badgeId: badge.id }))).onConflictDoNothing();
+  try {
+    const activityDate = await localActivityDate(userId);
+    const [streak] = await db.select().from(userStreaks).where(eq(userStreaks.userId, userId)).limit(1);
+    const previousDate = streak?.lastActivityDate;
+    const currentStreak = previousDate === activityDate ? (streak?.currentStreak ?? 1) : previousDate === new Date(Date.parse(`${activityDate}T00:00:00Z`) - 86400000).toISOString().slice(0, 10) ? (streak?.currentStreak ?? 0) + 1 : 1;
+    const longestStreak = Math.max(streak?.longestStreak ?? 0, currentStreak);
+    await db.insert(dailyActivities).values({ userId, activityDate }).onConflictDoNothing();
+    await db.insert(userStreaks).values({ userId, currentStreak, longestStreak, lastActivityDate: activityDate }).onConflictDoUpdate({ target: userStreaks.userId, set: { currentStreak, longestStreak, lastActivityDate: activityDate, updatedAt: new Date() } });
+    const [postCount] = await db.select({ count: sql<number>`count(*)` }).from(videos).where(eq(videos.userId, userId));
+    const [pookieCount] = await db.select({ count: sql<number>`count(*)` }).from(videoReactions).innerJoin(videos, eq(videoReactions.videoId, videos.id)).where(eq(videos.userId, userId));
+    const qualifying = [Number(postCount?.count ?? 0) >= 1 ? "first_post" : null, Number(pookieCount?.count ?? 0) >= 10 ? "ten_pookies" : null, currentStreak >= 7 ? "seven_day_streak" : null].filter((key): key is string => Boolean(key));
+    if (qualifying.length) {
+      const badgeRows = await db.select({ id: badges.id }).from(badges).where(inArray(badges.key, qualifying));
+      if (badgeRows.length) {
+        await db.insert(userBadges).values(badgeRows.map(badge => ({ userId, badgeId: badge.id }))).onConflictDoNothing();
+      }
+    }
+    return { currentStreak, longestStreak };
+  } catch (error) {
+    // Activity, streaks, and badges are post-publish enrichment. A missing
+    // optional table or a transient DB/network failure must never make a
+    // successfully-created media post look like it failed.
+    console.warn("[Activity] Optional activity/badge update skipped:", error);
+    return { currentStreak: 0, longestStreak: 0 };
   }
-  return { currentStreak, longestStreak };
 }
 
 export async function listTrendingHashtags(limit = 10, viewerId?: number) {

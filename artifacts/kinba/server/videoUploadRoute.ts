@@ -49,7 +49,13 @@ const upload = multer({
 });
 
 function errorMessage(error: unknown) {
-  if (error instanceof Error && error.message.trim()) return error.message;
+  const message = error instanceof Error ? error.message.trim() : "";
+  if (
+    message &&
+    !/failed query|insert into|user_badges|sqlstate|relation .* does not exist|syntax error/i.test(message)
+  ) {
+    return message;
+  }
   return "The media could not be published. Please try again.";
 }
 
