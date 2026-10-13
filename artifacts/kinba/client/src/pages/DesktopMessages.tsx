@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Switch, Route, useLocation, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { Loader2, ChevronLeft, Search, ArrowLeft, AlertCircle } from "lucide-react";
+import { Loader2, ChevronLeft, Search, ArrowLeft, AlertCircle, Settings, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { dmConversationPreview } from "@shared/dmMedia";
 import MessageDetail from "./MessageDetail";
@@ -15,6 +15,13 @@ export function DesktopMessages() {
     () => typeof window !== "undefined" && window.innerWidth >= 768
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
+  const [messagePreferences, setMessagePreferences] = useState({
+    notifications: true,
+    readReceipts: true,
+    onlineStatus: true,
+    typingIndicator: true,
+  });
   const utils = trpc.useUtils();
 
   useEffect(() => {
@@ -62,7 +69,10 @@ export function DesktopMessages() {
                 <ArrowLeft size={24} />
               </button>
             )}
-            <h1>Messages</h1>
+            <div className="messages-title-block">
+              <span className="messages-eyebrow">KINBA / INBOX</span>
+              <h1>Messages</h1>
+            </div>
           </header>
           {authLoading ? (
             <div className="messages-list" aria-busy="true" aria-label="Loading messages">
@@ -131,33 +141,87 @@ export function DesktopMessages() {
               <ArrowLeft size={24} />
             </button>
           )}
-          <h1>Messages</h1>
+          <div className="messages-title-block">
+            <span className="messages-eyebrow">KINBA / INBOX</span>
+            <h1>Messages</h1>
+          </div>
           <button
             type="button"
             className="header-action"
-            onClick={() => navigate(showRequests ? "/messages" : "/messages/requests")}
-            aria-label={showRequests ? "Back to conversations" : "Message requests"}
+            onClick={() => {
+              if (showRequests) {
+                navigate("/messages");
+              } else {
+                setShowSettings((visible) => !visible);
+              }
+            }}
+            aria-label={showRequests ? "Back to conversations" : "Message settings"}
           >
-            {showRequests ? (
-              <ChevronLeft size={24} />
-            ) : requestsUnread > 0 ? (
-              <>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <line x1="19" y1="8" x2="19" y2="14" />
-                </svg>
-                <span className="request-badge">{requestsUnread}</span>
-              </>
-            ) : (
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-                <line x1="19" y1="8" x2="19" y2="14" />
-              </svg>
-            )}
+            {showRequests ? <ChevronLeft size={24} /> : showSettings ? <X size={22} /> : <Settings size={22} />}
           </button>
         </header>
+
+        {showSettings && !showRequests && (
+          <section className="message-settings" aria-label="Message settings">
+            <div className="message-settings-heading">
+              <div>
+                <span className="messages-eyebrow">PREFERENCES</span>
+                <h2>Message settings</h2>
+              </div>
+              <button
+                type="button"
+                className="message-settings-close"
+                onClick={() => setShowSettings(false)}
+                aria-label="Close message settings"
+              >
+                <X size={17} />
+              </button>
+            </div>
+            <div className="message-settings-list">
+              {([
+                ["notifications", "Message notifications", "Alerts for new direct messages"],
+                ["readReceipts", "Read receipts", "Let people know when you have seen a message"],
+                ["onlineStatus", "Online status", "Show when you are active on KINBA"],
+                ["typingIndicator", "Typing indicator", "Show when you are typing a reply"],
+              ] as const).map(([key, label, description]) => (
+                <label className="message-setting-row" key={key}>
+                  <span>
+                    <strong>{label}</strong>
+                    <small>{description}</small>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={messagePreferences[key]}
+                    onChange={(event) =>
+                      setMessagePreferences((current) => ({
+                        ...current,
+                        [key]: event.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="message-settings-link"
+              onClick={() => {
+                setShowSettings(false);
+                navigate("/messages/requests");
+              }}
+            >
+              <span>
+                <strong>Message requests</strong>
+                <small>Review messages from people you do not follow</small>
+              </span>
+              <span className="request-badge">{requestsUnread}</span>
+            </button>
+            <div className="message-settings-secondary">
+              <span>Blocked accounts</span>
+              <span>Archived chats</span>
+            </div>
+          </section>
+        )}
 
         <div className="messages-search">
           <Search size={18} />
