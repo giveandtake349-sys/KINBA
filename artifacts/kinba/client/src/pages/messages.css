@@ -1643,3 +1643,229 @@
   0%, 70% { outline-color: var(--accent-soft); }
   100% { outline-color: transparent; }
 }
+
+
+/* KINBA Message refresh — visual-only inbox/chat layer. */
+.messages-shell,
+.message-detail-shell,
+.desktop-messages-shell {
+  background: var(--page-bg);
+}
+
+.messages-header,
+.message-detail-header {
+  background: var(--page-bg);
+  border-bottom-color: var(--border);
+  padding: 14px 16px;
+}
+
+.messages-header h1,
+.message-detail-header h1 {
+  font-size: clamp(1.25rem, 3vw, 1.6rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.messages-search {
+  background: var(--page-bg);
+  border-bottom: 0;
+  padding: 14px 16px 10px;
+}
+
+.messages-search input {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  min-height: 42px;
+  padding-inline: 14px;
+}
+
+.messages-list {
+  padding: 4px 8px 18px;
+}
+
+.conversation-item,
+.request-item {
+  border: 1px solid transparent;
+  border-radius: 16px;
+  margin: 3px 0;
+  min-height: 68px;
+  padding: 12px 10px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.conversation-item:hover,
+.request-item:hover,
+.conversation-item.active {
+  background: var(--surface-raised);
+  border-color: var(--border);
+  transform: translateY(-1px);
+}
+
+.conversation-item.unread {
+  background: linear-gradient(90deg, var(--blue-soft), transparent);
+  border-color: color-mix(in srgb, var(--blue) 18%, transparent);
+}
+
+.conversation-item.unread .conversation-preview {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.conversation-avatar,
+.request-avatar {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  height: 50px;
+  width: 50px;
+}
+
+.avatar-placeholder {
+  background: var(--surface-elevated);
+  color: var(--text);
+}
+
+.conversation-header,
+.request-header {
+  margin-bottom: 4px;
+}
+
+.conversation-header strong,
+.request-header strong {
+  font-weight: 700;
+}
+
+.conversation-header time,
+.request-header time {
+  color: var(--muted);
+  font-size: 0.6875rem;
+}
+
+.conversation-preview,
+.request-preview {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.unread-badge,
+.request-badge {
+  background: var(--blue);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--blue) 22%, transparent);
+  color: #fff;
+}
+
+.messages-shell > .messages-list,
+.desktop-sidebar > .messages-list {
+  scrollbar-color: var(--surface-elevated) transparent;
+  scrollbar-width: thin;
+}
+
+.message-detail-header {
+  align-items: center;
+  min-height: 68px;
+}
+
+.message-detail-messages {
+  background: color-mix(in srgb, var(--page-bg) 96%, var(--surface));
+  gap: 10px;
+  padding: 20px 18px;
+}
+
+.message-date {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.message-body {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 10px 13px;
+}
+
+.message-bubble.own .message-body {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+
+.message-bubble.own .message-time {
+  color: #dceaff;
+}
+
+.message-bubble:not(.own) .message-body {
+  border-bottom-left-radius: 5px;
+}
+
+.message-bubble.own .message-body {
+  border-bottom-right-radius: 5px;
+}
+
+.message-body p {
+  font-size: 0.9375rem;
+}
+
+.message-detail-input,
+.composer-shell {
+  background: var(--surface);
+  border-top-color: var(--border);
+  padding: 12px 14px;
+}
+
+.input-action-btn {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+}
+
+.input-action-btn:hover {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.input-wrapper textarea {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  min-height: 44px;
+}
+
+.send-btn {
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--blue) 24%, transparent);
+}
+
+.header-action,
+.back-btn {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+}
+
+.header-action:hover,
+.back-btn:hover {
+  background: var(--surface-elevated);
+}
+
+.desktop-sidebar {
+  background: var(--page-bg);
+}
+
+.desktop-chat {
+  background: color-mix(in srgb, var(--page-bg) 96%, var(--surface));
+}
+
+@media (max-width: 760px) {
+  .messages-header,
+  .message-detail-header {
+    padding-inline: 14px;
+  }
+
+  .messages-list {
+    padding-inline: 8px;
+  }
+
+  .message-detail-messages {
+    padding-inline: 14px;
+  }
+}
