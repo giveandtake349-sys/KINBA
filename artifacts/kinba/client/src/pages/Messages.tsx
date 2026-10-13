@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useLocation, Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { MessageCircle, Bell, Search, UserPlus, ChevronLeft, MoreVertical, Loader2, AlertCircle } from "lucide-react";
+import { MessageCircle, Bell, Search, UserPlus, ChevronLeft, MoreVertical, Loader2, AlertCircle, Settings, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { dmConversationPreview } from "@shared/dmMedia";
 import "./messages.css";
@@ -13,6 +13,13 @@ export default function Messages() {
   const utils = trpc.useUtils();
   const [searchQuery, setSearchQuery] = useState("");
   const [showRequests, setShowRequests] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [messagePreferences, setMessagePreferences] = useState({
+    notifications: true,
+    readReceipts: true,
+    onlineStatus: true,
+    typingIndicator: true,
+  });
 
   const conversationsQuery = trpc.directMessages.listConversations.useQuery(
     { limit: 50 },
@@ -70,25 +77,87 @@ export default function Messages() {
   return (
     <div className="messages-shell">
       <header className="messages-header">
-        <h1>Messages</h1>
+        <div className="messages-title-block">
+          <span className="messages-eyebrow">KINBA / INBOX</span>
+          <h1>Messages</h1>
+        </div>
         <button
           type="button"
           className="header-action"
-          onClick={() => setShowRequests(!showRequests)}
-          aria-label={showRequests ? "Back to conversations" : "Message requests"}
+          onClick={() => {
+            if (showRequests) {
+              setShowRequests(false);
+            } else {
+              setShowSettings((visible) => !visible);
+            }
+          }}
+          aria-label={showRequests ? "Back to conversations" : "Message settings"}
         >
-          {showRequests ? (
-            <ChevronLeft size={24} />
-          ) : requestsUnread > 0 ? (
-            <>
-              <UserPlus size={24} />
-              <span className="request-badge">{requestsUnread}</span>
-            </>
-          ) : (
-            <UserPlus size={24} />
-          )}
+          {showRequests ? <ChevronLeft size={24} /> : showSettings ? <X size={22} /> : <Settings size={22} />}
         </button>
       </header>
+
+      {showSettings && !showRequests && (
+        <section className="message-settings" aria-label="Message settings">
+          <div className="message-settings-heading">
+            <div>
+              <span className="messages-eyebrow">PREFERENCES</span>
+              <h2>Message settings</h2>
+            </div>
+            <button
+              type="button"
+              className="message-settings-close"
+              onClick={() => setShowSettings(false)}
+              aria-label="Close message settings"
+            >
+              <X size={17} />
+            </button>
+          </div>
+          <div className="message-settings-list">
+            {([
+              ["notifications", "Message notifications", "Alerts for new direct messages"],
+              ["readReceipts", "Read receipts", "Let people know when you have seen a message"],
+              ["onlineStatus", "Online status", "Show when you are active on KINBA"],
+              ["typingIndicator", "Typing indicator", "Show when you are typing a reply"],
+            ] as const).map(([key, label, description]) => (
+              <label className="message-setting-row" key={key}>
+                <span>
+                  <strong>{label}</strong>
+                  <small>{description}</small>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={messagePreferences[key]}
+                  onChange={(event) =>
+                    setMessagePreferences((current) => ({
+                      ...current,
+                      [key]: event.target.checked,
+                    }))
+                  }
+                />
+              </label>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="message-settings-link"
+            onClick={() => {
+              setShowSettings(false);
+              setShowRequests(true);
+            }}
+          >
+            <span>
+              <strong>Message requests</strong>
+              <small>Review messages from people you do not follow</small>
+            </span>
+            <span className="request-badge">{requestsUnread}</span>
+          </button>
+          <div className="message-settings-secondary">
+            <span>Blocked accounts</span>
+            <span>Archived chats</span>
+          </div>
+        </section>
+      )}
 
       <div className="messages-search">
         <Search size={18} />
