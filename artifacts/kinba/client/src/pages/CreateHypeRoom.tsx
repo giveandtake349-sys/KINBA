@@ -355,7 +355,7 @@ export default function CreateHypeRoom() {
               <button
                 type="button"
                 className="hype-attach-new"
-                onClick={() => navigate("/drops")}
+                onClick={() => navigate("/drops/new?returnTo=/hype-rooms/new")}
               >
                 <Plus size={16} aria-hidden="true" /> Create new drop
               </button>

@@ -11,6 +11,7 @@ import HypeRooms from "./pages/HypeRooms";
 import CreateHypeRoom from "./pages/CreateHypeRoom";
 import HypeRoomDetail from "./pages/HypeRoomDetail";
 import Drops from "./pages/Drops";
+import CreateDrop from "./pages/CreateDrop";
 import DropDetail from "./pages/DropDetail";
 import Messages from "./pages/Messages";
 import MessageRequests from "./pages/MessageRequests";
@@ -39,6 +40,7 @@ function AppRoutes() {
       <Route path="/rooms/new" component={CreateHypeRoom} />
       <Route path="/rooms/:id" component={HypeRoomDetail} />
       <Route path="/rooms" component={HypeRooms} />
+      <Route path="/drops/new" component={CreateDrop} />
       <Route path="/drops/:id" component={DropDetail} />
       <Route path="/drops" component={Drops} />
       <Route path="/messages/requests" component={MessageRequests} />
