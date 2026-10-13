@@ -80,6 +80,12 @@ import {
   getHashtagByTag,
   getHashtagContent,
   suggestHashtags,
+  listTrendingHashtags,
+  toggleHashtagFollow,
+  listCloseFriends,
+  toggleCloseFriend,
+  listBadges,
+  recordDailyActivity,
 } from "./db";
 import { getDb } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -517,6 +523,7 @@ const profileUpdateInput = z.object({
   about: z.string().trim().max(500).nullable().optional(),
   displayName: z.string().trim().max(64).nullable().optional(),
   birthday: z.string().datetime({ offset: true }).nullable().optional(),
+  timezone: z.string().trim().min(1).max(64).optional(),
 });
 const sponsorInput = z.object({
   sessionId: z.number().int().positive(),
@@ -692,6 +699,14 @@ export const appRouter = router({
     verification: protectedProcedure.query(({ ctx }) =>
       getVerificationStatus(ctx.user.id)
     ),
+    streak: protectedProcedure.query(({ ctx }) => recordDailyActivity(ctx.user.id)),
+    badges: publicProcedure
+      .input(z.object({ userId: z.number().int().positive() }))
+      .query(({ input }) => listBadges(input.userId)),
+    closeFriends: protectedProcedure.query(({ ctx }) => listCloseFriends(ctx.user.id)),
+    toggleCloseFriend: protectedProcedure
+      .input(z.object({ userId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) => toggleCloseFriend(ctx.user.id, input.userId)),
     followState: protectedProcedure
       .input(z.object({ userId: z.number().int().positive() }))
       .query(({ ctx, input }) => getFollowState(ctx.user.id, input.userId)),
@@ -775,6 +790,12 @@ export const appRouter = router({
   }),
   // Phase 2B — Hashtag queries
   hashtag: router({
+    trending: publicProcedure
+      .input(z.object({ limit: z.number().int().min(1).max(20).optional() }).optional())
+      .query(({ ctx, input }) => listTrendingHashtags(input?.limit ?? 10, ctx.user?.id)),
+    toggleFollow: protectedProcedure
+      .input(z.object({ tag: z.string().trim().min(1).max(120) }))
+      .mutation(({ ctx, input }) => toggleHashtagFollow(ctx.user.id, input.tag)),
     byTag: publicProcedure
       .input(z.object({ tag: z.string().trim().min(1).max(120) }))
       .query(({ input }) => getHashtagByTag(input.tag)),

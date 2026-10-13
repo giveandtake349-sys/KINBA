@@ -3512,3 +3512,11 @@
 .k-post__carousel-dots { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; max-width: 80%; overflow: hidden; }
 .k-post__carousel-dots button { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 50%; background: rgba(255,255,255,.52); }
 .k-post__carousel-dots button.is-active { background: white; transform: scale(1.35); }
+
+.trending-topics { display: grid; gap: 9px; margin: 0 0 16px; padding: 12px; border: 1px solid rgba(161,174,255,.16); border-radius: var(--radius-component); background: rgba(11,18,30,.3); }
+.trending-topics__list { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; }
+.trending-topic { display: grid; flex: 0 0 auto; gap: 3px; min-width: 136px; padding: 8px 10px; border: 1px solid rgba(161,174,255,.18); border-radius: var(--radius-control); background: transparent; color: #eef2ff; text-align: left; cursor: pointer; }
+.trending-topic:hover, .trending-topic:focus-visible { border-color: var(--blue); }
+.trending-topic small { color: #8997ba; font-size: 10px; }
+.cp-audience-picker { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #a8b2cd; font-size: 11px; }
+.cp-audience-picker select { background: rgba(11,18,30,.52); border: 1px solid rgba(161,174,255,.18); border-radius: var(--radius-control); color: #f2f5ff; padding: 8px 10px; }

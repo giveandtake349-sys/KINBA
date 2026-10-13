@@ -10,7 +10,7 @@ import { serveStatic, setupVite } from "./vite";
 import { registerVideoUploadRoute } from "../videoUploadRoute";
 import { registerDmUploadRoute } from "../dmMedia";
 import { registerCommentRoutes } from "../commentRoutes";
-import { listSpotlightHighlights } from "../db";
+import { getVideoSharePreview, listSpotlightHighlights } from "../db";
 import { rateLimit } from "../rateLimiter";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
@@ -70,6 +70,17 @@ async function startServer() {
       console.error("[Spotlight] Failed to load highlights:", error);
       return res.status(200).json({ highlights: [] });
     }
+  });
+  app.get("/videos/:videoId", async (req, res, next) => {
+    const userAgent = req.get("user-agent") || "";
+    if (!/(bot|crawler|spider|facebookexternalhit|whatsapp|slack|twitter)/i.test(userAgent)) return next();
+    const videoId = Number(req.params.videoId);
+    if (!Number.isInteger(videoId) || videoId <= 0) return next();
+    const preview = await getVideoSharePreview(videoId);
+    if (!preview) return next();
+    const escape = (value: string) => value.replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char] || char));
+    const canonical = `${req.protocol}://${req.get("host")}/videos/${videoId}`;
+    res.type("html").send(`<!doctype html><html><head><meta charset="utf-8"><title>${escape(preview.title)}</title><meta name="description" content="${escape(preview.description)}"><meta property="og:title" content="${escape(preview.title)}"><meta property="og:description" content="${escape(preview.description)}"><meta property="og:url" content="${canonical}">${preview.image ? `<meta property="og:image" content="${escape(preview.image)}">` : ""}<meta property="og:type" content="article"><meta property="og:site_name" content="JHILIK"><meta name="twitter:card" content="summary_large_image"></head><body><p>Open in JHILIK</p></body></html>`);
   });
   const allowedOrigins = parseAllowedOrigins(
     [

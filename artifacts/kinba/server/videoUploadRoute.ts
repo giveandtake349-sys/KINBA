@@ -227,6 +227,7 @@ export function registerVideoUploadRoute(app: Express) {
       const description = String(body.description ?? "").trim();
       const videoUrl = String(body.videoUrl ?? "").trim();
       const thumbnailUrl = String(body.thumbnailUrl ?? "").trim() || null;
+      const audience = body.audience === "close_friends" ? "close_friends" : "everyone";
       const kind = body.kind === "SHORT" ? "SHORT" : "LONG";
       const durationSeconds = Number(body.durationSeconds);
       const width = Number(body.width);
@@ -258,6 +259,7 @@ export function registerVideoUploadRoute(app: Express) {
         width,
         height,
         sources: [{ quality: "ORIGINAL", videoUrl }],
+        audience,
       });
       res.status(201).json({
         videoId: video.id,
@@ -282,6 +284,7 @@ export function registerVideoUploadRoute(app: Express) {
       }
       const title = String(req.body?.title ?? "").trim();
       const description = String(req.body?.description ?? "").trim();
+      const audience = req.body?.audience === "close_friends" ? "close_friends" : "everyone";
       const rawGallery = Array.isArray(req.body?.gallery) ? req.body.gallery : [];
       const gallery = rawGallery.map((item: any) => ({
         url: String(item?.url ?? "").trim(),
@@ -329,6 +332,7 @@ export function registerVideoUploadRoute(app: Express) {
         width,
         height,
         gallery: gallery.length ? gallery : [{ url: imageUrl, width, height }],
+        audience,
       });
       res.status(201).json({
         postId: post.id,
@@ -384,6 +388,7 @@ export function registerVideoUploadRoute(app: Express) {
       }
       const title = String(req.body.title ?? "").trim();
       const description = String(req.body.description ?? "").trim();
+      const audience = req.body.audience === "close_friends" ? "close_friends" : "everyone";
       const width = Number(req.body.width);
       const height = Number(req.body.height);
       if ((title.length > 0 && title.length < 3) || title.length > 180) {
@@ -421,6 +426,7 @@ export function registerVideoUploadRoute(app: Express) {
         imageUrl: uploaded.url,
         width,
         height,
+        audience,
       });
       logUploadStage("photo", "published", {
         userId: user.id,

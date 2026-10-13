@@ -128,6 +128,7 @@ type ProfileSnapshot = {
     iconsCount: number;
     followingCount: number;
     followersCount: number;
+    streak?: number;
   };
 };
 
@@ -216,9 +217,10 @@ function ProfileStatsGrid({ profile }: { profile?: ProfileSnapshot }) {
   const stats = profile?.stats;
   const [followList, setFollowList] = useState<FollowListMode | null>(null);
   const profileUserId = profile?.user?.id ?? 0;
+  const badges = trpc.profile.badges.useQuery({ userId: profileUserId }, { enabled: profileUserId > 0, staleTime: 60_000 });
   const items: Array<{ value: number; label: string; mode?: FollowListMode }> = [
     { value: stats?.reactionsReceived ?? 0, label: "reactions received" },
-    { value: stats?.iconsCount ?? 0, label: "icons" },
+    { value: stats?.streak ?? 0, label: "streak" },
     {
       value: stats?.followingCount ?? 0,
       label: "following",
@@ -249,6 +251,11 @@ function ProfileStatsGrid({ profile }: { profile?: ProfileSnapshot }) {
           )
         )}
       </div>
+      {badges.data?.length ? (
+        <div className="profile-badges" aria-label="Badges">
+          {badges.data.map(badge => <span key={badge.key} className={badge.awardedAt ? "is-earned" : "is-locked"} title={badge.description}>{badge.awardedAt ? "●" : "○"} {badge.title}</span>)}
+        </div>
+      ) : null}
       <FollowListModal
         open={followList !== null}
         mode={followList ?? "followers"}
@@ -1633,6 +1640,7 @@ function UploadVideoModal({
   const [mediaMode, setMediaMode] = useState<"video" | "photo">("video");
   const [kind, setKind] = useState<"LONG" | "SHORT">("LONG");
   const [caption, setCaption] = useState("");
+  const [audience, setAudience] = useState<"everyone" | "close_friends">("everyone");
   const [file, setFile] = useState<File | null>(null);
   const [selectedImages, setSelectedImages] = useState<UploadImageSelection[]>([]);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
@@ -1771,7 +1779,7 @@ function UploadVideoModal({
     }
     setTextBusy(true);
     try {
-      await createTextMutation.mutateAsync({ text });
+      await createTextMutation.mutateAsync({ text, audience });
       await onPublished();
       setTextBody("");
       writeTextDraft("");
@@ -1794,10 +1802,10 @@ function UploadVideoModal({
     setBusy(true);
     try {
       if (mediaMode === "photo" && selectedImages.length) {
-        await publishPhoto(selectedImages.map(image => image.file), "", captionText, selectedImages.map(image => image.dimensions));
+        await publishPhoto(selectedImages.map(image => image.file), "", captionText, selectedImages.map(image => image.dimensions), audience);
       } else {
         if (!file) throw new Error("Please choose a video first.");
-        await publishVideo(file, kind, "", captionText);
+        await publishVideo(file, kind, "", captionText, undefined, audience);
       }
       await onPublished();
       await Promise.all([mediaHistory.refetch(), textHistory.refetch()]);
@@ -1898,7 +1906,7 @@ function UploadVideoModal({
             <span className="cp-avatar" aria-hidden="true">{authorName.charAt(0).toUpperCase()}</span>
             <span className="cp-author-copy">
               <strong>{authorName}</strong>
-              <span>Visible to your followers</span>
+              <span>{audience === "close_friends" ? "Visible to close friends" : "Visible to everyone"}</span>
             </span>
           </div>
           <div className="cp-editor">
@@ -1927,6 +1935,12 @@ function UploadVideoModal({
             <span className="cp-count">{textBody.length} / {CREATE_TEXT_MAX}</span>
             <CharacterRing used={textBody.length} max={CREATE_TEXT_MAX} />
           </div>
+          <label className="cp-audience-picker">Audience
+            <select value={audience} onChange={event => setAudience(event.target.value as "everyone" | "close_friends")}>
+              <option value="everyone">Everyone</option>
+              <option value="close_friends">Close Friends</option>
+            </select>
+          </label>
         </div>
       ) : mode === "thread" ? (
         <div className="create-uploader-composer">
@@ -2006,6 +2020,12 @@ function UploadVideoModal({
               <span className="cp-count">{caption.length} / {CREATE_CAPTION_MAX}</span>
             </div>
           </div>
+          <label className="cp-audience-picker">Audience
+            <select value={audience} onChange={event => setAudience(event.target.value as "everyone" | "close_friends")}>
+              <option value="everyone">Everyone</option>
+              <option value="close_friends">Close Friends</option>
+            </select>
+          </label>
           <div className="cp-footer">
             <ol className="cp-steps" aria-label="Upload progress">
               {["Checked", "Uploading", "Published"].map((label, index) => (

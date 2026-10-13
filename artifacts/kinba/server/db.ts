@@ -58,6 +58,12 @@ import {
   hypeRoomHashtags,
   hypeRoomMessageHashtags,
   dropHashtags,
+  closeFriends,
+  userFollowsHashtag,
+  dailyActivities,
+  userStreaks,
+  badges,
+  userBadges,
 } from "../drizzle/schema";
 import {
   REACTION_TYPES,
@@ -548,6 +554,7 @@ export async function getProfileStats(userId: number) {
       iconsCount: sql<number>`(select count(*) from videos where videos."userId" = ${userId})`,
       followingCount: sql<number>`(select count(*) from follows where follows."followerId" = ${userId})`,
       followersCount: sql<number>`(select count(*) from follows where follows."followedId" = ${userId})`,
+      streak: sql<number>`coalesce((select "current_streak" from user_streaks where user_streaks."user_id" = ${userId}), 0)`,
     })
     .from(users)
     .where(eq(users.id, userId));
@@ -556,6 +563,7 @@ export async function getProfileStats(userId: number) {
     iconsCount: Number(stats?.iconsCount ?? 0),
     followingCount: Number(stats?.followingCount ?? 0),
     followersCount: Number(stats?.followersCount ?? 0),
+    streak: Number(stats?.streak ?? 0),
   };
 }
 
@@ -582,7 +590,7 @@ export async function getPublicProfile(userId: number) {
 
 export async function updateOwnProfile(
   userId: number,
-  input: { username?: string | null; photoUrl?: string | null; about?: string | null; displayName?: string | null; birthday?: string | null }
+  input: { username?: string | null; photoUrl?: string | null; about?: string | null; displayName?: string | null; birthday?: string | null; timezone?: string }
 ) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
@@ -591,6 +599,7 @@ export async function updateOwnProfile(
   const hasAbout = Object.prototype.hasOwnProperty.call(input, "about");
   const hasDisplayName = Object.prototype.hasOwnProperty.call(input, "displayName");
   const hasBirthday = Object.prototype.hasOwnProperty.call(input, "birthday");
+  const hasTimezone = Object.prototype.hasOwnProperty.call(input, "timezone");
 
   const username = hasUsername
     ? input.username?.trim().toLowerCase() || null
@@ -638,6 +647,7 @@ export async function updateOwnProfile(
   if (hasAbout) updateSet.about = input.about?.trim() || null;
   if (hasDisplayName) updateSet.displayName = displayName ?? null;
   if (hasBirthday) updateSet.birthday = birthday;
+  if (hasTimezone) updateSet.timezone = input.timezone?.trim() || "UTC";
 
   const insertValues: typeof profiles.$inferInsert = {
     userId,
@@ -646,6 +656,7 @@ export async function updateOwnProfile(
     about: hasAbout ? (input.about?.trim() || null) : undefined,
     displayName: hasDisplayName ? (displayName ?? null) : undefined,
     birthday: hasBirthday ? birthday : undefined,
+    timezone: hasTimezone ? (input.timezone?.trim() || "UTC") : undefined,
   };
   await db
     .insert(profiles)
@@ -1046,6 +1057,9 @@ async function selectVideos(
   const viewerBookmarked = viewerId
     ? sql<boolean>`exists (select 1 from video_bookmarks where video_bookmarks."videoId" = ${videos.id} and video_bookmarks."userId" = ${viewerId})`
     : sql<boolean>`false`;
+  const audienceVisible = viewerId
+    ? sql<boolean>`(${videos.audience} = 'everyone' OR ${videos.userId} = ${viewerId} OR exists (select 1 from close_friends where close_friends.owner_id = ${videos.userId} and close_friends.friend_id = ${viewerId}))`
+    : sql<boolean>`${videos.audience} = 'everyone'`;
   const rows = await db
     .select({
       video: videos,
@@ -1069,6 +1083,7 @@ async function selectVideos(
         // at unfinished HLS artifacts; filtering here keeps every public
         // listing (home feed, search, profiles, bookmarks) READY-only.
         eq(videos.processingStatus, "READY"),
+        audienceVisible,
         ...conditions
       )
     )
@@ -1705,6 +1720,14 @@ export async function listNotifications(userId: number) {
     .slice(0, 50);
 }
 
+export async function getVideoSharePreview(videoId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const [row] = await db.select({ title: videos.title, description: videos.description, image: videos.thumbnailUrl, videoUrl: videos.videoUrl, mediaType: videos.mediaType, audience: videos.audience }).from(videos).where(and(eq(videos.id, videoId), eq(videos.audience, "everyone"))).limit(1);
+  if (!row) return undefined;
+  return { title: row.title || "A post on JHILIK", description: row.description || "See this post on JHILIK.", image: row.image || (row.mediaType === "IMAGE" ? row.videoUrl : null) };
+}
+
 export async function getVideoThumbnailSource(videoId: number) {
   const db = await getDb();
   if (!db) return undefined;
@@ -1727,6 +1750,81 @@ export async function setVideoThumbnail(videoId: number, thumbnailUrl: string) {
   return updated;
 }
 
+
+function safeAudience(value: string | null | undefined): "everyone" | "close_friends" {
+  return value === "close_friends" ? "close_friends" : "everyone";
+}
+
+async function localActivityDate(userId: number): Promise<string> {
+  const db = await getDb();
+  if (!db) return new Date().toISOString().slice(0, 10);
+  const [profile] = await db.select({ timezone: profiles.timezone }).from(profiles).where(eq(profiles.userId, userId)).limit(1);
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: profile?.timezone || "UTC", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  } catch {
+    return new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  }
+}
+
+export async function recordDailyActivity(userId: number) {
+  const db = await getDb();
+  if (!db) return { currentStreak: 0, longestStreak: 0 };
+  const activityDate = await localActivityDate(userId);
+  const [streak] = await db.select().from(userStreaks).where(eq(userStreaks.userId, userId)).limit(1);
+  const previousDate = streak?.lastActivityDate;
+  const currentStreak = previousDate === activityDate ? (streak?.currentStreak ?? 1) : previousDate === new Date(Date.parse(`${activityDate}T00:00:00Z`) - 86400000).toISOString().slice(0, 10) ? (streak?.currentStreak ?? 0) + 1 : 1;
+  const longestStreak = Math.max(streak?.longestStreak ?? 0, currentStreak);
+  await db.insert(dailyActivities).values({ userId, activityDate }).onConflictDoNothing();
+  await db.insert(userStreaks).values({ userId, currentStreak, longestStreak, lastActivityDate: activityDate }).onConflictDoUpdate({ target: userStreaks.userId, set: { currentStreak, longestStreak, lastActivityDate: activityDate, updatedAt: new Date() } });
+  const [postCount] = await db.select({ count: sql<number>`count(*)` }).from(videos).where(eq(videos.userId, userId));
+  const [pookieCount] = await db.select({ count: sql<number>`count(*)` }).from(videoReactions).innerJoin(videos, eq(videoReactions.videoId, videos.id)).where(eq(videos.userId, userId));
+  const qualifying = [Number(postCount?.count ?? 0) >= 1 ? "first_post" : null, Number(pookieCount?.count ?? 0) >= 10 ? "ten_pookies" : null, currentStreak >= 7 ? "seven_day_streak" : null].filter((key): key is string => Boolean(key));
+  if (qualifying.length) {
+    const badgeRows = await db.select({ id: badges.id }).from(badges).where(inArray(badges.key, qualifying));
+    await db.insert(userBadges).values(badgeRows.map(badge => ({ userId, badgeId: badge.id }))).onConflictDoNothing();
+  }
+  return { currentStreak, longestStreak };
+}
+
+export async function listTrendingHashtags(limit = 10, viewerId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const postCount = sql<number>`count(*)`;
+  const rows = await db.select({ id: hashtags.id, tag: hashtags.tag, displayTag: hashtags.displayTag, postCount, following: viewerId ? sql<boolean>`exists (select 1 from user_follows_hashtag where user_follows_hashtag.user_id = ${viewerId} and user_follows_hashtag.hashtag_id = ${hashtags.id})` : sql<boolean>`false` }).from(videoHashtags).innerJoin(hashtags, eq(videoHashtags.hashtagId, hashtags.id)).innerJoin(videos, eq(videoHashtags.videoId, videos.id)).where(and(gt(videos.createdAt, new Date(Date.now() - 86400000)), eq(videos.processingStatus, "READY"))).groupBy(hashtags.id).orderBy(desc(postCount), desc(hashtags.tag)).limit(limit);
+  return rows.map(row => ({ ...row, postCount: Number(row.postCount), following: Boolean(row.following) }));
+}
+
+export async function toggleHashtagFollow(userId: number, tag: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [hashtag] = await db.select({ id: hashtags.id }).from(hashtags).where(eq(hashtags.tag, tag.replace(/^#/, "").trim().toLowerCase())).limit(1);
+  if (!hashtag) throw new Error("Hashtag not found.");
+  const [existing] = await db.select({ id: userFollowsHashtag.id }).from(userFollowsHashtag).where(and(eq(userFollowsHashtag.userId, userId), eq(userFollowsHashtag.hashtagId, hashtag.id))).limit(1);
+  if (existing) await db.delete(userFollowsHashtag).where(eq(userFollowsHashtag.id, existing.id)); else await db.insert(userFollowsHashtag).values({ userId, hashtagId: hashtag.id });
+  return { following: !existing };
+}
+
+export async function listCloseFriends(ownerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: users.id, name: users.name, username: profiles.username, photoUrl: profiles.photoUrl }).from(closeFriends).innerJoin(users, eq(closeFriends.friendId, users.id)).leftJoin(profiles, eq(users.id, profiles.userId)).where(eq(closeFriends.ownerId, ownerId)).orderBy(asc(users.name));
+}
+
+export async function toggleCloseFriend(ownerId: number, friendId: number) {
+  if (ownerId === friendId) throw new Error("You cannot add yourself.");
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const [existing] = await db.select({ id: closeFriends.id }).from(closeFriends).where(and(eq(closeFriends.ownerId, ownerId), eq(closeFriends.friendId, friendId))).limit(1);
+  if (existing) await db.delete(closeFriends).where(eq(closeFriends.id, existing.id)); else await db.insert(closeFriends).values({ ownerId, friendId });
+  return { closeFriend: !existing };
+}
+
+export async function listBadges(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ key: badges.key, title: badges.title, description: badges.description, awardedAt: userBadges.awardedAt }).from(badges).leftJoin(userBadges, and(eq(userBadges.badgeId, badges.id), eq(userBadges.userId, userId))).orderBy(asc(badges.id));
+}
+
 export async function createVideo(
   userId: number,
   input: {
@@ -1739,6 +1837,7 @@ export async function createVideo(
     width: number;
     height: number;
     sources: VideoSourceInput[];
+    audience?: "everyone" | "close_friends";
   }
 ) {
   if (!Number.isInteger(userId) || userId < 1)
@@ -1764,6 +1863,7 @@ export async function createVideo(
         width: input.width,
         height: input.height,
         processingStatus: "READY",
+        audience: safeAudience(input.audience),
       })
       .returning();
 
@@ -1787,6 +1887,7 @@ export async function createVideo(
       console.error("[MediaPublish] Optional video source insert failed:", error);
     }
   }
+  await recordDailyActivity(userId);
   return created;
 }
 
@@ -1799,6 +1900,7 @@ export async function createPhotoPost(
     width: number;
     height: number;
     gallery?: Array<{ url: string; width: number; height: number }>;
+    audience?: "everyone" | "close_friends";
   }
 ) {
   if (!Number.isInteger(userId) || userId < 1)
@@ -1825,6 +1927,7 @@ export async function createPhotoPost(
         width: input.width,
         height: input.height,
         processingStatus: "READY",
+        audience: safeAudience(input.audience),
       })
       .returning();
 
@@ -1835,12 +1938,13 @@ export async function createPhotoPost(
     return [photo];
   });
 
+  await recordDailyActivity(userId);
   return created;
 }
 
 export async function createTextPost(
   userId: number,
-  input: { text: string }
+  input: { text: string; audience?: "everyone" | "close_friends" }
 ) {
   if (!Number.isInteger(userId) || userId < 1)
     throw new Error("Authenticated application user ID is invalid.");
@@ -1867,6 +1971,7 @@ export async function createTextPost(
         width: 0,
         height: 0,
         processingStatus: "READY",
+        audience: safeAudience(input.audience),
       })
       .returning();
 
@@ -1877,6 +1982,7 @@ export async function createTextPost(
     return [post];
   });
 
+  await recordDailyActivity(userId);
   return created;
 }
 
@@ -2432,6 +2538,7 @@ export async function createVideoComment(
     return [newComment];
   });
 
+  await recordDailyActivity(userId);
   return comment;
 }
 

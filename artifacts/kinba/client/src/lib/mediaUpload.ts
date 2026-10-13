@@ -238,7 +238,8 @@ export async function publishPhoto(
   file: File | File[],
   title: string,
   description: string,
-  dimensions: { width: number; height: number } | Array<{ width: number; height: number }>
+  dimensions: { width: number; height: number } | Array<{ width: number; height: number }>,
+  audience: "everyone" | "close_friends" = "everyone"
 ): Promise<{ postId: number; status: string; imageUrl: string; gallery: Array<{ url: string; width: number; height: number }> }> {
   const files = Array.isArray(file) ? file : [file];
   const imageDimensions = Array.isArray(dimensions) ? dimensions : [dimensions];
@@ -283,7 +284,7 @@ export async function publishPhoto(
         "Content-Type": "application/json",
       },
       credentials: "include",
-      body: JSON.stringify({ title, description, imageUrl, ...gallery[0], gallery }),
+      body: JSON.stringify({ title, description, imageUrl, ...gallery[0], gallery, audience }),
     });
   } catch (error) {
     console.error("[MediaPublish] photo publication network failure", error);
@@ -382,7 +383,8 @@ export async function publishVideo(
   kind: VideoUploadKind,
   title: string,
   description: string,
-  metadata?: VideoMetadata
+  metadata?: VideoMetadata,
+  audience: "everyone" | "close_friends" = "everyone"
 ): Promise<{ videoId: number; status: string; videoUrl: string }> {
   if (!file.type.startsWith("video/"))
     throw new Error("Choose a supported video file.");
@@ -432,6 +434,7 @@ export async function publishVideo(
       description,
       videoUrl,
       thumbnailUrl,
+      audience,
       ...resolvedMetadata,
     }),
   });
