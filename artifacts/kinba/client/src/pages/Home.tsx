@@ -2606,6 +2606,14 @@ export default function Home() {
         {photoViewer && (
           <FeedPhotoLightbox
             imageUrl={photoViewer.videoUrl}
+            attachments={(photoViewer.gallery ?? []).map((image, imageIndex) => ({
+              id: imageIndex,
+              mediaType: "IMAGE" as const,
+              mediaUrl: image.url,
+              sortOrder: imageIndex,
+              width: image.width,
+              height: image.height,
+            }))}
             alt={photoViewer.title || "Post"}
             owner={photoViewer.owner}
             onClose={() => setPhotoViewer(null)}

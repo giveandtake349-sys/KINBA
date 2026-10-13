@@ -3630,24 +3630,30 @@ export function FeedPhotoLightbox({
   const [sharing, setSharing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [internalIndex, setInternalIndex] = useState(0);
+  const pointerStartRef = useRef<number | null>(null);
   const imageAttachments = attachments.filter(
     item => item.mediaType === "IMAGE"
   );
-  const current = imageAttachments[index ?? 0];
+  const activeIndex = index ?? internalIndex;
+  const current = imageAttachments[activeIndex];
+  const goTo = (nextIndex: number) => {
+    if (!imageAttachments.length) return;
+    const next = (nextIndex + imageAttachments.length) % imageAttachments.length;
+    if (onChange) onChange(next);
+    else setInternalIndex(next);
+  };
   useEffect(() => {
-    if (!current) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
-      if (event.key === "ArrowLeft" && onChange)
-        onChange(
-          ((index ?? 0) - 1 + imageAttachments.length) % imageAttachments.length
-        );
-      if (event.key === "ArrowRight" && onChange)
-        onChange(((index ?? 0) + 1) % imageAttachments.length);
+      if (event.key === "ArrowLeft" && imageAttachments.length > 1)
+        goTo(activeIndex - 1);
+      if (event.key === "ArrowRight" && imageAttachments.length > 1)
+        goTo(activeIndex + 1);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [current, imageAttachments.length, index, onChange, onClose]);
+  }, [activeIndex, imageAttachments.length, onClose]);
   if (!current && !imageUrl) return null;
   const photoUrl = imageUrl ?? current?.mediaUrl;
   const resolvedPhotoUrl = resolveMediaUrl(photoUrl ?? "") ?? photoUrl ?? "";
@@ -3714,6 +3720,16 @@ export function FeedPhotoLightbox({
       role="dialog"
       aria-modal="true"
       aria-label="Photo viewer"
+      onPointerDown={event => {
+        if (event.pointerType === "touch") pointerStartRef.current = event.clientX;
+      }}
+      onPointerUp={event => {
+        const start = pointerStartRef.current;
+        pointerStartRef.current = null;
+        if (event.pointerType !== "touch" || start == null || Math.abs(event.clientX - start) < 40) return;
+        event.stopPropagation();
+        goTo(event.clientX < start ? activeIndex + 1 : activeIndex - 1);
+      }}
       onClick={() => {
         setMenuOpen(false);
         onClose();
@@ -3769,19 +3785,16 @@ export function FeedPhotoLightbox({
       </div>
       {imageAttachments.length > 1 && (
         <span className="feed-photo-lightbox-counter">
-          {(index ?? 0) + 1} of {imageAttachments.length}
+          {activeIndex + 1} of {imageAttachments.length}
         </span>
       )}
-      {imageAttachments.length > 1 && onChange && (
+      {imageAttachments.length > 1 && (
         <button
           type="button"
           className="feed-photo-lightbox-nav feed-photo-lightbox-nav--prev"
           onClick={event => {
             event.stopPropagation();
-            onChange(
-              ((index ?? 0) - 1 + imageAttachments.length) %
-                imageAttachments.length
-            );
+            goTo(activeIndex - 1);
           }}
           aria-label="Previous photo"
         >
@@ -3816,13 +3829,13 @@ export function FeedPhotoLightbox({
           </span>
         </a>
       )}
-      {imageAttachments.length > 1 && onChange && (
+      {imageAttachments.length > 1 && (
         <button
           type="button"
           className="feed-photo-lightbox-nav feed-photo-lightbox-nav--next"
           onClick={event => {
             event.stopPropagation();
-            onChange(((index ?? 0) + 1) % imageAttachments.length);
+            goTo(activeIndex + 1);
           }}
           aria-label="Next photo"
         >

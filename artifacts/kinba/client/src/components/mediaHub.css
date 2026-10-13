@@ -2574,6 +2574,7 @@
   overflow: hidden;
   padding: 12px 8px;
   background: var(--page-bg);
+  touch-action: pan-y;
 }
 .feed-photo-lightbox img {
   display: block;
