@@ -11,8 +11,12 @@ import {
 import {
   BadgeCheck,
   Bell,
+  AtSign,
   Check,
+  ChevronLeft,
+  ChevronRight,
   FileText,
+  Hash,
   Radio,
   Clock3,
   Copy,
@@ -38,6 +42,8 @@ import {
   MessageCircle,
   Plus,
   QrCode,
+  RefreshCw,
+  Trash2,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -74,6 +80,7 @@ import MediaHub, {
 import ProfileView, { ProfileSkeleton } from "@/components/ProfileView";
 import FollowListModal, { type FollowListMode } from "@/components/FollowListModal";
 import "./profile.css";
+import "./createPost.css";
 
 type Screen = "landing" | "dashboard" | "profile";
 type AppModal =
@@ -1527,6 +1534,85 @@ function UploaderHistory({
   );
 }
 
+const TEXT_DRAFT_KEY = "kinba.create.textDraft";
+const CREATE_TEXT_MAX = 5000;
+const CREATE_CAPTION_MAX = 2400;
+
+function readTextDraft(): string {
+  try {
+    return typeof window === "undefined"
+      ? ""
+      : (window.localStorage.getItem(TEXT_DRAFT_KEY) ?? "");
+  } catch {
+    return "";
+  }
+}
+
+function writeTextDraft(value: string) {
+  try {
+    if (value.trim()) window.localStorage.setItem(TEXT_DRAFT_KEY, value);
+    else window.localStorage.removeItem(TEXT_DRAFT_KEY);
+  } catch {
+    // Private mode / blocked storage: drafts are a convenience only.
+  }
+}
+
+function formatClipDuration(seconds: number) {
+  const whole = Math.max(0, Math.round(seconds));
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+/** Same text as the textarea, with #hashtags and @mentions coloured. */
+function HighlightedDraft({ text }: { text: string }) {
+  const parts = text.split(/(#[\p{L}\p{N}_-]+|@[A-Za-z0-9_.]+)/gu);
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.startsWith("#") || part.startsWith("@") ? (
+          <span className="cp-token" key={index}>
+            {part}
+          </span>
+        ) : (
+          part
+        )
+      )}
+      {"​"}
+    </>
+  );
+}
+
+function CharacterRing({ used, max }: { used: number; max: number }) {
+  const ratio = Math.min(1, used / max);
+  const circumference = 2 * Math.PI * 12;
+  const tone = used >= max ? "is-max" : ratio >= 0.9 ? "is-near" : "";
+  return (
+    <svg
+      className={`cp-ring ${tone}`}
+      width="30"
+      height="30"
+      viewBox="0 0 30 30"
+      role="img"
+      aria-label={`${used} of ${max} characters used`}
+    >
+      <circle className="cp-ring-track" cx="15" cy="15" r="12" />
+      <circle
+        className="cp-ring-value"
+        cx="15"
+        cy="15"
+        r="12"
+        strokeDasharray={circumference}
+        strokeDashoffset={circumference * (1 - ratio)}
+        transform="rotate(-90 15 15)"
+      />
+    </svg>
+  );
+}
+
 function UploadVideoModal({
   open,
   onClose,
@@ -1542,11 +1628,15 @@ function UploadVideoModal({
   const [caption, setCaption] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [clipSeconds, setClipSeconds] = useState<number | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [textBody, setTextBody] = useState("");
+  const [textBody, setTextBody] = useState(() => readTextDraft());
+  const [draftSaved, setDraftSaved] = useState(true);
   const [textBusy, setTextBusy] = useState(false);
   const auth = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
   const createTextMutation = trpc.videos.createText.useMutation();
   const mediaHistory = trpc.profile.videos.useQuery(undefined, {
     enabled: open && auth.isAuthenticated,
@@ -1563,12 +1653,36 @@ function UploadVideoModal({
     if (!open) setMode("menu");
   }, [open]);
 
-  const close = () => {
-    setMode("menu");
+  // Text drafts survive closing the sheet and reloading the app.
+  useEffect(() => {
+    setDraftSaved(false);
+    const timer = window.setTimeout(() => {
+      writeTextDraft(textBody);
+      setDraftSaved(true);
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [textBody]);
+
+  // Local preview of the chosen file (revoked when it changes or the sheet unmounts).
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const clearMedia = () => {
     setFile(null);
     setImageDimensions(null);
+    setClipSeconds(null);
+  };
+  const close = () => {
+    setMode("menu");
+    clearMedia();
     setCaption("");
-    setTextBody("");
     onClose();
   };
   const chooseMode = (next: CreateUploaderMode) => {
@@ -1581,9 +1695,14 @@ function UploadVideoModal({
   const chooseMedia = (nextMode: "photo" | "video", nextKind: "LONG" | "SHORT" = "LONG") => {
     setMediaMode(nextMode);
     setKind(nextKind);
-    setFile(null);
-    setImageDimensions(null);
+    clearMedia();
     chooseMode("media");
+  };
+  const switchVideoKind = (nextKind: "LONG" | "SHORT") => {
+    if (nextKind === kind) return;
+    setKind(nextKind);
+    // The duration limit differs per kind, so the chosen clip must be re-checked.
+    clearMedia();
   };
   const selectFile = async (event: ChangeEvent<HTMLInputElement>) => {
     event.preventDefault();
@@ -1594,18 +1713,34 @@ function UploadVideoModal({
     try {
       if (mediaMode === "photo") {
         setImageDimensions(await getImageDimensions(nextFile));
+        setClipSeconds(null);
         setFile(nextFile);
         return;
       }
-      await getVideoMetadata(nextFile, {
+      const metadata = await getVideoMetadata(nextFile, {
         maxDurationSeconds:
           kind === "LONG" ? MAX_LONG_VIDEO_DURATION_SECONDS : MAX_SHORT_VIDEO_DURATION_SECONDS,
       });
       setImageDimensions(null);
+      setClipSeconds(metadata.durationSeconds);
       setFile(nextFile);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "This media cannot be uploaded.");
     }
+  };
+  const insertIntoText = (symbol: "#" | "@") => {
+    const area = textRef.current;
+    const start = area?.selectionStart ?? textBody.length;
+    const end = area?.selectionEnd ?? start;
+    const before = textBody.slice(0, start);
+    const glue = before.length === 0 || /\s$/.test(before) ? "" : " ";
+    const next = `${before}${glue}${symbol}${textBody.slice(end)}`.slice(0, CREATE_TEXT_MAX);
+    const caret = Math.min(before.length + glue.length + 1, CREATE_TEXT_MAX);
+    setTextBody(next);
+    requestAnimationFrame(() => {
+      area?.focus();
+      area?.setSelectionRange(caret, caret);
+    });
   };
   const submitText = async () => {
     const text = textBody.trim();
@@ -1618,6 +1753,7 @@ function UploadVideoModal({
       await createTextMutation.mutateAsync({ text });
       await onPublished();
       setTextBody("");
+      writeTextDraft("");
       toast.success("Text post published to your feed.");
       close();
     } catch (error) {
@@ -1653,8 +1789,34 @@ function UploadVideoModal({
   };
 
   const modalTitle = mode === "menu" ? "Create" : mode === "text" ? "Post Text" : mode === "thread" ? "Start a Thread" : mediaMode === "photo" ? "Post Image" : kind === "SHORT" ? "Upload Shorts" : "Post Video";
+  const authorName = (() => {
+    const name = auth.user?.name?.trim();
+    return name && !name.includes("@") ? name : "You";
+  })();
+  const draftExcerpt = textBody.trim().replace(/\s+/g, " ");
+  const maxClip = kind === "SHORT" ? MAX_SHORT_VIDEO_DURATION_SECONDS : MAX_LONG_VIDEO_DURATION_SECONDS;
+  const limitLabel = kind === "SHORT" ? "1 min" : "30 min";
+  const mediaReady = Boolean(file) && caption.trim().length > 0;
+  const checkedSteps = file ? 1 : 0;
+
+  const cards: Array<{
+    id: string;
+    title: string;
+    description: string;
+    tone: string;
+    icon: ReactNode;
+    run?: () => void;
+  }> = [
+    { id: "photo", title: "Photo", description: "JPG, PNG or WEBP up to 5 MB", tone: "amber", icon: <ImagePlus size={22} />, run: () => chooseMedia("photo") },
+    { id: "video", title: "Video", description: "Original video, up to 30 min", tone: "cyan", icon: <Video size={22} />, run: () => chooseMedia("video", "LONG") },
+    { id: "short", title: "Short", description: "Vertical clip, up to 1 min", tone: "violet", icon: <Film size={22} />, run: () => chooseMedia("video", "SHORT") },
+    { id: "text", title: "Text", description: "Share a thought, up to 5,000 characters", tone: "green", icon: <FileText size={22} />, run: () => chooseMode("text") },
+    { id: "thread", title: "Thread", description: "Start a conversation with your community", tone: "green", icon: <MessageCircle size={22} />, run: () => chooseMode("thread") },
+    { id: "live", title: "Go Live", description: "Live streaming is on the way", tone: "coral", icon: <Radio size={22} /> },
+  ];
+
   return (
-    <ActionModal title={modalTitle} open={open} onClose={close} className="upload-video-modal create-uploader-modal">
+    <ActionModal title={modalTitle} open={open} onClose={close} className="upload-video-modal create-uploader-modal create-post-modal">
       <button type="button" className="create-uploader-close" onClick={safeClick(close)} aria-label="Close Create uploader">
         <X size={24} />
       </button>
@@ -1665,39 +1827,83 @@ function UploadVideoModal({
             <h2>Create on JHILIK</h2>
             <p>Choose a format and continue directly into its publishing workflow.</p>
           </div>
-          <div className="create-uploader-wheel" aria-label="Create options">
-            <div className="create-uploader-wheel-core"><Plus size={24} /><span>Create</span></div>
-            <button type="button" className="create-uploader-option create-uploader-option--image" onClick={safeClick(() => chooseMedia("photo"))}><ImagePlus size={20} /><span>Post Image</span></button>
-            <button type="button" className="create-uploader-option create-uploader-option--video" onClick={safeClick(() => chooseMedia("video", "LONG"))}><Video size={20} /><span>Post Video</span></button>
-            <button type="button" className="create-uploader-option create-uploader-option--shorts" onClick={safeClick(() => chooseMedia("video", "SHORT"))}><Film size={20} /><span>Upload Shorts</span></button>
-            <button type="button" className="create-uploader-option create-uploader-option--text" onClick={safeClick(() => chooseMode("text"))}><FileText size={20} /><span>Post Text</span></button>
-            <button type="button" className="create-uploader-option create-uploader-option--thread" onClick={safeClick(() => chooseMode("thread"))}><MessageCircle size={20} /><span>Start a Thread</span></button>
-            <button type="button" className="create-uploader-option create-uploader-option--live" onClick={safeClick(() => chooseMedia("video", "LONG"))}><Radio size={20} /><span>Go Live</span></button>
+          {draftExcerpt ? (
+            <button type="button" className="cp-draft-card" onClick={safeClick(() => chooseMode("text"))}>
+              <span className="cp-draft-icon"><PenLine size={20} /></span>
+              <span className="cp-draft-copy">
+                <strong>Continue your draft</strong>
+                <span>{draftExcerpt}</span>
+              </span>
+              <ChevronRight size={18} aria-hidden="true" />
+            </button>
+          ) : null}
+          <div className="cp-grid" aria-label="Create options">
+            {cards.map(card => (
+              <button
+                key={card.id}
+                type="button"
+                className={`cp-card cp-card--${card.tone}${card.run ? "" : " is-soon"}`}
+                disabled={!card.run}
+                onClick={card.run ? safeClick(card.run) : undefined}
+              >
+                <span className="cp-card-icon">{card.icon}</span>
+                <span className="cp-card-copy">
+                  <strong>{card.title}</strong>
+                  <span>{card.description}</span>
+                </span>
+                {card.run ? null : <span className="cp-soon-badge">Soon</span>}
+              </button>
+            ))}
           </div>
           <UploaderHistory media={mediaHistory.data ?? []} textPosts={textHistory.data ?? []} />
         </>
       ) : mode === "text" ? (
-        <div className="create-uploader-composer">
-          <p className="modal-intro">Share a text post with your followers.</p>
-          <textarea
-            value={textBody}
-            onChange={event => setTextBody(event.target.value)}
-            placeholder="What's on your mind?"
-            maxLength={5000}
-            rows={5}
-            autoFocus
-          />
-          <span className="field-hint">{textBody.length}/5000</span>
-          <div className="create-uploader-form-actions">
-            <button type="button" className="muted-btn" onClick={safeClick(() => setMode("menu"))}>Back</button>
+        <div className="cp-composer">
+          <div className="cp-bar">
+            <button type="button" className="cp-back" onClick={safeClick(() => setMode("menu"))} aria-label="Back to create menu">
+              <ChevronLeft size={22} />
+            </button>
             <button
               type="button"
-              className="primary-btn"
+              className="cp-publish"
               disabled={textBusy || !textBody.trim()}
               onClick={safeClick(submitText)}
             >
-              {textBusy ? "Publishing…" : "Publish text post"}
+              {textBusy ? "Publishing…" : "Publish"}
             </button>
+          </div>
+          <div className="cp-author">
+            <span className="cp-avatar" aria-hidden="true">{authorName.charAt(0).toUpperCase()}</span>
+            <span className="cp-author-copy">
+              <strong>{authorName}</strong>
+              <span>Visible to your followers</span>
+            </span>
+          </div>
+          <div className="cp-editor">
+            <div className="cp-editor-text cp-editor-mirror" aria-hidden="true">
+              <HighlightedDraft text={textBody} />
+            </div>
+            <textarea
+              ref={textRef}
+              className="cp-editor-text cp-editor-input"
+              value={textBody}
+              onChange={event => setTextBody(event.target.value)}
+              placeholder="What's on your mind?"
+              aria-label="Write your post"
+              maxLength={CREATE_TEXT_MAX}
+              rows={1}
+              autoFocus
+            />
+          </div>
+          <p className="cp-draft-status" role="status">
+            {textBody.trim() ? (draftSaved ? "Draft saved" : "Saving draft…") : "Your draft is saved automatically."}
+          </p>
+          <div className="cp-toolbar">
+            <button type="button" aria-label="Add hashtag" onClick={safeClick(() => insertIntoText("#"))}><Hash size={20} /></button>
+            <button type="button" aria-label="Mention someone" onClick={safeClick(() => insertIntoText("@"))}><AtSign size={20} /></button>
+            <span className="cp-toolbar-spacer" />
+            <span className="cp-count">{textBody.length} / {CREATE_TEXT_MAX}</span>
+            <CharacterRing used={textBody.length} max={CREATE_TEXT_MAX} />
           </div>
         </div>
       ) : mode === "thread" ? (
@@ -1706,21 +1912,81 @@ function UploadVideoModal({
           <CommunityAnnouncements />
         </div>
       ) : (
-        <form className="modal-form" onSubmit={submit}>
-          <div className="modal-kind-switch" role="tablist" aria-label="Media type">
-            <button type="button" className={mediaMode === "video" ? "active" : ""} onClick={safeClick(() => chooseMedia("video", kind))}>Video</button>
-            <button type="button" className={mediaMode === "photo" ? "active" : ""} onClick={safeClick(() => chooseMedia("photo"))}>Photo</button>
+        <form className="cp-media" onSubmit={submit}>
+          <div className="cp-bar">
+            <button type="button" className="cp-back" onClick={safeClick(() => setMode("menu"))} aria-label="Back to create menu">
+              <ChevronLeft size={22} />
+            </button>
+          </div>
+          <div className="cp-segment" role="tablist" aria-label="Media type">
+            <button type="button" role="tab" aria-selected={mediaMode === "video"} className={mediaMode === "video" ? "active" : ""} onClick={safeClick(() => chooseMedia("video", kind))}>Video</button>
+            <button type="button" role="tab" aria-selected={mediaMode === "photo"} className={mediaMode === "photo" ? "active" : ""} onClick={safeClick(() => chooseMedia("photo"))}>Photo</button>
           </div>
           {mediaMode === "video" && (
-            <div className="modal-kind-switch" role="tablist" aria-label="Video type">
-              <button type="button" className={kind === "LONG" ? "active" : ""} onClick={safeClick(() => setKind("LONG"))}>Video · up to 30 min</button>
-              <button type="button" className={kind === "SHORT" ? "active" : ""} onClick={safeClick(() => setKind("SHORT"))}>Short · up to 1 min</button>
+            <div className="cp-kind" role="tablist" aria-label="Video type">
+              <button type="button" role="tab" aria-selected={kind === "LONG"} className={kind === "LONG" ? "active" : ""} onClick={safeClick(() => switchVideoKind("LONG"))}>Video · up to 30 min</button>
+              <button type="button" role="tab" aria-selected={kind === "SHORT"} className={kind === "SHORT" ? "active" : ""} onClick={safeClick(() => switchVideoKind("SHORT"))}>Short · up to 1 min</button>
             </div>
           )}
-          <label>Caption<textarea value={caption} onChange={event => setCaption(event.target.value)} placeholder={kind === "SHORT" ? "Describe your Short" : "What's on your mind?"} maxLength={2400} rows={4} required /></label>
           <input ref={inputRef} type="file" accept={mediaMode === "photo" ? "image/jpeg,image/png,image/webp" : "video/*"} className="sr-only" onChange={selectFile} />
-          <button type="button" className="modal-file-button" onClick={safeClick(() => inputRef.current?.click())}>{mediaMode === "photo" ? <ImagePlus size={18} /> : <Video size={18} />} {file ? file.name : mediaMode === "photo" ? "Choose JPG, PNG, or WEBP image" : "Choose original video"}</button>
-          <div className="create-uploader-form-actions"><button type="button" className="muted-btn" onClick={safeClick(() => setMode("menu"))}>Back</button><button className="primary-btn" type="submit" disabled={busy}>{busy ? "Uploading…" : mediaMode === "photo" ? "Publish image" : kind === "SHORT" ? "Upload Short" : "Publish video"}</button></div>
+          {file && previewUrl ? (
+            <div className="cp-picked">
+              <div className={`cp-preview${mediaMode === "video" && kind === "SHORT" ? " is-vertical" : ""}`}>
+                {mediaMode === "photo" ? (
+                  <img src={previewUrl} alt="Selected image preview" />
+                ) : (
+                  <video src={previewUrl} muted playsInline preload="metadata" />
+                )}
+                {clipSeconds != null ? <span className="cp-duration">{formatClipDuration(clipSeconds)}</span> : null}
+              </div>
+              <div className="cp-picked-info">
+                <strong title={file.name}>{file.name}</strong>
+                <span>{formatFileSize(file.size)}</span>
+                {mediaMode === "video" && clipSeconds != null && clipSeconds <= maxClip ? (
+                  <span className="cp-ok"><Check size={14} /> Within the {limitLabel} limit</span>
+                ) : null}
+                <div className="cp-picked-actions">
+                  <button type="button" onClick={safeClick(() => inputRef.current?.click())} disabled={busy}><RefreshCw size={15} /> Replace</button>
+                  <button type="button" className="is-danger" onClick={safeClick(clearMedia)} disabled={busy}><Trash2 size={15} /> Remove</button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="cp-drop" onClick={safeClick(() => inputRef.current?.click())}>
+              {mediaMode === "photo" ? <ImagePlus size={26} /> : <Video size={26} />}
+              <strong>{mediaMode === "photo" ? "Choose JPG, PNG, or WEBP image" : "Choose original video"}</strong>
+              <span>{mediaMode === "photo" ? "Up to 5 MB" : `Up to ${limitLabel}`}</span>
+            </button>
+          )}
+          <div className="cp-field">
+            <label htmlFor="cp-caption">Caption</label>
+            <textarea
+              id="cp-caption"
+              value={caption}
+              onChange={event => setCaption(event.target.value)}
+              placeholder={kind === "SHORT" && mediaMode === "video" ? "Describe your Short" : "What's on your mind?"}
+              maxLength={CREATE_CAPTION_MAX}
+              rows={4}
+              required
+            />
+            <div className="cp-field-foot">
+              <span>Required. Tag people with @ and topics with #.</span>
+              <span className="cp-count">{caption.length} / {CREATE_CAPTION_MAX}</span>
+            </div>
+          </div>
+          <div className="cp-footer">
+            <ol className="cp-steps" aria-label="Upload progress">
+              {["Checked", "Uploading", "Published"].map((label, index) => (
+                <li key={label} className={index < checkedSteps ? "is-done" : busy && index === 1 ? "is-current" : ""}>
+                  <span className="cp-step-dot">{index < checkedSteps ? <Check size={11} /> : null}</span>
+                  {label}
+                </li>
+              ))}
+            </ol>
+            <button className="cp-submit" type="submit" disabled={busy || !mediaReady}>
+              {busy ? "Uploading…" : mediaMode === "photo" ? "Publish image" : kind === "SHORT" ? "Upload Short" : "Publish video"}
+            </button>
+          </div>
         </form>
       )}
     </ActionModal>

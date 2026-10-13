@@ -1,0 +1,690 @@
+/* ==========================================================================
+   Create post sheet — refreshed look.
+   Cards, text composer (live #hashtag / @mention colouring, character ring,
+   draft status) and the media picker with preview. Loaded after the older
+   create-uploader styles; everything here uses its own `cp-` classes so the
+   old rules cannot interfere. Colours come from the theme tokens, so light
+   and dark both work.
+   ========================================================================== */
+
+.create-post-modal {
+  --cp-cyan: var(--teal, #38bdf8);
+  --cp-amber: #e9a63a;
+  --cp-violet: #8f6bea;
+  --cp-green: #25b37a;
+  --cp-coral: #ff6b57;
+}
+
+/* ---- Menu -------------------------------------------------------------- */
+.cp-draft-card {
+  align-items: center;
+  background: color-mix(in srgb, var(--cp-cyan) 12%, var(--surface, transparent));
+  border: 1px solid color-mix(in srgb, var(--cp-cyan) 45%, transparent);
+  border-radius: 16px;
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  text-align: left;
+  width: 100%;
+}
+
+.cp-draft-icon {
+  align-items: center;
+  background: var(--cp-cyan);
+  border-radius: 12px;
+  color: #04141c;
+  display: grid;
+  flex: 0 0 38px;
+  height: 38px;
+  place-items: center;
+  width: 38px;
+}
+
+.cp-draft-copy {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cp-draft-copy strong {
+  font-size: 14px;
+}
+
+.cp-draft-copy span {
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 14px 0 20px;
+}
+
+.cp-card {
+  align-content: start;
+  background: var(--surface-raised, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  min-height: 116px;
+  padding: 14px;
+  position: relative;
+  text-align: left;
+  transition:
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.cp-card:hover:not(:disabled),
+.cp-card:focus-visible {
+  border-color: var(--cp-cyan);
+  transform: translateY(-2px);
+}
+
+.cp-card-icon {
+  align-items: center;
+  border-radius: 12px;
+  display: grid;
+  height: 40px;
+  place-items: center;
+  width: 40px;
+}
+
+.cp-card--amber .cp-card-icon {
+  background: color-mix(in srgb, var(--cp-amber) 18%, transparent);
+  color: var(--cp-amber);
+}
+
+.cp-card--cyan .cp-card-icon {
+  background: color-mix(in srgb, var(--cp-cyan) 18%, transparent);
+  color: var(--cp-cyan);
+}
+
+.cp-card--violet .cp-card-icon {
+  background: color-mix(in srgb, var(--cp-violet) 18%, transparent);
+  color: var(--cp-violet);
+}
+
+.cp-card--green .cp-card-icon {
+  background: color-mix(in srgb, var(--cp-green) 18%, transparent);
+  color: var(--cp-green);
+}
+
+.cp-card--coral .cp-card-icon {
+  background: color-mix(in srgb, var(--cp-coral) 18%, transparent);
+  color: var(--cp-coral);
+}
+
+.cp-card-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.cp-card-copy strong {
+  font-size: 15px;
+}
+
+.cp-card-copy span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.cp-card.is-soon {
+  background: transparent;
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.cp-card.is-soon .cp-card-icon,
+.cp-card.is-soon .cp-card-copy strong {
+  opacity: 0.6;
+}
+
+.cp-soon-badge {
+  background: var(--surface-raised, var(--surface));
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  position: absolute;
+  right: 12px;
+  text-transform: uppercase;
+  top: 12px;
+}
+
+/* ---- Shared bar / buttons ---------------------------------------------- */
+.cp-composer,
+.cp-media {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.cp-bar {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.cp-back {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  height: 44px;
+  place-items: center;
+  width: 44px;
+}
+
+.cp-back:hover {
+  background: var(--surface-raised, transparent);
+}
+
+.cp-publish,
+.cp-submit {
+  background: var(--cp-cyan);
+  border: 0;
+  border-radius: 999px;
+  color: #04141c;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 44px;
+  padding: 0 22px;
+}
+
+.cp-publish:disabled,
+.cp-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* ---- Text composer ----------------------------------------------------- */
+.cp-author {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.cp-avatar {
+  align-items: center;
+  background: linear-gradient(135deg, var(--cp-cyan), var(--cp-green));
+  border-radius: 50%;
+  color: #04141c;
+  display: grid;
+  flex: 0 0 44px;
+  font-size: 17px;
+  font-weight: 700;
+  height: 44px;
+  place-items: center;
+  width: 44px;
+}
+
+.cp-author-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cp-author-copy strong {
+  font-size: 15px;
+}
+
+.cp-author-copy span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* The mirror and the textarea sit in one grid cell with identical metrics, so
+   the coloured text lines up exactly under the caret. */
+.cp-editor {
+  display: grid;
+  min-height: 180px;
+}
+
+.cp-editor-text {
+  border: 0;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 19px;
+  grid-area: 1 / 1;
+  letter-spacing: -0.005em;
+  line-height: 1.5;
+  margin: 0;
+  overflow-wrap: anywhere;
+  padding: 4px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cp-editor-mirror {
+  color: var(--text);
+  pointer-events: none;
+}
+
+.cp-token {
+  color: var(--cp-cyan);
+}
+
+.cp-editor-input {
+  background: transparent;
+  caret-color: var(--cp-cyan);
+  color: transparent;
+  outline: none;
+  overflow: hidden;
+  resize: none;
+}
+
+.cp-editor-input::placeholder {
+  color: var(--muted);
+}
+
+.cp-draft-status {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+}
+
+.cp-toolbar {
+  align-items: center;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 4px;
+  padding-top: 8px;
+}
+
+.cp-toolbar button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  color: var(--cp-cyan);
+  cursor: pointer;
+  display: grid;
+  height: 44px;
+  place-items: center;
+  width: 44px;
+}
+
+.cp-toolbar button:hover {
+  background: var(--surface-raised, transparent);
+}
+
+.cp-toolbar-spacer {
+  flex: 1;
+}
+
+.cp-count {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-ring {
+  margin-left: 6px;
+}
+
+.cp-ring circle {
+  fill: none;
+  stroke-width: 3;
+}
+
+.cp-ring-track {
+  stroke: var(--border);
+}
+
+.cp-ring-value {
+  stroke: var(--cp-cyan);
+  stroke-linecap: round;
+}
+
+.cp-ring.is-near .cp-ring-value {
+  stroke: #f59e0b;
+}
+
+.cp-ring.is-max .cp-ring-value {
+  stroke: #ef4444;
+}
+
+/* ---- Media form -------------------------------------------------------- */
+.cp-segment {
+  background: var(--surface-raised, transparent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 4px;
+}
+
+.cp-segment button {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  min-height: 40px;
+}
+
+.cp-segment button.active {
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.cp-kind {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.cp-kind button {
+  background: var(--surface-raised, transparent);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  min-height: 44px;
+}
+
+.cp-kind button.active {
+  border-color: var(--cp-cyan);
+  color: var(--text);
+  font-weight: 700;
+}
+
+.cp-drop {
+  align-items: center;
+  background: var(--surface-raised, transparent);
+  border: 1.5px dashed var(--border);
+  border-radius: 18px;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  min-height: 150px;
+  padding: 18px;
+  text-align: center;
+}
+
+.cp-drop svg {
+  color: var(--cp-cyan);
+}
+
+.cp-drop span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cp-drop:hover {
+  border-color: var(--cp-cyan);
+}
+
+.cp-picked {
+  align-items: stretch;
+  display: flex;
+  gap: 14px;
+}
+
+.cp-preview {
+  background: var(--surface-raised, #111);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  flex: 0 0 168px;
+  height: 126px;
+  overflow: hidden;
+  position: relative;
+}
+
+.cp-preview.is-vertical {
+  flex-basis: 110px;
+  height: 188px;
+}
+
+.cp-preview img,
+.cp-preview video {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.cp-duration {
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 999px;
+  bottom: 8px;
+  color: #fff;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  padding: 2px 8px;
+  position: absolute;
+  right: 8px;
+}
+
+.cp-picked-info {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cp-picked-info strong {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cp-picked-info > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cp-picked-info .cp-ok {
+  align-items: center;
+  background: color-mix(in srgb, var(--cp-green) 16%, transparent);
+  border-radius: 999px;
+  color: var(--cp-green);
+  display: inline-flex;
+  font-weight: 700;
+  gap: 5px;
+  justify-self: start;
+  padding: 4px 10px;
+}
+
+.cp-picked-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.cp-picked-actions button {
+  align-items: center;
+  background: var(--surface-raised, transparent);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+.cp-picked-actions button.is-danger {
+  background: transparent;
+  border-color: color-mix(in srgb, #ff6b57 45%, transparent);
+  color: #ff6b57;
+}
+
+.cp-picked-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.cp-field {
+  display: grid;
+  gap: 8px;
+}
+
+.cp-field label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.cp-field textarea {
+  background: var(--surface-raised, transparent);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-sizing: border-box;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  min-height: 104px;
+  outline: none;
+  padding: 12px 14px;
+  resize: vertical;
+  width: 100%;
+}
+
+.cp-field textarea:focus {
+  border-color: var(--cp-cyan);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cp-cyan) 20%, transparent);
+}
+
+.cp-field-foot {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  font-size: 12px;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.cp-footer {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.cp-steps {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cp-steps li {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 12px;
+  gap: 6px;
+}
+
+.cp-steps li + li::before {
+  background: var(--border);
+  content: "";
+  height: 2px;
+  margin-right: 2px;
+  width: 22px;
+}
+
+.cp-step-dot {
+  align-items: center;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  color: #04141c;
+  display: grid;
+  height: 18px;
+  place-items: center;
+  width: 18px;
+}
+
+.cp-steps li.is-done {
+  color: var(--cp-green);
+  font-weight: 700;
+}
+
+.cp-steps li.is-done .cp-step-dot {
+  background: var(--cp-green);
+  border-color: var(--cp-green);
+}
+
+.cp-steps li.is-current {
+  color: var(--text);
+}
+
+.cp-steps li.is-current .cp-step-dot {
+  animation: cp-pulse 1s ease-in-out infinite;
+  border-color: var(--cp-cyan);
+}
+
+@keyframes cp-pulse {
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--cp-cyan) 25%, transparent);
+  }
+}
+
+.cp-submit {
+  border-radius: 16px;
+  font-size: 16px;
+  min-height: 52px;
+  width: 100%;
+}
+
+@media (max-width: 460px) {
+  .cp-picked {
+    flex-direction: column;
+  }
+
+  .cp-preview,
+  .cp-preview.is-vertical {
+    flex-basis: auto;
+    height: 200px;
+    width: 100%;
+  }
+
+  .cp-preview.is-vertical {
+    height: 280px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cp-card,
+  .cp-steps li.is-current .cp-step-dot {
+    animation: none;
+    transition: none;
+  }
+}
