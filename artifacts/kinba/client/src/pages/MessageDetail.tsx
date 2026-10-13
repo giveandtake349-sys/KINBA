@@ -24,7 +24,9 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { nanoid } from "nanoid";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { FeedPhotoLightbox } from "@/components/MediaHub";
+import { supabase } from "@/lib/supabase";
 import { AttachmentMenu, PendingAttachmentStrip } from "./MessageAttachments";
 import {
   buildDmSendPayloads,
@@ -195,6 +197,9 @@ export default function MessageDetail() {
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
+  const [partnerTyping, setPartnerTyping] = useState(false);
+  const [partnerOnline, setPartnerOnline] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLButtonElement>(null);
@@ -208,6 +213,9 @@ export default function MessageDetail() {
   const recorderStreamRef = useRef<MediaStream | null>(null);
   const recorderChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<number | null>(null);
+  const realtimeChannelRef = useRef<RealtimeChannel | null>(null);
+  const typingStopTimerRef = useRef<number | null>(null);
+  const partnerTypingTimerRef = useRef<number | null>(null);
 
   const attachmentsRef = useRef<DmPendingAttachment[]>([]);
   const uploadHandlesRef = useRef<Map<string, DmUploadHandle>>(new Map());
@@ -273,7 +281,9 @@ export default function MessageDetail() {
     { conversationId, limit: 50 },
     {
       enabled: isAuthenticated && conversationId > 0,
-      refetchInterval: 5000,
+      // Realtime is the primary transport. Polling remains a bounded fallback
+      // while the channel is connecting or if Supabase reports an error.
+      refetchInterval: realtimeConnected ? false : 5000,
     }
   );
   const markReadMut = trpc.directMessages.markConversationRead.useMutation({
@@ -355,6 +365,180 @@ export default function MessageDetail() {
   const partnerName = partner?.name || partner?.username || "Unknown";
   const partnerPhoto = partner?.photoUrl;
   const partnerId = partner?.id;
+
+  const sendTypingState = useCallback(
+    (typing: boolean) => {
+      const channel = realtimeChannelRef.current;
+      if (!channel || user?.id == null) return;
+      void channel.send({
+        type: "broadcast",
+        event: "typing",
+        payload: { typing, userId: user.id },
+      });
+    },
+    [user?.id]
+  );
+
+  const stopTyping = useCallback(() => {
+    if (typingStopTimerRef.current != null) {
+      window.clearTimeout(typingStopTimerRef.current);
+      typingStopTimerRef.current = null;
+    }
+    sendTypingState(false);
+  }, [sendTypingState]);
+
+  useEffect(() => {
+    if (!isAuthenticated || user?.id == null || conversationId <= 0) return;
+
+    const channel = supabase.channel(`dm:${conversationId}`, {
+      config: { presence: { key: String(user.id) } },
+    });
+    realtimeChannelRef.current = channel;
+
+    const syncPresence = () => {
+      const state = channel.presenceState() as Record<
+        string,
+        Array<{ userId?: number | string }>
+      >;
+      const online =
+        partnerId != null &&
+        Object.entries(state).some(([key, metas]) => {
+          return (
+            Number(key) === partnerId ||
+            metas.some(meta => Number(meta.userId) === partnerId)
+          );
+        });
+      setPartnerOnline(online);
+    };
+
+    channel
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "dm_messages",
+          filter: `conversationId=eq.${conversationId}`,
+        },
+        payload => {
+          const incoming = payload.new as {
+            id?: number;
+            conversationId?: number;
+            senderId?: number;
+            body?: string | null;
+            mediaUrl?: string | null;
+            mediaType?: string | null;
+            createdAt?: string;
+            readAt?: string | null;
+            editedAt?: string | null;
+            deletedAt?: string | null;
+            replyToId?: number | null;
+          };
+          if (
+            incoming.id == null ||
+            incoming.conversationId !== conversationId ||
+            incoming.senderId == null
+          ) {
+            return;
+          }
+          utils.directMessages.listMessages.setData(
+            { conversationId, limit: 50 },
+            current => {
+              if (!current || current.some(message => message.id === incoming.id)) {
+                return current;
+              }
+              return [
+                ...current,
+                {
+                  ...incoming,
+                  id: incoming.id,
+                  conversationId,
+                  senderId: incoming.senderId,
+                  body: incoming.body ?? null,
+                  mediaUrl: incoming.mediaUrl ?? null,
+                  mediaType: incoming.mediaType ?? null,
+                  createdAt: incoming.createdAt ?? new Date().toISOString(),
+                  readAt: incoming.readAt ?? null,
+                  editedAt: incoming.editedAt ?? null,
+                  deletedAt: incoming.deletedAt ?? null,
+                  replyToId: incoming.replyToId ?? null,
+                  sender: {
+                    id: incoming.senderId,
+                    name: incoming.senderId === user.id ? user.name : null,
+                    username: null,
+                    photoUrl: null,
+                  },
+                  replyTo: null,
+                },
+              ] as typeof current;
+            }
+          );
+          // Hydrate sender/profile, signed media URLs, and reply previews.
+          void utils.directMessages.listMessages.invalidate({
+            conversationId,
+            limit: 50,
+          });
+        }
+      )
+      .on("broadcast", { event: "typing" }, ({ payload }) => {
+        if (
+          partnerId == null ||
+          Number(payload?.userId) !== partnerId
+        ) {
+          return;
+        }
+        const typing = payload?.typing === true;
+        setPartnerTyping(typing);
+        if (partnerTypingTimerRef.current != null) {
+          window.clearTimeout(partnerTypingTimerRef.current);
+        }
+        if (typing) {
+          partnerTypingTimerRef.current = window.setTimeout(() => {
+            setPartnerTyping(false);
+            partnerTypingTimerRef.current = null;
+          }, 2500);
+        }
+      })
+      .on("presence", { event: "sync" }, syncPresence)
+      .on("presence", { event: "join" }, syncPresence)
+      .on("presence", { event: "leave" }, syncPresence)
+      .subscribe(async status => {
+        if (status === "SUBSCRIBED") {
+          setRealtimeConnected(true);
+          await channel.track({
+            userId: user.id,
+            onlineAt: new Date().toISOString(),
+          });
+          syncPresence();
+        } else if (
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT" ||
+          status === "CLOSED"
+        ) {
+          setRealtimeConnected(false);
+          setPartnerOnline(false);
+        }
+      });
+
+    return () => {
+      sendTypingState(false);
+      if (typingStopTimerRef.current != null) {
+        window.clearTimeout(typingStopTimerRef.current);
+        typingStopTimerRef.current = null;
+      }
+      setRealtimeConnected(false);
+      setPartnerTyping(false);
+      setPartnerOnline(false);
+      if (partnerTypingTimerRef.current != null) {
+        window.clearTimeout(partnerTypingTimerRef.current);
+        partnerTypingTimerRef.current = null;
+      }
+      if (realtimeChannelRef.current === channel) {
+        realtimeChannelRef.current = null;
+      }
+      void supabase.removeChannel(channel);
+    };
+  }, [conversationId, isAuthenticated, partnerId, sendTypingState, user, utils]);
 
   // Only mark as read when there are actually unread messages from the partner
   useEffect(() => {
@@ -631,6 +815,7 @@ export default function MessageDetail() {
       const activeReplyToId = replyTarget?.id ?? null;
 
       setSending(true);
+      stopTyping();
       setMessageText("");
 
       const consumedIds = new Set(
@@ -691,6 +876,7 @@ export default function MessageDetail() {
       replyTarget,
       updateAttachments,
       dispatchMessage,
+      stopTyping,
     ]
   );
 
@@ -1034,7 +1220,10 @@ export default function MessageDetail() {
           </div>
           <div className="partner-details">
             <strong>{partnerName}</strong>
-            <span className="status">Active now</span>
+            <span className={`status${partnerOnline ? " is-online" : ""}`}>
+              <span className="status-dot" aria-hidden="true" />
+              {partnerTyping ? "typing…" : partnerOnline ? "Active now" : "Offline"}
+            </span>
           </div>
         </div>
         <div style={{ position: "relative" }}>
@@ -1336,6 +1525,13 @@ export default function MessageDetail() {
               </div>
             )
           })}
+            {partnerTyping && (
+              <div className="typing-indicator" role="status" aria-label="Partner is typing">
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </>
         )}
@@ -1436,7 +1632,22 @@ export default function MessageDetail() {
               ref={textareaRef}
               placeholder="Message..."
               value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
+              onChange={event => {
+                const nextValue = event.target.value;
+                setMessageText(nextValue);
+                if (nextValue.trim()) {
+                  sendTypingState(true);
+                  if (typingStopTimerRef.current != null) {
+                    window.clearTimeout(typingStopTimerRef.current);
+                  }
+                  typingStopTimerRef.current = window.setTimeout(
+                    stopTyping,
+                    2000
+                  );
+                } else {
+                  stopTyping();
+                }
+              }}
               rows={1}
               style={{ minHeight: "44px", maxHeight: "160px" }}
               disabled={sending}

@@ -29,9 +29,9 @@ export function AttachmentMenu({
     const files = event.target.files;
     if (files && files.length > 0) {
       onFileSelected(kind, files);
-      // Defer menu close to allow native picker to complete on mobile/WebView.
-      // Use a microtask to ensure the change event fully propagates before unmounting.
-      queueMicrotask(() => onClose());
+      // The native picker has completed its change event; close immediately so
+      // the menu cannot remain open over the newly queued upload preview.
+      onClose();
     }
     // Reset value so the same file can be picked again
     event.target.value = "";
