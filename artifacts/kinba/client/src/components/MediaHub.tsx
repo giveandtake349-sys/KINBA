@@ -3655,7 +3655,7 @@ export function FeedPhotoLightbox({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [activeIndex, imageAttachments.length, onClose]);
   if (!current && !imageUrl) return null;
-  const photoUrl = imageUrl ?? current?.mediaUrl;
+  const photoUrl = current?.mediaUrl ?? imageUrl;
   const resolvedPhotoUrl = resolveMediaUrl(photoUrl ?? "") ?? photoUrl ?? "";
 
   /**
@@ -5742,6 +5742,14 @@ export default function MediaHub({
       {photoViewer && (
         <FeedPhotoLightbox
           imageUrl={photoViewer.videoUrl}
+          attachments={(photoViewer.gallery ?? []).map((image, imageIndex) => ({
+            id: imageIndex,
+            mediaType: "IMAGE" as const,
+            mediaUrl: image.url,
+            sortOrder: imageIndex,
+            width: image.width,
+            height: image.height,
+          }))}
           alt={photoViewer.title || "Post"}
           owner={photoViewer.owner}
           onClose={() => setPhotoViewer(null)}
