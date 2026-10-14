@@ -1,0 +1,91 @@
+From bb91c394bb8b1bc18d5bcbb8b34d37042c05f9d2 Mon Sep 17 00:00:00 2001
+From: giveandtake349-sys
+ <3.07759562e+08+giveandtake349-sys@users.noreply.github.com>
+Date: Wed, 14 Oct 2026 14:56:44 +0000
+Subject: [PATCH] fix(jhilik-ads): normalize pre-roll inputs and mobile
+ overflow
+
+---
+ .../kinba/client/src/pages/advertise.css      | 21 +++++++++++++++++++
+ artifacts/kinba/server/preroll.ts             | 21 ++++++++++++++++---
+ 2 files changed, 39 insertions(+), 3 deletions(-)
+
+diff --git a/artifacts/kinba/client/src/pages/advertise.css b/artifacts/kinba/client/src/pages/advertise.css
+index cf37bf7..12a12d6 100644
+--- a/artifacts/kinba/client/src/pages/advertise.css
++++ b/artifacts/kinba/client/src/pages/advertise.css
+@@ -676,6 +676,27 @@
+   padding: 18px 16px;
+   margin-bottom: 16px;
+ }
++.adv-card,
++.adv-form-card,
++.adv-field,
++.an-empty,
++.an-wrap,
++.fb-card {
++  min-width: 0;
++  max-width: 100%;
++}
++.adv-field input[type="file"] {
++  min-width: 0;
++  max-width: 100%;
++}
++.adv-hint,
++.an-empty p,
++.fb-name,
++.fb-spent,
++.fb-note {
++  overflow-wrap: anywhere;
++  word-break: break-word;
++}
+ .adv-field > span {
+   font-weight: 700;
+   font-size: 14px;
+diff --git a/artifacts/kinba/server/preroll.ts b/artifacts/kinba/server/preroll.ts
+index 81cbcbe..fc72b84 100644
+--- a/artifacts/kinba/server/preroll.ts
++++ b/artifacts/kinba/server/preroll.ts
+@@ -474,13 +474,28 @@ export async function createAd(
+   const db = await getDb();
+   if (!db) throw new Error("Database unavailable");
+ 
++  const rawInput = input as unknown as {
++    dropId?: unknown;
++    thumbnailUrl?: unknown;
++  };
++  const thumbnailUrl =
++    typeof rawInput.thumbnailUrl === "string" && rawInput.thumbnailUrl.trim()
++      ? rawInput.thumbnailUrl.trim()
++      : null;
++
+   // Drop link must exist, be owned by the advertiser, and not be archived.
+   let dropId: number | null = null;
+-  if (input.dropId != null) {
++  const rawDropId = rawInput.dropId;
++  if (rawDropId !== null && rawDropId !== undefined && rawDropId !== "") {
++    const parsedDropId =
++      typeof rawDropId === "number" ? rawDropId : Number(String(rawDropId).trim());
++    if (!Number.isSafeInteger(parsedDropId) || parsedDropId <= 0) {
++      throw new Error("Drop link must be a valid drop.");
++    }
+     const [drop] = await db
+       .select({ id: drops.id, sellerId: drops.sellerId, status: drops.status })
+       .from(drops)
+-      .where(eq(drops.id, input.dropId))
++      .where(eq(drops.id, parsedDropId))
+       .limit(1);
+     if (!drop) throw new Error("Drop not found.");
+     if (drop.sellerId !== userId)
+@@ -496,7 +511,7 @@ export async function createAd(
+       userId,
+       title: input.title,
+       videoUrl: input.videoUrl,
+-      thumbnailUrl: input.thumbnailUrl ?? null,
++      thumbnailUrl,
+       dropId,
+       status: "draft",
+       budgetCents: input.budgetCents,
+-- 
+2.43.0
+

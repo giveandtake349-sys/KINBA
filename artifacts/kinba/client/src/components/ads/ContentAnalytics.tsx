@@ -40,11 +40,35 @@ const TYPE_META = {
 export function ContentAnalytics() {
   const stats = trpc.analytics.creatorDashboard.useQuery(undefined, {
     refetchOnWindowFocus: false,
+    // The dashboard does a bulk rollup server-side; give it room on slow
+    // networks before React Query treats it as failed.
+    retry: 1,
   });
   const data = stats.data;
 
   if (stats.isLoading) {
     return <p className="profile-loading-note">Loading analytics…</p>;
+  }
+  // FIX (2026-10-14): previously a failed/hung query left the tab on the
+  // spinner forever with no way out. Show an honest error + retry.
+  if (stats.isError) {
+    return (
+      <div className="an-empty" role="alert">
+        <BarChart3 size={28} aria-hidden="true" />
+        <p>
+          <strong>Couldn't load analytics.</strong>
+          <br />
+          Check your connection and try again.
+        </p>
+        <button
+          type="button"
+          className="an-retry-btn"
+          onClick={() => void stats.refetch()}
+        >
+          Try again
+        </button>
+      </div>
+    );
   }
   if (!data || !data.hasData) {
     return (

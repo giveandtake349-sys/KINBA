@@ -307,6 +307,151 @@ export async function rollupVideoDay(
 }
 
 /**
+ * Bulk rollup for a creator's videos over N days.
+ *
+ * FIX (2026-10-14): getCreatorStats used to call rollupVideoDay() in a
+ * nested per-video-per-day loop — up to 50 videos × 7 days × 5 queries =
+ * 1,750 SEQUENTIAL DB round-trips per dashboard load. On a real network
+ * that took minutes, leaving the Studio Analytics tab stuck on
+ * "Loading analytics…" forever. This version aggregates everything with
+ * 3 GROUP BY queries + 1 bulk upsert (chunked), same idempotent result.
+ */
+export async function rollupVideosBulk(
+  videoIds: number[],
+  dayList: string[],
+  mediaTypeById: Map<number, ContentTypeKey | null>
+): Promise<void> {
+  const db = await getDb();
+  if (!db || videoIds.length === 0 || dayList.length === 0) return;
+  const fromDay = dayList[0];
+
+  const viewRows = await db
+    .select({
+      videoId: videoViewEvents.videoId,
+      day: videoViewEvents.day,
+      views: count(videoViewEvents.id),
+      uniqueViewers:
+        sql<number>`count(distinct ${videoViewEvents.viewerHash})`,
+    })
+    .from(videoViewEvents)
+    .where(
+      and(
+        inArray(videoViewEvents.videoId, videoIds),
+        gte(videoViewEvents.day, fromDay)
+      )
+    )
+    .groupBy(videoViewEvents.videoId, videoViewEvents.day);
+
+  const impRows = await db
+    .select({
+      videoId: videoImpressions.videoId,
+      day: videoImpressions.day,
+      impressions: count(videoImpressions.id),
+    })
+    .from(videoImpressions)
+    .where(
+      and(
+        inArray(videoImpressions.videoId, videoIds),
+        gte(videoImpressions.day, fromDay)
+      )
+    )
+    .groupBy(videoImpressions.videoId, videoImpressions.day);
+
+  const clickRows = await db
+    .select({
+      videoId: linkClicks.videoId,
+      day: linkClicks.day,
+      clicks: count(linkClicks.id),
+    })
+    .from(linkClicks)
+    .where(
+      and(inArray(linkClicks.videoId, videoIds), gte(linkClicks.day, fromDay))
+    )
+    .groupBy(linkClicks.videoId, linkClicks.day);
+
+  type Agg = {
+    views: number;
+    uniqueViewers: number;
+    impressions: number;
+    clicks: number;
+  };
+  const keyOf = (videoId: number, day: string) => `${videoId}|${day}`;
+  const aggByKey = new Map<string, Agg>();
+  const getAgg = (videoId: number, day: string): Agg => {
+    const k = keyOf(videoId, day);
+    let a = aggByKey.get(k);
+    if (!a) {
+      a = { views: 0, uniqueViewers: 0, impressions: 0, clicks: 0 };
+      aggByKey.set(k, a);
+    }
+    return a;
+  };
+  for (const r of viewRows) {
+    const a = getAgg(r.videoId, String(r.day));
+    a.views = Number(r.views ?? 0);
+    a.uniqueViewers = Number(r.uniqueViewers ?? 0);
+  }
+  for (const r of impRows) {
+    getAgg(r.videoId, String(r.day)).impressions = Number(
+      r.impressions ?? 0
+    );
+  }
+  for (const r of clickRows) {
+    if (r.videoId == null) continue;
+    getAgg(r.videoId, String(r.day)).clicks = Number(r.clicks ?? 0);
+  }
+
+  const rows: Array<{
+    videoId: number;
+    day: string;
+    contentType: ContentTypeKey | null;
+    views: number;
+    impressions: number;
+    clicks: number;
+    uniqueViewers: number;
+  }> = [];
+  for (const videoId of videoIds) {
+    const contentType = mediaTypeById.get(videoId) ?? null;
+    for (const day of dayList) {
+      const a = aggByKey.get(keyOf(videoId, day)) ?? {
+        views: 0,
+        uniqueViewers: 0,
+        impressions: 0,
+        clicks: 0,
+      };
+      rows.push({
+        videoId,
+        day,
+        contentType,
+        views: a.views,
+        impressions: a.impressions,
+        clicks: a.clicks,
+        uniqueViewers: a.uniqueViewers,
+      });
+    }
+  }
+
+  // Chunked bulk upsert — same idempotent semantics as rollupVideoDay.
+  const CHUNK = 500;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    await db
+      .insert(dailyContentStats)
+      .values(chunk)
+      .onConflictDoUpdate({
+        target: [dailyContentStats.videoId, dailyContentStats.day],
+        set: {
+          contentType: sql`excluded."contentType"`,
+          views: sql`excluded."views"`,
+          impressions: sql`excluded."impressions"`,
+          clicks: sql`excluded."clicks"`,
+          uniqueViewers: sql`excluded."uniqueViewers"`,
+        },
+      });
+  }
+}
+
+/**
  * Aggregate one campaign-day from event tables + the fiat earnings ledger
  * (spend = approved/credited earnings decided that day) into
  * daily_campaign_stats. Idempotent upsert.
@@ -697,11 +842,12 @@ export async function getCreatorStats(
   if (ownVideos.length === 0) return empty;
   const videoIds = ownVideos.map(v => v.id);
   const dayList = lastNDays(days);
-  for (const videoId of videoIds) {
-    for (const day of dayList) {
-      await rollupVideoDay(videoId, day);
-    }
-  }
+  // Bulk rollup (was: nested per-video-per-day loop issuing up to 1,750
+  // sequential queries — the Analytics tab hung on "Loading…" forever).
+  const mediaTypeById = new Map<number, ContentTypeKey | null>(
+    ownVideos.map(v => [v.id, normalizeContentType(v.mediaType)] as const)
+  );
+  await rollupVideosBulk(videoIds, dayList, mediaTypeById);
   // Per-video engagements from the existing reaction/comment/share tables.
   const engagementByVideo = await getEngagementByVideo(videoIds);
   const stats = await db

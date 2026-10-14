@@ -19,6 +19,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Eye,
   FileText,
   Hash,
   Radio,
@@ -26,6 +27,7 @@ import {
   Copy,
   Coins,
   Film,
+  Heart,
   Home as HomeIcon,
   ImagePlus,
   Loader2,
@@ -36,6 +38,7 @@ import {
   Play,
   Search,
   Settings,
+  Share2,
   Sun,
   UserRound,
   Users,
@@ -78,6 +81,11 @@ import {
 } from "@/lib/mediaUpload";
 import { resolveMediaUrl } from "@/lib/runtimeConfig";
 import type { FeedSection, VideoRecord } from "@/components/MediaHub";
+import {
+  StudioContentTab,
+  StudioCreateTab,
+  type StudioCreateAction,
+} from "@/components/studio/StudioTabs";
 import ProfileView, { ProfileSkeleton } from "@/components/ProfileView";
 import { ContentAnalytics } from "@/components/ads/ContentAnalytics";
 import FollowListModal, { type FollowListMode } from "@/components/FollowListModal";
@@ -1739,10 +1747,17 @@ function UploadVideoModal({
   open,
   onClose,
   onPublished,
+  initialMode,
+  initialMediaMode,
+  initialKind,
 }: {
   open: boolean;
   onClose: () => void;
   onPublished: () => Promise<void>;
+  /** Deep-link into a specific composer (used by JHILIK Studio quick actions). */
+  initialMode?: CreateUploaderMode;
+  initialMediaMode?: "video" | "photo";
+  initialKind?: "LONG" | "SHORT";
 }) {
   const [mode, setMode] = useState<CreateUploaderMode>("menu");
   const [mediaMode, setMediaMode] = useState<"video" | "photo">("video");
@@ -1787,8 +1802,15 @@ function UploadVideoModal({
   });
 
   useEffect(() => {
-    if (!open) setMode("menu");
-  }, [open]);
+    if (open) {
+      // Deep-link preset (JHILIK Studio quick actions); default to the menu.
+      setMode(initialMode ?? "menu");
+      if (initialMediaMode) setMediaMode(initialMediaMode);
+      if (initialKind) setKind(initialKind);
+    } else {
+      setMode("menu");
+    }
+  }, [open, initialMode, initialMediaMode, initialKind]);
 
   // Text drafts survive closing the sheet and reloading the app.
   useEffect(() => {
@@ -2452,16 +2474,19 @@ function QRCodeModal({
   );
 }
 
+
+type StudioTab = "create" | "content" | "analytics" | "earnings";
+
 function CreatorStudioModal({
   open,
   onClose,
   profile,
-  onCreate,
+  onCreateAction,
 }: {
   open: boolean;
   onClose: () => void;
   profile?: ProfileSnapshot;
-  onCreate: () => void;
+  onCreateAction: (action: StudioCreateAction) => void;
 }) {
   const stats = profile?.stats;
   const [tab, setTab] = useState<StudioTab>("create");
@@ -2475,6 +2500,10 @@ function CreatorStudioModal({
     { id: "analytics", label: "Analytics", icon: BarChart3 },
     { id: "earnings", label: "Earnings", icon: WalletCards },
   ];
+  const fireCreate = (action: StudioCreateAction) => {
+    onClose();
+    onCreateAction(action);
+  };
   return (
     <ActionModal
       title="JHILIK Studio"
@@ -2502,78 +2531,15 @@ function CreatorStudioModal({
       </div>
 
       {tab === "create" ? (
-        <>
-          <p className="modal-intro">Manage your publishing momentum from one creator workspace.</p>
-          <div className="studio-stat-grid">
-            <div><strong>{stats?.followersCount ?? 0}</strong><span>Followers</span></div>
-            <div><strong>{stats?.reactionsReceived ?? 0}</strong><span>Pookies</span></div>
-            <div><strong>{stats?.iconsCount ?? 0}</strong><span>ICONS</span></div>
-          </div>
-          <button
-            type="button"
-            className="primary-btn"
-            onClick={event => {
-              event.preventDefault();
-              event.stopPropagation();
-              onClose();
-              onCreate();
-            }}
-          >
-            <Plus size={18} /> Upload new video
-          </button>
-        </>
+        <StudioCreateTab stats={stats} onAction={fireCreate} />
       ) : null}
 
-      {tab === "content" ? <StudioContentTab /> : null}
+      {tab === "content" ? (
+        <StudioContentTab onViewAnalytics={() => setTab("analytics")} />
+      ) : null}
       {tab === "analytics" ? <ContentAnalytics /> : null}
       {tab === "earnings" ? <StudioEarningsTab /> : null}
     </ActionModal>
-  );
-}
-
-type StudioTab = "create" | "content" | "analytics" | "earnings";
-
-/** Own published content — every account type. Honest empty state. */
-function StudioContentTab() {
-  const videos = trpc.profile.videos.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-  });
-  const rows = videos.data ?? [];
-  if (videos.isLoading) {
-    return <p className="profile-loading-note">Loading your content…</p>;
-  }
-  if (rows.length === 0) {
-    return (
-      <div className="an-empty" role="status">
-        <Film size={28} aria-hidden="true" />
-        <p>
-          <strong>No content yet.</strong>
-          <br />
-          Publish your first video, photo, or post to see it here.
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div className="an-card">
-      <b>Your content</b>
-      <div className="an-table" role="table" aria-label="Your published content">
-        <div className="an-thead" role="row">
-          <span>Post</span>
-          <span>Type</span>
-          <span>Views</span>
-        </div>
-        {rows.map(v => (
-          <div className="an-trow" role="row" key={v.id}>
-            <span className="an-post">
-              <span>{v.title || `Post #${v.id}`}</span>
-            </span>
-            <span>{v.mediaType ?? "—"}</span>
-            <span>{(v.viewCount ?? 0).toLocaleString()}</span>
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -2916,6 +2882,49 @@ export default function Home() {
     setMenuOpen(false);
     setActiveModal(modal);
   };
+  /** JHILIK Studio quick actions → upload modal deep-linked to a composer. */
+  const [uploadPreset, setUploadPreset] = useState<{
+    mode?: CreateUploaderMode;
+    mediaMode?: "video" | "photo";
+    kind?: "LONG" | "SHORT";
+  }>({});
+  const openUpload = (preset: {
+    mode?: CreateUploaderMode;
+    mediaMode?: "video" | "photo";
+    kind?: "LONG" | "SHORT";
+  } = {}) => {
+    setUploadPreset(preset);
+    openModal("upload");
+  };
+  // Deep-link from the /studio page: /?upload=video|photo|text|short
+  // opens the upload modal straight into that composer.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const upload = params.get("upload");
+    if (
+      upload === "video" ||
+      upload === "photo" ||
+      upload === "text" ||
+      upload === "short"
+    ) {
+      const preset =
+        upload === "video"
+          ? { mode: "media", mediaMode: "video", kind: "LONG" }
+          : upload === "photo"
+            ? { mode: "media", mediaMode: "photo" }
+            : upload === "text"
+              ? { mode: "text" }
+              : { mode: "media", mediaMode: "video", kind: "SHORT" };
+      setUploadPreset(preset as typeof uploadPreset);
+      setActiveModal("upload");
+      params.delete("upload");
+      const qs = params.toString();
+      window.history.replaceState(null, "", qs ? `/?${qs}` : "/");
+    }
+    // Run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const showNotifications = () => {
     setProfileOpen(false);
     setActiveView("notifications");
@@ -3092,6 +3101,9 @@ export default function Home() {
                 utils.videos.list.invalidate(),
               ]);
             }}
+            initialMode={uploadPreset.mode}
+            initialMediaMode={uploadPreset.mediaMode}
+            initialKind={uploadPreset.kind}
           />
         )}
         {activeModal === "search" && <SearchModal open onClose={() => setActiveModal(null)} onOpenVideo={(v) => {
@@ -3117,7 +3129,14 @@ export default function Home() {
             open
             onClose={() => setActiveModal(null)}
             profile={profile}
-            onCreate={() => openModal("upload")}
+            onCreateAction={action => {
+              if (action === "video")
+                openUpload({ mode: "media", mediaMode: "video", kind: "LONG" });
+              else if (action === "photo")
+                openUpload({ mode: "media", mediaMode: "photo" });
+              else if (action === "text") openUpload({ mode: "text" });
+              else openUpload({ mode: "media", mediaMode: "video", kind: "SHORT" });
+            }}
           />
         )}
         {activeModal === "announcements" && (

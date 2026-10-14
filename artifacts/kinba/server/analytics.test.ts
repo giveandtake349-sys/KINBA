@@ -453,18 +453,12 @@ describe("getCreatorBreakdownForCampaign", () => {
 
 describe("getCreatorStats engagement split", () => {
   it("exposes real reactions/comments/shares totals for the hero bars", async () => {
-    const rollupSelects: unknown[][] = [];
-    for (let i = 0; i < 7; i++) {
-      rollupSelects.push(
-        [{ mediaType: "VIDEO" }],
-        [{ views: "10", uniqueViewers: "8" }],
-        [{ impressions: "20" }],
-        [{ clicks: "2" }]
-      );
-    }
     queueSelects(
       [{ id: 7, title: "T", mediaType: "VIDEO" }], // ownVideos
-      ...rollupSelects, // 7 × rollupVideoDay
+      // bulk rollup: 1 GROUP BY each (was 7 × 4 selects via rollupVideoDay)
+      [{ videoId: 7, day: "2026-10-14", views: "70", uniqueViewers: "8" }], // views
+      [{ videoId: 7, day: "2026-10-14", impressions: "140" }], // impressions
+      [{ videoId: 7, day: "2026-10-14", clicks: "14" }], // clicks
       [{ videoId: 7, n: "5" }], // engagementByVideo: reactions
       [{ videoId: 7, n: "3" }], // comments
       [{ videoId: 7, n: "1" }], // shares
@@ -473,9 +467,9 @@ describe("getCreatorStats engagement split", () => {
           videoId: 7,
           day: "2026-10-14",
           contentType: "VIDEO",
-          views: "10",
-          impressions: "20",
-          clicks: "2",
+          views: "70",
+          impressions: "140",
+          clicks: "14",
           uniqueViewers: "8",
         },
       ], // stats
@@ -493,6 +487,42 @@ describe("getCreatorStats engagement split", () => {
     expect(dash.totals.shares).toBe(1);
     expect(dash.totals.engagements).toBe(9);
     expect(dash.totals.engagementRate).toBe(112.5); // 9/8 — FB formula
+  });
+
+  it("bulk rollup upserts one row per video per day", async () => {
+    const { rollupVideosBulk } = await import("./analytics");
+    queueSelects(
+      [{ videoId: 7, day: "2026-10-14", views: "70", uniqueViewers: "8" }],
+      [{ videoId: 7, day: "2026-10-14", impressions: "140" }],
+      [{ videoId: 7, day: "2026-10-14", clicks: "14" }]
+    );
+    await rollupVideosBulk(
+      [7],
+      ["2026-10-14", "2026-10-13"],
+      new Map([[7, "VIDEO"]])
+    );
+    const inserts = insertsFor(dailyContentStats);
+    expect(inserts).toHaveLength(1);
+    const values = inserts[0].values as Array<Record<string, unknown>>;
+    // 1 video × 2 days = 2 rows; zeros where no events.
+    expect(values).toHaveLength(2);
+    expect(values[0]).toMatchObject({
+      videoId: 7,
+      day: "2026-10-14",
+      contentType: "VIDEO",
+      views: 70,
+      impressions: 140,
+      clicks: 14,
+      uniqueViewers: 8,
+    });
+    expect(values[1]).toMatchObject({
+      videoId: 7,
+      day: "2026-10-13",
+      views: 0,
+      impressions: 0,
+      clicks: 0,
+      uniqueViewers: 0,
+    });
   });
 });
 
