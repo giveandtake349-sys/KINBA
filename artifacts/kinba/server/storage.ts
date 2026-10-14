@@ -207,3 +207,65 @@ export async function storageCreateUploadUrl(
   );
   return { key, url, publicUrl: publicUrl(key) };
 }
+
+function getPrivateDocumentsBucket(): string {
+  const bucket = ENV.r2PrivateBucketName.trim();
+  if (!bucket) {
+    throw new Error(
+      "Private document storage is not configured. Set R2_PRIVATE_BUCKET_NAME to a private R2 bucket."
+    );
+  }
+  const mediaBucket = ENV.r2BucketName.trim() || "kinba-media";
+  if (bucket === mediaBucket) {
+    throw new Error(
+      "Brand verification documents must use a bucket different from R2_BUCKET_NAME."
+    );
+  }
+  return bucket;
+}
+
+/**
+ * Create a signed upload URL for a dedicated private bucket. The exact byte
+ * length is signed, so callers cannot use the URL to upload a larger object.
+ */
+export async function storageCreatePrivateUploadUrl(
+  relKey: string,
+  contentType: string,
+  contentLength: number
+): Promise<{ key: string; url: string }> {
+  if (!Number.isSafeInteger(contentLength) || contentLength < 1) {
+    throw new Error("Upload size must be a positive integer.");
+  }
+  const bucket = getPrivateDocumentsBucket();
+  const key = appendHashSuffix(normalizeKey(relKey));
+  const url = await getSignedUrl(
+    getR2Client(),
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ContentType: contentType,
+      ContentLength: contentLength,
+      CacheControl: "private, no-store, max-age=0",
+    }),
+    { expiresIn: uploadUrlLifetimeSeconds }
+  );
+  return { key, url };
+}
+
+/** Signed, short-lived admin download URL from the private documents bucket. */
+export async function storageGetPrivateSignedUrl(
+  relKey: string
+): Promise<string> {
+  const bucket = getPrivateDocumentsBucket();
+  return getSignedUrl(
+    getR2Client(),
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: normalizeKey(relKey),
+      ResponseCacheControl: "private, no-store, max-age=0",
+      ResponseContentDisposition: "attachment",
+      ResponseContentType: "application/octet-stream",
+    }),
+    { expiresIn: signedUrlLifetimeSeconds }
+  );
+}

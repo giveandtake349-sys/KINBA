@@ -68,6 +68,7 @@ The managed Manus environment injects its configured values. External deployment
 | `R2_ENDPOINT`                                       | Server-side S3-compatible R2 endpoint.                                                                            |
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`         | Server-only R2 write credentials.                                                                                 |
 | `R2_BUCKET_NAME`                                    | R2 bucket for uploaded media and generated HLS assets.                                                            |
+| `R2_PRIVATE_BUCKET_NAME`                            | Dedicated private R2 bucket for brand verification documents; do not expose it through a public domain.            |
 | `R2_PUBLIC_BASE_URL`                                | HTTPS public base URL for browser playback of stored media.                                                       |
 | `VITE_R2_PUBLIC_BASE_URL`                           | Optional browser build override for the public R2 media base URL.                                                |
 | `OWNER_OPEN_ID` / `OWNER_NAME`                      | Owner/admin identity configuration.                                                                               |
@@ -93,6 +94,8 @@ Before release, run the applicable typecheck, tests, and production build. Test 
 
 ## Deployment and data safety
 
-`render.yaml` is the repository’s Render Blueprint and defines `/api/health` as its health check. Keep database, Supabase service-role, and R2 write credentials in the hosting provider’s secret store. The browser uses Supabase Auth sessions and sends access tokens to the API; the server validates them before user-scoped operations. Configure the R2 bucket for browser `GET`/`HEAD` playback while keeping writes private.
+`render.yaml` is the repository’s Render Blueprint and defines `/api/health` as its health check. Keep database, Supabase service-role, and R2 write credentials in the hosting provider’s secret store. The browser uses Supabase Auth sessions and sends access tokens to the API; the server validates them before user-scoped operations. Configure the media R2 bucket for browser `GET`/`HEAD` playback while keeping writes private.
+
+Brand verification documents must use a separate R2 bucket configured in `R2_PRIVATE_BUCKET_NAME`. Keep public access and public custom domains disabled for that bucket, grant the server-side R2 credentials access to it, and configure bucket CORS for signed browser `PUT` requests from the deployed app origin. The document upload endpoint fails closed if this variable is unset; never point it at `R2_BUCKET_NAME`.
 
 Do not run schema push against production without an explicit migration review and backup. Use the production Publish/deploy workflow for the selected host and check health, sign-in, feed, media playback, reporting, and Drop reservation behavior after deployment.

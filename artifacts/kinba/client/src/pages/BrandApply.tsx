@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -13,6 +13,11 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import {
+  BRAND_DOC_CONTENT_TYPES,
+  MAX_BRAND_DOC_BYTES,
+  MAX_BRAND_DOC_SIZE_LABEL,
+} from "@shared/brandApplications";
 import "./advertise.css";
 
 const OBJECTIVE_IDS = [
@@ -57,22 +62,8 @@ const FORMATS: { id: FormatId; label: string }[] = [
   { id: "product_demo", label: "Product demo" },
 ];
 
-/**
- * ILLUSTRATIVE estimate multiplier only — shown so the brand gets a rough
- * sense of scale while applying. The review team confirms a real custom
- * estimate from platform data before any agreement. Clearly labelled
- * "Estimated — Not Guaranteed" in the UI.
- */
-const ESTIMATE_PER_UNIT = {
-  USD: { low: 30, high: 45 },
-  BDT: { low: 0.25, high: 0.4 },
-} as const;
-
-function formatCompact(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
-  return `${Math.round(n)}`;
-}
+const isSupportedDocType = (contentType: string) =>
+  (BRAND_DOC_CONTENT_TYPES as readonly string[]).includes(contentType);
 
 type LinkDraft = {
   kind: "website" | "landing" | "social" | "product";
@@ -165,28 +156,38 @@ export default function BrandApply() {
     set: (v: T[]) => void
   ) => set(list.includes(id) ? list.filter(x => x !== id) : [...list, id]);
 
-  const estimate = useMemo(() => {
-    const amount = Number(budget.replace(/,/g, ""));
-    if (!Number.isFinite(amount) || amount <= 0) return null;
-    const m = ESTIMATE_PER_UNIT[currency];
-    return {
-      low: formatCompact(amount * m.low),
-      high: formatCompact(amount * m.high),
-    };
-  }, [budget, currency]);
-
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    if (docs.length + files.length > 5) {
+    const filesToUpload = Array.from(files);
+    if (
+      filesToUpload.some(
+        file => !isSupportedDocType(file.type)
+      )
+    ) {
+      toast.error("Only PDF, PNG, JPG, or WEBP documents are accepted.");
+      return;
+    }
+    if (
+      filesToUpload.some(
+        file => file.size < 1 || file.size > MAX_BRAND_DOC_BYTES
+      )
+    ) {
+      toast.error(
+        `Each document must be between 1 byte and ${MAX_BRAND_DOC_SIZE_LABEL}.`
+      );
+      return;
+    }
+    if (docs.length + filesToUpload.length > 5) {
       toast.error("You can attach up to 5 documents.");
       return;
     }
     setUploading(true);
     try {
-      for (const file of Array.from(files)) {
+      for (const file of filesToUpload) {
         const { key, uploadUrl } = await getUploadUrl.mutateAsync({
-          contentType: file.type,
+          contentType: file.type as (typeof BRAND_DOC_CONTENT_TYPES)[number],
           fileName: file.name,
+          fileSize: file.size,
         });
         const res = await fetch(uploadUrl, {
           method: "PUT",
@@ -328,9 +329,9 @@ export default function BrandApply() {
             </span>
             <h2>Application received</h2>
             <p>
-              Our team reviews every application within 48 hours. We'll notify
-              you here the moment there's an update — and confirm a custom
-              reach estimate before anything goes live.
+              Thanks for applying. Our team will review your submission and
+              contact you about possible next steps. This application does not
+              guarantee campaign availability or reach.
             </p>
             <button
               type="button"
@@ -520,7 +521,7 @@ export default function BrandApply() {
           <Field
             label={`Total budget (${currency})`}
             required
-            hint="You propose the total budget. Our team sets the creator reward pool and service fee — you approve the split before launch."
+            hint="Proposed budget only. Applying does not charge you or confirm a campaign cost."
           >
             <input
               className="big-input"
@@ -530,21 +531,6 @@ export default function BrandApply() {
               placeholder={currency === "USD" ? "5,000" : "50,000"}
             />
           </Field>
-          {estimate ? (
-            <div className="adv-estimate" aria-label="Estimated reach">
-              <b>
-                Illustrative reach for {currency} {budget}
-              </b>
-              <div className="adv-estimate-num">
-                ~{estimate.low} – {estimate.high} <small>impressions</small>
-              </div>
-              <span>
-                Rough illustration only — our team confirms a custom estimate
-                from real platform data after review. Estimated — Not
-                Guaranteed.
-              </span>
-            </div>
-          ) : null}
           <div className="adv-row-2">
             <Field label="Preferred start">
               <input
@@ -687,9 +673,10 @@ export default function BrandApply() {
           <div className="adv-privacy-note">
             <Lock size={14} aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }} />
             <span>
-              Trade license or business documents help us verify you faster.
-              Files are stored privately — only you and our review team can
-              access them. PDF, PNG, JPG, or WEBP, up to 5 files.
+              Optional trade license or business documents can support your
+              application. Files are uploaded to a dedicated private bucket;
+              reviewer access uses a time-limited signed link. PDF, PNG, JPG,
+              or WEBP, up to 5 files and 10 MB per file.
             </span>
           </div>
           <input

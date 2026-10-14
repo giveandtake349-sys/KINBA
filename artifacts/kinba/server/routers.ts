@@ -1084,7 +1084,8 @@ export const appRouter = router({
           return await createBrandDocUploadUrl(
             ctx.user.id,
             input.contentType,
-            input.fileName
+            input.fileName,
+            input.fileSize
           );
         } catch (error) {
           throw new TRPCError({

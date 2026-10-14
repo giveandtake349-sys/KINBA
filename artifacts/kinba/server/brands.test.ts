@@ -7,7 +7,8 @@ import {
   assertTransition,
   BRAND_APPLICATION_TRANSITIONS,
 } from "../shared/stateMachines";
-import { brandApplicationInput } from "./brands";
+import { MAX_BRAND_DOC_BYTES } from "../shared/brandApplications";
+import { brandApplicationInput, brandDocUploadInput } from "./brands";
 
 const validInput = {
   brandName: "Aarong Dairy",
@@ -174,5 +175,34 @@ describe("brand application review transitions", () => {
     const parsed = brandApplicationInput.parse(validInput);
     expect("creatorPool" in parsed).toBe(false);
     expect("serviceFee" in parsed).toBe(false);
+  });
+});
+
+describe("brandDocUploadInput", () => {
+  const validUpload = {
+    contentType: "application/pdf",
+    fileName: "trade-license.pdf",
+    fileSize: 1024,
+  };
+
+  it("accepts an allowed document within the size limit", () => {
+    expect(brandDocUploadInput.parse(validUpload).fileSize).toBe(1024);
+  });
+
+  it("rejects empty, oversized, or non-integer sizes", () => {
+    for (const fileSize of [0, MAX_BRAND_DOC_BYTES + 1, 1.5]) {
+      expect(
+        brandDocUploadInput.safeParse({ ...validUpload, fileSize }).success
+      ).toBe(false);
+    }
+  });
+
+  it("rejects unsupported document types", () => {
+    expect(
+      brandDocUploadInput.safeParse({
+        ...validUpload,
+        contentType: "text/html",
+      }).success
+    ).toBe(false);
   });
 });

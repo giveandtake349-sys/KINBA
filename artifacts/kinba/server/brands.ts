@@ -16,13 +16,18 @@
  * Money: budgetAmount is a decimal string mapped to numeric(12,2); currency is
  * an explicit USD|BDT column. No floats, no FX conversion in Phase 2.
  *
- * Documents: verification files upload straight from the browser to R2 under
- * a private `brand-docs/{userId}/` prefix via signed PUT URLs. Only the R2 key
- * is stored in the DB; admins fetch short-lived signed GET URLs. There is NO
- * public serving route for brand documents.
+ * Documents: verification files upload straight from the browser to the
+ * dedicated R2_PRIVATE_BUCKET_NAME under a user-scoped prefix. The private
+ * bucket must differ from the public media bucket. Only the R2 key is stored;
+ * admins fetch short-lived signed GET URLs. There is no public serving route.
  */
 import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
+import {
+  BRAND_DOC_CONTENT_TYPES,
+  MAX_BRAND_DOC_BYTES,
+  MAX_BRAND_DOC_SIZE_LABEL,
+} from "../shared/brandApplications";
 import {
   brandApplications,
   brandLinks,
@@ -38,7 +43,10 @@ import {
 import { getDb } from "./db";
 import { validateRoomLink } from "./hypeRooms";
 import { insertNotification, NOTIFICATION_TYPES } from "./notifications";
-import { storageCreateUploadUrl, storageGetSignedUrl } from "./storage";
+import {
+  storageCreatePrivateUploadUrl,
+  storageGetPrivateSignedUrl,
+} from "./storage";
 
 /* ------------------------------------------------------------------ */
 /* Input validation                                                    */
@@ -255,8 +263,9 @@ export const reviewApplicationInput = z.object({
 });
 
 export const brandDocUploadInput = z.object({
-  contentType: z.string().trim().min(1).max(120),
+  contentType: z.enum(BRAND_DOC_CONTENT_TYPES),
   fileName: z.string().trim().min(1).max(160),
+  fileSize: z.number().int().min(1).max(MAX_BRAND_DOC_BYTES),
 });
 
 /* ------------------------------------------------------------------ */
@@ -267,13 +276,6 @@ const orNull = (value: string | null | undefined): string | null =>
   value && value.length > 0 ? value : null;
 
 const DOC_KEY_PREFIX = "brand-docs/";
-
-const DOC_CONTENT_TYPES = new Set([
-  "application/pdf",
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-]);
 
 /* ------------------------------------------------------------------ */
 /* Brand procedures                                                    */
@@ -510,7 +512,7 @@ export async function getBrandApplicationForAdmin(id: number) {
         fileName: doc.fileName,
         contentType: doc.contentType,
         uploadedAt: doc.uploadedAt ?? null,
-        viewUrl: await storageGetSignedUrl(doc.key),
+        viewUrl: await storageGetPrivateSignedUrl(doc.key),
       }))
   );
 
@@ -602,17 +604,33 @@ export async function reviewBrandApplication(
 export async function createBrandDocUploadUrl(
   userId: number,
   contentType: string,
-  fileName: string
+  fileName: string,
+  fileSize: number
 ) {
-  if (!DOC_CONTENT_TYPES.has(contentType)) {
+  if (
+    !(BRAND_DOC_CONTENT_TYPES as readonly string[]).includes(contentType)
+  ) {
     throw new Error(
       "Only PDF, PNG, JPG, or WEBP documents are accepted."
+    );
+  }
+  if (
+    !Number.isSafeInteger(fileSize) ||
+    fileSize < 1 ||
+    fileSize > MAX_BRAND_DOC_BYTES
+  ) {
+    throw new Error(
+      `Each document must be between 1 byte and ${MAX_BRAND_DOC_SIZE_LABEL}.`
     );
   }
   const clean =
     fileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120) || "document";
   const relKey = `${DOC_KEY_PREFIX}${userId}/${clean}`;
-  const { key, url } = await storageCreateUploadUrl(relKey, contentType);
+  const { key, url } = await storageCreatePrivateUploadUrl(
+    relKey,
+    contentType,
+    fileSize
+  );
   return { key, uploadUrl: url };
 }
 
@@ -624,5 +642,5 @@ export async function getBrandDocViewUrl(key: string) {
   if (!key.startsWith(DOC_KEY_PREFIX)) {
     throw new Error("Invalid document reference.");
   }
-  return { viewUrl: await storageGetSignedUrl(key) };
+  return { viewUrl: await storageGetPrivateSignedUrl(key) };
 }

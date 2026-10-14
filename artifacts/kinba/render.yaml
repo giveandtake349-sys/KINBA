@@ -41,6 +41,8 @@ services:
         sync: false
       - key: R2_BUCKET_NAME
         sync: false
+      - key: R2_PRIVATE_BUCKET_NAME
+        sync: false
       - key: R2_PUBLIC_BASE_URL
         value: https://pub-70b81b5880fc4021aec379e9320a0260.r2.dev
       - key: VITE_R2_PUBLIC_BASE_URL

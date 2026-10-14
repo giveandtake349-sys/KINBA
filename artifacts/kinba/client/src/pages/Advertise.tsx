@@ -13,22 +13,26 @@ const FORMATS = [
 const STEPS = [
   {
     title: "Apply",
-    text: "Tell us about your brand, goals, and budget. Takes about 5 minutes.",
+    text: "Share your brand, objectives, preferred formats, and proposed budget.",
   },
   {
     title: "Review",
-    text: "Our team reviews every application within 48 hours and confirms a custom reach estimate.",
+    text: "Our team assesses submitted applications. Review timing may vary.",
   },
   {
-    title: "Launch",
-    text: "Invited creators publish, and you track real views, clicks, and engagement.",
+    title: "Discuss next steps",
+    text: "If there is a fit, we can discuss availability, scope, and any estimate before an agreement.",
   },
 ];
 
-/**
- * Public "Advertise with JHILIK" landing page. Visible to everyone —
- * including logged-out visitors. Contains zero budget or business internals.
- */
+const APPLICATION_DETAILS = [
+  "Your brand and business contact details",
+  "Campaign objectives, preferred formats, and target market",
+  "Proposed budget, timing, and relevant links",
+  "Optional business verification documents",
+];
+
+/** Public application information only; no unverified audience or service claims. */
 export default function Advertise() {
   const [, navigate] = useLocation();
 
@@ -49,14 +53,13 @@ export default function Advertise() {
 
       <section className="adv-hero" aria-label="Advertise with JHILIK">
         <h1>
-          Grow with
+          Explore
           <br />
           JHILIK
         </h1>
         <p>
-          Put your brand in front of real audiences — through creators they
-          already trust. Sponsored feed, videos, shorts, and creator-led
-          campaigns.
+          Share your brand goals and campaign idea. Submit an application for
+          review; campaign availability and reach are not guaranteed.
         </p>
         <button
           type="button"
@@ -66,20 +69,6 @@ export default function Advertise() {
           Apply as a Brand
           <ArrowRight size={18} />
         </button>
-        <div className="adv-hero-stats" aria-label="Platform highlights">
-          <div>
-            <b>48K</b>
-            <span>creators</span>
-          </div>
-          <div>
-            <b>2.1M</b>
-            <span>monthly views</span>
-          </div>
-          <div>
-            <b>48h</b>
-            <span>review time</span>
-          </div>
-        </div>
       </section>
 
       <section className="adv-card" aria-label="How it works">
@@ -99,8 +88,12 @@ export default function Advertise() {
         </div>
       </section>
 
-      <section className="adv-card" aria-label="Campaign formats">
-        <h2>Campaign formats</h2>
+      <section className="adv-card" aria-label="Campaign formats to request">
+        <h2>Formats to discuss</h2>
+        <p className="adv-hint">
+          You can ask about these formats in your application. Availability is
+          assessed during review.
+        </p>
         <div className="adv-formats">
           {FORMATS.map(format => (
             <span className="adv-format-pill" key={format}>
@@ -110,15 +103,10 @@ export default function Advertise() {
         </div>
       </section>
 
-      <section className="adv-card" aria-label="What you get">
-        <h2>Every campaign includes</h2>
+      <section className="adv-card" aria-label="Application details">
+        <h2>What to include</h2>
         <div className="adv-steps">
-          {[
-            "A dedicated review manager from our team",
-            "Invitation-only creators matched to your goals",
-            "Real view, impression, and click tracking",
-            "Honest estimates — never inflated numbers",
-          ].map(line => (
+          {APPLICATION_DETAILS.map(line => (
             <div className="adv-step" key={line}>
               <CheckCircle2 size={20} color="#1a7f37" aria-hidden="true" />
               <div>
@@ -138,9 +126,9 @@ export default function Advertise() {
       </section>
 
       <p className="adv-fine">
-        All reach figures are honest estimates from real platform data.
-        <br />
-        <strong>Estimated — Not Guaranteed.</strong>
+        Submitting an application is not a campaign commitment. Any proposed
+        scope, reach estimate, availability, and timing will be discussed
+        separately before an agreement.
       </p>
     </main>
   );
