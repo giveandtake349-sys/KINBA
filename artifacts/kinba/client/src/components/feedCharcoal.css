@@ -49,10 +49,12 @@
   color: #e4e6eb;
 }
 
+.media-hub .home-feed-tabs button.active,
 .home-feed-tabs button.active {
   background: transparent !important;
   color: #e4e6eb !important;
-  /* Kill the blue underline from kinbaModern.css — white ::after only. */
+  /* Kill the blue underline from kinbaModern.css — white ::after only.
+     NOTE: must match kinbaModern's .media-hub prefixed specificity. */
   border-bottom-color: transparent !important;
   box-shadow: none !important;
 }
