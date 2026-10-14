@@ -678,6 +678,26 @@
   overflow: hidden;
   overflow-wrap: break-word;
 }
+.adv-card .an-head {
+  min-width: 0;
+  align-items: center;
+}
+.adv-card .an-head h3 {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+}
+.adv-card .an-head .adv-cta {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+}
+.adv-form-card .adv-field input,
+.adv-form-card .adv-field select {
+  min-width: 0;
+  max-width: 100%;
+}
 .adv-card,
 .adv-form-card,
 .adv-field,

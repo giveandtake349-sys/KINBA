@@ -75,6 +75,8 @@ const videoUrlInput = z
   .max(1024)
   .refine(u => u.startsWith("https://"), "Ad video URL must be https.");
 const currencyInput = z.enum(PREROLL_CURRENCIES);
+const blankToUndefined = (value: unknown) =>
+  typeof value === "string" && value.trim() === "" ? undefined : value;
 
 export const createAdInput = z.object({
   title: adTitleInput,
@@ -82,12 +84,12 @@ export const createAdInput = z.object({
   // Defense in depth: blank strings become undefined BEFORE validation,
   // so even a stale client sending "" can't reach the DB as "".
   thumbnailUrl: z.preprocess(
-    v => (typeof v === "string" && v.trim() === "" ? undefined : v),
-    z.string().trim().url().max(1024).nullish(),
+    blankToUndefined,
+    z.string().trim().url().max(1024).nullable().optional(),
   ),
   dropId: z.preprocess(
-    v => (v === "" || (typeof v === "string" && v.trim() === "") ? undefined : v),
-    z.number().int().positive().nullish(),
+    blankToUndefined,
+    z.number().int().positive().nullable().optional(),
   ),
   budgetCents: z.number().int().min(100).max(100_000_000),
   currency: currencyInput.default("USD"),
@@ -486,17 +488,30 @@ export async function createAd(
     dropId?: unknown;
     thumbnailUrl?: unknown;
   };
-  const thumbnailUrl =
-    typeof rawInput.thumbnailUrl === "string" && rawInput.thumbnailUrl.trim()
+  const normalizedThumbnailUrl =
+    typeof rawInput.thumbnailUrl === "string"
       ? rawInput.thumbnailUrl.trim()
+      : rawInput.thumbnailUrl;
+  const thumbnailUrl: string | null =
+    typeof normalizedThumbnailUrl === "string" && normalizedThumbnailUrl
+      ? normalizedThumbnailUrl
       : null;
 
   // Drop link must exist, be owned by the advertiser, and not be archived.
   let dropId: number | null = null;
-  const rawDropId = rawInput.dropId;
-  if (rawDropId !== null && rawDropId !== undefined && rawDropId !== "") {
+  const normalizedDropId =
+    typeof rawInput.dropId === "string"
+      ? rawInput.dropId.trim()
+      : rawInput.dropId;
+  if (
+    normalizedDropId !== null &&
+    normalizedDropId !== undefined &&
+    normalizedDropId !== ""
+  ) {
     const parsedDropId =
-      typeof rawDropId === "number" ? rawDropId : Number(String(rawDropId).trim());
+      typeof normalizedDropId === "number"
+        ? normalizedDropId
+        : Number(normalizedDropId);
     if (!Number.isSafeInteger(parsedDropId) || parsedDropId <= 0) {
       throw new Error("Drop link must be a valid drop.");
     }

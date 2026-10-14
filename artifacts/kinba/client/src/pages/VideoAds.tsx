@@ -247,7 +247,8 @@ function NewVideoAdForm({ onDone }: { onDone: () => void }) {
       await createAd.mutateAsync({
         title: title.trim(),
         videoUrl: publicUrl,
-        dropId: dropId ? Number(dropId) : null,
+        thumbnailUrl: null,
+        dropId: dropId.trim() ? Number(dropId) : null,
         budgetCents,
         currency,
         startsAt: startsAt ? new Date(startsAt).toISOString() : null,

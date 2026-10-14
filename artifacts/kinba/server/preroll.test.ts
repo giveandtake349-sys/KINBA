@@ -96,6 +96,7 @@ import {
   PREROLL_AD_TRANSITIONS,
 } from "../shared/stateMachines";
 import {
+  createAd,
   createAdInput,
   getPrerollSettings,
   isCreatorEligible,
@@ -184,6 +185,36 @@ describe("input validation", () => {
       createAdInput.parse({ ...base, videoUrl: "http://x.example/a.mp4" })
     ).toThrow();
     expect(() => createAdInput.parse({ ...base, title: "" })).toThrow();
+  });
+  it("normalizes blank optional fields before the preroll INSERT", async () => {
+    const base = {
+      title: "Sale",
+      videoUrl: "https://cdn.example/ad.mp4",
+      budgetCents: 500,
+      currency: "USD" as const,
+      startsAt: "2026-10-14T00:00:00.000Z",
+    };
+    const parsed = createAdInput.parse({
+      ...base,
+      thumbnailUrl: "",
+      dropId: "",
+    } as never);
+    expect(parsed.thumbnailUrl).toBeUndefined();
+    expect(parsed.dropId).toBeUndefined();
+
+    await createAd(327, {
+      ...base,
+      thumbnailUrl: "",
+      dropId: "",
+    } as never);
+
+    const values = insertsFor(prerollAds)[0].values as Record<string, unknown>;
+    console.info("createAd final insert optionals", {
+      thumbnailUrl: values.thumbnailUrl,
+      dropId: values.dropId,
+    });
+    expect(values.thumbnailUrl).toBeNull();
+    expect(values.dropId).toBeNull();
   });
   it("rejects invalid settings", () => {
     expect(() =>
