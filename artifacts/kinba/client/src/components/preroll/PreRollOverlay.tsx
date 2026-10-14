@@ -46,9 +46,11 @@ export function PreRollOverlay({
   const remain = Math.max(0, SKIP_AFTER_SECS - Math.floor(elapsed));
   const progress = duration > 0 ? Math.min(100, (elapsed / duration) * 100) : 0;
 
+  const hasCta = Boolean(ad.linkUrl || ad.drop);
+
   return (
     <div
-      className="preroll-overlay"
+      className={`preroll-overlay${hasCta ? " has-cta" : ""}`}
       role="region"
       aria-label={`Advertisement: ${ad.title}`}
       data-preroll-no-swipe

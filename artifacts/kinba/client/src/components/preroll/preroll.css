@@ -97,6 +97,12 @@
   cursor: pointer;
 }
 
+/* When the Visit/Drop CTA card is shown, lift the skip button above it
+   so the two never overlap. */
+.preroll-overlay.has-cta .preroll-skip {
+  bottom: 112px;
+}
+
 .preroll-drop {
   position: absolute;
   bottom: 34px;
