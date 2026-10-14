@@ -675,6 +675,8 @@
   border-radius: 16px;
   padding: 18px 16px;
   margin-bottom: 16px;
+  overflow: hidden;
+  overflow-wrap: break-word;
 }
 .adv-card,
 .adv-form-card,

@@ -79,8 +79,16 @@ const currencyInput = z.enum(PREROLL_CURRENCIES);
 export const createAdInput = z.object({
   title: adTitleInput,
   videoUrl: videoUrlInput,
-  thumbnailUrl: z.string().trim().url().max(1024).nullish(),
-  dropId: z.number().int().positive().nullish(),
+  // Defense in depth: blank strings become undefined BEFORE validation,
+  // so even a stale client sending "" can't reach the DB as "".
+  thumbnailUrl: z.preprocess(
+    v => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z.string().trim().url().max(1024).nullish(),
+  ),
+  dropId: z.preprocess(
+    v => (v === "" || (typeof v === "string" && v.trim() === "") ? undefined : v),
+    z.number().int().positive().nullish(),
+  ),
   budgetCents: z.number().int().min(100).max(100_000_000),
   currency: currencyInput.default("USD"),
   startsAt: z.string().datetime({ offset: true }).nullish(),

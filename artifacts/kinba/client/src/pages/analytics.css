@@ -108,7 +108,8 @@
   justify-items: center;
 }
 .an-empty svg { opacity: 0.5; }
-.an-head { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; }
+.an-head { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; flex-wrap: wrap; gap: 8px; }
+.an-head > * { min-width: 0; }
 .an-head h3 { margin: 0; font-size: 20px; letter-spacing: -0.02em; color: var(--text); display: flex; align-items: center; gap: 8px; }
 .an-live { font-size: 12px; color: var(--success, #1a7f37); font-weight: 700; display: flex; align-items: center; gap: 5px; }
 .an-live::before { content: ""; width: 7px; height: 7px; border-radius: 99px; background: currentColor; }
