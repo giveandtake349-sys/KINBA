@@ -31,6 +31,7 @@ const Advertise = lazy(() => import("./pages/Advertise"));
 const BrandApply = lazy(() => import("./pages/BrandApply"));
 const MyAds = lazy(() => import("./pages/MyAds"));
 const CreatorCampaigns = lazy(() => import("./pages/CreatorCampaigns"));
+const JHILIKStudio = lazy(() => import("./pages/JHILIKStudio"));
 
 function RouteLoading() {
   return (
@@ -53,6 +54,7 @@ function AppRoutes() {
         <Route path="/advertise/apply" component={BrandApply} />
         <Route path="/advertise/my-ads" component={MyAds} />
         <Route path="/advertise" component={Advertise} />
+        <Route path="/studio" component={JHILIKStudio} />
         <Route path="/campaigns" component={CreatorCampaigns} />
         <Route path="/admin" component={Admin} />
         <Route path="/auth/callback" component={AuthCallback} />

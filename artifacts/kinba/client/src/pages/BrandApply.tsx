@@ -13,7 +13,6 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { AdvertiseNav } from "@/components/ads/AdvertiseNav";
 import {
   BRAND_DOC_CONTENT_TYPES,
   MAX_BRAND_DOC_BYTES,
@@ -397,8 +396,6 @@ export default function BrandApply() {
         <span className="adv-topbar-title">Brand Application</span>
         <span style={{ width: 40 }} aria-hidden="true" />
       </div>
-
-      <AdvertiseNav active="apply" />
 
       <div className="adv-form">
         {formError ? (

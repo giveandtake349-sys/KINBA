@@ -2931,6 +2931,12 @@ export default function Home() {
       navigate("/advertise");
       return;
     }
+    if (next === "studio") {
+      setMenuOpen(false);
+      setActiveModal(null);
+      navigate("/studio");
+      return;
+    }
     openModal(next);
   };
   const logout = async () => {

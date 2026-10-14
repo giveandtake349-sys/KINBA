@@ -5,11 +5,11 @@ export type AdvertiseSection = "advertise" | "my-ads" | "apply";
 const ITEMS: Array<{ id: AdvertiseSection; label: string; path: string }> = [
   { id: "advertise", label: "Advertise", path: "/advertise" },
   { id: "my-ads", label: "My Ads", path: "/advertise/my-ads" },
-  { id: "apply", label: "Apply", path: "/advertise/apply" },
 ];
 
 /**
- * Top section nav for the advertise area (Advertise | My Ads | Apply).
+ * Top section nav for the advertise area. Application is intentionally hidden
+ * here and opens only from an explicit Apply button on the landing page.
  * Never called "dashboard" — the user's confirmed IA names it "My Ads".
  */
 export function AdvertiseNav({ active }: { active: AdvertiseSection }) {
