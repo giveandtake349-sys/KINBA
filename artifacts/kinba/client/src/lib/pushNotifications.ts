@@ -4,6 +4,7 @@ import {
   type ActionPerformed,
   type Token,
 } from "@capacitor/push-notifications";
+import { supabase } from "./supabase";
 
 const PUSH_TOKEN_STORAGE_KEY = "kinba.push-token";
 
@@ -17,14 +18,21 @@ export async function initializePushNotifications(
 ): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
 
+  let currentToken: string | null = null;
+  const registerCurrentToken = () =>
+    currentToken && onToken ? onToken(currentToken).catch(error => {
+      console.error("[PushNotifications] token registration failed", error);
+    }) : Promise.resolve();
+
+  supabase.auth.onAuthStateChange((_event, session) => {
+    if (session && currentToken) void registerCurrentToken();
+  });
+
   await PushNotifications.addListener("registration", ({ value }: Token) => {
+    currentToken = value;
     localStorage.setItem(PUSH_TOKEN_STORAGE_KEY, value);
     console.info("[PushNotifications] FCM token registered");
-    if (onToken) {
-      void onToken(value).catch(error => {
-        console.error("[PushNotifications] token registration failed", error);
-      });
-    }
+    void registerCurrentToken();
     window.dispatchEvent(new CustomEvent("kinba:push-token", { detail: value }));
   });
 
