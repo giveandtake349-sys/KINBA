@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "298650239415",
+    "project_id": "jhilik-b81fd",
+    "storage_bucket": "jhilik-b81fd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:298650239415:android:758ff564b1bdb91370e832",
+        "android_client_info": {
+          "package_name": "com.kinba.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCo6YI6vBil32OP030Wp3-OwQA5s8Hlq4I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
