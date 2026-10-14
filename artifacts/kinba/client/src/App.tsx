@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import { SupabaseAuthProvider } from "./contexts/SupabaseAuthContext";
+import { JHILIKRealtimeBridge } from "./lib/jhilikRealtime";
 import Home from "./pages/Home";
 import "./components/kinbaModern.css";
 import { OfflineBanner } from "./components/OfflineBanner";
@@ -101,6 +102,7 @@ export default function App() {
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
           <SupabaseAuthProvider>
+            <JHILIKRealtimeBridge />
             <ThemedToaster />
             <OfflineBanner />
             <AppRoutes />
