@@ -1,0 +1,255 @@
+/* ========================================================================
+   FEED CHARCOAL — Charcoal dark theme for the feed (approved redesign).
+   Loaded AFTER modernFeed.css so it wins the cascade.
+
+   Scope: `.home-page` (dashboard feed section) + `.home-feed-tabs`.
+   Other pages (profile, messages, admin, shorts) are untouched.
+   ======================================================================== */
+
+/* ---- CHARCOAL VARIABLES (scoped to feed) ---- */
+.home-page {
+  --page-bg: #1c1e21;
+  --surface: #242526;
+  --surface-raised: #242526;
+  --surface-elevated: #3a3b3c;
+  --border: #3e4042;
+  --input: #3a3b3c;
+  --text: #e4e6eb;
+  --muted: #9aa0a6;
+  --reaction-accent: #ff3040;
+  --reaction-accent-soft: rgba(255, 48, 64, 0.12);
+  --reaction-accent-border: rgba(255, 48, 64, 0.45);
+  background: var(--page-bg);
+}
+
+/* ---- FEED TABS (For You / Following / Spotlight / Shorts) ----
+   Tabs live outside .home-page (in the header), so style directly. */
+.home-feed-tabs {
+  background: #242526;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid #3e4042;
+  padding: 0;
+  gap: 0;
+}
+
+.home-feed-tabs button {
+  position: relative;
+  flex: 1 0 auto;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: #9aa0a6;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 14px;
+}
+
+.home-feed-tabs button:hover {
+  color: #e4e6eb;
+}
+
+.home-feed-tabs button.active {
+  background: transparent;
+  color: #e4e6eb;
+}
+
+.home-feed-tabs button.active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 20%;
+  right: 20%;
+  height: 3px;
+  background: #e4e6eb;
+  border-radius: 3px 3px 0 0;
+}
+
+/* ---- COMPOSER PILL (top of feed) ---- */
+.feed-composer-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  background: #242526;
+  border: 0;
+  border-bottom: 8px solid #1c1e21;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.feed-composer-avatar {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #3a3b3c;
+  color: #e4e6eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  overflow: hidden;
+}
+
+.feed-composer-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.feed-composer-text {
+  flex: 1;
+  background: #3a3b3c;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 14px;
+  color: #9aa0a6;
+}
+
+/* ---- POST CARDS: borderless, divider-separated ---- */
+.home-page .k-post {
+  background: var(--surface);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0;
+  max-width: 100%;
+  border-bottom: 8px solid var(--page-bg);
+}
+
+.home-page .k-post__creator {
+  padding: 12px 14px;
+}
+
+.home-page .k-post__name {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.home-page .k-post__meta-line {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.home-page .k-post__caption,
+.home-page .caption-container {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.home-page .k-post__title {
+  color: var(--text);
+}
+
+.home-page .k-post__stats {
+  color: var(--muted);
+}
+
+.home-page .k-post__media {
+  background: #000;
+}
+
+/* ---- COUNTS ROW (reaction stack + comments/shares) ---- */
+.home-page .k-post__counts {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.home-page .k-post__counts-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.home-page .k-post__react-stack {
+  display: flex;
+  align-items: center;
+}
+
+.home-page .k-post__react-stack > * {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  background: var(--surface-elevated);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  margin-left: -6px;
+}
+
+.home-page .k-post__react-stack > *:first-child {
+  margin-left: 0;
+}
+
+/* ---- ACTION ROW: Pookie / Comment / Share ---- */
+.home-page .k-post__actions {
+  border-top: 1px solid var(--border);
+  margin: 0 14px;
+  padding: 2px 0;
+}
+
+.home-page .k-post__actions button {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 42px;
+}
+
+.home-page .k-post__actions button svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+}
+
+.home-page .k-post__actions button:hover {
+  color: var(--text);
+  background: transparent;
+}
+
+/* Pookie active = red heart (feed cards only; shorts rail keeps its own style) */
+.home-page .k-post__actions button.is-active.media-engagement-actions__pookie,
+.home-page .media-engagement-actions:not(.media-engagement-actions--overlay) button.is-active.media-engagement-actions__pookie {
+  color: #ff3040;
+  background: transparent;
+  border-color: transparent;
+}
+
+.home-page .k-post__actions button.is-active.media-engagement-actions__pookie svg,
+.home-page .media-engagement-actions:not(.media-engagement-actions--overlay) button.is-active.media-engagement-actions__pookie svg {
+  stroke: #ff3040;
+  fill: #ff3040;
+}
+
+/* ---- SPONSORED BADGE: subtle grey pill ---- */
+.home-page .sponsored-badge {
+  background: #3a3b3c;
+  color: #9aa0a6;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* ---- TEXT POSTS ---- */
+.home-page .k-post--text .k-post__bottom {
+  padding: 0 14px 14px;
+}
+
+/* ---- FEED SKELETONS / EMPTY STATES ---- */
+.home-page .feed-empty,
+.home-page .feed-loading {
+  color: var(--muted);
+}

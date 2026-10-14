@@ -2906,7 +2906,28 @@ export default function Home() {
               ) : activeView === "settings" ? (
                 <SettingsPanel onLogout={logout} />
               ) : (
-                <MediaHub
+                <>
+                  {(activeView === "videos" ||
+                    activeView === "following" ||
+                    activeView === "spotlight") && (
+                    <button
+                      type="button"
+                      className="feed-composer-pill"
+                      onClick={safeClick(() => openModal("upload"))}
+                    >
+                      <span className="feed-composer-avatar" aria-hidden="true">
+                        {profile?.profile?.photoUrl ? (
+                          <img src={profile.profile.photoUrl} alt="" />
+                        ) : (
+                          (auth.user?.name || "?").charAt(0).toUpperCase()
+                        )}
+                      </span>
+                      <span className="feed-composer-text">
+                        What&apos;s on your mind?
+                      </span>
+                    </button>
+                  )}
+                  <MediaHub
                   section={activeView}
                   onSectionChange={showFeed}
                   showTabs={false}
@@ -2919,6 +2940,7 @@ export default function Home() {
                     setActiveView("shorts");
                   }}
                 />
+                </>
               )}
             </section>
           ) : publicProfileLoading ? (

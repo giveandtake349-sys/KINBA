@@ -115,6 +115,7 @@ import { Caption } from "./Caption";
 import "./mediaHub.css";
 import "./feedUi.css";
 import "./modernFeed.css";
+import "./feedCharcoal.css";
 import "./shorts-stage.css";
 import "./conversation/conversation.css";
 import "./commentsUpgrade.css";
@@ -3606,6 +3607,18 @@ function VideoCard({
           </>
         )}
 
+        <div className="k-post__counts">
+          <span className="k-post__counts-left">
+            <span className="k-post__react-stack" aria-hidden="true">
+              <span>❤️</span>
+            </span>
+            {formatCount(current.reactionCount)}
+          </span>
+          <span>
+            {formatCount(current.commentCount)} comments ·{" "}
+            {formatCount(current.shareCount)} shares
+          </span>
+        </div>
         <div className="k-post__actions">
           <button
             type="button"
