@@ -228,3 +228,36 @@ describe("creator visibility guard", () => {
     expect(body).toContain("budgetTotal");
   });
 });
+
+describe("runMode (Phase 6 retrofit)", () => {
+  it("defaults to continuous", () => {
+    const parsed = createCampaignInput.parse(validCreate);
+    expect(parsed.runMode).toBe("continuous");
+  });
+
+  it("accepts explicit scheduled with an end date", () => {
+    const parsed = createCampaignInput.parse({
+      ...validCreate,
+      runMode: "scheduled",
+      startsAt: "2026-10-20T00:00:00.000Z",
+      endsAt: "2026-11-20T00:00:00.000Z",
+    });
+    expect(parsed.runMode).toBe("scheduled");
+  });
+
+  it("rejects scheduled without an end date", () => {
+    const result = createCampaignInput.safeParse({
+      ...validCreate,
+      runMode: "scheduled",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects an unknown run mode", () => {
+    const result = createCampaignInput.safeParse({
+      ...validCreate,
+      runMode: "forever",
+    });
+    expect(result.success).toBe(false);
+  });
+});

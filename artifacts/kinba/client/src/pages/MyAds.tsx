@@ -12,6 +12,7 @@ import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { AdvertiseNav } from "@/components/ads/AdvertiseNav";
+import { VideoAdsSection } from "./VideoAds";
 import "./advertise.css";
 import "./analytics.css";
 
@@ -75,7 +76,10 @@ export default function MyAds() {
 
       <div className="adv-form">
         {auth.isAuthenticated ? (
-          <MyAdsContent />
+          <>
+            <MyAdsContent />
+            <VideoAdsSection />
+          </>
         ) : (
           <section className="adv-card" aria-label="Sign in required">
             <h2>My Ads</h2>
@@ -99,12 +103,14 @@ export default function MyAds() {
 
 function MyAdsContent() {
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
   const dashboard = trpc.analytics.brandDashboard.useQuery(undefined, {
     refetchOnWindowFocus: false,
   });
   const myApps = trpc.brands.myApplications.useQuery(undefined, {
     refetchOnWindowFocus: false,
   });
+  const updateStatus = trpc.campaigns.updateMyStatus.useMutation();
   const data = dashboard.data;
 
   if (dashboard.isLoading) {
@@ -151,6 +157,18 @@ function MyAdsContent() {
 
   const { totals, byType } = data!;
 
+  const setCampaignStatus = async (
+    campaignId: number,
+    status: "active" | "paused" | "ended"
+  ) => {
+    try {
+      await updateStatus.mutateAsync({ id: campaignId, status });
+      await utils.analytics.brandDashboard.invalidate();
+    } catch {
+      /* Error surfaces via the mutation state; card stays as-is. */
+    }
+  };
+
   return (
     <section className="adv-card" aria-label="My ads report">
       <div className="an-head">
@@ -189,28 +207,39 @@ function MyAdsContent() {
 
       <div className="an-wrap">
         {campaigns.map(camp => {
-          const campEngagements = camp.creators.reduce(
-            (s, c) => s + c.engagements,
-            0
-          );
-          const campReach = camp.creators.reduce((s, c) => s + c.reach, 0);
-          const campRate =
-            campReach > 0
-              ? +((campEngagements / campReach) * 100).toFixed(1)
-              : null;
+          const dotClass =
+            camp.status === "active"
+              ? "g"
+              : camp.status === "paused"
+                ? "a"
+                : camp.status === "draft"
+                  ? "b"
+                  : "gr";
+          const statusLabel =
+            camp.status.charAt(0).toUpperCase() + camp.status.slice(1);
+          const modeLabel =
+            camp.runMode === "continuous"
+              ? "Continuous"
+              : `Scheduled${camp.endsAt ? ` · ends ${new Date(camp.endsAt).toLocaleDateString()}` : ""}`;
+          const spentPct =
+            camp.budgetCents && camp.budgetCents > 0
+              ? Math.min(100, (camp.spentCents / camp.budgetCents) * 100)
+              : 0;
+          const sym =
+            (camp.currency ?? "").toUpperCase() === "BDT" ? "৳" : "$";
           return (
-            <div className="an-hero" key={camp.campaignId}>
-              <span>
-                {camp.title}{" "}
-                <em className={`an-status ${camp.status}`}>{camp.status}</em>
-              </span>
-              <b>
-                {formatCompact(camp.impressions)} <small>impressions</small>
-              </b>
-              <div className="an-hero-row">
+            <div className="fb-card" key={camp.campaignId}>
+              <div>
+                <div className="fb-name">{camp.title}</div>
+                <div className="fb-meta">
+                  <i className={`dot ${dotClass}`} aria-hidden="true" />
+                  {statusLabel} · {modeLabel}
+                </div>
+              </div>
+              <div className="fb-stats">
                 <div>
-                  <b>{formatCompact(camp.views)}</b>
-                  <span>Views</span>
+                  <b>{formatCompact(camp.impressions)}</b>
+                  <span>Impressions</span>
                 </div>
                 <div>
                   <b>{formatCompact(camp.clicks)}</b>
@@ -220,46 +249,105 @@ function MyAdsContent() {
                   <b>{formatPct(camp.ctr)}</b>
                   <span>CTR</span>
                 </div>
-                <div>
-                  <b>{formatPct(campRate)}</b>
-                  <span>Eng. rate</span>
-                </div>
               </div>
-              {camp.creators.length > 0 ? (
+              {camp.budgetCents ? (
                 <>
-                  <span style={{ marginTop: 6 }}>Creator performance</span>
                   <div
-                    className="an-table"
-                    role="table"
-                    aria-label={`Creator performance for ${camp.title}`}
+                    className="fb-bar"
+                    role="progressbar"
+                    aria-label="Budget spent"
+                    aria-valuenow={Math.round(spentPct)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
                   >
-                    <div className="an-thead" role="row">
-                      <span>Creator</span>
-                      <span>Views</span>
-                      <span>Eng.</span>
-                      <span>Reward</span>
-                    </div>
-                    {camp.creators.map(c => (
-                      <div className="an-trow" role="row" key={c.userId}>
-                        <span className="an-post">
-                          <span>
-                            {c.username
-                              ? `@${c.username}`
-                              : (c.displayName ?? "Creator")}
-                          </span>
-                        </span>
-                        <span>{formatCompact(c.views)}</span>
-                        <b>{formatPct(c.engagementRate)}</b>
-                        <b className="an-ok">
-                          {formatReward(c.rewardAmount, c.rewardCurrency)}
-                        </b>
-                      </div>
-                    ))}
+                    <div style={{ width: `${spentPct}%` }} />
+                  </div>
+                  <div className="fb-spent">
+                    {sym}
+                    {(camp.spentCents / 100).toLocaleString("en-US", {
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    of {sym}
+                    {(camp.budgetCents / 100).toLocaleString("en-US", {
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    spent
                   </div>
                 </>
-              ) : (
-                <span>No creators have joined this campaign yet.</span>
-              )}
+              ) : null}
+              <div className="fb-actions">
+                {camp.status === "active" ? (
+                  <button
+                    type="button"
+                    className="fb-btn sec"
+                    disabled={updateStatus.isPending}
+                    onClick={() =>
+                      void setCampaignStatus(camp.campaignId, "paused")
+                    }
+                  >
+                    Pause
+                  </button>
+                ) : null}
+                {camp.status === "paused" ? (
+                  <button
+                    type="button"
+                    className="fb-btn pri"
+                    disabled={updateStatus.isPending}
+                    onClick={() =>
+                      void setCampaignStatus(camp.campaignId, "active")
+                    }
+                  >
+                    Resume
+                  </button>
+                ) : null}
+                {camp.status === "draft" ? (
+                  <span className="fb-spent">
+                    Under review — activates once approved.
+                  </span>
+                ) : null}
+                {camp.status === "active" || camp.status === "paused" ? (
+                  <button
+                    type="button"
+                    className="fb-btn sec danger"
+                    disabled={updateStatus.isPending}
+                    onClick={() =>
+                      void setCampaignStatus(camp.campaignId, "ended")
+                    }
+                  >
+                    End
+                  </button>
+                ) : null}
+              </div>
+              {camp.creators.length > 0 ? (
+                <div
+                  className="an-table"
+                  role="table"
+                  aria-label={`Creator performance for ${camp.title}`}
+                >
+                  <div className="an-thead" role="row">
+                    <span>Creator</span>
+                    <span>Views</span>
+                    <span>Eng.</span>
+                    <span>Reward</span>
+                  </div>
+                  {camp.creators.map(c => (
+                    <div className="an-trow" role="row" key={c.userId}>
+                      <span className="an-post">
+                        <span>
+                          {c.username
+                            ? `@${c.username}`
+                            : (c.displayName ?? "Creator")}
+                        </span>
+                      </span>
+                      <span>{formatCompact(c.views)}</span>
+                      <b>{formatPct(c.engagementRate)}</b>
+                      <b className="an-ok">
+                        {formatReward(c.rewardAmount, c.rewardCurrency)}
+                      </b>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           );
         })}
@@ -306,6 +394,9 @@ function MyAdsContent() {
 
         <p className="an-fine">
           Estimated — Not Guaranteed · Real database numbers
+        </p>
+        <p className="fb-note">
+          When the budget runs out, the ad pauses automatically.
         </p>
       </div>
     </section>

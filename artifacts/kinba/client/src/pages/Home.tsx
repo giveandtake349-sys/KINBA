@@ -42,6 +42,7 @@ import {
   Video,
   WalletCards,
   X,
+  Clapperboard,
   Megaphone,
   MessageCircle,
   Plus,
@@ -2592,7 +2593,8 @@ function StudioEarningsTab() {
         <p>
           <strong>No earnings yet.</strong>
           <br />
-          Approved campaign submissions show up here.
+          Approved campaign submissions and pre-roll ad revenue show up
+          here.
         </p>
       </div>
     );
@@ -2611,7 +2613,20 @@ function StudioEarningsTab() {
         {rows.map(row => (
           <div className="an-trow" role="row" key={row.id}>
             <span className="an-post">
-              <span>{row.campaignTitle}</span>
+              <span>
+                {row.source === "preroll" ? (
+                  <>
+                    <Clapperboard
+                      size={13}
+                      aria-hidden="true"
+                      style={{ marginRight: 4, verticalAlign: "-2px" }}
+                    />
+                    Pre-roll ad revenue
+                  </>
+                ) : (
+                  row.campaignTitle
+                )}
+              </span>
             </span>
             <b>
               {symbolFor(row.currency)}

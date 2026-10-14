@@ -87,6 +87,9 @@ export type BrandApplicationStatus = (typeof BRAND_APPLICATION_STATUSES)[number]
 export const CAMPAIGN_STATUSES = ["draft", "active", "paused", "ended"] as const;
 export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
 
+export const PREROLL_AD_STATUSES = ["draft", "active", "paused", "ended"] as const;
+export type PrerollAdStatus = (typeof PREROLL_AD_STATUSES)[number];
+
 export const CAMPAIGN_INVITATION_STATUSES = [
   "pending",
   "accepted",
@@ -180,6 +183,20 @@ export const BRAND_APPLICATION_TRANSITIONS: TransitionMap<BrandApplicationStatus
 /** Campaign lifecycle. MVP: activation/expiry is a manual admin action. */
 export const CAMPAIGN_TRANSITIONS: TransitionMap<CampaignStatus> = {
   draft: ["active"],
+  active: ["paused", "ended"],
+  paused: ["active", "ended"],
+  ended: [],
+};
+
+/**
+ * Pre-roll ad lifecycle (Phase 6). FB-style continuous run: manual
+ * advertiser/admin Activate/Pause/End, no cron. `draft` → `active` is the
+ * admin approval (or advertiser activation); budget exhaustion pauses
+ * serving but does not auto-change status — the ad simply stops being
+ * selected once spentCents reaches budgetCents.
+ */
+export const PREROLL_AD_TRANSITIONS: TransitionMap<PrerollAdStatus> = {
+  draft: ["active", "ended"],
   active: ["paused", "ended"],
   paused: ["active", "ended"],
   ended: [],

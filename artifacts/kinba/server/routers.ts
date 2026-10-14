@@ -45,6 +45,7 @@ import {
   setCampaignStatusInput,
   updateCampaign,
   updateCampaignInput,
+  updateMyCampaignStatus,
 } from "./campaigns";
 import {
   campaignIdInput,
@@ -62,6 +63,28 @@ import {
   submitDeliverable,
   submitDeliverableInput,
 } from "./submissions";
+import {
+  adminListAds,
+  adminPrerollStats,
+  adminUpdateAdStatus,
+  adStatusInput,
+  createAd,
+  createAdInput,
+  createAdUploadUrl,
+  getAdForVideo,
+  getAdForVideoInput,
+  getPrerollSettings,
+  hashViewer,
+  isBotUserAgent,
+  listMyAds,
+  listMyDropsForAds,
+  reportPlay,
+  reportPlayInput,
+  updateAdStatus,
+  updatePrerollSettings,
+  updateSettingsInput,
+} from "./preroll";
+import { PREROLL_AD_STATUSES } from "../shared/stateMachines";
 import {
   adminProcedure,
   protectedProcedure,
@@ -1230,6 +1253,31 @@ export const appRouter = router({
         // brand-scoped view (their own brands, if any).
         return listCampaignsForBrand(ctx.user.id, input);
       }),
+    // Phase 6: advertiser Pause / Resume / End on their own campaigns.
+    updateMyStatus: protectedProcedure
+      .input(
+        z.object({
+          id: z.number().int().positive(),
+          status: z.enum(["active", "paused", "ended"]),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await updateMyCampaignStatus(
+            ctx.user.id,
+            input.id,
+            input.status
+          );
+        } catch (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Could not update campaign.",
+          });
+        }
+      }),
     get: protectedProcedure
       .input(z.object({ id: z.number().int().positive() }))
       .query(async ({ ctx, input }) => {
@@ -1437,6 +1485,175 @@ export const appRouter = router({
       links: adminProcedure
         .input(campaignIdInput)
         .query(({ input }) => listCampaignLinks(input.campaignId)),
+    }),
+  }),
+  preroll: router({
+    // Public: pick a pre-roll ad for a video (null = no ad). Viewers may
+    // be logged out. Rate-limited + bot-filtered.
+    getAdForVideo: publicProcedure
+      .input(getAdForVideoInput)
+      .query(async ({ ctx, input }) => {
+        const ip = getClientIp(ctx.req);
+        const rl = await checkDbRateLimit({
+          key: `preroll:getAd:${ip}`,
+          windowMs: 60_000,
+          max: 60,
+        });
+        if (!rl.allowed) {
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: "Too many ad requests. Please slow down.",
+          });
+        }
+        if (isBotUserAgent(ctx.req.get("user-agent"))) return null;
+        return getAdForVideo(
+          input.videoId,
+          hashViewer(ip, process.env.VIEW_SALT ?? "jhilik-view-salt")
+        );
+      }),
+    // Public: record one play + credit the creator in-transaction.
+    reportPlay: publicProcedure
+      .input(reportPlayInput)
+      .mutation(async ({ ctx, input }) => {
+        const ip = getClientIp(ctx.req);
+        const rl = await checkDbRateLimit({
+          key: `preroll:report:${ip}`,
+          windowMs: 60_000,
+          max: 30,
+        });
+        if (!rl.allowed) {
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: "Too many play reports. Please slow down.",
+          });
+        }
+        if (isBotUserAgent(ctx.req.get("user-agent"))) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Bot traffic is not counted.",
+          });
+        }
+        try {
+          return await reportPlay({
+            ...input,
+            viewerHash: hashViewer(
+              ip,
+              process.env.VIEW_SALT ?? "jhilik-view-salt"
+            ),
+          });
+        } catch (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              error instanceof Error ? error.message : "Could not record play.",
+          });
+        }
+      }),
+    // Advertiser: signed upload URL for the ad video file.
+    createAdUploadUrl: protectedProcedure
+      .input(
+        z.object({
+          contentType: z.string().min(1).max(128),
+          fileName: z.string().min(1).max(160),
+          fileSize: z.number().int().positive(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await createAdUploadUrl(
+            ctx.user.id,
+            input.contentType,
+            input.fileName,
+            input.fileSize
+          );
+        } catch (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Could not create the upload URL.",
+          });
+        }
+      }),
+    // Advertiser: create a video ad (starts as draft).
+    createAd: protectedProcedure
+      .input(createAdInput)
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await createAd(ctx.user.id, input);
+        } catch (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              error instanceof Error ? error.message : "Could not create ad.",
+          });
+        }
+      }),
+    // Advertiser: own video ads with real stats.
+    myAds: protectedProcedure.query(({ ctx }) => listMyAds(ctx.user.id)),
+    // Advertiser: own drops for the attach-drop picker.
+    myDrops: protectedProcedure.query(({ ctx }) =>
+      listMyDropsForAds(ctx.user.id)
+    ),
+    // Advertiser: manual Pause/Resume/End (no cron).
+    updateAdStatus: protectedProcedure
+      .input(adStatusInput)
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await updateAdStatus(ctx.user.id, input.adId, input.status);
+        } catch (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Could not update ad status.",
+          });
+        }
+      }),
+    admin: router({
+      list: adminProcedure
+        .input(
+          z.object({
+            status: z.enum(PREROLL_AD_STATUSES).optional(),
+            limit: z.number().int().min(1).max(100).default(25),
+            offset: z.number().int().min(0).default(0),
+          })
+        )
+        .query(({ input }) => adminListAds(input)),
+      setStatus: adminProcedure
+        .input(adStatusInput)
+        .mutation(async ({ input }) => {
+          try {
+            return await adminUpdateAdStatus(input.adId, input.status);
+          } catch (error) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not update ad status.",
+            });
+          }
+        }),
+      settings: adminProcedure.query(() => getPrerollSettings()),
+      updateSettings: adminProcedure
+        .input(updateSettingsInput)
+        .mutation(async ({ input }) => {
+          try {
+            return await updatePrerollSettings(input);
+          } catch (error) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not update settings.",
+            });
+          }
+        }),
+      stats: adminProcedure.query(() => adminPrerollStats()),
     }),
   }),
   admin: router({

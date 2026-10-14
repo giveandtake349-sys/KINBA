@@ -86,12 +86,21 @@ export const createCampaignInput = z
     concepts: stringList(10, 500, "concepts"),
     rules: z.string().trim().max(5000).optional().default(""),
     validationQuestions: stringList(10, 300, "validation questions"),
+    // Phase 6: FB-style run mode. Continuous (default) = no end date.
+    runMode: z.enum(["continuous", "scheduled"]).default("continuous"),
     startsAt: z.string().datetime({ offset: true }).optional(),
     endsAt: z.string().datetime({ offset: true }).optional(),
     creatorPool: moneyString("Creator pool"),
     serviceFee: moneyString("Service fee"),
   })
   .superRefine((value, ctx) => {
+    if (value.runMode === "scheduled" && !value.endsAt) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endsAt"],
+        message: "Scheduled campaigns need an end date.",
+      });
+    }
     if (
       value.startsAt &&
       value.endsAt &&
@@ -266,6 +275,7 @@ export async function createCampaign(
             : null,
         startsAt: input.startsAt ? new Date(input.startsAt) : null,
         endsAt: input.endsAt ? new Date(input.endsAt) : null,
+        runMode: input.runMode,
         status: "draft",
         budgetTotal: application.budgetAmount,
         budgetCurrency: application.budgetCurrency,
@@ -538,6 +548,73 @@ export async function setCampaignStatus(
       });
     }
   }
+
+  return { id, status: toStatus };
+}
+
+/* ------------------------------------------------------------------ */
+/* Advertiser: Pause / Resume / End their own campaigns                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Phase 6: the advertiser ("brand" = user who applied) can Pause, Resume,
+ * or End their own campaigns — manual control, no cron. Draft activation
+ * stays admin-only. Ownership is verified through the brand application.
+ */
+export async function updateMyCampaignStatus(
+  userId: number,
+  id: number,
+  toStatus: "active" | "paused" | "ended"
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const [campaign] = await db
+    .select({
+      id: campaigns.id,
+      title: campaigns.title,
+      status: campaigns.status,
+      applicationId: campaigns.applicationId,
+      ownerId: brandApplications.userId,
+    })
+    .from(campaigns)
+    .leftJoin(
+      brandApplications,
+      eq(brandApplications.id, campaigns.applicationId)
+    )
+    .where(eq(campaigns.id, id))
+    .limit(1);
+  if (!campaign || campaign.ownerId !== userId) {
+    throw new Error("Campaign not found.");
+  }
+  if (campaign.status === "draft" && toStatus === "active") {
+    throw new Error("Only an admin can activate a draft campaign.");
+  }
+  assertTransition(
+    CAMPAIGN_TRANSITIONS,
+    campaign.status as CampaignStatus,
+    toStatus,
+    "campaign status"
+  );
+
+  const now = new Date();
+  await db.transaction(async tx => {
+    const updated = await tx
+      .update(campaigns)
+      .set({ status: toStatus, updatedAt: now })
+      .where(and(eq(campaigns.id, id), eq(campaigns.status, campaign.status)))
+      .returning({ id: campaigns.id });
+    if (updated.length === 0) {
+      throw new Error("Campaign status changed — please reload and retry.");
+    }
+    await tx.insert(campaignAuditLog).values({
+      campaignId: id,
+      applicationId: campaign.applicationId,
+      actorId: userId,
+      action: `campaign.${toStatus}_by_advertiser`,
+      details: { from: campaign.status },
+    });
+  });
 
   return { id, status: toStatus };
 }

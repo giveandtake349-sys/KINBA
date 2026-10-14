@@ -166,6 +166,28 @@ export const campaignEarningsStatus = pgEnum("campaign_earnings_status", [
   "paid_recorded",
 ]);
 
+/**
+ * JHILIK Ads Phase 6: pre-roll ad lifecycle. FB-style continuous run —
+ * no mandatory end date. Runs until budget exhausted or manually
+ * paused/ended. `draft` = created by advertiser, needs admin approval.
+ */
+export const prerollAdStatus = pgEnum("preroll_ad_status", [
+  "draft",
+  "active",
+  "paused",
+  "ended",
+]);
+
+/**
+ * Campaign run mode (Phase 6 retrofit). `continuous` = FB-style: no end
+ * date, runs until budget exhausted or manually paused/ended.
+ * `scheduled` = fixed start/end dates (legacy behavior).
+ */
+export const campaignRunMode = pgEnum("campaign_run_mode", [
+  "continuous",
+  "scheduled",
+]);
+
 const createdAt = () =>
   timestamp("createdAt", { withTimezone: true }).defaultNow().notNull();
 const updatedAt = () =>
@@ -1983,6 +2005,9 @@ export const campaigns = pgTable(
     validationQuestions: jsonb("validationQuestions"),
     startsAt: timestamp("startsAt", { withTimezone: true }),
     endsAt: timestamp("endsAt", { withTimezone: true }),
+    // Phase 6 retrofit: FB-style flexible run. `continuous` (default) has
+    // no end date — runs until budget exhausted or manually paused/ended.
+    runMode: campaignRunMode("runMode").default("continuous").notNull(),
     status: campaignStatus("status").default("draft").notNull(),
     budgetTotal: numeric("budgetTotal", { precision: 12, scale: 2 }),
     budgetCurrency: char("budgetCurrency", { length: 3 }),
@@ -2085,13 +2110,20 @@ export const campaignEarnings = pgTable(
   "campaign_earnings",
   {
     id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
-    campaignId: integer("campaignId")
-      .notNull()
-      .references(() => campaigns.id, { onDelete: "cascade" }),
+    // NULL for pre-roll ad earnings (Phase 6) — those are not tied to a
+    // campaign. Campaign-submission earnings always have a campaignId.
+    campaignId: integer("campaignId").references(() => campaigns.id, {
+      onDelete: "cascade",
+    }),
     submissionId: integer("submissionId").references(
       () => campaignSubmissions.id,
       { onDelete: "set null" }
     ),
+    // Phase 6: link to the pre-roll play that generated this earning.
+    // NULL for campaign-submission earnings.
+    prerollPlayId: integer("prerollPlayId").references(() => prerollPlays.id, {
+      onDelete: "set null",
+    }),
     creatorId: integer("creatorId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
@@ -2120,6 +2152,120 @@ export const campaignEarnings = pgTable(
     index("campaign_earnings_campaign_idx").on(table.campaignId),
     index("campaign_earnings_creator_idx").on(table.creatorId),
     index("campaign_earnings_status_idx").on(table.status),
+    index("campaign_earnings_preroll_play_idx").on(table.prerollPlayId),
+  ]
+);
+
+/* ------------------------------------------------------------------ */
+/* JHILIK Ads Phase 6: video pre-roll ads                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Pre-roll ads. FB-style continuous run: no mandatory end date — an ad
+ * keeps running until the budget is exhausted or the advertiser (or an
+ * admin) pauses/ends it. Money scope is ledger tracking only: each play
+ * charges the brand a fixed per-play rate (admin-set) and credits 55% to
+ * the creator whose video the ad played before; 45% stays with the
+ * platform. No collection/payout — that is the later payment module.
+ */
+export const prerollAds = pgTable(
+  "preroll_ads",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    // The advertiser. "Brand" is a conceptual label — everyone is a user.
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 120 }).notNull(),
+    videoUrl: varchar("videoUrl", { length: 1024 }).notNull(),
+    thumbnailUrl: varchar("thumbnailUrl", { length: 1024 }),
+    // Optional shoppable Drop attached to the ad (commerce loop tie-in).
+    dropId: integer("dropId").references(() => drops.id, {
+      onDelete: "set null",
+    }),
+    status: prerollAdStatus("status").default("draft").notNull(),
+    // Budget / spend in cents of `currency`. `spentCents` is denormalized
+    // and bumped in the same transaction that records each play.
+    budgetCents: integer("budgetCents").notNull(),
+    spentCents: integer("spentCents").default(0).notNull(),
+    currency: char("currency", { length: 3 }).default("USD").notNull(),
+    // Optional start date. No end date — runs until budget/paused/ended.
+    startsAt: timestamp("startsAt", { withTimezone: true }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  table => [
+    check(
+      "preroll_ads_currency_check",
+      sql`${table.currency} IN ('USD', 'BDT')`
+    ),
+    check("preroll_ads_budget_check", sql`${table.budgetCents} > 0`),
+    check(
+      "preroll_ads_spent_check",
+      sql`${table.spentCents} >= 0`
+    ),
+    index("preroll_ads_user_idx").on(table.userId),
+    index("preroll_ads_status_idx").on(table.status),
+  ]
+);
+
+/**
+ * One recorded pre-roll play. `revenueCents` = full per-play charge to the
+ * brand; `creatorShareCents` = 55% credited to the creator's fiat ledger.
+ */
+export const prerollPlays = pgTable(
+  "preroll_plays",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    adId: integer("adId")
+      .notNull()
+      .references(() => prerollAds.id, { onDelete: "cascade" }),
+    videoId: integer("videoId").references(() => videos.id, {
+      onDelete: "set null",
+    }),
+    // The creator whose video the ad played before — earns the 55% share.
+    creatorId: integer("creatorId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    viewerHash: char("viewerHash", { length: 64 }).notNull(),
+    watchedSecs: integer("watchedSecs").default(0).notNull(),
+    skipped: boolean("skipped").default(false).notNull(),
+    completed: boolean("completed").default(false).notNull(),
+    revenueCents: integer("revenueCents").notNull(),
+    creatorShareCents: integer("creatorShareCents").notNull(),
+    createdAt: createdAt(),
+  },
+  table => [
+    index("preroll_plays_ad_idx").on(table.adId),
+    index("preroll_plays_creator_idx").on(table.creatorId),
+    index("preroll_plays_viewer_day_idx").on(
+      table.viewerHash,
+      table.createdAt
+    ),
+  ]
+);
+
+/**
+ * Admin-set pre-roll policy. Single row (id = 1).
+ * - minFollowers / minViews: creator eligibility criteria
+ * - costPerPlayCents: fixed brand charge per play (revenue split base)
+ * - maxPlaysPerViewerPerDay: abuse cap per viewer hash
+ */
+export const prerollSettings = pgTable(
+  "preroll_settings",
+  {
+    id: integer("id").primaryKey(),
+    minFollowers: integer("minFollowers").default(1000).notNull(),
+    minViews: integer("minViews").default(10000).notNull(),
+    costPerPlayCents: integer("costPerPlayCents").default(2).notNull(),
+    maxPlaysPerViewerPerDay: integer("maxPlaysPerViewerPerDay")
+      .default(20)
+      .notNull(),
+    updatedAt: updatedAt(),
+  },
+  table => [
+    check("preroll_settings_single_row", sql`${table.id} = 1`),
+    check("preroll_settings_cost_check", sql`${table.costPerPlayCents} > 0`),
   ]
 );
 

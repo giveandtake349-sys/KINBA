@@ -23,6 +23,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import {
+  brandApplications,
   campaignAuditLog,
   campaignEarnings,
   campaignInvitations,
@@ -301,6 +302,8 @@ export async function listMySubmissions(userId: number) {
 /**
  * Creator's own fiat earnings ledger rows: amount, currency, status,
  * campaign title, createdAt. NO pool/budget/totals — ever.
+ * Phase 6: also includes pre-roll ad earnings (campaignId NULL) —
+ * shown with the "Pre-roll ad revenue" label and a `source` discriminator.
  */
 export async function listMyEarnings(userId: number) {
   const db = await getDb();
@@ -312,11 +315,12 @@ export async function listMyEarnings(userId: number) {
       currency: campaignEarnings.currency,
       status: campaignEarnings.status,
       campaignId: campaignEarnings.campaignId,
-      campaignTitle: campaigns.title,
+      campaignTitle: sql<string | null>`coalesce(${campaigns.title}, ${campaignEarnings.reason})`,
+      source: sql<"campaign" | "preroll">`case when ${campaignEarnings.prerollPlayId} is not null then 'preroll' else 'campaign' end`,
       createdAt: campaignEarnings.createdAt,
     })
     .from(campaignEarnings)
-    .innerJoin(campaigns, eq(campaigns.id, campaignEarnings.campaignId))
+    .leftJoin(campaigns, eq(campaigns.id, campaignEarnings.campaignId))
     .where(eq(campaignEarnings.creatorId, userId))
     .orderBy(desc(campaignEarnings.createdAt))
     .limit(100);
@@ -481,7 +485,31 @@ export async function reviewSubmission(
         },
       });
 
-      return { earningId: earning?.id ?? null, reversed: false };
+      // Phase 6: auto-pause when the creator pool is exhausted — FB-style
+      // continuous run stops serving when the budget runs out. The
+      // advertiser is notified outside the transaction.
+      let autoPaused = false;
+      if (campaign.status === "active" && campaign.creatorPool) {
+        const newCommittedCents = committedCents + newCents;
+        if (newCommittedCents >= toCents(campaign.creatorPool)) {
+          await tx
+            .update(campaigns)
+            .set({ status: "paused", updatedAt: now })
+            .where(eq(campaigns.id, campaign.id));
+          await tx.insert(campaignAuditLog).values({
+            campaignId: campaign.id,
+            actorId: adminId,
+            action: "campaign.auto_paused_budget_exhausted",
+            details: {
+              committedCents: newCommittedCents,
+              poolCents: toCents(campaign.creatorPool),
+            },
+          });
+          autoPaused = true;
+        }
+      }
+
+      return { earningId: earning?.id ?? null, reversed: false, autoPaused };
     }
 
     // Reject: never mint money. Compensate a stray earning row if one exists.
@@ -531,7 +559,7 @@ export async function reviewSubmission(
       },
     });
 
-    return { earningId: null, reversed };
+    return { earningId: null, reversed, autoPaused: false };
   });
 
   // Notify the creator — outside the transaction so a notification failure
@@ -559,6 +587,27 @@ export async function reviewSubmission(
     entityId: submission.id,
     link: "/campaigns",
   });
+
+  // Phase 6: notify the advertiser when their campaign auto-paused on
+  // budget exhaustion — outside the transaction, never rolls back review.
+  if (outcome.autoPaused && campaign.applicationId) {
+    const [application] = await db
+      .select({ userId: brandApplications.userId })
+      .from(brandApplications)
+      .where(eq(brandApplications.id, campaign.applicationId))
+      .limit(1);
+    if (application) {
+      await insertNotification({
+        userId: application.userId,
+        type: "campaign.auto_paused",
+        title: "Campaign paused — budget exhausted",
+        body: `"${campaign.title}" was automatically paused because its creator budget ran out.`,
+        entityType: "campaign",
+        entityId: campaign.id,
+        link: "/advertise/my-ads",
+      });
+    }
+  }
 
   return { submissionId: submission.id, status: toStatus, ...outcome };
 }

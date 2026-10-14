@@ -86,6 +86,9 @@ import {
   type MentionToken,
 } from "@/lib/mentionParser";
 import { isAbsoluteHttpUrl, resolveMediaUrl } from "@/lib/runtimeConfig";
+import { PreRollOverlay } from "@/components/preroll/PreRollOverlay";
+import { usePreRoll } from "@/components/preroll/usePreRoll";
+import "@/components/preroll/preroll.css";
 import { isAndroidApp, saveImageToGallery } from "@/lib/galleryDownload";
 import {
   attachPlaybackDiagnostics,
@@ -4474,6 +4477,9 @@ function ShortVideoCard({
     setShortMuted(muted);
     writeShortsMutePreference(muted);
   };
+  // Phase 6: pre-roll ad gate — every 3rd video may show a skippable ad
+  // before the main video plays. While blocking, the player stays paused.
+  const preRoll = usePreRoll(video.id, active);
   const recordView = () => {
     if (viewedRef.current || viewMutation.isPending) return;
     viewedRef.current = true;
@@ -4517,13 +4523,21 @@ function ShortVideoCard({
         <QualityVideoPlayer
           video={video}
           vertical
-          active={active}
+          active={active && !preRoll.blocking}
           preload={preload}
           muted={shortMuted}
           onMutedChange={setMutePreference}
           onFirstPlay={recordView}
         />
       )}
+      {preRoll.ad && preRoll.blocking ? (
+        <PreRollOverlay
+          ad={preRoll.ad}
+          muted={shortMuted}
+          onMutedChange={setMutePreference}
+          onFinish={preRoll.finish}
+        />
+      ) : null}
       <div className="absolute right-3 top-4 z-20">
         <PostManagementMenu
           video={video}

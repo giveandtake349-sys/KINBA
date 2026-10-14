@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   BarChart3,
   CheckCircle2,
+  Clapperboard,
   Image as ImageIcon,
   Loader2,
   Lock,
@@ -57,7 +58,7 @@ function linesToList(value: string): string[] {
  */
 export default function AdminCampaigns() {
   const [view, setView] = useState<
-    "list" | "new" | "review" | "earnings" | "analytics"
+    "list" | "new" | "review" | "earnings" | "analytics" | "videoads"
   >(
     "list"
   );
@@ -155,6 +156,18 @@ export default function AdminCampaigns() {
           >
             <BarChart3 size={14} aria-hidden="true" /> Analytics
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "videoads"}
+            className={view === "videoads" ? "active" : ""}
+            onClick={() => {
+              setView("videoads");
+              setOpenId(null);
+            }}
+          >
+            <Clapperboard size={14} aria-hidden="true" /> Video ads
+          </button>
         </div>
         {view === "list" ? (
           <label className="camp-filter">
@@ -197,6 +210,8 @@ export default function AdminCampaigns() {
         <AdminEarningsTab onDone={setNotice} />
       ) : view === "analytics" ? (
         <AdminAnalyticsTab />
+      ) : view === "videoads" ? (
+        <AdminVideoAdsTab onDone={setNotice} />
       ) : list.isLoading ? (
         <p className="profile-loading-note">Loading campaigns…</p>
       ) : list.data && list.data.items.length > 0 ? (
@@ -281,6 +296,9 @@ function NewCampaignForm({
   const [questions, setQuestions] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [endsAt, setEndsAt] = useState("");
+  const [runMode, setRunMode] = useState<"continuous" | "scheduled">(
+    "continuous"
+  );
   const [creatorPool, setCreatorPool] = useState("");
   const [serviceFee, setServiceFee] = useState("");
   const [saving, setSaving] = useState(false);
@@ -326,6 +344,7 @@ function NewCampaignForm({
         concepts: linesToList(concepts),
         rules,
         validationQuestions: linesToList(questions),
+        runMode,
         startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
         endsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
         creatorPool: creatorPool.trim(),
@@ -414,6 +433,22 @@ function NewCampaignForm({
       </label>
       <div className="camp-row">
         <label>
+          Run mode
+          <select
+            value={runMode}
+            onChange={event =>
+              setRunMode(event.target.value as "continuous" | "scheduled")
+            }
+          >
+            <option value="continuous">
+              Continuous — no end date, runs until budget or manual stop
+            </option>
+            <option value="scheduled">Scheduled — fixed start/end dates</option>
+          </select>
+        </label>
+      </div>
+      <div className="camp-row">
+        <label>
           Starts
           <input
             type="date"
@@ -422,7 +457,7 @@ function NewCampaignForm({
           />
         </label>
         <label>
-          Ends
+          Ends{runMode === "continuous" ? " (optional)" : ""}
           <input
             type="date"
             value={endsAt}
@@ -1310,6 +1345,312 @@ function AdminAnalyticsTab() {
 
       <p className="an-fine">
         Real database numbers — deduplicated, bot-filtered, self-views excluded.
+      </p>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Phase 6: pre-roll video ads — admin review + eligibility settings    */
+/* ------------------------------------------------------------------ */
+
+function formatCents(cents: number): string {
+  return `$${(cents / 100).toLocaleString("en-US", {
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function AdminVideoAdsTab({ onDone }: { onDone: (msg: string) => void }) {
+  const utils = trpc.useUtils();
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const list = trpc.preroll.admin.list.useQuery(
+    {
+      status:
+        statusFilter === "all"
+          ? undefined
+          : (statusFilter as "draft" | "active" | "paused" | "ended"),
+      limit: 25,
+      offset: 0,
+    },
+    { refetchOnWindowFocus: false }
+  );
+  const stats = trpc.preroll.admin.stats.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+  const settings = trpc.preroll.admin.settings.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+  const setStatus = trpc.preroll.admin.setStatus.useMutation();
+  const saveSettings = trpc.preroll.admin.updateSettings.useMutation();
+
+  const [form, setForm] = useState({
+    minFollowers: "",
+    minViews: "",
+    costPerPlayCents: "",
+    maxPlaysPerViewerPerDay: "",
+  });
+  const [formInit, setFormInit] = useState(false);
+
+  const refresh = async () => {
+    await utils.preroll.admin.list.invalidate();
+    await utils.preroll.admin.stats.invalidate();
+  };
+
+  const changeStatus = async (
+    adId: number,
+    status: "active" | "paused" | "ended"
+  ) => {
+    try {
+      await setStatus.mutateAsync({ adId, status });
+      onDone(`Ad #${adId} → ${status}.`);
+      await refresh();
+    } catch (e) {
+      onDone(e instanceof Error ? e.message : "Could not update ad.");
+    }
+  };
+
+  const save = async () => {
+    const parsed = {
+      minFollowers: Number(form.minFollowers),
+      minViews: Number(form.minViews),
+      costPerPlayCents: Number(form.costPerPlayCents),
+      maxPlaysPerViewerPerDay: Number(form.maxPlaysPerViewerPerDay),
+    };
+    try {
+      await saveSettings.mutateAsync(parsed);
+      onDone("Pre-roll settings saved.");
+      await utils.preroll.admin.settings.invalidate();
+    } catch (e) {
+      onDone(e instanceof Error ? e.message : "Could not save settings.");
+    }
+  };
+
+  const s = settings.data;
+  if (!formInit && s) {
+    setForm({
+      minFollowers: String(s.minFollowers),
+      minViews: String(s.minViews),
+      costPerPlayCents: String(s.costPerPlayCents),
+      maxPlaysPerViewerPerDay: String(s.maxPlaysPerViewerPerDay),
+    });
+    setFormInit(true);
+  }
+
+  const st = stats.data;
+  const ads = list.data ?? [];
+
+  return (
+    <div className="an-wrap">
+      <div className="an-head">
+        <h3>
+          <Clapperboard size={18} aria-hidden="true" /> Video ads
+        </h3>
+        <span className="an-priv">
+          <Lock
+            size={12}
+            aria-hidden="true"
+            style={{ verticalAlign: "-1px", marginRight: 4 }}
+          />
+          Admin
+        </span>
+      </div>
+
+      {st ? (
+        <div className="an-kpis cols-4">
+          <div className="an-kpi">
+            <b>{st.totalAds}</b>
+            <span>Total ads</span>
+          </div>
+          <div className="an-kpi">
+            <b>{st.activeAds}</b>
+            <span>Running</span>
+          </div>
+          <div className="an-kpi">
+            <b>{st.totalPlays.toLocaleString()}</b>
+            <span>Plays</span>
+          </div>
+          <div className="an-kpi">
+            <b>{formatCents(st.totalCreatorPayoutCents)}</b>
+            <span>Creator payouts</span>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="an-card">
+        <b>Eligibility &amp; pricing</b>
+        <p className="adv-hint">
+          Only creators meeting both criteria see ads on their videos. Each
+          play charges the brand the per-play rate — 55% goes to the
+          creator, 45% to the platform.
+        </p>
+        {s ? (
+          <div className="adv-row-2">
+            <label className="adv-field">
+              <span>Min followers</span>
+              <input
+                type="number"
+                min={0}
+                value={form.minFollowers}
+                onChange={e =>
+                  setForm({ ...form, minFollowers: e.target.value })
+                }
+              />
+            </label>
+            <label className="adv-field">
+              <span>Min lifetime views</span>
+              <input
+                type="number"
+                min={0}
+                value={form.minViews}
+                onChange={e => setForm({ ...form, minViews: e.target.value })}
+              />
+            </label>
+            <label className="adv-field">
+              <span>Cost per play (cents)</span>
+              <input
+                type="number"
+                min={1}
+                value={form.costPerPlayCents}
+                onChange={e =>
+                  setForm({ ...form, costPerPlayCents: e.target.value })
+                }
+              />
+            </label>
+            <label className="adv-field">
+              <span>Max plays / viewer / day</span>
+              <input
+                type="number"
+                min={1}
+                value={form.maxPlaysPerViewerPerDay}
+                onChange={e =>
+                  setForm({
+                    ...form,
+                    maxPlaysPerViewerPerDay: e.target.value,
+                  })
+                }
+              />
+            </label>
+          </div>
+        ) : (
+          <p className="profile-loading-note">Loading settings…</p>
+        )}
+        <button
+          type="button"
+          className="adv-cta small"
+          disabled={saveSettings.isPending}
+          onClick={() => void save()}
+        >
+          {saveSettings.isPending ? "Saving…" : "Save settings"}
+        </button>
+      </div>
+
+      <div className="an-card">
+        <div className="an-head">
+          <b>All video ads</b>
+          <label className="camp-filter">
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              aria-label="Filter by status"
+            >
+              <option value="all">All statuses</option>
+              <option value="draft">Draft</option>
+              <option value="active">Running</option>
+              <option value="paused">Paused</option>
+              <option value="ended">Ended</option>
+            </select>
+          </label>
+        </div>
+        {list.isLoading ? (
+          <p className="profile-loading-note">Loading video ads…</p>
+        ) : ads.length === 0 ? (
+          <div className="an-empty" role="status">
+            <Clapperboard size={28} aria-hidden="true" />
+            <p>
+              <strong>No video ads yet.</strong>
+              <br />
+              Advertisers create them from My Ads → Video ads.
+            </p>
+          </div>
+        ) : (
+          <div
+            className="an-table"
+            role="table"
+            aria-label="Video ads for review"
+          >
+            <div className="an-thead" role="row">
+              <span>Ad</span>
+              <span>Plays</span>
+              <span>Spent</span>
+              <span>Status</span>
+            </div>
+            {ads.map(ad => (
+              <div className="an-trow" role="row" key={ad.id}>
+                <span className="an-post">
+                  <span>
+                    {ad.title}
+                    <br />
+                    <small className="adv-hint">
+                      by {ad.advertiserName ?? "unknown"}
+                    </small>
+                  </span>
+                </span>
+                <span>{ad.plays.toLocaleString()}</span>
+                <span>
+                  {formatCents(ad.spentCents)} / {formatCents(ad.budgetCents)}
+                </span>
+                <span>
+                  <em className={`an-status ${ad.status}`}>{ad.status}</em>
+                  <span className="adv-ad-actions">
+                    {ad.status === "draft" ? (
+                      <button
+                        type="button"
+                        className="adv-btn primary"
+                        disabled={setStatus.isPending}
+                        onClick={() => void changeStatus(ad.id, "active")}
+                      >
+                        <CheckCircle2 size={14} aria-hidden="true" /> Approve
+                      </button>
+                    ) : null}
+                    {ad.status === "active" ? (
+                      <button
+                        type="button"
+                        className="adv-btn"
+                        disabled={setStatus.isPending}
+                        onClick={() => void changeStatus(ad.id, "paused")}
+                      >
+                        <PauseCircle size={14} aria-hidden="true" /> Pause
+                      </button>
+                    ) : null}
+                    {ad.status === "paused" ? (
+                      <button
+                        type="button"
+                        className="adv-btn primary"
+                        disabled={setStatus.isPending}
+                        onClick={() => void changeStatus(ad.id, "active")}
+                      >
+                        <PlayCircle size={14} aria-hidden="true" /> Resume
+                      </button>
+                    ) : null}
+                    {ad.status === "active" || ad.status === "paused" ? (
+                      <button
+                        type="button"
+                        className="adv-btn danger"
+                        disabled={setStatus.isPending}
+                        onClick={() => void changeStatus(ad.id, "ended")}
+                      >
+                        <StopCircle size={14} aria-hidden="true" /> End
+                      </button>
+                    ) : null}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <p className="an-fine">
+        Real database numbers · Ledger only — no collection or payout.
       </p>
     </div>
   );

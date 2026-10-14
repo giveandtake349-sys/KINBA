@@ -875,12 +875,19 @@ export type BrandCampaignStat = {
   campaignId: number;
   title: string;
   status: string;
+  /** Phase 6: FB-style run mode. */
+  runMode: "continuous" | "scheduled";
   views: number;
   impressions: number;
   clicks: number;
   ctr: number | null;
   spend: string;
   currency: string | null;
+  /** Phase 6: budget tracking for the spent bar (cents). */
+  budgetCents: number | null;
+  spentCents: number;
+  startsAt: string | null;
+  endsAt: string | null;
   /** Per accepted creator: real views / engagement / reward for this campaign. */
   creators: BrandCreatorStat[];
 };
@@ -1047,7 +1054,11 @@ export async function getBrandStats(
       id: campaigns.id,
       title: campaigns.title,
       status: campaigns.status,
+      runMode: campaigns.runMode,
+      budgetTotal: campaigns.budgetTotal,
       budgetCurrency: campaigns.budgetCurrency,
+      startsAt: campaigns.startsAt,
+      endsAt: campaigns.endsAt,
     })
     .from(campaigns)
     .where(inArray(campaigns.applicationId, appIds));
@@ -1093,6 +1104,26 @@ export async function getBrandStats(
   }
   const totals = { views: 0, impressions: 0, clicks: 0, ctr: null as number | null };
   const campaignRows: BrandCampaignStat[] = [];
+  // Phase 6: real spend per campaign from the fiat ledger (approved+).
+  const spendRows = await db
+    .select({
+      campaignId: campaignEarnings.campaignId,
+      total: sql<string>`coalesce(sum(${campaignEarnings.amount}), 0)`,
+    })
+    .from(campaignEarnings)
+    .where(
+      and(
+        inArray(campaignEarnings.campaignId, campIds),
+        inArray(campaignEarnings.status, ["approved", "paid_recorded"])
+      )
+    )
+    .groupBy(campaignEarnings.campaignId);
+  const spendByCamp = new Map<number, number>();
+  for (const r of spendRows) {
+    if (r.campaignId != null) {
+      spendByCamp.set(r.campaignId, Math.round(Number(r.total) * 100));
+    }
+  }
   for (const camp of camps) {
     const agg = aggByCamp.get(camp.id) ?? {
       views: 0,
@@ -1104,16 +1135,23 @@ export async function getBrandStats(
     totals.impressions += agg.impressions;
     totals.clicks += agg.clicks;
     const creators = await getCreatorBreakdownForCampaign(camp.id, dayList[0]);
+    const budgetCents =
+      camp.budgetTotal != null ? Math.round(Number(camp.budgetTotal) * 100) : null;
     campaignRows.push({
       campaignId: camp.id,
       title: camp.title,
       status: camp.status,
+      runMode: (camp.runMode ?? "continuous") as "continuous" | "scheduled",
       views: agg.views,
       impressions: agg.impressions,
       clicks: agg.clicks,
       ctr: ctrOf(agg.clicks, agg.impressions),
       spend: (agg.spendCents / 100).toFixed(2),
       currency: camp.budgetCurrency,
+      budgetCents,
+      spentCents: spendByCamp.get(camp.id) ?? 0,
+      startsAt: camp.startsAt ? camp.startsAt.toISOString() : null,
+      endsAt: camp.endsAt ? camp.endsAt.toISOString() : null,
       creators,
     });
   }
@@ -1179,7 +1217,11 @@ export async function getAdminStats(days = 30): Promise<AdminDashboard> {
       id: campaigns.id,
       title: campaigns.title,
       status: campaigns.status,
+      runMode: campaigns.runMode,
+      budgetTotal: campaigns.budgetTotal,
       budgetCurrency: campaigns.budgetCurrency,
+      startsAt: campaigns.startsAt,
+      endsAt: campaigns.endsAt,
     })
     .from(campaigns)
     .orderBy(desc(campaigns.createdAt))
@@ -1250,12 +1292,18 @@ export async function getAdminStats(days = 30): Promise<AdminDashboard> {
       campaignId: camp.id,
       title: camp.title,
       status: camp.status,
+      runMode: (camp.runMode ?? "continuous") as "continuous" | "scheduled",
       views: agg.views,
       impressions: agg.impressions,
       clicks: agg.clicks,
       ctr: ctrOf(agg.clicks, agg.impressions),
       spend: (agg.spendCents / 100).toFixed(2),
       currency: camp.budgetCurrency,
+      budgetCents:
+        camp.budgetTotal != null ? Math.round(Number(camp.budgetTotal) * 100) : null,
+      spentCents: agg.spendCents,
+      startsAt: camp.startsAt ? camp.startsAt.toISOString() : null,
+      endsAt: camp.endsAt ? camp.endsAt.toISOString() : null,
       // Admin top-campaigns table doesn't show per-creator rows; the
       // breakdown lives on the brand dashboard for the owning brand.
       creators: [],
