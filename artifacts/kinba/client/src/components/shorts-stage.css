@@ -242,7 +242,7 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
   position: absolute !important;
   top: auto !important;
   right: 10px !important;
-  bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+  bottom: calc(90px + env(safe-area-inset-bottom)) !important;
   left: auto !important;
   z-index: 30 !important;
   display: flex !important;
@@ -532,7 +532,7 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .shorts-overlay-actions {
   top: auto !important;
   right: 10px !important;
-  bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+  bottom: calc(90px + env(safe-area-inset-bottom)) !important;
   left: auto !important;
   z-index: 30 !important;
   display: flex !important;

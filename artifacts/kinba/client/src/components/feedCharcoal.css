@@ -50,8 +50,11 @@
 }
 
 .home-feed-tabs button.active {
-  background: transparent;
-  color: #e4e6eb;
+  background: transparent !important;
+  color: #e4e6eb !important;
+  /* Kill the blue underline from kinbaModern.css — white ::after only. */
+  border-bottom-color: transparent !important;
+  box-shadow: none !important;
 }
 
 .home-feed-tabs button.active::after {

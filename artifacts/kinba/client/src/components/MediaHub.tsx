@@ -3632,18 +3632,6 @@ function VideoCard({
             <Heart size={16} fill={current.viewerReacted ? "currentColor" : "none"} />
             <span>{current.viewerReacted ? "Pookied" : "Pookie"}</span>
           </button>
-          <ReactionSummaryPill
-            count={current.reactionCount}
-            active={current.viewerReaction}
-            disabled={!!pending}
-            ariaLabel="See who reacted"
-            title="See who reacted"
-            onClick={event => {
-              event.preventDefault();
-              event.stopPropagation();
-              setReactorsOpen(true);
-            }}
-          />
           <button
             type="button"
             onClick={() => {
