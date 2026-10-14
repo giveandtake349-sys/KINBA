@@ -29,6 +29,14 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   padding-bottom: 0 !important;
 }
 
+/* All shorts parents get black background — kills any white gaps. */
+body:has(.shorts-tab-panel),
+body:has(.shorts-tab-panel) .app-main-content,
+body:has(.shorts-tab-panel) .app-main-content.has-feed-tabs .home-page,
+body:has(.shorts-tab-panel) .media-hub {
+  background: #000 !important;
+}
+
 /* TRUE FULL-SCREEN SHORTS: the fixed top navigation (app header + feed tabs)
    is hidden while the Shorts tab is active, so the video fills the viewport
    edge-to-edge (100dvh). No chrome offset is needed. Bottom nav / drawer
