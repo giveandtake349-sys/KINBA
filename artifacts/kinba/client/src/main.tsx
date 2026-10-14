@@ -7,6 +7,7 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import OpeningSplash from "./components/OpeningSplash";
+import { initializePushNotifications } from "./lib/pushNotifications";
 import "./index.css";
 import "./signalNoir.css";
 import "./facebookDarkGrey.css";
@@ -43,6 +44,10 @@ const trpcClient = trpc.createClient({
       },
     }),
   ],
+});
+
+void initializePushNotifications().catch(error => {
+  console.error("[PushNotifications] initialization failed", error);
 });
 
 createRoot(document.getElementById("root")!).render(
