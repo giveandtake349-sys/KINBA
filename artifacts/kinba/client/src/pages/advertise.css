@@ -372,8 +372,13 @@
 
 .adv-row-2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
+  min-width: 0;
+}
+
+.adv-row-2 > * {
+  min-width: 0;
 }
 
 .adv-link-row {
@@ -565,6 +570,9 @@
 }
 
 @media (min-width: 720px) {
+  .adv-row-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .adv-hero,
   .adv-card {
     max-width: 640px;
