@@ -144,6 +144,7 @@ function VideoModal({
             viewerShared: false,
             bookmarkCount: 0,
             viewerBookmarked: false,
+            campaignId: null,
             owner: {
               id: video.authorId ?? 0,
               name: video.authorName ?? "Unknown",

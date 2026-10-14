@@ -36,6 +36,22 @@ import {
   updateCampaignInput,
 } from "./campaigns";
 import {
+  campaignIdInput,
+  createCampaignLink,
+  createLinkInput,
+  listCampaignLinks,
+  listEarningsForAdmin,
+  listMyEarnings,
+  listMySubmissions,
+  listReviewQueue,
+  reverseEarning,
+  reverseEarningInput,
+  reviewSubmission,
+  reviewSubmissionInput,
+  submitDeliverable,
+  submitDeliverableInput,
+} from "./submissions";
+import {
   adminProcedure,
   protectedProcedure,
   publicProcedure,
@@ -1297,6 +1313,88 @@ export const appRouter = router({
       searchCreators: adminProcedure
         .input(searchCreatorsInput)
         .query(({ input }) => searchCreators(input.query, input.limit)),
+    }),
+  }),
+  // JHILIK Ads Phase 4: submissions + fiat earnings + campaign links.
+  submissions: router({
+    // Creator portal: submit a deliverable to an accepted campaign.
+    submitDeliverable: protectedProcedure
+      .input(submitDeliverableInput)
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await submitDeliverable(ctx.user.id, input);
+        } catch (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Could not submit the deliverable.",
+          });
+        }
+      }),
+    // Creator portal: own submissions + own earnings (no pool/budget).
+    mySubmissions: protectedProcedure.query(({ ctx }) =>
+      listMySubmissions(ctx.user.id)
+    ),
+    myEarnings: protectedProcedure.query(({ ctx }) =>
+      listMyEarnings(ctx.user.id)
+    ),
+    admin: router({
+      reviewQueue: adminProcedure
+        .input(campaignIdInput)
+        .query(({ input }) => listReviewQueue(input.campaignId)),
+      reviewSubmission: adminProcedure
+        .input(reviewSubmissionInput)
+        .mutation(async ({ ctx, input }) => {
+          try {
+            return await reviewSubmission(ctx.user.id, input);
+          } catch (error) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not review the submission.",
+            });
+          }
+        }),
+      reverseEarning: adminProcedure
+        .input(reverseEarningInput)
+        .mutation(async ({ ctx, input }) => {
+          try {
+            return await reverseEarning(ctx.user.id, input);
+          } catch (error) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not reverse the earning.",
+            });
+          }
+        }),
+      earnings: adminProcedure
+        .input(campaignIdInput)
+        .query(({ input }) => listEarningsForAdmin(input.campaignId)),
+      createLink: adminProcedure
+        .input(createLinkInput)
+        .mutation(async ({ ctx, input }) => {
+          try {
+            return await createCampaignLink(ctx.user.id, input);
+          } catch (error) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not create the link.",
+            });
+          }
+        }),
+      links: adminProcedure
+        .input(campaignIdInput)
+        .query(({ input }) => listCampaignLinks(input.campaignId)),
     }),
   }),
   admin: router({

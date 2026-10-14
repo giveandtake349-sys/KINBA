@@ -73,6 +73,34 @@
   text-overflow: ellipsis;
 }
 
+/* JHILIK Ads — Sponsored badge. FB-style: small gray pill, theme-aware. */
+.sponsored-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  color: var(--muted);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.sponsored-badge--tile {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
+/* Inline variant for dark video overlays (Shorts player). */
+.sponsored-badge--dark {
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+}
+
 /* ---- MEDIA AREA ---- */
 .k-post__media {
   position: relative;

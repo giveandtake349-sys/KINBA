@@ -171,6 +171,8 @@ export type VideoRecord = {
   viewerShared: boolean;
   bookmarkCount: number;
   viewerBookmarked: boolean;
+  /** JHILIK Ads — set when the video is a campaign deliverable (Sponsored badge). */
+  campaignId: number | null;
   owner: {
     id: number;
     name: string | null;
@@ -180,6 +182,29 @@ export type VideoRecord = {
     isVerified: boolean;
   };
 };
+
+/**
+ * JHILIK Ads — subtle "Sponsored" pill (FB-style) shown on any video that is
+ * a campaign deliverable (video.campaignId != null). Rendered on every
+ * content surface: feed card, Shorts fullscreen player, text posts,
+ * profile grid, and search — never when campaignId is null.
+ */
+export function SponsoredBadge({
+  tile = false,
+  dark = false,
+}: {
+  tile?: boolean;
+  dark?: boolean;
+}) {
+  return (
+    <span
+      className={`sponsored-badge${tile ? " sponsored-badge--tile" : ""}${dark ? " sponsored-badge--dark" : ""}`}
+      aria-label="Sponsored content"
+    >
+      Sponsored
+    </span>
+  );
+}
 type FeedAttachment = {
   id: number;
   mediaType: "IMAGE" | "VIDEO";
@@ -3532,6 +3557,12 @@ function VideoCard({
               {relativeTime(video.createdAt)}
               {!isText && ` · ${isImage ? "Photo" : "Video"}`}
               {isEdited ? <em className="cp-edited-badge"> · Edited</em> : null}
+              {video.campaignId != null && (
+                <>
+                  <span> · </span>
+                  <SponsoredBadge />
+                </>
+              )}
             </span>
           </div>
           <PostManagementMenu
@@ -4504,6 +4535,7 @@ function ShortVideoCard({
                         aria-label="Verified profile"
                       />
                     )}
+                    {video.campaignId != null && <SponsoredBadge dark />}
                   </strong>
                   <span>
                     {ownerHandle(video.owner.name, video.owner.username)}
@@ -5892,6 +5924,12 @@ function SearchVideoCard({ video, onOpenVideo }: { video: VideoRecord; onOpenVid
         <Caption text={postCaption(video.title, video.description)} maxLines={2} className="search-video-caption" />
         <span className="search-video-meta">
           {formatCount(video.viewCount)} views · {relativeTime(video.createdAt)}
+          {video.campaignId != null && (
+            <>
+              {" · "}
+              <SponsoredBadge />
+            </>
+          )}
         </span>
       </div>
     </article>

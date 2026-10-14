@@ -1,4 +1,4 @@
-import { VideoRecord } from "@/components/MediaHub";
+import { VideoRecord, SponsoredBadge } from "@/components/MediaHub";
 import {
   useCallback,
   useEffect,
@@ -650,6 +650,7 @@ function ProfileTile({
 
   const media = isMedia ? (
     <div className="pr-tile-media" style={aspectRatio ? { aspectRatio } : undefined}>
+      {video.campaignId != null && <SponsoredBadge tile />}
       {mediaSrc ? (
         <img src={mediaSrc} className="pr-tile-img" alt={mediaAlt} loading="lazy" />
       ) : (
@@ -701,6 +702,7 @@ function ProfileTile({
     <div className="pr-tile-text pr-tile-text--rich">
       <span className="pr-quote-mark" aria-hidden="true">“</span>
       <span className="pr-tile-text-content">{video.title || video.description || ""}</span>
+      {video.campaignId != null && <SponsoredBadge />}
       <div className="pr-quote-foot">
         <span>{ago}</span>
         <b>
@@ -712,6 +714,7 @@ function ProfileTile({
   ) : (
     <div className="pr-tile-text">
       <span className="pr-tile-text-content">{video.title || video.description || ""}</span>
+      {video.campaignId != null && <SponsoredBadge />}
     </div>
   );
 

@@ -11,7 +11,8 @@ import { registerVideoUploadRoute } from "../videoUploadRoute";
 import { registerDmUploadRoute } from "../dmMedia";
 import { registerCommentRoutes } from "../commentRoutes";
 import { getVideoSharePreview, listSpotlightHighlights } from "../db";
-import { rateLimit } from "../rateLimiter";
+import { getClientIp, rateLimit } from "../rateLimiter";
+import { getClickTarget, recordLinkClick } from "../submissions";
 import { getDb } from "../db";
 import { sql } from "drizzle-orm";
 import { execSync } from "node:child_process";
@@ -180,6 +181,39 @@ async function startServer() {
 
   // Global catch-all for any tRPC route not explicitly limited: 120 req/min
   app.use("/api/trpc", rateLimit({ windowMs: 60_000, max: 120, keyPrefix: "tRPC" }));
+
+  // JHILIK Ads Phase 4 — short link redirect with click tracking.
+  // Idempotent per (linkId, ipHash, UTC day); bots are redirected but not counted.
+  // Must sit before the static/Vite catch-all below.
+  app.get(
+    "/r/:linkId",
+    rateLimit({ windowMs: 60_000, max: 60, keyPrefix: "clk" }),
+    async (req, res) => {
+      const linkId = Number(req.params.linkId);
+      if (!Number.isInteger(linkId) || linkId <= 0) {
+        return res.status(404).send("Not found");
+      }
+      const target = await getClickTarget(linkId);
+      if (!target) return res.status(404).send("Not found");
+      const userAgent = req.get("user-agent") || "";
+      const isBot = /(bot|crawler|spider|facebookexternalhit|whatsapp|slack|twitter)/i.test(userAgent);
+      if (!isBot) {
+        try {
+          await recordLinkClick({
+            linkId,
+            ip: getClientIp(req),
+            ipSalt: process.env.CLICK_SALT ?? "jhilik-click-salt",
+            userAgent,
+            referrer: req.get("referer") || req.get("referrer") || null,
+          });
+        } catch (error) {
+          // A tracking failure must never break the redirect itself.
+          console.error("[ClickTracking] Failed to record click:", error);
+        }
+      }
+      return res.redirect(302, target);
+    }
+  );
 
   // tRPC API
   app.use(

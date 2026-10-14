@@ -441,3 +441,102 @@
     font-size: 14px;
   }
 }
+
+/* JHILIK Ads Phase 4 — submit checklist, video picker, earnings table */
+.camp-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  margin: 6px 0;
+  border-radius: 8px;
+  background: var(--surface, #f5f5f5);
+  cursor: pointer;
+  font-size: 13px;
+}
+.camp-check input {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary, #1877f2);
+  flex-shrink: 0;
+}
+.camp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+  font-size: 13px;
+}
+.camp-field > span {
+  font-weight: 600;
+}
+.camp-field select {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #ddd);
+  background: var(--bg, #fff);
+  color: inherit;
+  font-size: 14px;
+}
+.camp-handled {
+  opacity: 0.85;
+}
+.camp-table-wrap {
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.camp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.camp-table th,
+.camp-table td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border, #eee);
+}
+.camp-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+.camp-num {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* JHILIK Ads Phase 4 — campaign links mini-UI */
+.camp-links {
+  margin-top: 20px;
+}
+.camp-link-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.camp-link-form input {
+  flex: 1 1 160px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #ddd);
+  background: var(--bg, #fff);
+  color: inherit;
+  font-size: 14px;
+}
+.camp-link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border, #eee);
+  font-size: 13px;
+}
+.camp-link-url {
+  color: var(--muted);
+  word-break: break-all;
+}

@@ -14,7 +14,7 @@ setInterval(() => {
   }
 }, 60_000);
 
-function getClientIp(req: Request): string {
+export function getClientIp(req: Request): string {
   const forwarded = req.headers["x-forwarded-for"];
   if (typeof forwarded === "string") {
     // Proxies APPEND to X-Forwarded-For, so only the LAST hop is trustworthy:

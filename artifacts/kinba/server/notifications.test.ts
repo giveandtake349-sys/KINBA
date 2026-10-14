@@ -517,7 +517,9 @@ describe("§22 writers — flag gating + payloads", () => {
     // "campaign.application_status" was approved with the JHILIK ads Phase 2
     // brand-application review flow (applicant notified on every transition).
     // The five "campaign.*" types below were approved with the JHILIK ads
-    // Phase 3 campaign/invitation flow.
+    // Phase 3 campaign/invitation flow. The three "campaign.submission_*"
+    // types were approved with the JHILIK ads Phase 4 submission review flow
+    // (admin notified on new submission; creator notified on approve/reject).
     expect(Object.values(NOTIFICATION_TYPES).sort()).toEqual(
       [
         "campaign.application_status",
@@ -526,6 +528,9 @@ describe("§22 writers — flag gating + payloads", () => {
         "campaign.invitation",
         "campaign.invitation_accepted",
         "campaign.invitation_declined",
+        "campaign.submission_approved",
+        "campaign.submission_received",
+        "campaign.submission_rejected",
         "dm_message",
         "dm_request",
         "dm_request_accepted",

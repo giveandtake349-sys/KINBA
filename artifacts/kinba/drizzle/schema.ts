@@ -2238,6 +2238,9 @@ export const linkClicks = pgTable(
     ipHash: char("ipHash", { length: 64 }),
     userAgent: varchar("userAgent", { length: 512 }),
     referrer: varchar("referrer", { length: 1024 }),
+    // UTC calendar day of the click — part of the idempotency key so one
+    // IP counts at most once per link per day (onConflictDoNothing).
+    day: date("day").notNull(),
     createdAt: createdAt(),
   },
   table => [
@@ -2245,6 +2248,11 @@ export const linkClicks = pgTable(
     index("link_clicks_campaign_created_idx").on(
       table.campaignId,
       table.createdAt
+    ),
+    uniqueIndex("link_clicks_dedup_unique").on(
+      table.linkId,
+      table.ipHash,
+      table.day
     ),
   ]
 );

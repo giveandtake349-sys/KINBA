@@ -69,6 +69,11 @@ export const NOTIFICATION_TYPES = {
   /** JHILIK brand advertising — campaign activated / ended (to brand owner). */
   campaignActivated: "campaign.activated",
   campaignEnded: "campaign.ended",
+  /** JHILIK brand advertising — new deliverable submitted (to campaign admin). */
+  submissionReceived: "campaign.submission_received",
+  /** JHILIK brand advertising — submission approved / rejected (to creator). */
+  submissionApproved: "campaign.submission_approved",
+  submissionRejected: "campaign.submission_rejected",
 } as const;
 
 const TYPE_MAX = 64;

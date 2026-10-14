@@ -50,7 +50,9 @@ function linesToList(value: string): string[] {
  * Full budget breakdown is admin-only — never sent to brand/creator views.
  */
 export default function AdminCampaigns() {
-  const [view, setView] = useState<"list" | "new">("list");
+  const [view, setView] = useState<"list" | "new" | "review" | "earnings">(
+    "list"
+  );
   const [statusFilter, setStatusFilter] = useState<CampaignStatus | "all">(
     "all"
   );
@@ -109,6 +111,30 @@ export default function AdminCampaigns() {
           >
             <PlusCircle size={14} aria-hidden="true" /> New campaign
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "review"}
+            className={view === "review" ? "active" : ""}
+            onClick={() => {
+              setView("review");
+              setOpenId(null);
+            }}
+          >
+            Review queue
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "earnings"}
+            className={view === "earnings" ? "active" : ""}
+            onClick={() => {
+              setView("earnings");
+              setOpenId(null);
+            }}
+          >
+            Earnings
+          </button>
         </div>
         {view === "list" ? (
           <label className="camp-filter">
@@ -145,6 +171,10 @@ export default function AdminCampaigns() {
           }}
           onError={setNotice}
         />
+      ) : view === "review" ? (
+        <ReviewQueueTab onDone={setNotice} />
+      ) : view === "earnings" ? (
+        <AdminEarningsTab onDone={setNotice} />
       ) : list.isLoading ? (
         <p className="profile-loading-note">Loading campaigns…</p>
       ) : list.data && list.data.items.length > 0 ? (
@@ -575,6 +605,11 @@ function CampaignDetail({
               ))}
             </ul>
           )}
+
+          <CampaignLinks
+            campaignId={id}
+            onChanged={onChanged}
+          />
         </>
       )}
     </div>
@@ -724,5 +759,387 @@ function InviteCreator({
         Send invitation
       </button>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Phase 4 — campaign links (/r/:linkId targets)                       */
+/* ------------------------------------------------------------------ */
+
+function CampaignLinks({
+  campaignId,
+  onChanged,
+}: {
+  campaignId: number;
+  onChanged: (message: string) => Promise<void>;
+}) {
+  const links = trpc.submissions.admin.links.useQuery(
+    { campaignId },
+    { refetchOnWindowFocus: false }
+  );
+  const createLink = trpc.submissions.admin.createLink.useMutation();
+  const [label, setLabel] = useState("");
+  const [url, setUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const add = async () => {
+    if (!label.trim() || !url.trim() || saving) return;
+    setSaving(true);
+    try {
+      const result = await createLink.mutateAsync({
+        campaignId,
+        label: label.trim(),
+        url: url.trim(),
+      });
+      setLabel("");
+      setUrl("");
+      await links.refetch();
+      await onChanged(`Link created — short URL ${result.shortUrl}.`);
+    } catch (error) {
+      await onChanged(error instanceof Error ? error.message : "Add link failed.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const copy = async (shortUrl: string) => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}${shortUrl}`);
+      await onChanged(`Copied ${shortUrl}.`);
+    } catch {
+      await onChanged(`Copy failed — the URL is ${shortUrl}.`);
+    }
+  };
+
+  return (
+    <div className="camp-links">
+      <h4>Links ({links.data?.length ?? 0})</h4>
+      <div className="camp-link-form">
+        <input
+          value={label}
+          onChange={event => setLabel(event.target.value)}
+          placeholder="Label (e.g. Promo page)"
+          maxLength={160}
+          aria-label="Link label"
+        />
+        <input
+          value={url}
+          onChange={event => setUrl(event.target.value)}
+          placeholder="https://…"
+          maxLength={2048}
+          inputMode="url"
+          aria-label="Link URL"
+        />
+        <button
+          type="button"
+          className="adv-btn primary"
+          disabled={saving || !label.trim() || !url.trim()}
+          onClick={add}
+        >
+          {saving ? <Loader2 size={14} className="spin" aria-hidden="true" /> : null}
+          Add link
+        </button>
+      </div>
+      {(links.data ?? []).map(link => (
+        <div key={link.id} className="camp-link-row">
+          <div>
+            <strong>{link.label || link.kind}</strong>
+            <br />
+            <small className="camp-link-url">{link.url}</small>
+          </div>
+          <button
+            type="button"
+            className="adv-btn ghost"
+            onClick={() => copy(`/r/${link.id}`)}
+          >
+            Copy /r/{link.id}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Phase 4 — review queue                                              */
+/* ------------------------------------------------------------------ */
+
+function ReviewQueueTab({ onDone }: { onDone: (message: string) => void }) {
+  const list = trpc.campaigns.admin.list.useQuery(
+    { limit: 100 },
+    { refetchOnWindowFocus: false }
+  );
+  const [campaignId, setCampaignId] = useState("");
+  const queue = trpc.submissions.admin.reviewQueue.useQuery(
+    { campaignId: Number(campaignId) },
+    { enabled: campaignId !== "", refetchOnWindowFocus: false }
+  );
+  const review = trpc.submissions.admin.reviewSubmission.useMutation();
+  const [notes, setNotes] = useState<Record<number, string>>({});
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const decide = async (submissionId: number, decision: "approve" | "reject") => {
+    setBusyId(submissionId);
+    try {
+      const result = await review.mutateAsync({
+        submissionId,
+        decision,
+        note: notes[submissionId]?.trim() || undefined,
+      });
+      await queue.refetch();
+      onDone(
+        decision === "approve"
+          ? `Submission approved — earning #${result.earningId ?? "?"} recorded.`
+          : "Submission rejected."
+      );
+    } catch (error) {
+      onDone(error instanceof Error ? error.message : "Review failed.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const items = list.data?.items ?? [];
+
+  return (
+    <section aria-label="Review queue">
+      <h3 className="camp-section-title">Review queue</h3>
+      <label className="camp-field">
+        <span>Campaign</span>
+        <select
+          value={campaignId}
+          onChange={event => setCampaignId(event.target.value)}
+        >
+          <option value="">Pick a campaign…</option>
+          {items.map(item => (
+            <option key={item.id} value={item.id}>
+              {item.title} ({item.status})
+            </option>
+          ))}
+        </select>
+      </label>
+      {campaignId === "" ? (
+        <p className="profile-loading-note">Pick a campaign to see submissions.</p>
+      ) : queue.isLoading ? (
+        <p className="profile-loading-note">Loading submissions…</p>
+      ) : (queue.data ?? []).length === 0 ? (
+        <p className="profile-loading-note">No submissions yet.</p>
+      ) : (
+        (queue.data ?? []).map(sub => (
+          <article key={sub.id} className="camp-card">
+            <h3>
+              {sub.videoTitle || `Video #${sub.videoId ?? "?"}`}{" "}
+              <span className={`adv-status ${sub.reviewStatus}`}>
+                {sub.reviewStatus}
+              </span>
+            </h3>
+            <p className="camp-meta">
+              {sub.creatorDisplayName || sub.creatorUsername || `User ${sub.creatorId}`}
+              {" · "}
+              {sub.submittedAt ? new Date(sub.submittedAt).toLocaleString() : "—"}
+            </p>
+            {Array.isArray(sub.answers) && sub.answers.length > 0 ? (
+              <div className="camp-list">
+                <strong>Checklist answers</strong>
+                {sub.answers.map((answer: string, i: number) => (
+                  <p key={i}>✓ {answer}</p>
+                ))}
+              </div>
+            ) : null}
+            {sub.reviewStatus === "in_review" ? (
+              <>
+                <label className="camp-field">
+                  <span>Note (optional)</span>
+                  <input
+                    value={notes[sub.id] ?? ""}
+                    onChange={event =>
+                      setNotes(prev => ({ ...prev, [sub.id]: event.target.value }))
+                    }
+                    placeholder="Review note…"
+                    maxLength={500}
+                  />
+                </label>
+                <div className="camp-actions">
+                  <button
+                    type="button"
+                    className="adv-btn primary"
+                    disabled={busyId === sub.id}
+                    onClick={() => decide(sub.id, "approve")}
+                  >
+                    {busyId === sub.id ? (
+                      <Loader2 size={15} className="spin" aria-hidden="true" />
+                    ) : (
+                      <CheckCircle2 size={15} aria-hidden="true" />
+                    )}
+                    Approve + pay
+                  </button>
+                  <button
+                    type="button"
+                    className="adv-btn danger"
+                    disabled={busyId === sub.id}
+                    onClick={() => decide(sub.id, "reject")}
+                  >
+                    <XCircle size={15} aria-hidden="true" />
+                    Reject
+                  </button>
+                </div>
+              </>
+            ) : null}
+          </article>
+        ))
+      )}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Phase 4 — admin earnings ledger                                     */
+/* ------------------------------------------------------------------ */
+
+function AdminEarningsTab({ onDone }: { onDone: (message: string) => void }) {
+  const list = trpc.campaigns.admin.list.useQuery(
+    { limit: 100 },
+    { refetchOnWindowFocus: false }
+  );
+  const [campaignId, setCampaignId] = useState("");
+  const earnings = trpc.submissions.admin.earnings.useQuery(
+    { campaignId: Number(campaignId) },
+    { enabled: campaignId !== "", refetchOnWindowFocus: false }
+  );
+  const reverse = trpc.submissions.admin.reverseEarning.useMutation();
+  const [reason, setReason] = useState("");
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const doReverse = async (earningId: number) => {
+    if (reason.trim().length < 3 || busyId != null) return;
+    setBusyId(earningId);
+    try {
+      await reverse.mutateAsync({ earningId, reason: reason.trim() });
+      await earnings.refetch();
+      onDone("Earning reversed (append-only — original row untouched).");
+      setReason("");
+    } catch (error) {
+      onDone(error instanceof Error ? error.message : "Reversal failed.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const items = list.data?.items ?? [];
+  const data = earnings.data;
+
+  return (
+    <section aria-label="Earnings ledger">
+      <h3 className="camp-section-title">Earnings</h3>
+      <p className="camp-hint">
+        Admin-only fiat ledger. Reversals append a new row — money rows are
+        never edited.
+      </p>
+      <label className="camp-field">
+        <span>Campaign</span>
+        <select
+          value={campaignId}
+          onChange={event => setCampaignId(event.target.value)}
+        >
+          <option value="">Pick a campaign…</option>
+          {items.map(item => (
+            <option key={item.id} value={item.id}>
+              {item.title} ({item.status})
+            </option>
+          ))}
+        </select>
+      </label>
+      {campaignId === "" ? (
+        <p className="profile-loading-note">Pick a campaign to see the ledger.</p>
+      ) : earnings.isLoading ? (
+        <p className="profile-loading-note">Loading ledger…</p>
+      ) : !data ? (
+        <p className="profile-loading-note">No data.</p>
+      ) : (
+        <>
+          <div className="camp-budget">
+            {data.totals.length === 0 ? (
+              <div>
+                <span>Approved total</span>
+                <strong>—</strong>
+              </div>
+            ) : (
+              data.totals.map(total => (
+                <div key={total.currency}>
+                  <span>Approved ({total.currency})</span>
+                  <strong>{total.amount}</strong>
+                </div>
+              ))
+            )}
+          </div>
+          {(data.rows ?? []).length === 0 ? (
+            <p className="profile-loading-note">No earning rows yet.</p>
+          ) : (
+            <div className="camp-table-wrap">
+              <table className="camp-table">
+                <thead>
+                  <tr>
+                    <th>Creator</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                    <th>Reason</th>
+                    <th>Date</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.rows.map(row => (
+                    <tr key={row.id}>
+                      <td>
+                        {row.creatorDisplayName || row.creatorUsername || `#${row.creatorId}`}
+                      </td>
+                      <td className="camp-num">
+                        {row.currency === "BDT" ? "৳" : "$"}
+                        {Number(row.amount).toLocaleString()}
+                      </td>
+                      <td>
+                        <span className={`adv-status ${row.status}`}>
+                          {row.status}
+                        </span>
+                      </td>
+                      <td>
+                        <small>{row.reason || "—"}</small>
+                      </td>
+                      <td>
+                        <small>
+                          {row.createdAt ? new Date(row.createdAt).toLocaleString() : "—"}
+                        </small>
+                      </td>
+                      <td>
+                        {(row.status === "approved" || row.status === "paid_recorded") ? (
+                          <button
+                            type="button"
+                            className="adv-btn ghost"
+                            disabled={busyId === row.id}
+                            onClick={() => doReverse(row.id)}
+                            title="Reverse this earning (append-only)"
+                          >
+                            Reverse
+                          </button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <label className="camp-field">
+            <span>Reversal reason (required)</span>
+            <input
+              value={reason}
+              onChange={event => setReason(event.target.value)}
+              placeholder="Why is this earning being reversed?"
+              maxLength={500}
+            />
+          </label>
+        </>
+      )}
+    </section>
   );
 }
