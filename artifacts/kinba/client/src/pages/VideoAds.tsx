@@ -1,9 +1,12 @@
 import { useRef, useState } from "react";
 import {
   ArrowRight,
+  Check,
   Clapperboard,
+  Crosshair,
   ExternalLink,
   Plus,
+  Search,
   Upload,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -201,6 +204,143 @@ export function VideoAdsSection() {
   );
 }
 
+function formatCompact(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+}
+
+/**
+ * Optional manual video targeting picker. The advertiser can select
+ * specific videos the ad will play on; an empty selection keeps the
+ * automatic eligible-creator pool behavior.
+ */
+function VideoTargetPicker({
+  selected,
+  onChange,
+}: {
+  selected: number[];
+  onChange: (ids: number[]) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const videos = trpc.preroll.listVideosForTargeting.useQuery(
+    { search: search.trim() || undefined, limit: 20, offset: 0 },
+    { refetchOnWindowFocus: false, enabled: open }
+  );
+
+  const toggle = (id: number) => {
+    onChange(
+      selected.includes(id)
+        ? selected.filter(v => v !== id)
+        : [...selected, id].slice(0, 50)
+    );
+  };
+
+  return (
+    <div className="adv-field">
+      <span className="adv-target-label">
+        <Crosshair size={14} aria-hidden="true" />
+        Target specific videos (optional)
+        {selected.length > 0 && (
+          <em className="adv-target-count">{selected.length} selected</em>
+        )}
+      </span>
+      <button
+        type="button"
+        className="adv-target-toggle"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+      >
+        {open
+          ? "Hide video picker"
+          : selected.length > 0
+            ? `Change selection (${selected.length})`
+            : "Choose videos…"}
+      </button>
+      {selected.length === 0 && !open && (
+        <span className="adv-hint">
+          Leave empty to run on the automatic pool of eligible creator videos.
+        </span>
+      )}
+      {open && (
+        <div className="adv-target-panel">
+          <label className="adv-target-search">
+            <Search size={14} aria-hidden="true" />
+            <input
+              type="search"
+              value={search}
+              placeholder="Search videos…"
+              onChange={e => setSearch(e.target.value)}
+              aria-label="Search videos"
+            />
+          </label>
+          {videos.isPending ? (
+            <p className="adv-hint">Loading videos…</p>
+          ) : videos.isError ? (
+            <p className="adv-error" role="alert">
+              Could not load videos: {videos.error.message}
+            </p>
+          ) : (videos.data ?? []).length === 0 ? (
+            <p className="adv-hint">No videos found.</p>
+          ) : (
+            <ul className="adv-target-list">
+              {(videos.data ?? []).map(v => {
+                const checked = selected.includes(v.id);
+                return (
+                  <li key={v.id}>
+                    <button
+                      type="button"
+                      className={`adv-target-item${checked ? " selected" : ""}`}
+                      onClick={() => toggle(v.id)}
+                      aria-pressed={checked}
+                    >
+                      {v.thumbnailUrl ? (
+                        <img
+                          src={v.thumbnailUrl}
+                          alt=""
+                          className="adv-target-thumb"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <span className="adv-target-thumb adv-target-thumb-empty">
+                          <Clapperboard size={16} aria-hidden="true" />
+                        </span>
+                      )}
+                      <span className="adv-target-meta">
+                        <strong>{v.title}</strong>
+                        <span>
+                          {v.creatorName ?? "Unknown creator"} ·{" "}
+                          {formatCompact(v.viewCount)} views
+                        </span>
+                      </span>
+                      <span
+                        className="adv-target-check"
+                        aria-hidden="true"
+                      >
+                        {checked && <Check size={14} />}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {selected.length > 0 && (
+            <button
+              type="button"
+              className="adv-target-clear"
+              onClick={() => onChange([])}
+            >
+              Clear selection (back to automatic pool)
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NewVideoAdForm({ onDone }: { onDone: () => void }) {
   const [, navigate] = useLocation();
   const [title, setTitle] = useState("");
@@ -212,6 +352,7 @@ function NewVideoAdForm({ onDone }: { onDone: () => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [targetVideoIds, setTargetVideoIds] = useState<number[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const drops = trpc.preroll.myDrops.useQuery(undefined, {
@@ -258,6 +399,7 @@ function NewVideoAdForm({ onDone }: { onDone: () => void }) {
         budgetCents,
         currency,
         startsAt: startsAt ? new Date(startsAt).toISOString() : null,
+        targetVideoIds: targetVideoIds.length > 0 ? targetVideoIds : undefined,
       });
       onDone();
     } catch (e) {
@@ -386,6 +528,7 @@ function NewVideoAdForm({ onDone }: { onDone: () => void }) {
           onChange={e => setStartsAt(e.target.value)}
         />
       </label>
+      <VideoTargetPicker selected={targetVideoIds} onChange={setTargetVideoIds} />
       {error ? (
         <p className="adv-error" role="alert">
           {error}

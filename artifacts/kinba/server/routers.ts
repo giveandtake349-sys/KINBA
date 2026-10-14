@@ -78,6 +78,8 @@ import {
   isBotUserAgent,
   listMyAds,
   listMyDropsForAds,
+  listVideosForTargeting,
+  listVideosForTargetingInput,
   reportPlay,
   reportPlayInput,
   updateAdStatus,
@@ -88,6 +90,7 @@ import {
   decideModeration,
   deleteRevenueOverride,
   getAdminOverview,
+  getAdTargetDetails,
   getAuditLog,
   getModerationQueue,
   getPayoutQueue,
@@ -95,6 +98,7 @@ import {
   moderateUser,
   releasePayout,
   searchAdminUsers,
+  setAdTargets,
   setDefaultCreatorPercent,
   setRevenueOverride,
   setUserRole,
@@ -1559,6 +1563,10 @@ export const appRouter = router({
     myDrops: protectedProcedure.query(({ ctx }) =>
       listMyDropsForAds(ctx.user.id)
     ),
+    // Advertiser: videos to pick for manual ad targeting (searchable).
+    listVideosForTargeting: protectedProcedure
+      .input(listVideosForTargetingInput)
+      .query(({ input }) => listVideosForTargeting(input)),
     // Advertiser: manual Pause/Resume/End (no cron).
     updateAdStatus: protectedProcedure
       .input(adStatusInput)
@@ -1631,6 +1639,20 @@ export const appRouter = router({
           })
         )
         .query(({ input }) => getAuditLog(input.limit, input.offset)),
+      // Ad targeting — admin can view/change target videos for any ad.
+      adTargetDetails: adminProcedure
+        .input(z.object({ adId: z.number().int().positive() }))
+        .query(({ input }) => getAdTargetDetails(input.adId)),
+      setAdTargets: adminProcedure
+        .input(
+          z.object({
+            adId: z.number().int().positive(),
+            videoIds: z.array(z.number().int().positive()).max(50).default([]),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          setAdTargets(ctx.user.id, input.adId, input.videoIds)
+        ),
       // Revenue control — admin decides creator payouts.
       revenueSettings: adminProcedure.query(() => getRevenueSettings()),
       setDefaultPercent: adminProcedure

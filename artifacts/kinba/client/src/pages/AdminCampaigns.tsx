@@ -2,8 +2,10 @@ import { useState } from "react";
 import {
   ArrowLeft,
   BarChart3,
+  Check,
   CheckCircle2,
   Clapperboard,
+  Crosshair,
   Image as ImageIcon,
   Loader2,
   Lock,
@@ -16,6 +18,7 @@ import {
   Type as TypeIcon,
   UserPlus,
   Video as VideoIcon,
+  X,
   XCircle,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
@@ -1360,6 +1363,220 @@ function formatCents(cents: number): string {
   })}`;
 }
 
+/**
+ * Admin targeting editor — view/change the videos an ad plays on.
+ * Empty selection = automatic eligible-creator pool.
+ */
+function AdTargetingEditor({
+  adId,
+  onDone,
+}: {
+  adId: number;
+  onDone: (msg: string) => void;
+}) {
+  const utils = trpc.useUtils();
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [draft, setDraft] = useState<number[] | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const details = trpc.admin.control.adTargetDetails.useQuery(
+    { adId },
+    { refetchOnWindowFocus: false, enabled: open }
+  );
+  const searchResults = trpc.preroll.listVideosForTargeting.useQuery(
+    { search: search.trim() || undefined, limit: 20, offset: 0 },
+    { refetchOnWindowFocus: false, enabled: open && search.trim().length > 0 }
+  );
+  const setTargets = trpc.admin.control.setAdTargets.useMutation();
+
+  // Initialize the draft from loaded targets.
+  const current = draft ?? (details.data ?? []).map(t => t.videoId);
+  const savedCount = (details.data ?? []).length;
+
+  const add = (id: number) => {
+    if (current.includes(id) || current.length >= 50) return;
+    setDraft([...current, id]);
+  };
+  const remove = (id: number) => setDraft(current.filter(v => v !== id));
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const res = await setTargets.mutateAsync({ adId, videoIds: current });
+      onDone(
+        res.count === 0
+          ? `Ad #${adId} targeting cleared — back to automatic pool.`
+          : `Ad #${adId} now targets ${res.count} video${res.count > 1 ? "s" : ""}.`
+      );
+      setDraft(null);
+      await utils.admin.control.adTargetDetails.invalidate({ adId });
+    } catch (e) {
+      onDone(e instanceof Error ? e.message : "Could not save targeting.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const dirty =
+    draft !== null &&
+    (draft.length !== savedCount ||
+      draft.some(id => !(details.data ?? []).some(t => t.videoId === id)));
+
+  return (
+    <div className="adv-target-admin">
+      <button
+        type="button"
+        className="adv-btn"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+      >
+        <Crosshair size={14} aria-hidden="true" />
+        Targeting{savedCount > 0 ? ` (${savedCount})` : ""}
+      </button>
+      {open && (
+        <div className="adv-target-admin-panel">
+          {details.isPending ? (
+            <p className="adv-hint">Loading targets…</p>
+          ) : details.isError ? (
+            <p className="adv-error" role="alert">
+              {details.error.message}
+            </p>
+          ) : (
+            <>
+              {current.length === 0 ? (
+                <p className="adv-hint">
+                  No manual targets — this ad runs on the automatic pool of
+                  eligible creator videos.
+                </p>
+              ) : (
+                <ul className="adv-target-admin-list">
+                  {(details.data ?? [])
+                    .filter(t => current.includes(t.videoId))
+                    .map(t => (
+                      <li key={t.videoId} className="adv-target-admin-row">
+                        {t.thumbnailUrl ? (
+                          <img src={t.thumbnailUrl} alt="" loading="lazy" />
+                        ) : (
+                          <span className="adv-target-admin-thumb-empty">
+                            <Clapperboard size={14} aria-hidden="true" />
+                          </span>
+                        )}
+                        <span className="adv-target-admin-meta">
+                          <strong>{t.title}</strong>
+                          <span>{t.creatorName ?? "Unknown creator"}</span>
+                        </span>
+                        <button
+                          type="button"
+                          className="adv-target-admin-remove"
+                          onClick={() => remove(t.videoId)}
+                          aria-label={`Remove ${t.title}`}
+                        >
+                          <X size={14} aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                  {/* Newly added videos not yet in details */}
+                  {current
+                    .filter(id => !(details.data ?? []).some(t => t.videoId === id))
+                    .map(id => (
+                      <li key={`new-${id}`} className="adv-target-admin-row">
+                        <span className="adv-target-admin-thumb-empty">
+                          <VideoIcon size={14} aria-hidden="true" />
+                        </span>
+                        <span className="adv-target-admin-meta">
+                          <strong>Video #{id}</strong>
+                          <span>Newly added — save to confirm</span>
+                        </span>
+                        <button
+                          type="button"
+                          className="adv-target-admin-remove"
+                          onClick={() => remove(id)}
+                          aria-label={`Remove video ${id}`}
+                        >
+                          <X size={14} aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              )}
+              <label className="adv-target-search">
+                <Search size={14} aria-hidden="true" />
+                <input
+                  type="search"
+                  value={search}
+                  placeholder="Search videos to add…"
+                  onChange={e => setSearch(e.target.value)}
+                  aria-label="Search videos to add"
+                />
+              </label>
+              {search.trim().length > 0 && (
+                <>
+                  {searchResults.isPending ? (
+                    <p className="adv-hint">Searching…</p>
+                  ) : (searchResults.data ?? []).length === 0 ? (
+                    <p className="adv-hint">No videos found.</p>
+                  ) : (
+                    <ul className="adv-target-admin-list">
+                      {(searchResults.data ?? [])
+                        .filter(v => !current.includes(v.id))
+                        .map(v => (
+                          <li key={v.id} className="adv-target-admin-row">
+                            {v.thumbnailUrl ? (
+                              <img src={v.thumbnailUrl} alt="" loading="lazy" />
+                            ) : (
+                              <span className="adv-target-admin-thumb-empty">
+                                <Clapperboard size={14} aria-hidden="true" />
+                              </span>
+                            )}
+                            <span className="adv-target-admin-meta">
+                              <strong>{v.title}</strong>
+                              <span>
+                                {v.creatorName ?? "Unknown"} ·{" "}
+                                {v.viewCount.toLocaleString()} views
+                              </span>
+                            </span>
+                            <button
+                              type="button"
+                              className="adv-target-admin-add"
+                              onClick={() => add(v.id)}
+                              disabled={current.length >= 50}
+                            >
+                              <Check size={14} aria-hidden="true" /> Add
+                            </button>
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+                </>
+              )}
+              <div className="adv-target-admin-actions">
+                {current.length > 0 && (
+                  <button
+                    type="button"
+                    className="adv-target-clear"
+                    onClick={() => setDraft([])}
+                  >
+                    Clear all (automatic pool)
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="adv-cta small"
+                  disabled={saving || !dirty}
+                  onClick={() => void save()}
+                >
+                  {saving ? "Saving…" : "Save targeting"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminVideoAdsTab({ onDone }: { onDone: (msg: string) => void }) {
   const utils = trpc.useUtils();
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -1620,6 +1837,7 @@ function AdminVideoAdsTab({ onDone }: { onDone: (msg: string) => void }) {
                 <span>
                   <em className={`an-status ${ad.status}`}>{ad.status}</em>
                   <span className="adv-ad-actions">
+                    <AdTargetingEditor adId={ad.id} onDone={onDone} />
                     {ad.status === "draft" ? (
                       <button
                         type="button"

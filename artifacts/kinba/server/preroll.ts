@@ -25,13 +25,14 @@
  * budget check runs inside a row-locked transaction so concurrent plays
  * cannot overspend.
  */
-import { and, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   campaignEarnings,
   drops,
   follows,
   prerollAds,
+  prerollAdTargets,
   prerollPlays,
   prerollSettings,
   revenueShareOverrides,
@@ -169,6 +170,9 @@ export const createAdInput = z.object({
   budgetCents: z.number().int().min(100).max(100_000_000),
   currency: currencyInput.default("USD"),
   startsAt: z.string().datetime({ offset: true }).nullish(),
+  // Optional manual video targeting: when provided, the ad ONLY plays on
+  // these videos. Empty/omitted = automatic eligible-creator pool.
+  targetVideoIds: z.array(z.number().int().positive()).max(50).optional(),
 });
 
 export const adStatusInput = z.object({
@@ -353,6 +357,8 @@ export async function getAdForVideo(
   if (Number(cap?.n ?? 0) >= settings.maxPlaysPerViewerPerDay) return null;
 
   // Active ads with remaining budget and (optional) start date reached.
+  // Manual targeting: an ad with target rows ONLY plays on those videos;
+  // an ad with no targets runs on the automatic eligible-creator pool.
   // Random pick spreads spend across advertisers.
   const [ad] = await db
     .select({
@@ -372,7 +378,13 @@ export async function getAdForVideo(
           isNull(prerollAds.startsAt),
           lte(prerollAds.startsAt, new Date())
         ),
-        sql`${prerollAds.spentCents} + ${settings.costPerPlayCents} <= ${prerollAds.budgetCents}`
+        sql`${prerollAds.spentCents} + ${settings.costPerPlayCents} <= ${prerollAds.budgetCents}`,
+        // Manual targeting via EXISTS subqueries (no extra round-trips).
+        // Table/column references keep identifiers in sync with the schema.
+        or(
+          sql`not exists (select 1 from ${prerollAdTargets} where ${prerollAdTargets.adId} = ${prerollAds.id})`,
+          sql`exists (select 1 from ${prerollAdTargets} where ${prerollAdTargets.adId} = ${prerollAds.id} and ${prerollAdTargets.videoId} = ${videoId})`
+        )
       )
     )
     .orderBy(sql`random()`)
@@ -627,6 +639,23 @@ export async function createAd(
     dropId = drop.id;
   }
 
+  // Manual video targeting: validate every video exists BEFORE the ad
+  // insert, so a bad target list can't leave an orphan ad behind.
+  const targetVideoIds = [...new Set(input.targetVideoIds ?? [])];
+  if (targetVideoIds.length > 0) {
+    const found = await db
+      .select({ id: videos.id })
+      .from(videos)
+      .where(inArray(videos.id, targetVideoIds));
+    const foundIds = new Set(found.map(r => r.id));
+    const missing = targetVideoIds.filter(id => !foundIds.has(id));
+    if (missing.length > 0) {
+      throw new Error(
+        `Targeted video${missing.length > 1 ? "s" : ""} not found: ${missing.join(", ")}`
+      );
+    }
+  }
+
   const [ad] = await db
     .insert(prerollAds)
     .values({
@@ -642,7 +671,15 @@ export async function createAd(
       startsAt: input.startsAt ? new Date(input.startsAt) : null,
     })
     .returning({ id: prerollAds.id });
-  return { id: ad?.id ?? 0 };
+  const adId = ad?.id ?? 0;
+
+  if (targetVideoIds.length > 0 && adId > 0) {
+    await db.insert(prerollAdTargets).values(
+      targetVideoIds.map(videoId => ({ adId, videoId }))
+    );
+  }
+
+  return { id: adId };
 }
 
 export type MyPrerollAd = {
@@ -762,6 +799,71 @@ export async function listMyDropsForAds(userId: number) {
     )
     .orderBy(desc(drops.createdAt))
     .limit(50);
+}
+
+/* ------------------------------------------------------------------ */
+/* Manual video targeting                                              */
+/* ------------------------------------------------------------------ */
+
+export const listVideosForTargetingInput = z.object({
+  search: z.string().trim().max(100).optional(),
+  limit: z.number().int().min(1).max(50).default(20),
+  offset: z.number().int().min(0).default(0),
+});
+
+export type TargetableVideo = {
+  id: number;
+  title: string;
+  thumbnailUrl: string | null;
+  viewCount: number;
+  creatorName: string | null;
+};
+
+/**
+ * Videos an advertiser can pick for manual ad targeting.
+ * Paginated + searchable. Returns real platform videos.
+ */
+export async function listVideosForTargeting(
+  input: z.infer<typeof listVideosForTargetingInput>
+): Promise<TargetableVideo[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const conditions = [];
+  if (input.search) {
+    conditions.push(ilike(videos.title, `%${input.search}%`));
+  }
+  const rows = await db
+    .select({
+      id: videos.id,
+      title: videos.title,
+      thumbnailUrl: videos.thumbnailUrl,
+      viewCount: videos.viewCount,
+      creatorName: users.name,
+    })
+    .from(videos)
+    .leftJoin(users, eq(users.id, videos.userId))
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(videos.viewCount))
+    .limit(input.limit)
+    .offset(input.offset);
+  return rows.map(r => ({
+    id: r.id,
+    title: r.title,
+    thumbnailUrl: r.thumbnailUrl,
+    viewCount: r.viewCount ?? 0,
+    creatorName: r.creatorName,
+  }));
+}
+
+/** Target video IDs already saved on an ad (for the edit/display UI). */
+export async function getAdTargets(adId: number): Promise<number[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const rows = await db
+    .select({ videoId: prerollAdTargets.videoId })
+    .from(prerollAdTargets)
+    .where(eq(prerollAdTargets.adId, adId));
+  return rows.map(r => r.videoId);
 }
 
 /* ------------------------------------------------------------------ */

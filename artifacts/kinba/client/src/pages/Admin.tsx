@@ -18,6 +18,7 @@ import {
   Megaphone,
   Pause,
   Play,
+  RefreshCw,
   ScrollText,
   Settings2,
   ShieldAlert,
@@ -152,12 +153,39 @@ function OverviewTab() {
         <div>
           <p className="eyebrow">Platform</p>
           <h2>Overview</h2>
+          <p className="admin-tab-desc">
+            Live platform health at a glance — users, content, ad revenue and
+            everything waiting for your attention.
+          </p>
         </div>
+        {!overview.isPending && !overview.isError && (
+          <button
+            type="button"
+            className="admin-refresh-btn"
+            onClick={() => overview.refetch()}
+            disabled={overview.isFetching}
+          >
+            <RefreshCw size={14} />
+            {overview.isFetching ? "Refreshing…" : "Refresh"}
+          </button>
+        )}
       </div>
       {overview.isPending ? (
         <p className="profile-loading-note">Loading…</p>
       ) : overview.isError ? (
-        <p className="form-message">Could not load overview.</p>
+        <div className="admin-error-box">
+          <p className="form-message">
+            Could not load overview: {overview.error?.message ?? "Unknown error"}
+          </p>
+          <button
+            type="button"
+            className="admin-refresh-btn"
+            onClick={() => overview.refetch()}
+          >
+            <RefreshCw size={14} />
+            Retry
+          </button>
+        </div>
       ) : d ? (
         <>
           <div className="admin-stat-grid">
@@ -413,6 +441,10 @@ function UsersTab({ isAdmin }: { isAdmin: boolean }) {
         <div>
           <p className="eyebrow">People</p>
           <h2>Users</h2>
+          <p className="admin-tab-desc">
+            Search any account, warn, restrict, suspend or ban — and assign
+            moderator roles. Strict hierarchy: moderators can't touch admins.
+          </p>
         </div>
         <Users size={24} />
       </div>
@@ -676,6 +708,9 @@ function BroadcastsTab() {
         <div>
           <p className="eyebrow">Comms</p>
           <h2>Broadcasts</h2>
+          <p className="admin-tab-desc">
+            Publish platform-wide announcements every user will see.
+          </p>
         </div>
         <Megaphone size={24} />
       </div>
@@ -722,6 +757,10 @@ function SettingsTab() {
         <div>
           <p className="eyebrow">Platform</p>
           <h2>Settings</h2>
+          <p className="admin-tab-desc">
+            Platform policy, feature flags and the full audit log — every
+            admin action, who did it and when.
+          </p>
         </div>
         <Settings2 size={24} />
       </div>

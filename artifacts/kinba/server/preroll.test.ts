@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   campaignEarnings,
   prerollAds,
+  prerollAdTargets,
   prerollPlays,
   prerollSettings,
 } from "../drizzle/schema";
@@ -226,6 +227,47 @@ describe("input validation", () => {
     expect(values.thumbnailUrl).toBeNull();
     expect(values.dropId).toBeNull();
     expect(values.linkUrl).toBe("https://brand.example/product");
+  });
+  it("saves manual video targets on createAd", async () => {
+    queueSelects([{ id: 11 }, { id: 22 }]); // videos found for targeting
+    const result = await createAd(327, {
+      title: "Targeted",
+      videoUrl: "https://cdn.example/ad.mp4",
+      budgetCents: 500,
+      currency: "USD",
+      targetVideoIds: [11, 22, 11], // dupes are deduped
+    } as never);
+    expect(result.id).toBeGreaterThan(0);
+    const targetInserts = insertsFor(prerollAdTargets);
+    expect(targetInserts).toHaveLength(1);
+    expect(targetInserts[0].values).toEqual([
+      { adId: result.id, videoId: 11 },
+      { adId: result.id, videoId: 22 },
+    ]);
+  });
+  it("createAd throws when a targeted video does not exist", async () => {
+    queueSelects([{ id: 11 }]); // only 11 exists, 99 is missing
+    await expect(
+      createAd(327, {
+        title: "Targeted",
+        videoUrl: "https://cdn.example/ad.mp4",
+        budgetCents: 500,
+        currency: "USD",
+        targetVideoIds: [11, 99],
+      } as never)
+    ).rejects.toThrow(/not found/);
+  });
+  it("createAdInput caps targetVideoIds at 50", () => {
+    const ids = Array.from({ length: 51 }, (_, i) => i + 1);
+    expect(() =>
+      createAdInput.parse({
+        title: "T",
+        videoUrl: "https://cdn.example/ad.mp4",
+        budgetCents: 500,
+        currency: "USD",
+        targetVideoIds: ids,
+      })
+    ).toThrow();
   });
   it("rejects invalid settings", () => {
     expect(() =>

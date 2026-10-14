@@ -10,13 +10,15 @@
  * All functions assume the caller is already authorized (adminProcedure
  * or moderatorProcedure at the router layer).
  */
-import { and, desc, eq, ilike, isNull, or, sql, count } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, isNull, or, sql, count, sum } from "drizzle-orm";
 import {
   adminAuditLog,
   campaignEarnings,
   campaigns,
   moderationReports,
   prerollAds,
+  prerollAdTargets,
+  prerollPlays,
   prerollSettings,
   revenueShareOverrides,
   users,
@@ -77,43 +79,71 @@ export async function getAdminOverview() {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
-  const [userCount] = await db
-    .select({ n: count() })
-    .from(users);
-  const [videoCount] = await db
-    .select({ n: count() })
-    .from(videos);
-  const [pendingAds] = await db
-    .select({ n: count() })
-    .from(prerollAds)
-    .where(eq(prerollAds.status, "draft"));
-  const [pendingCampaigns] = await db
-    .select({ n: count() })
-    .from(campaigns)
-    .where(eq(campaigns.status, "draft"));
-  const [openReports] = await db
-    .select({ n: count() })
-    .from(moderationReports)
-    .where(eq(moderationReports.status, "open"));
-  const [pendingPayouts] = await db
-    .select({ n: count() })
-    .from(campaignEarnings)
-    .where(eq(campaignEarnings.status, "approved"));
+  // Each stat is independent: run in parallel, and never let one bad
+  // table/query kill the whole overview — a failed stat reports 0.
+  const safeCount = async (
+    run: () => Promise<Array<{ n: number }>>
+  ): Promise<number> => {
+    try {
+      const [row] = await run();
+      return row?.n ?? 0;
+    } catch {
+      return 0;
+    }
+  };
 
-  // Platform ad revenue (sum of all play revenue) — real DB number.
-  const [revenue] = await db
-    .select({
-      total: sql<string>`coalesce(sum("revenueCents"), 0)`,
-    })
-    .from(sql`preroll_plays`);
+  const [
+    userCount,
+    videoCount,
+    pendingPrerollAds,
+    pendingCampaigns,
+    openReports,
+    pendingPayouts,
+    adRevenueCents,
+  ] = await Promise.all([
+    safeCount(() => db.select({ n: count() }).from(users)),
+    safeCount(() => db.select({ n: count() }).from(videos)),
+    safeCount(() =>
+      db
+        .select({ n: count() })
+        .from(prerollAds)
+        .where(eq(prerollAds.status, "draft"))
+    ),
+    safeCount(() =>
+      db.select({ n: count() }).from(campaigns).where(eq(campaigns.status, "draft"))
+    ),
+    safeCount(() =>
+      db
+        .select({ n: count() })
+        .from(moderationReports)
+        .where(eq(moderationReports.status, "open"))
+    ),
+    safeCount(() =>
+      db
+        .select({ n: count() })
+        .from(campaignEarnings)
+        .where(eq(campaignEarnings.status, "approved"))
+    ),
+    // Platform ad revenue (sum of all play revenue) — real DB number.
+    (async (): Promise<number> => {
+      try {
+        const [row] = await db
+          .select({ total: sum(prerollPlays.revenueCents) })
+          .from(prerollPlays);
+        return Number(row?.total ?? 0);
+      } catch {
+        return 0;
+      }
+    })(),
+  ]);
 
   return {
-    users: userCount?.n ?? 0,
-    content: videoCount?.n ?? 0,
-    pendingAdReviews: (pendingAds?.n ?? 0) + (pendingCampaigns?.n ?? 0),
-    openReports: openReports?.n ?? 0,
-    pendingPayouts: pendingPayouts?.n ?? 0,
-    adRevenueCents: Number(revenue?.total ?? 0),
+    users: userCount,
+    content: videoCount,
+    pendingAdReviews: pendingPrerollAds + pendingCampaigns,
+    openReports,
+    pendingPayouts,
+    adRevenueCents,
   };
 }
 
@@ -264,6 +294,88 @@ export async function releasePayout(adminId: number, creatorId: number) {
     );
   await logAdminAction(adminId, "payout.release", "creator", creatorId);
   return { ok: true };
+}
+
+/* ------------------------------------------------------------------ */
+/* Ad targeting — admin can view/change target videos for any ad       */
+/* ------------------------------------------------------------------ */
+
+export type AdTargetDetail = {
+  videoId: number;
+  title: string;
+  thumbnailUrl: string | null;
+  creatorName: string | null;
+};
+
+/** Full target-video details for an ad (admin view). */
+export async function getAdTargetDetails(adId: number): Promise<AdTargetDetail[]> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const rows = await db
+    .select({
+      videoId: prerollAdTargets.videoId,
+      title: videos.title,
+      thumbnailUrl: videos.thumbnailUrl,
+      creatorName: users.name,
+    })
+    .from(prerollAdTargets)
+    .innerJoin(videos, eq(videos.id, prerollAdTargets.videoId))
+    .leftJoin(users, eq(users.id, videos.userId))
+    .where(eq(prerollAdTargets.adId, adId))
+    .orderBy(desc(prerollAdTargets.id))
+    .limit(50);
+  return rows;
+}
+
+/**
+ * Replace an ad's manual target videos (admin). Empty list clears the
+ * targets → the ad falls back to the automatic eligible-creator pool.
+ * Every change is written to the audit log.
+ */
+export async function setAdTargets(
+  adminId: number,
+  adId: number,
+  videoIds: number[]
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  const uniqueIds = [...new Set(videoIds.filter(id => Number.isSafeInteger(id) && id > 0))];
+  if (uniqueIds.length > 50) {
+    throw new Error("At most 50 target videos per ad.");
+  }
+
+  const [ad] = await db
+    .select({ id: prerollAds.id })
+    .from(prerollAds)
+    .where(eq(prerollAds.id, adId))
+    .limit(1);
+  if (!ad) throw new Error("Ad not found.");
+
+  if (uniqueIds.length > 0) {
+    const found = await db
+      .select({ id: videos.id })
+      .from(videos)
+      .where(inArray(videos.id, uniqueIds));
+    const foundIds = new Set(found.map(r => r.id));
+    const missing = uniqueIds.filter(id => !foundIds.has(id));
+    if (missing.length > 0) {
+      throw new Error(`Video${missing.length > 1 ? "s" : ""} not found: ${missing.join(", ")}`);
+    }
+  }
+
+  // Replace all targets atomically.
+  await db.delete(prerollAdTargets).where(eq(prerollAdTargets.adId, adId));
+  if (uniqueIds.length > 0) {
+    await db.insert(prerollAdTargets).values(
+      uniqueIds.map(videoId => ({ adId, videoId }))
+    );
+  }
+
+  await logAdminAction(adminId, "ad.set_targets", "preroll_ad", adId, {
+    videoIds: uniqueIds,
+  });
+  return { ok: true, count: uniqueIds.length };
 }
 
 /* ------------------------------------------------------------------ */

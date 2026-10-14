@@ -2112,6 +2112,29 @@ export const prerollPlays = pgTable(
 );
 
 /**
+ * Optional manual video targeting for a pre-roll ad. When an ad has at
+ * least one target row, it ONLY plays on those videos; when it has none,
+ * the ad runs on the automatic eligible-creator pool (unchanged behavior).
+ */
+export const prerollAdTargets = pgTable(
+  "preroll_ad_targets",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    adId: integer("adId")
+      .notNull()
+      .references(() => prerollAds.id, { onDelete: "cascade" }),
+    videoId: integer("videoId")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  table => [
+    uniqueIndex("preroll_ad_targets_ad_video_uniq").on(table.adId, table.videoId),
+    index("preroll_ad_targets_video_idx").on(table.videoId),
+  ]
+);
+
+/**
  * Admin-set pre-roll policy. Single row (id = 1).
  * - minFollowers / minViews: creator eligibility criteria
  * - costPerPlayCents: fixed brand charge per play (revenue split base)
