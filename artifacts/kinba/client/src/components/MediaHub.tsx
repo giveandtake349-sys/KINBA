@@ -1883,8 +1883,6 @@ function EngagementActions({
   feedStyle = false,
   bookmarked = false,
   onBookmark,
-  owner,
-  shorts = false,
 }: {
   engagement: Engagement;
   videoId?: number;
@@ -1896,11 +1894,7 @@ function EngagementActions({
   feedStyle?: boolean;
   bookmarked?: boolean;
   onBookmark?: () => void;
-  owner?: VideoRecord["owner"];
-  shorts?: boolean;
 }) {
-  const auth = useAuth();
-  const utils = trpc.useUtils();
   const [reactorsOpen, setReactorsOpen] = useState(false);
   // Single reaction (Pookie/Love): a tap toggles it; a long-press opens the
   // reactor list instead of a multi-option picker.
@@ -1908,62 +1902,10 @@ function EngagementActions({
     enabled: Boolean(videoId),
     onLongPress: () => setReactorsOpen(true),
   });
-  const followState = trpc.profile.followState.useQuery(
-    { userId: owner?.id ?? 0 },
-    {
-      enabled: Boolean(
-        owner && auth.isAuthenticated && auth.user?.id !== owner.id
-      ),
-      refetchOnWindowFocus: false,
-    }
-  );
-  const toggleFollow = trpc.profile.toggleFollow.useMutation();
-  const isOwnVideo = Boolean(owner && auth.user?.id === owner.id);
-  const following = followState.data?.following ?? false;
-  const followOwner = async () => {
-    if (!owner || isOwnVideo) return;
-    if (!auth.isAuthenticated) return auth.openAuth();
-    try {
-      await toggleFollow.mutateAsync({ userId: owner.id });
-      await Promise.all([
-        followState.refetch(),
-        utils.home.feed.invalidate(),
-        utils.videos.list.invalidate(),
-      ]);
-    } catch (error) {
-      notifyError(error);
-    }
-  };
   return (
     <div
       className={`media-engagement-actions${overlay ? " media-engagement-actions--overlay absolute right-3 bottom-16 z-20 flex flex-col items-center gap-4" : ""}${feedStyle ? " feed-action-bar flex flex-row justify-around mt-3 pb-3" : ""}`}
     >
-      {overlay && !shorts && owner && !isOwnVideo && (
-        <button
-          type="button"
-          className={`creator-follow-action${following ? " is-following" : ""}`}
-          onClick={event => {
-            event.preventDefault();
-            event.stopPropagation();
-            void followOwner();
-          }}
-          disabled={toggleFollow.isPending}
-          aria-label={following ? "Unfollow creator" : "Follow creator"}
-          aria-pressed={following}
-        >
-          <span className="creator-follow-avatar">
-            {owner.photoUrl ? (
-              <img src={resolveMediaUrl(owner.photoUrl, "avatars")} alt="" />
-            ) : (
-              <UserRound size={18} />
-            )}
-          </span>
-          <span className="creator-follow-badge" aria-hidden="true">
-            {following ? <Check size={14} /> : <Plus size={14} />}
-          </span>
-          <span>{following ? "Following" : "Follow"}</span>
-        </button>
-      )}
       <button
         type="button"
         className={`media-engagement-actions__pookie${engagement.viewerReacted ? " is-active" : ""}`}
@@ -1978,7 +1920,7 @@ function EngagementActions({
         aria-label={engagement.viewerReacted ? "Remove Pookie" : "Pookie video"}
       >
         <Heart
-          size={overlay ? 27 : 16}
+          size={overlay ? 22 : 16}
           fill={engagement.viewerReacted ? "currentColor" : "none"}
         />
         <span>{engagement.viewerReacted ? "Pookied" : "Pookie"}</span>
@@ -1993,7 +1935,7 @@ function EngagementActions({
         }}
         aria-label="Open comments"
       >
-        <MessageCircle size={overlay ? 27 : 16} /> <span>Comment</span>
+        <MessageCircle size={overlay ? 22 : 16} /> <span>Comment</span>
         <strong>{formatCount(engagement.commentCount)}</strong>
       </button>
       <button
@@ -2007,7 +1949,7 @@ function EngagementActions({
         disabled={pending === "share"}
         aria-label="Share video"
       >
-        <Share2 size={overlay ? 28 : 16} />
+        <Share2 size={overlay ? 22 : 16} />
         <span>{pending === "share" ? "Sharing" : "Share"}</span>
         <strong>{formatCount(engagement.shareCount)}</strong>
       </button>
@@ -2024,7 +1966,7 @@ function EngagementActions({
           aria-label={bookmarked ? "Remove saved video" : "Save video"}
         >
           <Bookmark
-            size={overlay ? 27 : 16}
+            size={overlay ? 22 : 16}
             fill={bookmarked ? "currentColor" : "none"}
           />
           <span>{bookmarked ? "Saved" : "Save"}</span>
@@ -4456,10 +4398,36 @@ function ShortVideoCard({
   const [deleted, setDeleted] = useState(false);
   const [shortMuted, setShortMuted] = useState(readShortsMutePreference);
   const auth = useAuth();
+  const utils = trpc.useUtils();
   const viewMutation = trpc.videos.view.useMutation();
   const viewedRef = useRef(false);
   const [bookmarked, setBookmarked] = useState(video.viewerBookmarked ?? false);
   const bookmarkMutation = trpc.videos.bookmark.useMutation();
+  // Follow creator — Instagram-style button in the bottom caption area.
+  const isOwnVideo = Boolean(auth.user?.id === video.owner.id);
+  const followState = trpc.profile.followState.useQuery(
+    { userId: video.owner.id },
+    {
+      enabled: Boolean(auth.isAuthenticated && !isOwnVideo),
+      refetchOnWindowFocus: false,
+    }
+  );
+  const toggleFollow = trpc.profile.toggleFollow.useMutation();
+  const following = followState.data?.following ?? false;
+  const followOwner = async () => {
+    if (isOwnVideo) return;
+    if (!auth.isAuthenticated) return auth.openAuth();
+    try {
+      await toggleFollow.mutateAsync({ userId: video.owner.id });
+      await Promise.all([
+        followState.refetch(),
+        utils.home.feed.invalidate(),
+        utils.videos.list.invalidate(),
+      ]);
+    } catch (error) {
+      notifyError(error);
+    }
+  };
   const toggleBookmark = async () => {
     if (!auth.isAuthenticated) return auth.openAuth();
     if (bookmarkMutation.isPending) return;
@@ -4585,6 +4553,23 @@ function ShortVideoCard({
                 </div>
               </div>
             </a>
+            {!compact && !isOwnVideo && (
+              <button
+                type="button"
+                className={`short-follow-btn${following ? " is-following" : ""}`}
+                data-short-no-swipe
+                onClick={event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void followOwner();
+                }}
+                disabled={toggleFollow.isPending}
+                aria-label={following ? "Unfollow creator" : "Follow creator"}
+                aria-pressed={following}
+              >
+                {following ? "Following" : "Follow"}
+              </button>
+            )}
           </div>
           <Caption text={postCaption(video.title, description)} maxLines={3} className="short-caption" />
           <p className="media-caption-tags">
@@ -4609,8 +4594,6 @@ function ShortVideoCard({
             feedStyle={compact}
             bookmarked={bookmarked}
             onBookmark={toggleBookmark}
-            owner={video.owner}
-            shorts={true}
           />
           <button
             type="button"
@@ -4622,7 +4605,7 @@ function ShortVideoCard({
             }}
             aria-label={shortMuted ? "Unmute video" : "Mute video"}
           >
-            {shortMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+            {shortMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
           </button>
         </div>
       </div>

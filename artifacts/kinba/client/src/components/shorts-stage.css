@@ -57,7 +57,7 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
   margin: 0 !important;
   padding: 0 !important;
   overflow: hidden !important;
-  background: var(--page-bg) !important;
+  background: #000 !important;
 }
 
 .app-main-content.chrome-collapsed .shorts-tab-panel,
@@ -78,7 +78,7 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
   border: 0 !important;
   border-radius: 0 !important;
   overflow: hidden !important;
-  background: var(--page-bg) !important;
+  background: #000 !important;
 }
 
 /* ---------------------------------------------------------------------------
@@ -103,7 +103,7 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
   -ms-overflow-style: none !important;
   touch-action: pan-y !important;
   overscroll-behavior-y: contain !important;
-  background: var(--page-bg) !important;
+  background: #000 !important;
   border-radius: 0 !important;
 }
 
@@ -125,7 +125,7 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
-  background: var(--page-bg) !important;
+  background: #000 !important;
   overflow: hidden !important;
   position: relative !important;
   box-sizing: border-box !important;
@@ -242,14 +242,14 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
   position: absolute !important;
   top: auto !important;
   right: 10px !important;
-  bottom: 72px !important;
+  bottom: calc(16px + env(safe-area-inset-bottom)) !important;
   left: auto !important;
   z-index: 30 !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  gap: 18px !important;
-  width: auto !important;
+  gap: 20px !important;
+  width: 56px !important;
   min-width: 0 !important;
   max-width: none !important;
   margin: 0 !important;
@@ -265,7 +265,7 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  gap: 18px !important;
+  gap: 20px !important;
   width: auto !important;
   min-width: 0 !important;
   max-width: none !important;
@@ -328,8 +328,8 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  width: 40px !important;
-  height: 40px !important;
+  width: 32px !important;
+  height: 32px !important;
   padding: 0 !important;
   border: none !important;
   border-radius: 50% !important;
@@ -367,7 +367,7 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
   margin: 0 !important;
   padding: 0 !important;
   overflow: hidden !important;
-  background: var(--page-bg) !important;
+  background: #000 !important;
   isolation: isolate !important;
 }
 
@@ -384,7 +384,7 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
   border: 0 !important;
   border-radius: 0 !important;
   overflow: hidden !important;
-  background: var(--page-bg) !important;
+  background: #000 !important;
 }
 
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .media-section-heading {
@@ -410,7 +410,7 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
   -ms-overflow-style: none !important;
   touch-action: pan-y !important;
   overscroll-behavior-y: contain !important;
-  background: var(--page-bg) !important;
+  background: #000 !important;
 }
 
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport::-webkit-scrollbar {
@@ -432,7 +432,7 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
   border: 0 !important;
   border-radius: 0 !important;
   box-shadow: none !important;
-  background: var(--page-bg) !important;
+  background: #000 !important;
   overflow: hidden !important;
   position: relative !important;
   box-sizing: border-box !important;
@@ -532,14 +532,14 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .shorts-overlay-actions {
   top: auto !important;
   right: 10px !important;
-  bottom: 72px !important;
+  bottom: calc(16px + env(safe-area-inset-bottom)) !important;
   left: auto !important;
   z-index: 30 !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  gap: 18px !important;
-  width: auto !important;
+  gap: 20px !important;
+  width: 56px !important;
   min-width: 0 !important;
   max-width: none !important;
   margin: 0 !important;
@@ -555,7 +555,7 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
-  gap: 18px !important;
+  gap: 20px !important;
   width: auto !important;
   min-width: 0 !important;
   max-width: none !important;
@@ -720,15 +720,12 @@ body:has(.shorts-viewer-layer) .action-modal-layer {
 
 .media-hub .shorts-tab-panel,
 .media-hub .shorts-viewer-layer {
-  background:
-    radial-gradient(circle at 18% 0%, color-mix(in srgb, var(--teal) 8%, transparent), transparent 34%),
-    radial-gradient(circle at 90% 100%, color-mix(in srgb, var(--blue) 10%, transparent), transparent 38%),
-    var(--page-bg) !important;
+  background: #000 !important;
 }
 
 .media-hub .shorts-tab-panel .shorts-viewport > .short-card,
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card {
-  background: #0b0e15 !important;
+  background: #000 !important;
 }
 
 .media-hub .shorts-tab-panel .shorts-viewport > .short-card .short-overlay,
@@ -759,18 +756,27 @@ body:has(.shorts-viewer-layer) .action-modal-layer {
 .media-hub .shorts-tab-panel .shorts-viewport > .short-card .shorts-overlay-actions,
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .shorts-overlay-actions {
   right: 16px !important;
-  bottom: 82px !important;
-  gap: 14px !important;
+  bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+  gap: 20px !important;
 }
 
 .media-hub .shorts-tab-panel .shorts-viewport > .short-card .media-engagement-actions--overlay > button,
-.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .media-engagement-actions--overlay > button,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .media-engagement-actions--overlay > button {
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  background: rgba(13, 16, 24, 0.54) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24) !important;
+}
+
 .media-hub .shorts-tab-panel .shorts-viewport > .short-card .shorts-overlay-actions .shorts-mute-btn,
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .shorts-overlay-actions .shorts-mute-btn {
-  width: 42px !important;
-  min-width: 42px !important;
-  height: 42px !important;
-  min-height: 42px !important;
+  width: 32px !important;
+  min-width: 32px !important;
+  height: 32px !important;
+  min-height: 32px !important;
   border: 1px solid rgba(255, 255, 255, 0.16) !important;
   background: rgba(13, 16, 24, 0.54) !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24) !important;
@@ -796,8 +802,8 @@ body:has(.shorts-viewer-layer) .action-modal-layer {
   .media-hub .shorts-tab-panel .shorts-viewport > .short-card .shorts-overlay-actions,
   .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .shorts-overlay-actions {
     right: 10px !important;
-    bottom: 66px !important;
-    gap: 12px !important;
+    bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+    gap: 20px !important;
   }
 }
 
@@ -965,4 +971,51 @@ body:has(.shorts-viewer-layer) .action-modal-layer {
   .media-hub .shorts-viewer-layer .shorts-progress > span {
     transition: none !important;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   10. Shorts follow button — Instagram style, bottom caption area.
+   [avatar] [@username] [Follow] on one row, caption below.
+   --------------------------------------------------------------------------- */
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .media-owner,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .media-owner {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .short-follow-btn,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .short-follow-btn {
+  flex-shrink: 0 !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  color: #fff !important;
+  background: rgba(0, 0, 0, 0.35) !important;
+  border: 1px solid rgba(255, 255, 255, 0.9) !important;
+  border-radius: 8px !important;
+  padding: 7px 14px !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6) !important;
+  transition: background 0.15s ease, transform 0.15s ease !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .short-follow-btn:active,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .short-follow-btn:active {
+  transform: scale(0.94) !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .short-follow-btn.is-following,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .short-follow-btn.is-following {
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  color: rgba(255, 255, 255, 0.75) !important;
+  background: transparent !important;
+}
+
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card .short-follow-btn:disabled,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .short-follow-btn:disabled {
+  opacity: 0.6 !important;
+  cursor: default !important;
 }
