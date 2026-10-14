@@ -570,6 +570,9 @@
 }
 
 @media (min-width: 720px) {
+  .adv-destination-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .adv-row-2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -710,6 +713,48 @@
 .adv-field input[type="file"] {
   min-width: 0;
   max-width: 100%;
+}
+.adv-drop-link-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+.adv-drop-link,
+.adv-drop-create {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 36px;
+  max-width: 100%;
+  padding: 7px 10px;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.adv-drop-link {
+  color: var(--blue, #1d9bf0);
+  border: 1px solid color-mix(in srgb, var(--blue, #1d9bf0) 35%, transparent);
+  text-decoration: none;
+}
+.adv-drop-create {
+  border: 1px dashed color-mix(in srgb, var(--text) 25%, transparent);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.adv-destination-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+}
+.adv-destination-grid .adv-field {
+  min-width: 0;
 }
 .adv-hint,
 .an-empty p,

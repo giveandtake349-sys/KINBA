@@ -185,6 +185,15 @@ describe("input validation", () => {
       createAdInput.parse({ ...base, videoUrl: "http://x.example/a.mp4" })
     ).toThrow();
     expect(() => createAdInput.parse({ ...base, title: "" })).toThrow();
+    expect(
+      createAdInput.parse({
+        ...base,
+        linkUrl: "https://brand.example/product",
+      }).linkUrl
+    ).toBe("https://brand.example/product");
+    expect(() =>
+      createAdInput.parse({ ...base, linkUrl: "http://brand.example/product" })
+    ).toThrow();
   });
   it("normalizes blank optional fields before the preroll INSERT", async () => {
     const base = {
@@ -206,6 +215,7 @@ describe("input validation", () => {
       ...base,
       thumbnailUrl: "",
       dropId: "",
+      linkUrl: "https://brand.example/product",
     } as never);
 
     const values = insertsFor(prerollAds)[0].values as Record<string, unknown>;
@@ -215,6 +225,7 @@ describe("input validation", () => {
     });
     expect(values.thumbnailUrl).toBeNull();
     expect(values.dropId).toBeNull();
+    expect(values.linkUrl).toBe("https://brand.example/product");
   });
   it("rejects invalid settings", () => {
     expect(() =>

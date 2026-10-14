@@ -74,6 +74,12 @@ const videoUrlInput = z
   .url()
   .max(1024)
   .refine(u => u.startsWith("https://"), "Ad video URL must be https.");
+const adLinkUrlInput = z
+  .string()
+  .trim()
+  .url()
+  .max(2048)
+  .refine(u => u.startsWith("https://"), "Ad destination must be https.");
 const currencyInput = z.enum(PREROLL_CURRENCIES);
 const blankToUndefined = (value: unknown) =>
   typeof value === "string" && value.trim() === "" ? undefined : value;
@@ -90,6 +96,10 @@ export const createAdInput = z.object({
   dropId: z.preprocess(
     blankToUndefined,
     z.number().int().positive().nullable().optional(),
+  ),
+  linkUrl: z.preprocess(
+    blankToUndefined,
+    adLinkUrlInput.nullable().optional(),
   ),
   budgetCents: z.number().int().min(100).max(100_000_000),
   currency: currencyInput.default("USD"),
@@ -224,6 +234,7 @@ export type ServedPrerollAd = {
   title: string;
   videoUrl: string;
   brandName: string;
+  linkUrl: string | null;
   drop: {
     id: number;
     title: string;
@@ -279,6 +290,7 @@ export async function getAdForVideo(
       title: prerollAds.title,
       videoUrl: prerollAds.videoUrl,
       dropId: prerollAds.dropId,
+      linkUrl: prerollAds.linkUrl,
       brandName: users.name,
     })
     .from(prerollAds)
@@ -326,6 +338,7 @@ export async function getAdForVideo(
     title: ad.title,
     videoUrl: ad.videoUrl,
     brandName: ad.brandName ?? "Sponsored",
+    linkUrl: ad.linkUrl ?? null,
     drop,
   };
 }
@@ -487,6 +500,7 @@ export async function createAd(
   const rawInput = input as unknown as {
     dropId?: unknown;
     thumbnailUrl?: unknown;
+    linkUrl?: unknown;
   };
   const normalizedThumbnailUrl =
     typeof rawInput.thumbnailUrl === "string"
@@ -496,6 +510,15 @@ export async function createAd(
     typeof normalizedThumbnailUrl === "string" && normalizedThumbnailUrl
       ? normalizedThumbnailUrl
       : null;
+  const normalizedLinkUrl =
+    typeof rawInput.linkUrl === "string" ? rawInput.linkUrl.trim() : rawInput.linkUrl;
+  const linkUrl: string | null =
+    typeof normalizedLinkUrl === "string" && normalizedLinkUrl
+      ? normalizedLinkUrl
+      : null;
+  if (linkUrl && !linkUrl.startsWith("https://")) {
+    throw new Error("Ad destination must be an https URL.");
+  }
 
   // Drop link must exist, be owned by the advertiser, and not be archived.
   let dropId: number | null = null;
@@ -536,6 +559,7 @@ export async function createAd(
       videoUrl: input.videoUrl,
       thumbnailUrl,
       dropId,
+      linkUrl,
       status: "draft",
       budgetCents: input.budgetCents,
       currency: input.currency,

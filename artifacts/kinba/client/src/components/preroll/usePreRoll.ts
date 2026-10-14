@@ -6,6 +6,7 @@ export type ServedAd = {
   title: string;
   videoUrl: string;
   brandName: string;
+  linkUrl: string | null;
   drop: {
     id: number;
     title: string;

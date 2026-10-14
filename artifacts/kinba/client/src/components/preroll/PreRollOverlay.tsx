@@ -95,7 +95,21 @@ export function PreRollOverlay({
         </span>
       )}
 
-      {ad.drop ? (
+      {ad.linkUrl ? (
+        <div className="preroll-drop preroll-external-link">
+          <ExternalLink size={16} aria-hidden="true" />
+          <span className="preroll-drop-title">Visit {ad.brandName}</span>
+          <a
+            className="preroll-drop-cta"
+            href={ad.linkUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={e => e.stopPropagation()}
+          >
+            Visit website <ExternalLink size={12} aria-hidden="true" />
+          </a>
+        </div>
+      ) : ad.drop ? (
         <div className="preroll-drop">
           <ShoppingBag size={16} aria-hidden="true" />
           <span className="preroll-drop-title">{ad.drop.title}</span>

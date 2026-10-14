@@ -2183,6 +2183,8 @@ export const prerollAds = pgTable(
     dropId: integer("dropId").references(() => drops.id, {
       onDelete: "set null",
     }),
+    // Optional advertiser website/product destination shown as a clickable CTA.
+    linkUrl: varchar("linkUrl", { length: 2048 }),
     status: prerollAdStatus("status").default("draft").notNull(),
     // Budget / spend in cents of `currency`. `spentCents` is denormalized
     // and bumped in the same transaction that records each play.

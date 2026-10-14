@@ -2,10 +2,12 @@ import { useRef, useState } from "react";
 import {
   ArrowRight,
   Clapperboard,
+  ExternalLink,
   Plus,
   Upload,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { useLocation } from "wouter";
 import "./advertise.css";
 import "./analytics.css";
 
@@ -200,10 +202,12 @@ export function VideoAdsSection() {
 }
 
 function NewVideoAdForm({ onDone }: { onDone: () => void }) {
+  const [, navigate] = useLocation();
   const [title, setTitle] = useState("");
   const [budget, setBudget] = useState("");
   const [currency, setCurrency] = useState<"USD" | "BDT">("USD");
   const [dropId, setDropId] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -215,6 +219,7 @@ function NewVideoAdForm({ onDone }: { onDone: () => void }) {
   });
   const uploadUrl = trpc.preroll.createAdUploadUrl.useMutation();
   const createAd = trpc.preroll.createAd.useMutation();
+  const selectedDrop = (drops.data ?? []).find(d => String(d.id) === dropId);
 
   const submit = async () => {
     setError("");
@@ -249,6 +254,7 @@ function NewVideoAdForm({ onDone }: { onDone: () => void }) {
         videoUrl: publicUrl,
         thumbnailUrl: null,
         dropId: dropId.trim() ? Number(dropId) : null,
+        linkUrl: linkUrl.trim() || null,
         budgetCents,
         currency,
         startsAt: startsAt ? new Date(startsAt).toISOString() : null,
@@ -288,18 +294,67 @@ function NewVideoAdForm({ onDone }: { onDone: () => void }) {
           </span>
         ) : null}
       </label>
-      <label className="adv-field">
-        <span>Drop link (optional)</span>
-        <select value={dropId} onChange={e => setDropId(e.target.value)}>
-          <option value="">No drop attached</option>
-          {(drops.data ?? []).map(d => (
-            <option key={d.id} value={d.id}>
-              {d.title} — {d.currency === "BDT" ? "৳" : "$"}
-              {d.discountedPrice}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="adv-destination-grid">
+        <label className="adv-field">
+          <span>Drop link (optional)</span>
+          <select
+            value={dropId}
+            onChange={e => {
+              const value = e.target.value;
+              setDropId(value);
+              if (value) setLinkUrl("");
+            }}
+          >
+            <option value="">No drop attached</option>
+            {(drops.data ?? []).map(d => (
+              <option key={d.id} value={d.id}>
+                {d.title} — {d.currency === "BDT" ? "৳" : "$"}
+                {d.discountedPrice}
+              </option>
+            ))}
+          </select>
+          <div className="adv-drop-link-row">
+            {selectedDrop ? (
+              <a
+                className="adv-drop-link"
+                href={`/drops/${selectedDrop.id}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLink size={14} aria-hidden="true" />
+                View attached drop link
+              </a>
+            ) : (
+              <span className="adv-hint">Select a Drop to attach it.</span>
+            )}
+            <button
+              type="button"
+              className="adv-drop-create"
+              onClick={() => navigate("/drops/new?returnTo=/advertise/my-ads")}
+            >
+              <Plus size={14} aria-hidden="true" /> Create new Drop
+            </button>
+          </div>
+        </label>
+        <label className="adv-field">
+          <span>Website / product link (optional)</span>
+          <input
+            type="url"
+            inputMode="url"
+            value={linkUrl}
+            placeholder="https://brand.com/product"
+            maxLength={2048}
+            onChange={e => {
+              const value = e.target.value;
+              setLinkUrl(value);
+              if (value.trim()) setDropId("");
+            }}
+          />
+          <span className="adv-hint">
+            Add your own HTTPS website or product page. It will be clickable in the ad.
+          </span>
+        </label>
+      </div>
       <div className="adv-row-2">
         <label className="adv-field">
           <span>Budget</span>
