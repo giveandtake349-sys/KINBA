@@ -113,7 +113,6 @@ type AppModal =
   | "upload"
   | "search"
   | "notifications"
-  | "wallet"
   | "activity"
   | "offline"
   | "qr"
@@ -648,17 +647,6 @@ function MobileDrawer({
       icon: typeof Video;
     }[];
   }[] = [
-    {
-      title: "Assets",
-      items: [
-        {
-          section: "wallet",
-          label: "Balance",
-          description: "Wallet and account funds",
-          icon: WalletCards,
-        },
-      ],
-    },
     {
       title: "Personal tools",
       items: [
@@ -1360,126 +1348,6 @@ function SettingsPanel({ onLogout }: { onLogout: () => void }) {
         </button>
       </div>
     </section>
-  );
-}
-
-function WalletPanel() {
-  const wallet = trpc.sponsorBids.walletBalance.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-    staleTime: 30_000,
-  });
-  const verification = trpc.payments.status.useQuery(undefined, {
-    refetchOnWindowFocus: false,
-  });
-  return (
-    <section
-      className="media-section utility-section wallet-panel"
-      aria-labelledby="wallet-heading"
-    >
-      <div className="media-section-heading">
-        <div>
-          <p className="eyebrow">Assets</p>
-          <h2 id="wallet-heading">Your JHILIK wallet.</h2>
-        </div>
-        <Coins size={24} aria-hidden="true" />
-      </div>
-      {wallet.isPending ? (
-        <div className="wallet-balance-skeleton" aria-busy="true" />
-      ) : wallet.isError ? (
-        <div className="media-empty" role="alert">
-          <h3>Wallet balance is unavailable.</h3>
-          <p>Try again in a moment.</p>
-          <button
-            type="button"
-            className="muted-btn"
-            onClick={() => wallet.refetch()}
-          >
-            Retry
-          </button>
-        </div>
-      ) : (
-        <div className="wallet-balance-card">
-          <span>Available balance</span>
-          <strong>৳{Number(wallet.data ?? 0).toFixed(2)}</strong>
-          <small>Used for sponsorships.</small>
-        </div>
-      )}
-      <div className="wallet-status-row">
-        <div>
-          <span>Account status</span>
-          <strong>
-            {verification.data?.isVerified ? "Verified" : "Standard member"}
-          </strong>
-        </div>
-        <span
-          className={
-            verification.data?.isVerified
-              ? "wallet-status is-ready"
-              : "wallet-status"
-          }
-        >
-          {verification.data?.isVerified
-            ? "Ready to publish"
-            : "Verification available"}
-        </span>
-      </div>
-    </section>
-  );
-}
-
-function WalletModal({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
-  if (!open) return null;
-  return (
-    <div className="wallet-modal-layer" role="presentation">
-      <button
-        type="button"
-        className="wallet-modal-backdrop"
-        aria-label="Close wallet"
-        onClick={safeClick(onClose)}
-      />
-      <section
-        className="wallet-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="wallet-heading"
-      >
-        <button
-          type="button"
-          className="wallet-modal-close"
-          aria-label="Close wallet"
-          onClick={safeClick(onClose)}
-        >
-          <X size={20} />
-        </button>
-        <WalletPanel />
-        <div className="wallet-modal-actions" aria-label="Wallet actions">
-          <button
-            type="button"
-            className="primary-btn"
-            onClick={safeClick(() =>
-              toast.info("Deposit requests are being prepared for your account.")
-            )}
-          >
-            <Plus size={16} /> Deposit funds
-          </button>
-          <button
-            type="button"
-            className="secondary-media-btn"
-            onClick={safeClick(() =>
-              toast.info("Withdrawals are reviewed before funds are released.")
-            )}
-          >
-            Withdraw funds
-          </button>
-        </div>
-      </section>
-    </div>
   );
 }
 
@@ -3090,7 +2958,6 @@ export default function Home() {
             onLogout={logout}
           />
         )}
-        {activeModal === "wallet" && <WalletModal open onClose={() => setActiveModal(null)} />}
         {activeModal === "upload" && (
           <UploadVideoModal
             open

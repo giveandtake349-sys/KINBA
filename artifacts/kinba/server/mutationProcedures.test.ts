@@ -15,9 +15,6 @@ const databaseMocks = vi.hoisted(() => ({
   listVideoComments: vi.fn(),
   submitVerificationTransaction: vi.fn(),
   approveVerificationTransaction: vi.fn(),
-  adminListDashboard: vi.fn(),
-  adminCreateSponsorBidsSession: vi.fn(),
-  adminStartSponsorBidsSession: vi.fn(),
   adminSetSponsorStatus: vi.fn(),
   toggleCommentReaction: vi.fn(),
 }));
@@ -210,34 +207,10 @@ describe("KINBA protected procedures", () => {
     ).rejects.toThrow("required permission");
   });
 
-  it("blocks the Admin Dashboard for regular users", async () => {
+  it("blocks admin procedures for regular users", async () => {
     await expect(
-      appRouter.createCaller(context()).admin.dashboard()
+      appRouter.createCaller(context()).admin.featureFlags.list()
     ).rejects.toThrow("required permission");
-    expect(databaseMocks.adminListDashboard).not.toHaveBeenCalled();
-  });
-
-  it("allows only database-role admins to create and inspect sessions", async () => {
-    const dashboard = { sessions: [], wallets: [], ledger: [], sponsors: [] };
-    const session = { id: 9, title: "TimeWheels", status: "scheduled" };
-    databaseMocks.adminListDashboard.mockResolvedValue(dashboard);
-    databaseMocks.adminCreateSponsorBidsSession.mockResolvedValue(session);
-
-    await expect(
-      appRouter.createCaller(context(adminUser)).admin.dashboard()
-    ).resolves.toEqual(dashboard);
-    await expect(
-      appRouter
-        .createCaller(context(adminUser))
-        .admin.createSession({
-          title: "TimeWheels",
-          startsAt: "2026-09-01T12:00:00.000Z",
-        })
-    ).resolves.toEqual(session);
-    expect(databaseMocks.adminCreateSponsorBidsSession).toHaveBeenCalledWith({
-      title: "TimeWheels",
-      startsAt: new Date("2026-09-01T12:00:00.000Z"),
-    });
   });
 
   it("creates a protected video comment", async () => {

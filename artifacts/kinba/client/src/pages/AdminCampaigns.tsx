@@ -1388,6 +1388,7 @@ function AdminVideoAdsTab({ onDone }: { onDone: (msg: string) => void }) {
     minViews: "",
     costPerPlayCents: "",
     maxPlaysPerViewerPerDay: "",
+    defaultCreatorPercent: "55",
   });
   const [formInit, setFormInit] = useState(false);
 
@@ -1415,6 +1416,7 @@ function AdminVideoAdsTab({ onDone }: { onDone: (msg: string) => void }) {
       minViews: Number(form.minViews),
       costPerPlayCents: Number(form.costPerPlayCents),
       maxPlaysPerViewerPerDay: Number(form.maxPlaysPerViewerPerDay),
+      defaultCreatorPercent: Number(form.defaultCreatorPercent ?? 55),
     };
     try {
       await saveSettings.mutateAsync(parsed);
@@ -1432,6 +1434,7 @@ function AdminVideoAdsTab({ onDone }: { onDone: (msg: string) => void }) {
       minViews: String(s.minViews),
       costPerPlayCents: String(s.costPerPlayCents),
       maxPlaysPerViewerPerDay: String(s.maxPlaysPerViewerPerDay),
+      defaultCreatorPercent: String(s.defaultCreatorPercent ?? 55),
     });
     setFormInit(true);
   }
@@ -1526,6 +1529,21 @@ function AdminVideoAdsTab({ onDone }: { onDone: (msg: string) => void }) {
                   setForm({
                     ...form,
                     maxPlaysPerViewerPerDay: e.target.value,
+                  })
+                }
+              />
+            </label>
+            <label className="adv-field">
+              <span>Default creator share (%)</span>
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={form.defaultCreatorPercent ?? "55"}
+                onChange={e =>
+                  setForm({
+                    ...form,
+                    defaultCreatorPercent: e.target.value,
                   })
                 }
               />

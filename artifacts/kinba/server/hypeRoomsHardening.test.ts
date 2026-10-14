@@ -16,8 +16,6 @@ const databaseMocks = vi.hoisted(() => ({
   submitVerificationTransaction: vi.fn(),
   approveVerificationTransaction: vi.fn(),
   adminListDashboard: vi.fn(),
-  adminCreateSponsorBidsSession: vi.fn(),
-  adminStartSponsorBidsSession: vi.fn(),
   adminSetSponsorStatus: vi.fn(),
   getDb: vi.fn(),
 }));

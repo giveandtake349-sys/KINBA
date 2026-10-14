@@ -17,7 +17,7 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-export const appRole = pgEnum("app_role", ["user", "admin"]);
+export const appRole = pgEnum("app_role", ["user", "moderator", "admin"]);
 export const videoKind = pgEnum("video_kind", ["LONG", "SHORT", "WHEEL"]);
 export const mediaType = pgEnum("media_type", ["VIDEO", "IMAGE", "TEXT"]);
 export const videoProcessingStatus = pgEnum("video_processing_status", [
@@ -200,6 +200,8 @@ export const users = pgTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: appRole("role").default("user").notNull(),
+  isBanned: boolean("isBanned").default(false).notNull(),
+  suspendedUntil: timestamp("suspendedUntil", { withTimezone: true }),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
   lastSignedIn: timestamp("lastSignedIn", { withTimezone: true })
@@ -207,194 +209,56 @@ export const users = pgTable("users", {
     .notNull(),
 });
 
-export const sponsorBidsSessionStatus = pgEnum("sponsor_bids_session_status", [
-  "scheduled",
-  "live",
-  "completed",
-  "cancelled",
-]);
+// ---------------------------------------------------------------------------
+// Admin Control Center — revenue share overrides + audit log (additive).
+// ---------------------------------------------------------------------------
 
-export const sponsorBidsSessions = pgTable(
-  "sponsor_bids_sessions",
+/**
+ * Per-ad / per-creator revenue share overrides. Admin decides the creator's
+ * cut. Resolution order: per-ad+creator > per-ad > per-creator > global default.
+ * creatorPercent is 0-100 (e.g. 55 = creator gets 55%, platform keeps 45%).
+ */
+export const revenueShareOverrides = pgTable(
+  "revenue_share_overrides",
   {
     id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
-    title: varchar("title", { length: 180 }).notNull(),
-    status: sponsorBidsSessionStatus("status").default("scheduled").notNull(),
-    startsAt: timestamp("startsAt", { withTimezone: true }),
-    endsAt: timestamp("endsAt", { withTimezone: true }),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  table => [
-    index("sponsor_bids_sessions_status_idx").on(table.status),
-    index("sponsor_bids_sessions_starts_idx").on(table.startsAt),
-  ]
-);
-
-export const participants = pgTable(
-  "participants",
-  {
-    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
-    userId: integer("userId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    sessionId: integer("sessionId")
-      .notNull()
-      .references(() => sponsorBidsSessions.id, { onDelete: "cascade" }),
-    joinedAt: createdAt(),
-  },
-  table => [
-    uniqueIndex("participants_session_user_unique").on(
-      table.sessionId,
-      table.userId
-    ),
-    index("participants_user_idx").on(table.userId),
-    index("participants_session_idx").on(table.sessionId, table.joinedAt),
-  ]
-);
-
-export const liveSponsorStatus = pgEnum("live_sponsor_status", [
-  "pending",
-  "approved",
-  "rejected",
-]);
-export const liveSponsors = pgTable(
-  "live_sponsors",
-  {
-    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
-    sessionId: integer("sessionId")
-      .notNull()
-      .references(() => sponsorBidsSessions.id, { onDelete: "cascade" }),
-    userId: integer("userId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    logoUrl: varchar("logoUrl", { length: 1024 }).notNull(),
-    externalLink: varchar("externalLink", { length: 2048 }).notNull(),
-    sponsoredAmount: numeric("sponsoredAmount", {
-      precision: 12,
-      scale: 2,
-    }).notNull(),
-    status: liveSponsorStatus("status").default("pending").notNull(),
-    sponsoredAt: createdAt(),
-    expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
-  },
-  table => [
-    index("live_sponsors_session_idx").on(table.sessionId, table.sponsoredAt),
-    index("live_sponsors_expiry_idx").on(table.expiresAt),
-  ]
-);
-
-export const sponsorBidsDraws = pgTable(
-  "sponsor_bids_draws",
-  {
-    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
-    sessionId: integer("sessionId")
-      .notNull()
-      .references(() => sponsorBidsSessions.id, { onDelete: "cascade" }),
-    rank: integer("rank").notNull(),
-    nomineeParticipantIds: jsonb("nomineeParticipantIds")
-      .$type<number[]>()
-      .notNull(),
-    selectedParticipantId: integer("selectedParticipantId").references(
-      () => participants.id,
-      { onDelete: "set null" }
-    ),
-    preliminaryAt: timestamp("preliminaryAt", { withTimezone: true })
-      .defaultNow()
-      .notNull(),
-    selectedAt: timestamp("selectedAt", { withTimezone: true }),
-  },
-  table => [
-    uniqueIndex("sponsor_bids_draws_session_rank_unique").on(
-      table.sessionId,
-      table.rank
-    ),
-    index("sponsor_bids_draws_session_idx").on(table.sessionId, table.rank),
-  ]
-);
-
-export const sessionWinners = pgTable(
-  "session_winners",
-  {
-    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
-    sessionId: integer("sessionId")
-      .notNull()
-      .references(() => sponsorBidsSessions.id, { onDelete: "cascade" }),
-    participantId: integer("participantId")
-      .notNull()
-      .references(() => participants.id, { onDelete: "cascade" }),
-    rank: integer("rank").notNull(),
-    prizeAmount: numeric("prizeAmount", { precision: 12, scale: 2 }).notNull(),
-    awardedAt: createdAt(),
-  },
-  table => [
-    uniqueIndex("session_winners_session_participant_unique").on(
-      table.sessionId,
-      table.participantId
-    ),
-    uniqueIndex("session_winners_session_rank_unique").on(
-      table.sessionId,
-      table.rank
-    ),
-    index("session_winners_session_idx").on(table.sessionId, table.awardedAt),
-  ]
-);
-
-export const walletTransactionType = pgEnum("wallet_transaction_type", [
-  "sponsor_bids_entry",
-  "sponsor_payment",
-  "sponsor_bids_prize",
-]);
-
-export const wallets = pgTable(
-  "wallets",
-  {
-    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
-    userId: integer("userId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    balance: numeric("balance", { precision: 12, scale: 2 })
-      .default("0.00")
-      .notNull(),
-    createdAt: createdAt(),
-    updatedAt: updatedAt(),
-  },
-  table => [uniqueIndex("wallets_user_unique").on(table.userId)]
-);
-
-export const walletTransactions = pgTable(
-  "wallet_transactions",
-  {
-    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
-    walletId: integer("walletId")
-      .notNull()
-      .references(() => wallets.id, { onDelete: "cascade" }),
-    userId: integer("userId")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    sessionId: integer("sessionId")
-      .notNull()
-      .references(() => sponsorBidsSessions.id, { onDelete: "cascade" }),
-    participantId: integer("participantId").references(() => participants.id, {
+    adId: integer("adId").references(() => prerollAds.id, {
       onDelete: "cascade",
     }),
-    type: walletTransactionType("type").notNull(),
-    referenceKey: varchar("referenceKey", { length: 160 }).notNull(),
-    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    creatorId: integer("creatorId").references(() => users.id, {
+      onDelete: "cascade",
+    }),
+    creatorPercent: integer("creatorPercent").notNull(),
+    createdBy: integer("createdBy")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     createdAt: createdAt(),
+    updatedAt: updatedAt(),
   },
   table => [
-    uniqueIndex("wallet_transactions_user_session_reference_unique").on(
-      table.userId,
-      table.sessionId,
-      table.referenceKey
-    ),
-    index("wallet_transactions_wallet_idx").on(table.walletId, table.createdAt),
-    index("wallet_transactions_session_idx").on(
-      table.sessionId,
-      table.createdAt
-    ),
+    index("revenue_share_overrides_ad_idx").on(table.adId),
+    index("revenue_share_overrides_creator_idx").on(table.creatorId),
   ]
+);
+
+/**
+ * Every admin action is logged: who did what, to which target, when.
+ * Append-only — never updated or deleted.
+ */
+export const adminAuditLog = pgTable(
+  "admin_audit_log",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    adminId: integer("adminId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    action: varchar("action", { length: 64 }).notNull(),
+    targetType: varchar("targetType", { length: 32 }),
+    targetId: varchar("targetId", { length: 64 }),
+    details: jsonb("details").$type<Record<string, unknown>>(),
+    createdAt: createdAt(),
+  },
+  table => [index("admin_audit_log_admin_idx").on(table.adminId, table.createdAt)]
 );
 
 export const profiles = pgTable(
@@ -2263,11 +2127,16 @@ export const prerollSettings = pgTable(
     maxPlaysPerViewerPerDay: integer("maxPlaysPerViewerPerDay")
       .default(20)
       .notNull(),
+    defaultCreatorPercent: integer("defaultCreatorPercent").default(55).notNull(),
     updatedAt: updatedAt(),
   },
   table => [
     check("preroll_settings_single_row", sql`${table.id} = 1`),
     check("preroll_settings_cost_check", sql`${table.costPerPlayCents} > 0`),
+    check(
+      "preroll_settings_percent_check",
+      sql`${table.defaultCreatorPercent} >= 0 AND ${table.defaultCreatorPercent} <= 100`
+    ),
   ]
 );
 

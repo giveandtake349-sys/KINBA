@@ -1,216 +1,87 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+/**
+ * JHILIK Admin Control Center — unified, Meta-style.
+ *
+ * Tabs: Overview | Ads | Revenue | Users | Content | Broadcasts | Settings
+ * FB-classic professional styling. No fake data — honest empty states.
+ * Role-based: admin sees all; moderators see Overview/Users/Content only.
+ */
+import { useState } from "react";
 import {
   ArrowLeft,
-  Clock3,
-  ExternalLink,
+  BadgeCheck,
+  Ban,
+  Bell,
+  CheckCircle2,
+  DollarSign,
+  Eye,
   Flag,
-  EyeOff,
+  Megaphone,
+  Pause,
+  Play,
+  ScrollText,
+  Settings2,
+  ShieldAlert,
   ShieldCheck,
   SlidersHorizontal,
-  WalletCards,
+  Users,
+  XCircle,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { getTrpcCode } from "@/pages/HypeRooms";
-import type { FeatureFlagKey } from "@shared/featureFlags";
-import AdminBrandApplications from "./AdminBrandApplications";
 import AdminCampaigns from "./AdminCampaigns";
 
-type ReportStatusFilter = "all" | "open" | "resolved";
-type ReportTargetFilter =
-  | "all"
-  | "hype_room"
-  | "hype_room_message"
-  | "drop"
-  | "user";
+type TabId =
+  | "overview"
+  | "ads"
+  | "revenue"
+  | "users"
+  | "content"
+  | "broadcasts"
+  | "settings";
 
-const formatDate = (value: Date | string | null | undefined) =>
-  value ? new Date(value).toLocaleString() : "—";
+const TABS: { id: TabId; label: string; icon: typeof Bell; adminOnly?: boolean }[] = [
+  { id: "overview", label: "Overview", icon: Bell },
+  { id: "ads", label: "Ads", icon: Megaphone, adminOnly: true },
+  { id: "revenue", label: "Revenue", icon: DollarSign, adminOnly: true },
+  { id: "users", label: "Users", icon: Users },
+  { id: "content", label: "Content", icon: Flag },
+  { id: "broadcasts", label: "Broadcasts", icon: Bell, adminOnly: true },
+  { id: "settings", label: "Settings", icon: Settings2, adminOnly: true },
+];
 
-const TARGET_LABELS: Record<Exclude<ReportTargetFilter, "all">, string> = {
-  hype_room: "Hype Room",
-  hype_room_message: "Hype Room Message",
-  drop: "Drop",
-  user: "User",
-};
+const fmtMoney = (cents: number, currency = "USD") =>
+  `${currency === "BDT" ? "৳" : "$"}${(cents / 100).toFixed(2)}`;
 
-function moderationErrorMessage(error: unknown): string {
-  if (getTrpcCode(error) === "PRECONDITION_FAILED") {
-    return "Reporting is currently unavailable.";
-  }
-  return error instanceof Error ? error.message : "Request failed.";
-}
+const fmtDate = (v: Date | string | null | undefined) =>
+  v ? new Date(v).toLocaleString() : "—";
 
 export default function Admin() {
   const auth = useAuth();
   const [, navigate] = useLocation();
+  const [tab, setTab] = useState<TabId>("overview");
   const isAdmin = auth.user?.role === "admin";
-  const dashboard = trpc.admin.dashboard.useQuery(undefined, {
-    enabled: !auth.loading && isAdmin,
-    refetchOnWindowFocus: false,
-    staleTime: 30_000,
-  });
-  const createSession = trpc.admin.createSession.useMutation();
-  const startSession = trpc.admin.startSession.useMutation();
-  const setSponsorStatus = trpc.admin.setSponsorStatus.useMutation();
-  const utils = trpc.useUtils();
-  const [title, setTitle] = useState("TimeWheels Session");
-  const [startsAt, setStartsAt] = useState("");
-  const [notice, setNotice] = useState("");
-  const [pendingSponsor, setPendingSponsor] = useState<number | null>(null);
-  const [statusFilter, setStatusFilter] = useState<ReportStatusFilter>("open");
-  const [targetFilter, setTargetFilter] = useState<ReportTargetFilter>("all");
-  const [resolveReportId, setResolveReportId] = useState<number | null>(null);
-  const [resolveReason, setResolveReason] = useState("");
-  const [hideMessageId, setHideMessageId] = useState<number | null>(null);
-  const [hideReason, setHideReason] = useState("");
+  const isModerator = auth.user?.role === "moderator" || isAdmin;
 
-  const reportsQuery = trpc.admin.reports.list.useQuery(
-    {
-      ...(statusFilter === "all"
-        ? {}
-        : { status: statusFilter }),
-      ...(targetFilter === "all" ? {} : { targetType: targetFilter }),
-      limit: 50,
-    },
-    {
-      enabled: !auth.loading && isAdmin,
-      refetchOnWindowFocus: false,
-      staleTime: 10_000,
-    }
-  );
-  const resolveReport = trpc.admin.reports.resolve.useMutation();
-  const hideMessage = trpc.admin.messages.hide.useMutation();
+  if (auth.loading) {
+    return (
+      <main className="admin-page section-shell">
+        <p className="profile-loading-note">Checking access…</p>
+      </main>
+    );
+  }
+  if (!isModerator) {
+    return (
+      <main className="admin-page section-shell">
+        <p className="profile-loading-note">Admin access required.</p>
+        <button type="button" className="muted-btn" onClick={() => navigate("/")}>
+          Back to feed
+        </button>
+      </main>
+    );
+  }
 
-  const featureFlagsQuery = trpc.admin.featureFlags.list.useQuery(undefined, {
-    enabled: !auth.loading && isAdmin,
-    refetchOnWindowFocus: false,
-    staleTime: 10_000,
-  });
-  const setFeatureFlag = trpc.admin.featureFlags.set.useMutation();
-  const [pendingFlag, setPendingFlag] = useState<string | null>(null);
-  const [flagNotice, setFlagNotice] = useState<{
-    ok: boolean;
-    message: string;
-  } | null>(null);
-
-  const refreshReports = async () => {
-    await utils.admin.reports.list.invalidate();
-  };
-
-  const refreshFeatureFlags = async () => {
-    await utils.admin.featureFlags.list.invalidate();
-  };
-
-  const handleToggleFlag = async (
-    flagKey: FeatureFlagKey,
-    enabled: boolean
-  ) => {
-    if (pendingFlag || setFeatureFlag.isPending) return;
-    setPendingFlag(flagKey);
-    setFlagNotice(null);
-    try {
-      await setFeatureFlag.mutateAsync({ flagKey, enabled });
-      setFlagNotice({
-        ok: true,
-        message: `${flagKey} is now ${enabled ? "enabled" : "disabled"}.`,
-      });
-      await refreshFeatureFlags();
-    } catch (error) {
-      setFlagNotice({
-        ok: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "Failed to update feature flag.",
-      });
-    } finally {
-      setPendingFlag(null);
-    }
-  };
-
-  useEffect(() => {
-    if (!auth.loading && (!auth.user || !isAdmin)) navigate("/");
-  }, [auth.loading, auth.user, isAdmin, navigate]);
-
-  const refresh = async () => {
-    await utils.admin.dashboard.invalidate();
-  };
-  const submitSession = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setNotice("");
-    try {
-      await createSession.mutateAsync({
-        title,
-        startsAt: startsAt ? new Date(startsAt).toISOString() : undefined,
-      });
-      setNotice("Session scheduled. The one-hour entry window will open automatically.");
-      await refresh();
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Session could not be scheduled.");
-    }
-  };
-  const manualStart = async (sessionId: number) => {
-    setNotice("");
-    try {
-      await startSession.mutateAsync({ sessionId });
-      setNotice("Session entry window opened for the next hour.");
-      await refresh();
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Session could not be started.");
-    }
-  };
-  const updateSponsor = async (sponsorId: number, status: "approved" | "rejected") => {
-    setPendingSponsor(sponsorId);
-    try {
-      await setSponsorStatus.mutateAsync({ sponsorId, status });
-      await refresh();
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Sponsor status could not be updated.");
-    } finally {
-      setPendingSponsor(null);
-    }
-  };
-
-  const handleResolve = async (reportId: number) => {
-    const reason = resolveReason.trim();
-    if (!reason || reason.length > 500) return;
-    setNotice("");
-    try {
-      await resolveReport.mutateAsync({ reportId, reason });
-      setResolveReportId(null);
-      setResolveReason("");
-      setNotice("Report resolved.");
-      await refreshReports();
-    } catch (error) {
-      setNotice(moderationErrorMessage(error));
-    }
-  };
-
-  const handleHideMessage = async (messageId: number) => {
-    const reason = hideReason.trim();
-    if (!reason || reason.length > 500) return;
-    setNotice("");
-    try {
-      await hideMessage.mutateAsync({ messageId, reason });
-      setHideMessageId(null);
-      setHideReason("");
-      setNotice("Message hidden.");
-      await refreshReports();
-    } catch (error) {
-      setNotice(moderationErrorMessage(error));
-    }
-  };
-
-  const data = dashboard.data;
-  const totals = useMemo(() => ({
-    wallets: data?.wallets.length ?? 0,
-    sponsors: data?.sponsors.filter(row => row.sponsor.status === "pending").length ?? 0,
-    payouts: data?.ledger.filter(row => row.transaction.type === "sponsor_bids_prize").length ?? 0,
-  }), [data]);
-
-  if (auth.loading || !isAdmin) return <main className="admin-page section-shell"><p className="profile-loading-note">Checking admin access…</p></main>;
+  const visibleTabs = TABS.filter(t => !t.adminOnly || isAdmin);
 
   return (
     <main className="admin-page section-shell">
@@ -219,343 +90,708 @@ export default function Admin() {
         className="admin-back-btn"
         onClick={() => navigate("/")}
       >
-        <ArrowLeft size={16} />
-        Back to feed
+        <ArrowLeft size={16} /> Back to feed
       </button>
       <header className="admin-page__header">
         <div>
-          <p className="eyebrow eyebrow--bright"><ShieldCheck size={16} /> Restricted control center</p>
-          <h1>TimeWheels Admin</h1>
-          <p>Manage sessions, review wallet activity, and approve live sponsorships.</p>
+          <p className="eyebrow eyebrow--bright">
+            <ShieldCheck size={16} /> Control Center
+          </p>
+          <h1>JHILIK Admin</h1>
+          <p>
+            {isAdmin
+              ? "Full platform control — ads, revenue, users, content."
+              : "Moderator access — users and content."}
+          </p>
         </div>
-        <span className="admin-role-badge">Admin access</span>
+        <span className="admin-role-badge">
+          {isAdmin ? "Admin" : "Moderator"}
+        </span>
       </header>
-      {notice && <p className="form-message" role="status">{notice}</p>}
 
-      <section className="admin-card admin-session-control">
-        <div className="admin-section-heading"><div><p className="eyebrow">Session control</p><h2>Open a new TimeWheels entry window</h2></div><Clock3 size={24} /></div>
-        <form className="admin-session-form" onSubmit={submitSession}>
-          <label>Session title<input value={title} onChange={event => setTitle(event.target.value)} minLength={3} maxLength={180} required /></label>
-          <label>Wheel start time<input type="datetime-local" value={startsAt} onChange={event => setStartsAt(event.target.value)} /></label>
-          <button className="primary-btn" type="submit" disabled={createSession.isPending}>{createSession.isPending ? "Scheduling…" : "Schedule Session"}</button>
-        </form>
-        <p className="admin-help">Leave the start time blank to schedule the wheel one hour from now, which opens the entry window immediately.</p>
-        <div className="admin-session-list">
-          {(data?.sessions ?? []).map(session => (
-            <div className="admin-session-row" key={session.id}>
-              <div><strong>{session.title}</strong><span>{session.status} · Starts {formatDate(session.startsAt)}</span></div>
-              {session.status === "scheduled" && <button className="muted-btn" type="button" onClick={() => manualStart(session.id)} disabled={startSession.isPending}>Start 1-hour window</button>}
-            </div>
-          ))}
+      <nav className="admin-tabs" aria-label="Admin sections">
+        {visibleTabs.map(t => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              className={`admin-tab${tab === t.id ? " active" : ""}`}
+              onClick={() => setTab(t.id)}
+            >
+              <Icon size={16} /> {t.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {tab === "overview" && <OverviewTab />}
+      {tab === "ads" && isAdmin && <AdminCampaigns />}
+      {tab === "revenue" && isAdmin && <RevenueTab />}
+      {tab === "users" && <UsersTab isAdmin={isAdmin} />}
+      {tab === "content" && <ContentTab />}
+      {tab === "broadcasts" && isAdmin && <BroadcastsTab />}
+      {tab === "settings" && isAdmin && <SettingsTab />}
+    </main>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Overview                                                             */
+/* ------------------------------------------------------------------ */
+
+function OverviewTab() {
+  const overview = trpc.admin.control.overview.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+    staleTime: 30_000,
+  });
+  const d = overview.data;
+  return (
+    <section className="admin-card">
+      <div className="admin-section-heading">
+        <div>
+          <p className="eyebrow">Platform</p>
+          <h2>Overview</h2>
         </div>
-      </section>
-
-      <div className="admin-stat-grid">
-        <div className="admin-stat"><WalletCards size={18} /><span>Wallets monitored</span><strong>{totals.wallets}</strong></div>
-        <div className="admin-stat"><Clock3 size={18} /><span>Pending sponsors</span><strong>{totals.sponsors}</strong></div>
-        <div className="admin-stat"><ShieldCheck size={18} /><span>Payout entries</span><strong>{totals.payouts}</strong></div>
       </div>
-
-      <section className="admin-card">
-        <div className="admin-section-heading"><div><p className="eyebrow">Financial monitoring</p><h2>Wallet balances & ledger</h2></div></div>
-        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>User</th><th>Balance</th><th>Recent activity</th></tr></thead><tbody>
-          {(data?.wallets ?? []).map(row => <tr key={row.wallet.id}><td>{row.user.name || row.user.email || `User #${row.user.id}`}</td><td>৳{Number(row.wallet.balance).toFixed(2)}</td><td>{formatDate(row.wallet.updatedAt)}</td></tr>)}
-        </tbody></table></div>
-        <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Type</th><th>User</th><th>Amount</th><th>Reference</th></tr></thead><tbody>
-          {(data?.ledger ?? []).map(row => <tr key={row.transaction.id}><td>{row.transaction.type}</td><td>{row.user.name || row.user.email || `User #${row.user.id}`}</td><td className={Number(row.transaction.amount) >= 0 ? "ledger-credit" : "ledger-debit"}>৳{Number(row.transaction.amount).toFixed(2)}</td><td>{row.transaction.referenceKey}</td></tr>)}
-        </tbody></table></div>
-      </section>
-
-      <section className="admin-card">
-        <div className="admin-section-heading"><div><p className="eyebrow">Sponsorship moderation</p><h2>Review Sponsor This Wheel requests</h2></div></div>
-        <div className="admin-sponsor-list">
-          {(data?.sponsors ?? []).map(row => <article className="admin-sponsor-row" key={row.sponsor.id}>
-            <img src={row.sponsor.logoUrl} alt="Sponsor logo" />
-            <div><strong>{row.user.name || row.user.email || `User #${row.user.id}`}</strong><span>{row.session.title} · ৳{Number(row.sponsor.sponsoredAmount).toFixed(2)} · Expires {formatDate(row.sponsor.expiresAt)}</span><a href={row.sponsor.externalLink} target="_blank" rel="noreferrer">Open sponsor link <ExternalLink size={14} /></a></div>
-            <div className="admin-sponsor-actions"><span className={`status-chip status-chip--${row.sponsor.status}`}>{row.sponsor.status}</span>{row.sponsor.status === "pending" && <><button className="muted-btn" type="button" onClick={() => updateSponsor(row.sponsor.id, "approved")} disabled={pendingSponsor === row.sponsor.id}>Approve</button><button className="danger-btn" type="button" onClick={() => updateSponsor(row.sponsor.id, "rejected")} disabled={pendingSponsor === row.sponsor.id}>Reject</button></>}</div>
-          </article>)}
-        </div>
-      </section>
-
-      <section className="admin-card admin-reports-section" aria-label="Reports">
-        <div className="admin-section-heading">
-          <div>
-            <p className="eyebrow">Content reports</p>
-            <h2>Reports</h2>
+      {overview.isPending ? (
+        <p className="profile-loading-note">Loading…</p>
+      ) : overview.isError ? (
+        <p className="form-message">Could not load overview.</p>
+      ) : d ? (
+        <>
+          <div className="admin-stat-grid">
+            <div className="admin-stat">
+              <Users size={18} />
+              <span>Users</span>
+              <strong>{d.users.toLocaleString()}</strong>
+            </div>
+            <div className="admin-stat">
+              <Eye size={18} />
+              <span>Content</span>
+              <strong>{d.content.toLocaleString()}</strong>
+            </div>
+            <div className="admin-stat">
+              <DollarSign size={18} />
+              <span>Ad revenue</span>
+              <strong>{fmtMoney(d.adRevenueCents)}</strong>
+            </div>
+            <div className="admin-stat">
+              <ShieldAlert size={18} />
+              <span>Pending payouts</span>
+              <strong>{d.pendingPayouts}</strong>
+            </div>
           </div>
-          <Flag size={24} />
+          <div className="admin-attention">
+            <h3>Needs action</h3>
+            <div className="admin-attention-row">
+              <span>
+                <i className="dot dot-red" /> {d.pendingAdReviews} ads pending review
+              </span>
+            </div>
+            <div className="admin-attention-row">
+              <span>
+                <i className="dot dot-red" /> {d.openReports} open reports
+              </span>
+            </div>
+            <div className="admin-attention-row">
+              <span>
+                <i className="dot dot-amber" /> {d.pendingPayouts} payouts pending
+              </span>
+            </div>
+          </div>
+        </>
+      ) : null}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Revenue                                                              */
+/* ------------------------------------------------------------------ */
+
+function RevenueTab() {
+  const utils = trpc.useUtils();
+  const settings = trpc.admin.control.revenueSettings.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+  const payouts = trpc.admin.control.payoutQueue.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+  const [defaultPct, setDefaultPct] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const setDefault = trpc.admin.control.setDefaultPercent.useMutation({
+    onSuccess: () => {
+      setNotice("Default split updated.");
+      setDefaultPct("");
+      utils.admin.control.revenueSettings.invalidate();
+    },
+    onError: e => setNotice(e.message),
+  });
+  const release = trpc.admin.control.releasePayout.useMutation({
+    onSuccess: () => {
+      setNotice("Payout released.");
+      utils.admin.control.payoutQueue.invalidate();
+    },
+    onError: e => setNotice(e.message),
+  });
+  const delOverride = trpc.admin.control.deleteRevenueOverride.useMutation({
+    onSuccess: () => {
+      setNotice("Override removed.");
+      utils.admin.control.revenueSettings.invalidate();
+    },
+    onError: e => setNotice(e.message),
+  });
+
+  const s = settings.data;
+  return (
+    <section className="admin-card">
+      <div className="admin-section-heading">
+        <div>
+          <p className="eyebrow">Money</p>
+          <h2>Revenue control</h2>
         </div>
-        <p className="admin-help">
-          Raw report rows only — targetId is the backend target ID for the reported content.
+        <DollarSign size={24} />
+      </div>
+      <p className="admin-help">
+        You decide the creator's cut. Creators see only their own earnings —
+        never the split, never others' data.
+      </p>
+      {notice && (
+        <p className="form-message" role="status">
+          {notice}
         </p>
-        <div className="admin-reports-filters">
-          <label>
-            Status
-            <select
-              value={statusFilter}
-              onChange={event => {
-                setStatusFilter(event.target.value as ReportStatusFilter);
-                setResolveReportId(null);
-              }}
-            >
-              <option value="all">All</option>
-              <option value="open">Open</option>
-              <option value="resolved">Resolved</option>
-            </select>
-          </label>
-          <label>
-            Target type
-            <select
-              value={targetFilter}
-              onChange={event => {
-                setTargetFilter(event.target.value as ReportTargetFilter);
-                setResolveReportId(null);
-                setHideMessageId(null);
-              }}
-            >
-              <option value="all">All</option>
-              <option value="hype_room">Hype Room</option>
-              <option value="hype_room_message">Hype Room Message</option>
-              <option value="drop">Drop</option>
-              <option value="user">User</option>
-            </select>
-          </label>
-          <button
-            type="button"
-            className="muted-btn"
-            onClick={() => void refreshReports()}
-            disabled={reportsQuery.isFetching}
-          >
-            {reportsQuery.isFetching ? "Refreshing…" : "Refresh"}
-          </button>
-        </div>
-        {reportsQuery.isPending ? (
-          <p className="admin-reports-empty">Loading reports…</p>
-        ) : reportsQuery.isError ? (
-          <div className="admin-reports-empty">
-            <p>{moderationErrorMessage(reportsQuery.error)}</p>
+      )}
+
+      <h3>Default split</h3>
+      {settings.isPending ? (
+        <p className="profile-loading-note">Loading…</p>
+      ) : s ? (
+        <div className="admin-split-row">
+          <div>
+            <span>Creator</span>
+            <strong>{s.defaultCreatorPercent}%</strong>
+          </div>
+          <div className="admin-split-bar">
+            <div style={{ width: `${s.defaultCreatorPercent}%` }} />
+          </div>
+          <div>
+            <span>Platform</span>
+            <strong>{100 - s.defaultCreatorPercent}%</strong>
+          </div>
+          <div className="admin-inline-form">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              placeholder="New %"
+              value={defaultPct}
+              onChange={e => setDefaultPct(e.target.value)}
+              aria-label="New default creator percent"
+            />
             <button
               type="button"
               className="muted-btn"
-              onClick={() => void reportsQuery.refetch()}
+              disabled={setDefault.isPending || !defaultPct}
+              onClick={() => setDefault.mutate({ percent: Number(defaultPct) })}
             >
-              Retry
+              Update
             </button>
           </div>
-        ) : (reportsQuery.data?.reports ?? []).length === 0 ? (
-          <p className="admin-reports-empty">No reports match these filters.</p>
-        ) : (
-          <div className="admin-reports-list">
-            {(reportsQuery.data?.reports ?? []).map(report => (
-              <article className="admin-report-row" key={report.id}>
-                <div className="admin-report-meta">
-                  <span className={`status-chip status-chip--${report.status}`}>
-                    {report.status}
-                  </span>
-                  <span className="admin-report-id">Report #{report.id}</span>
-                  <span className="admin-report-target">
-                    {TARGET_LABELS[report.targetType as Exclude<ReportTargetFilter, "all">] ?? report.targetType}
-                    {" · targetId "}
-                    <strong>{report.targetId}</strong>
-                  </span>
-                  <span className="admin-report-time">{formatDate(report.createdAt)}</span>
-                </div>
-                <div className="admin-report-body">
-                  <p className="admin-report-reason">{report.reason}</p>
-                  {report.details ? (
-                    <p className="admin-report-details">{report.details}</p>
-                  ) : null}
-                  <p className="admin-report-ids">
-                    reporterId {report.reporterId}
-                    {report.resolvedAt
-                      ? ` · resolved ${formatDate(report.resolvedAt)}${report.resolvedBy != null ? ` by ${report.resolvedBy}` : ""}`
-                      : ""}
-                  </p>
-                </div>
-                <div className="admin-report-actions">
-                  {report.status === "open" ? (
-                    resolveReportId === report.id ? (
-                      <div className="admin-report-inline-form">
-                        <input
-                          value={resolveReason}
-                          onChange={event => setResolveReason(event.target.value)}
-                          maxLength={500}
-                          placeholder="Resolution reason (1–500)"
-                          aria-label="Resolution reason"
-                        />
+        </div>
+      ) : null}
+
+      <h3>Overrides</h3>
+      {!s?.overrides.length ? (
+        <p className="admin-empty">No overrides. Default applies everywhere.</p>
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Ad</th>
+                <th>Creator</th>
+                <th>Cut</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {s.overrides.map(o => (
+                <tr key={o.id}>
+                  <td>{o.adTitle ?? (o.adId ? `Ad #${o.adId}` : "—")}</td>
+                  <td>{o.creatorName ?? (o.creatorId ? `User #${o.creatorId}` : "All")}</td>
+                  <td>{o.creatorPercent}%</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="muted-btn"
+                      onClick={() => delOverride.mutate({ id: o.id })}
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <h3>Payout queue</h3>
+      {payouts.isPending ? (
+        <p className="profile-loading-note">Loading…</p>
+      ) : !payouts.data?.length ? (
+        <p className="admin-empty">No pending payouts.</p>
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Creator</th>
+                <th>Amount</th>
+                <th>Earnings</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {payouts.data.map(p => (
+                <tr key={p.creatorId}>
+                  <td>{p.creatorName ?? `User #${p.creatorId}`}</td>
+                  <td>{fmtMoney(p.totalCents, p.currency)}</td>
+                  <td>{p.earningCount}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="primary-btn"
+                      onClick={() => release.mutate({ creatorId: p.creatorId })}
+                    >
+                      <CheckCircle2 size={14} /> Release
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Users                                                                */
+/* ------------------------------------------------------------------ */
+
+function UsersTab({ isAdmin }: { isAdmin: boolean }) {
+  const utils = trpc.useUtils();
+  const [query, setQuery] = useState("");
+  const [notice, setNotice] = useState("");
+  const search = trpc.admin.control.searchUsers.useQuery(
+    { query },
+    { enabled: query.trim().length >= 2, refetchOnWindowFocus: false }
+  );
+
+  const moderate = trpc.admin.control.moderateUser.useMutation({
+    onSuccess: () => {
+      setNotice("Action applied.");
+      utils.admin.control.searchUsers.invalidate();
+    },
+    onError: e => setNotice(e.message),
+  });
+  const setRole = trpc.admin.control.setUserRole.useMutation({
+    onSuccess: () => {
+      setNotice("Role updated.");
+      utils.admin.control.searchUsers.invalidate();
+    },
+    onError: e => setNotice(e.message),
+  });
+
+  return (
+    <section className="admin-card">
+      <div className="admin-section-heading">
+        <div>
+          <p className="eyebrow">People</p>
+          <h2>Users</h2>
+        </div>
+        <Users size={24} />
+      </div>
+      {notice && (
+        <p className="form-message" role="status">
+          {notice}
+        </p>
+      )}
+      <label className="admin-field">
+        <span>Search by name or email</span>
+        <input
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Type at least 2 characters…"
+        />
+      </label>
+      {search.data && (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {search.data.map(u => (
+                <tr key={u.id}>
+                  <td>
+                    {u.name ?? u.email ?? `User #${u.id}`}
+                    <br />
+                    <small>{fmtDate(u.createdAt)}</small>
+                  </td>
+                  <td>
+                    <span className="admin-pill">{u.role}</span>
+                    {isAdmin && (
+                      <select
+                        value={u.role}
+                        onChange={e =>
+                          setRole.mutate({
+                            userId: u.id,
+                            role: e.target.value as "user" | "moderator" | "admin",
+                          })
+                        }
+                        aria-label="Change role"
+                      >
+                        <option value="user">user</option>
+                        <option value="moderator">moderator</option>
+                        <option value="admin">admin</option>
+                      </select>
+                    )}
+                  </td>
+                  <td>
+                    {u.isBanned ? (
+                      <span className="admin-pill admin-pill--red">banned</span>
+                    ) : u.suspendedUntil &&
+                      new Date(u.suspendedUntil) > new Date() ? (
+                      <span className="admin-pill admin-pill--amber">suspended</span>
+                    ) : (
+                      <span className="admin-pill admin-pill--green">active</span>
+                    )}
+                  </td>
+                  <td>
+                    <div className="admin-row-actions">
+                      {!u.isBanned ? (
+                        <>
+                          <button
+                            type="button"
+                            className="muted-btn"
+                            title="Warn"
+                            onClick={() =>
+                              moderate.mutate({ userId: u.id, action: "warn" })
+                            }
+                          >
+                            <Flag size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className="muted-btn"
+                            title="Restrict 24h"
+                            onClick={() =>
+                              moderate.mutate({ userId: u.id, action: "restrict" })
+                            }
+                          >
+                            <Pause size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className="muted-btn"
+                            title="Suspend 7d"
+                            onClick={() =>
+                              moderate.mutate({ userId: u.id, action: "suspend" })
+                            }
+                          >
+                            <Eye size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            className="danger-btn"
+                            title="Ban"
+                            onClick={() =>
+                              moderate.mutate({ userId: u.id, action: "ban" })
+                            }
+                          >
+                            <Ban size={14} />
+                          </button>
+                        </>
+                      ) : (
                         <button
                           type="button"
                           className="primary-btn"
-                          disabled={
-                            resolveReport.isPending ||
-                            resolveReason.trim().length < 1
+                          onClick={() =>
+                            moderate.mutate({ userId: u.id, action: "unban" })
                           }
-                          onClick={() => void handleResolve(report.id)}
                         >
-                          {resolveReport.isPending ? "Saving…" : "Confirm resolve"}
+                          <Play size={14} /> Unban
                         </button>
-                        <button
-                          type="button"
-                          className="muted-btn"
-                          onClick={() => {
-                            setResolveReportId(null);
-                            setResolveReason("");
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className="muted-btn"
-                        onClick={() => {
-                          setResolveReportId(report.id);
-                          setResolveReason("");
-                          setHideMessageId(null);
-                        }}
-                      >
-                        Resolve
-                      </button>
-                    )
-                  ) : null}
-                  {report.targetType === "hype_room_message" ? (
-                    hideMessageId === report.targetId ? (
-                      <div className="admin-report-inline-form">
-                        <input
-                          value={hideReason}
-                          onChange={event => setHideReason(event.target.value)}
-                          maxLength={500}
-                          placeholder="Hide reason (1–500)"
-                          aria-label="Hide reason"
-                        />
-                        <button
-                          type="button"
-                          className="danger-btn"
-                          disabled={
-                            hideMessage.isPending || hideReason.trim().length < 1
-                          }
-                          onClick={() => void handleHideMessage(report.targetId)}
-                        >
-                          {hideMessage.isPending ? "Hiding…" : "Confirm hide"}
-                        </button>
-                        <button
-                          type="button"
-                          className="muted-btn"
-                          onClick={() => {
-                            setHideMessageId(null);
-                            setHideReason("");
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className="muted-btn"
-                        onClick={() => {
-                          setHideMessageId(report.targetId);
-                          setHideReason("");
-                          setResolveReportId(null);
-                        }}
-                      >
-                        <EyeOff size={14} aria-hidden="true" /> Hide message
-                      </button>
-                    )
-                  ) : null}
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="admin-card" aria-label="Brand applications">
-        <AdminBrandApplications />
-      </section>
-
-      <section className="admin-card" aria-label="Campaigns">
-        <AdminCampaigns />
-      </section>
-
-      <section className="admin-card admin-flags-section" aria-label="Feature flags">
-        <div className="admin-section-heading">
-          <div>
-            <p className="eyebrow">Feature flags</p>
-            <h2>Runtime feature toggles</h2>
-          </div>
-          <SlidersHorizontal size={24} />
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-        <p className="admin-help">
-          Server is authoritative. Changes apply immediately; unset flags stay
-          fail-closed (disabled).
+      )}
+      {search.data && !search.data.length && (
+        <p className="admin-empty">No users found.</p>
+      )}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Content — Meta 3-tier: REMOVE / REDUCE / KEEP                         */
+/* ------------------------------------------------------------------ */
+
+function ContentTab() {
+  const utils = trpc.useUtils();
+  const [notice, setNotice] = useState("");
+  const queue = trpc.admin.control.moderationQueue.useQuery(
+    { limit: 25, offset: 0 },
+    { refetchOnWindowFocus: false }
+  );
+  const decide = trpc.admin.control.decideModeration.useMutation({
+    onSuccess: () => {
+      setNotice("Decision recorded.");
+      utils.admin.control.moderationQueue.invalidate();
+    },
+    onError: e => setNotice(e.message),
+  });
+
+  return (
+    <section className="admin-card">
+      <div className="admin-section-heading">
+        <div>
+          <p className="eyebrow">Enforcement</p>
+          <h2>Moderation queue</h2>
+        </div>
+        <Flag size={24} />
+      </div>
+      <p className="admin-help">
+        Meta 3-tier model: <strong>Remove</strong> (violates standards),{" "}
+        <strong>Reduce</strong> (limit distribution), <strong>Keep</strong>{" "}
+        (dismiss report).
+      </p>
+      {notice && (
+        <p className="form-message" role="status">
+          {notice}
         </p>
-        {flagNotice ? (
-          <p
-            className={`form-message${flagNotice.ok ? "" : " form-message--error"}`}
-            role="status"
-          >
-            {flagNotice.message}
-          </p>
-        ) : null}
-        {featureFlagsQuery.isPending ? (
-          <p className="admin-reports-empty">Loading feature flags…</p>
-        ) : featureFlagsQuery.isError ? (
-          <div className="admin-reports-empty">
-            <p>Could not load feature flags.</p>
-            <button
-              type="button"
-              className="muted-btn"
-              onClick={() => void featureFlagsQuery.refetch()}
-            >
-              Retry
-            </button>
-          </div>
-        ) : (featureFlagsQuery.data ?? []).length === 0 ? (
-          <p className="admin-reports-empty">No feature flags returned.</p>
-        ) : (
-          <div className="admin-session-list">
-            {(featureFlagsQuery.data ?? []).map(flag => (
-              <div className="admin-session-row" key={flag.flagKey}>
-                <div>
-                  <strong>{flag.flagKey}</strong>
-                  <span>
-                    {flag.enabled ? "Enabled" : "Disabled"}
-                    {flag.updatedAt
-                      ? ` · Updated ${formatDate(flag.updatedAt)}`
-                      : ""}
-                  </span>
-                </div>
-                <div className="admin-flag-actions">
-                  <span
-                    className={`status-chip${flag.enabled ? " status-chip--approved" : ""}`}
-                    aria-live="polite"
-                  >
-                    {flag.enabled ? "ON" : "OFF"}
-                  </span>
-                  <button
-                    type="button"
-                    className={flag.enabled ? "danger-btn" : "primary-btn"}
-                    disabled={pendingFlag !== null || setFeatureFlag.isPending}
-                    onClick={() =>
-                      void handleToggleFlag(flag.flagKey, !flag.enabled)
-                    }
-                  >
-                    {pendingFlag === flag.flagKey
-                      ? flag.enabled
-                        ? "Disabling…"
-                        : "Enabling…"
-                      : flag.enabled
-                        ? "Disable"
-                        : "Enable"}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-    </main>
+      )}
+      {queue.isPending ? (
+        <p className="profile-loading-note">Loading…</p>
+      ) : !queue.data?.length ? (
+        <p className="admin-empty">Queue is clear. No open reports.</p>
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Target</th>
+                <th>Reason</th>
+                <th>Reports</th>
+                <th>Decision</th>
+              </tr>
+            </thead>
+            <tbody>
+              {queue.data.map(r => (
+                <tr key={r.id}>
+                  <td>
+                    {r.targetType} #{r.targetId}
+                    <br />
+                    <small>by {r.reporterName ?? "unknown"}</small>
+                  </td>
+                  <td>{r.reason}</td>
+                  <td>{r.reportCount}</td>
+                  <td>
+                    <div className="admin-row-actions">
+                      <button
+                        type="button"
+                        className="danger-btn"
+                        title="Remove — violates standards"
+                        onClick={() =>
+                          decide.mutate({ reportId: r.id, decision: "remove" })
+                        }
+                      >
+                        <XCircle size={14} /> Remove
+                      </button>
+                      <button
+                        type="button"
+                        className="muted-btn"
+                        title="Reduce — limit distribution"
+                        onClick={() =>
+                          decide.mutate({ reportId: r.id, decision: "reduce" })
+                        }
+                      >
+                        <Eye size={14} /> Reduce
+                      </button>
+                      <button
+                        type="button"
+                        className="muted-btn"
+                        title="Keep — dismiss report"
+                        onClick={() =>
+                          decide.mutate({ reportId: r.id, decision: "keep" })
+                        }
+                      >
+                        <CheckCircle2 size={14} /> Keep
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Broadcasts                                                           */
+/* ------------------------------------------------------------------ */
+
+function BroadcastsTab() {
+  const [body, setBody] = useState("");
+  const [notice, setNotice] = useState("");
+  const create = trpc.community.create.useMutation({
+    onSuccess: () => {
+      setNotice("Announcement published.");
+      setBody("");
+    },
+    onError: e => setNotice(e.message),
+  });
+
+  return (
+    <section className="admin-card">
+      <div className="admin-section-heading">
+        <div>
+          <p className="eyebrow">Comms</p>
+          <h2>Broadcasts</h2>
+        </div>
+        <Megaphone size={24} />
+      </div>
+      {notice && (
+        <p className="form-message" role="status">
+          {notice}
+        </p>
+      )}
+      <label className="admin-field">
+        <span>Message</span>
+        <textarea
+          value={body}
+          onChange={e => setBody(e.target.value)}
+          rows={4}
+          placeholder="Write the announcement…"
+        />
+      </label>
+      <button
+        type="button"
+        className="primary-btn"
+        disabled={create.isPending || !body.trim()}
+        onClick={() => create.mutate({ body: body.trim() })}
+      >
+        <Megaphone size={16} /> Publish announcement
+      </button>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Settings — audit log                                                  */
+/* ------------------------------------------------------------------ */
+
+function SettingsTab() {
+  const [notice, setNotice] = useState("");
+  const audit = trpc.admin.control.auditLog.useQuery(
+    { limit: 50, offset: 0 },
+    { refetchOnWindowFocus: false }
+  );
+
+  return (
+    <section className="admin-card">
+      <div className="admin-section-heading">
+        <div>
+          <p className="eyebrow">Platform</p>
+          <h2>Settings</h2>
+        </div>
+        <Settings2 size={24} />
+      </div>
+      {notice && (
+        <p className="form-message" role="status">
+          {notice}
+        </p>
+      )}
+
+      <h3>Audit log</h3>
+      <p className="admin-help">
+        Every admin action is recorded: who did what, when.
+      </p>
+      {audit.isPending ? (
+        <p className="profile-loading-note">Loading…</p>
+      ) : !audit.data?.length ? (
+        <p className="admin-empty">No admin actions logged yet.</p>
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Admin</th>
+                <th>Action</th>
+                <th>Target</th>
+              </tr>
+            </thead>
+            <tbody>
+              {audit.data.map(a => (
+                <tr key={a.id}>
+                  <td>{fmtDate(a.createdAt)}</td>
+                  <td>{a.adminName ?? `User #${a.adminId}`}</td>
+                  <td>
+                    <code>{a.action}</code>
+                  </td>
+                  <td>
+                    {a.targetType ? `${a.targetType} ${a.targetId ?? ""}` : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <h3>Quick links</h3>
+      <div className="admin-row-actions">
+        <button
+          type="button"
+          className="muted-btn"
+          onClick={() => setNotice("Verification queue lives in the main admin router.")}
+        >
+          <BadgeCheck size={16} /> Verification
+        </button>
+        <button
+          type="button"
+          className="muted-btn"
+          onClick={() => setNotice("Feature flags are under Ads → Video ads settings.")}
+        >
+          <SlidersHorizontal size={16} /> Feature flags
+        </button>
+        <button
+          type="button"
+          className="muted-btn"
+          onClick={() => setNotice("Ad eligibility and pricing are under Ads → Video ads.")}
+        >
+          <ScrollText size={16} /> Ad settings
+        </button>
+      </div>
+    </section>
   );
 }

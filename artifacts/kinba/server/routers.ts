@@ -84,9 +84,25 @@ import {
   updatePrerollSettings,
   updateSettingsInput,
 } from "./preroll";
+import {
+  decideModeration,
+  deleteRevenueOverride,
+  getAdminOverview,
+  getAuditLog,
+  getModerationQueue,
+  getPayoutQueue,
+  getRevenueSettings,
+  moderateUser,
+  releasePayout,
+  searchAdminUsers,
+  setDefaultCreatorPercent,
+  setRevenueOverride,
+  setUserRole,
+} from "./adminControl";
 import { PREROLL_AD_STATUSES } from "../shared/stateMachines";
 import {
   adminProcedure,
+  moderatorProcedure,
   protectedProcedure,
   publicProcedure,
   router,
@@ -128,21 +144,9 @@ import {
   searchVideos,
   searchAll,
   listVideos,
-  listSponsorBidsSessions,
-  getSponsorBidsSession,
-  getSponsorBidsState,
-  joinSponsorBidsSession,
-  listLiveSponsors,
-  listSessionWinners,
-  getWalletBalance,
   getFollowState,
   listFollowers,
   listFollowing,
-  createLiveSponsor,
-  adminListDashboard,
-  adminCreateSponsorBidsSession,
-  adminStartSponsorBidsSession,
-  adminSetSponsorStatus,
   recordVideoShare,
   recordVideoView,
   listBookmarkedVideos,
@@ -617,19 +621,6 @@ const profileUpdateInput = z.object({
   birthday: z.string().datetime({ offset: true }).nullable().optional(),
   timezone: z.string().trim().min(1).max(64).optional(),
 });
-const sponsorInput = z.object({
-  sessionId: z.number().int().positive(),
-  logoUrl: z.string().url().max(1024),
-  externalLink: z.string().url().max(2048),
-  sponsoredAmount: z
-    .string()
-    .regex(/^\d{1,10}(\.\d{1,2})?$/, "Enter a valid sponsorship amount.")
-    .refine(
-      value => Number(value) > 0,
-      "Sponsorship amount must be greater than zero."
-    ),
-});
-
 const paymentInput = z.object({
   amount: z
     .string()
@@ -1132,34 +1123,6 @@ export const appRouter = router({
         )
       ),
   }),
-  sponsorBids: router({
-    sessions: publicProcedure.query(() => listSponsorBidsSessions()),
-    session: publicProcedure
-      .input(z.object({ sessionId: z.number().int().positive() }))
-      .query(({ input }) => getSponsorBidsSession(input.sessionId)),
-    state: publicProcedure
-      .input(z.object({ sessionId: z.number().int().positive() }))
-      .query(({ input }) => getSponsorBidsState(input.sessionId)),
-    join: protectedProcedure
-      .input(z.object({ sessionId: z.number().int().positive() }))
-      .mutation(({ ctx, input }) =>
-        joinSponsorBidsSession(input.sessionId, ctx.user.id)
-      ),
-    liveSponsors: publicProcedure
-      .input(z.object({ sessionId: z.number().int().positive() }))
-      .query(({ input }) => listLiveSponsors(input.sessionId)),
-    winners: publicProcedure
-      .input(z.object({ sessionId: z.number().int().positive() }))
-      .query(({ input }) => listSessionWinners(input.sessionId)),
-    walletBalance: protectedProcedure.query(({ ctx }) =>
-      getWalletBalance(ctx.user.id)
-    ),
-    sponsor: protectedProcedure
-      .input(sponsorInput)
-      .mutation(({ ctx, input }) =>
-        createLiveSponsor({ ...input, userId: ctx.user.id })
-      ),
-  }),
   brands: router({
     submitApplication: protectedProcedure
       .input(brandApplicationInput)
@@ -1657,7 +1620,110 @@ export const appRouter = router({
     }),
   }),
   admin: router({
-    dashboard: adminProcedure.query(() => adminListDashboard()),
+    // Unified Admin Control Center (Meta-style).
+    control: router({
+      overview: adminProcedure.query(() => getAdminOverview()),
+      auditLog: adminProcedure
+        .input(
+          z.object({
+            limit: z.number().int().min(1).max(100).default(50),
+            offset: z.number().int().min(0).default(0),
+          })
+        )
+        .query(({ input }) => getAuditLog(input.limit, input.offset)),
+      // Revenue control — admin decides creator payouts.
+      revenueSettings: adminProcedure.query(() => getRevenueSettings()),
+      setDefaultPercent: adminProcedure
+        .input(z.object({ percent: z.number().int().min(0).max(100) }))
+        .mutation(({ ctx, input }) =>
+          setDefaultCreatorPercent(ctx.user.id, input.percent)
+        ),
+      setRevenueOverride: adminProcedure
+        .input(
+          z.object({
+            adId: z.number().int().positive().nullish(),
+            creatorId: z.number().int().positive().nullish(),
+            percent: z.number().int().min(0).max(100),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          setRevenueOverride(ctx.user.id, input)
+        ),
+      deleteRevenueOverride: adminProcedure
+        .input(z.object({ id: z.number().int().positive() }))
+        .mutation(({ ctx, input }) =>
+          deleteRevenueOverride(ctx.user.id, input.id)
+        ),
+      payoutQueue: adminProcedure.query(() => getPayoutQueue()),
+      releasePayout: adminProcedure
+        .input(z.object({ creatorId: z.number().int().positive() }))
+        .mutation(({ ctx, input }) =>
+          releasePayout(ctx.user.id, input.creatorId)
+        ),
+      // Users — moderator+ can moderate, only admin can set roles.
+      searchUsers: moderatorProcedure
+        .input(z.object({ query: z.string().trim().min(1).max(100) }))
+        .query(({ input }) => searchAdminUsers(input.query)),
+      moderateUser: moderatorProcedure
+        .input(
+          z.object({
+            userId: z.number().int().positive(),
+            action: z.enum(["warn", "restrict", "suspend", "ban", "unban"]),
+            reason: z.string().trim().max(500).optional(),
+          })
+        )
+        .mutation(async ({ ctx, input }) => {
+          // Moderators cannot act on admins (strict hierarchy).
+          if (ctx.user.role !== "admin") {
+            const { getDb } = await import("./db");
+            const db = await getDb();
+            const [target] = db
+              ? await db
+                  .select({ role: users.role })
+                  .from(users)
+                  .where(eq(users.id, input.userId))
+                  .limit(1)
+              : [];
+            if (target?.role === "admin") {
+              throw new TRPCError({
+                code: "FORBIDDEN",
+                message: "Moderators cannot act on admins.",
+              });
+            }
+          }
+          return moderateUser(ctx.user.id, input.userId, input.action, input.reason);
+        }),
+      setUserRole: adminProcedure
+        .input(
+          z.object({
+            userId: z.number().int().positive(),
+            role: z.enum(["user", "moderator", "admin"]),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          setUserRole(ctx.user.id, input.userId, input.role)
+        ),
+      // Content — Meta 3-tier: remove / reduce / keep.
+      moderationQueue: moderatorProcedure
+        .input(
+          z.object({
+            limit: z.number().int().min(1).max(50).default(25),
+            offset: z.number().int().min(0).default(0),
+          })
+        )
+        .query(({ input }) => getModerationQueue(input.limit, input.offset)),
+      decideModeration: moderatorProcedure
+        .input(
+          z.object({
+            reportId: z.number().int().positive(),
+            decision: z.enum(["remove", "reduce", "keep"]),
+            note: z.string().trim().max(500).optional(),
+          })
+        )
+        .mutation(({ ctx, input }) =>
+          decideModeration(ctx.user.id, input.reportId, input.decision, input.note)
+        ),
+    }),
     featureFlags: router({
       list: adminProcedure.query(() => listFeatureFlagRows()),
       set: adminProcedure
@@ -1685,32 +1751,6 @@ export const appRouter = router({
           }
         }),
     }),
-    createSession: adminProcedure
-      .input(
-        z.object({
-          title: z.string().trim().min(3).max(180),
-          startsAt: z.string().datetime({ offset: true }).optional(),
-        })
-      )
-      .mutation(({ input }) =>
-        adminCreateSponsorBidsSession({
-          title: input.title,
-          startsAt: input.startsAt ? new Date(input.startsAt) : undefined,
-        })
-      ),
-    startSession: adminProcedure
-      .input(z.object({ sessionId: z.number().int().positive() }))
-      .mutation(({ input }) => adminStartSponsorBidsSession(input.sessionId)),
-    setSponsorStatus: adminProcedure
-      .input(
-        z.object({
-          sponsorId: z.number().int().positive(),
-          status: z.enum(["approved", "rejected"]),
-        })
-      )
-      .mutation(({ input }) =>
-        adminSetSponsorStatus(input.sponsorId, input.status)
-      ),
     // M8 — admin Hype Rooms (flag time_limited_communities; no host checks).
     hypeRooms: router({
       list: adminProcedure

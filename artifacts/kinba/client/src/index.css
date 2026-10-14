@@ -2519,3 +2519,115 @@ html[data-motion="reduced"] *::after {
   border-radius: 8px;
   cursor: pointer;
 }
+
+/* ------------------------------------------------------------------ */
+/* Admin Control Center — unified tabs (FB-classic)                     */
+/* ------------------------------------------------------------------ */
+.admin-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 12px;
+  margin-bottom: 4px;
+}
+.admin-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 16px;
+  border-radius: 99px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.admin-tab.active {
+  background: #0f1419;
+  border-color: #0f1419;
+  color: #fff;
+}
+.admin-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: var(--border);
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.admin-pill--green { background: #def7e5; color: #1a7f37; }
+.admin-pill--amber { background: #fff3d6; color: #8a6d00; }
+.admin-pill--red { background: #fde8e8; color: #c81e1e; }
+.admin-row-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.admin-empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 12px 0;
+}
+.admin-attention { display: grid; gap: 4px; margin-top: 12px; }
+.admin-attention h3 { font-size: 14px; margin: 0 0 4px; }
+.admin-attention-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+.dot-red { background: #f4212e; }
+.dot-amber { background: #e6a817; }
+.dot-green { background: #1a7f37; }
+.admin-split-row { display: grid; gap: 10px; }
+.admin-split-row > div { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+.admin-split-bar { background: var(--border); border-radius: 99px; height: 10px; overflow: hidden; }
+.admin-split-bar > div { background: #1d9bf0; height: 100%; border-radius: 99px; }
+.admin-inline-form { display: flex; gap: 8px; }
+.admin-inline-form input {
+  width: 100px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+.admin-field { display: grid; gap: 6px; margin-bottom: 12px; }
+.admin-field > span { font-size: 13px; font-weight: 600; color: var(--muted); }
+.admin-field input,
+.admin-field textarea,
+.admin-field select {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--card);
+  color: var(--text);
+  width: 100%;
+  box-sizing: border-box;
+}
+.danger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #f4212e;
+  background: transparent;
+  color: #f4212e;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 14px;
+  border-radius: 99px;
+  cursor: pointer;
+  font-family: inherit;
+}

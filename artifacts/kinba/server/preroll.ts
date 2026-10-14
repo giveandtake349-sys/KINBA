@@ -34,6 +34,7 @@ import {
   prerollAds,
   prerollPlays,
   prerollSettings,
+  revenueShareOverrides,
   users,
   videos,
 } from "../drizzle/schema";
@@ -53,18 +54,82 @@ import { storageCreateUploadUrl } from "./storage";
 
 export const PREROLL_CURRENCIES = ["USD", "BDT"] as const;
 
-/** Revenue split: 55% creator / 45% platform, integer math in cents. */
+/** Revenue split: default 55% creator / 45% platform, integer math in cents.
+ * Admin can override via preroll_settings.defaultCreatorPercent,
+ * revenue_share_overrides (per-ad / per-creator). */
 export const CREATOR_SHARE_PCT = 55;
 
-export function splitRevenueCents(revenueCents: number): {
+export function splitRevenueCents(
+  revenueCents: number,
+  creatorPct: number = CREATOR_SHARE_PCT
+): {
   creatorShareCents: number;
   platformShareCents: number;
 } {
-  const creatorShareCents = Math.round((revenueCents * CREATOR_SHARE_PCT) / 100);
+  const pct = Math.max(0, Math.min(100, Math.round(creatorPct)));
+  const creatorShareCents = Math.round((revenueCents * pct) / 100);
   return {
     creatorShareCents,
     platformShareCents: revenueCents - creatorShareCents,
   };
+}
+
+/**
+ * Resolve the creator's revenue percent for an ad play.
+ * Order: per-ad+creator override > per-ad override > per-creator override
+ * > global default (preroll_settings.defaultCreatorPercent).
+ */
+export async function resolveCreatorPercent(
+  adId: number,
+  creatorId: number,
+  tx?: { select: Function }
+): Promise<number> {
+  const db = await getDb();
+  if (!db) return CREATOR_SHARE_PCT;
+  const q = tx ?? db;
+
+  // Most specific first: ad + creator
+  const [both] = await q
+    .select({ creatorPercent: revenueShareOverrides.creatorPercent })
+    .from(revenueShareOverrides)
+    .where(
+      and(
+        eq(revenueShareOverrides.adId, adId),
+        eq(revenueShareOverrides.creatorId, creatorId)
+      )
+    )
+    .limit(1);
+  if (both) return both.creatorPercent;
+
+  // Per-ad
+  const [adOnly] = await q
+    .select({ creatorPercent: revenueShareOverrides.creatorPercent })
+    .from(revenueShareOverrides)
+    .where(
+      and(
+        eq(revenueShareOverrides.adId, adId),
+        isNull(revenueShareOverrides.creatorId)
+      )
+    )
+    .limit(1);
+  if (adOnly) return adOnly.creatorPercent;
+
+  // Per-creator
+  const [creatorOnly] = await q
+    .select({ creatorPercent: revenueShareOverrides.creatorPercent })
+    .from(revenueShareOverrides)
+    .where(
+      and(
+        isNull(revenueShareOverrides.adId),
+        eq(revenueShareOverrides.creatorId, creatorId)
+      )
+    )
+    .limit(1);
+  if (creatorOnly) return creatorOnly.creatorPercent;
+
+  // Global default
+  const settings = await getPrerollSettings();
+  return settings.defaultCreatorPercent ?? CREATOR_SHARE_PCT;
 }
 
 const adTitleInput = z.string().trim().min(1).max(120);
@@ -127,6 +192,7 @@ export const updateSettingsInput = z.object({
   minViews: z.number().int().min(0).max(1_000_000_000),
   costPerPlayCents: z.number().int().min(1).max(10_000),
   maxPlaysPerViewerPerDay: z.number().int().min(1).max(10_000),
+  defaultCreatorPercent: z.number().int().min(0).max(100).optional(),
 });
 
 /* ------------------------------------------------------------------ */
@@ -138,6 +204,7 @@ export type PrerollSettings = {
   minViews: number;
   costPerPlayCents: number;
   maxPlaysPerViewerPerDay: number;
+  defaultCreatorPercent: number;
 };
 
 const DEFAULT_SETTINGS: PrerollSettings = {
@@ -145,6 +212,7 @@ const DEFAULT_SETTINGS: PrerollSettings = {
   minViews: 10000,
   costPerPlayCents: 2,
   maxPlaysPerViewerPerDay: 20,
+  defaultCreatorPercent: 55,
 };
 
 /** Read the single settings row, seeding defaults on first use. */
@@ -162,6 +230,7 @@ export async function getPrerollSettings(): Promise<PrerollSettings> {
       minViews: row.minViews,
       costPerPlayCents: row.costPerPlayCents,
       maxPlaysPerViewerPerDay: row.maxPlaysPerViewerPerDay,
+      defaultCreatorPercent: row.defaultCreatorPercent ?? 55,
     };
   }
   await db.insert(prerollSettings).values({ id: 1, ...DEFAULT_SETTINGS });
@@ -189,6 +258,7 @@ export async function updatePrerollSettings(
     minViews: row.minViews,
     costPerPlayCents: row.costPerPlayCents,
     maxPlaysPerViewerPerDay: row.maxPlaysPerViewerPerDay,
+    defaultCreatorPercent: row.defaultCreatorPercent,
   };
 }
 
@@ -370,7 +440,6 @@ export async function reportPlay(opts: {
   if (!db) throw new Error("Database unavailable");
   const settings = await getPrerollSettings();
   const cost = settings.costPerPlayCents;
-  const { creatorShareCents, platformShareCents } = splitRevenueCents(cost);
 
   return db.transaction(async tx => {
     // Row-lock the ad: the budget gate for concurrent plays.
@@ -395,6 +464,13 @@ export async function reportPlay(opts: {
       .where(eq(videos.id, opts.videoId))
       .limit(1);
     if (!video) throw new Error("Video not found.");
+
+    // Resolve creator percent: per-ad+creator > per-ad > per-creator > default.
+    const creatorPct = await resolveCreatorPercent(ad.id, video.userId, tx);
+    const { creatorShareCents, platformShareCents } = splitRevenueCents(
+      cost,
+      creatorPct
+    );
 
     const completed = !opts.skipped && opts.watchedSecs >= 5;
 
@@ -421,7 +497,7 @@ export async function reportPlay(opts: {
       })
       .where(eq(prerollAds.id, ad.id));
 
-    // Creator credit: 55% into the fiat ledger. Auto-approved (no admin
+    // Creator credit: resolved percent into the fiat ledger. Auto-approved (no admin
     // review for pre-roll) — idempotent per play via the play id.
     // Amount is numeric(12,2) dollars; cents → dollars conversion here.
     await tx
