@@ -492,6 +492,10 @@ function SpotlightHighlights({
 }
 
 function notifyError(error: unknown) {
+  if (error instanceof Error && error.message.trim().toLowerCase() === "video not found.") {
+    toast.error("This post was deleted.");
+    return;
+  }
   toast.error(
     error instanceof Error
       ? error.message
