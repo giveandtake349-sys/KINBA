@@ -59,6 +59,8 @@ export const NOTIFICATION_TYPES = {
   /** Video comment writers. */
   videoComment: "video_comment",
   videoReply: "video_reply",
+  /** JHILIK brand advertising — attached to application review transitions only. */
+  applicationStatus: "campaign.application_status",
 } as const;
 
 const TYPE_MAX = 64;

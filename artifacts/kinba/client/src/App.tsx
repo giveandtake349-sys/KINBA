@@ -27,6 +27,8 @@ const DesktopMessages = lazy(() =>
   }))
 );
 const HashtagPage = lazy(() => import("./pages/HashtagPage"));
+const Advertise = lazy(() => import("./pages/Advertise"));
+const BrandApply = lazy(() => import("./pages/BrandApply"));
 
 function RouteLoading() {
   return (
@@ -45,6 +47,9 @@ function AppRoutes() {
   return (
     <Suspense fallback={<RouteLoading />}>
       <Switch>
+        {/* /advertise/apply must be registered before /advertise. */}
+        <Route path="/advertise/apply" component={BrandApply} />
+        <Route path="/advertise" component={Advertise} />
         <Route path="/admin" component={Admin} />
         <Route path="/auth/callback" component={AuthCallback} />
         {/* Account Center: /settings shows the category index (and, on desktop,

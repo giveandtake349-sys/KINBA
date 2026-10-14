@@ -14,6 +14,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { getTrpcCode } from "@/pages/HypeRooms";
 import type { FeatureFlagKey } from "@shared/featureFlags";
+import AdminBrandApplications from "./AdminBrandApplications";
 
 type ReportStatusFilter = "all" | "open" | "resolved";
 type ReportTargetFilter =
@@ -467,6 +468,10 @@ export default function Admin() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="admin-card" aria-label="Brand applications">
+        <AdminBrandApplications />
       </section>
 
       <section className="admin-card admin-flags-section" aria-label="Feature flags">

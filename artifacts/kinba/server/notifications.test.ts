@@ -514,8 +514,11 @@ describe("§22 writers — flag gating + payloads", () => {
     // Exact list (no extras) — the five Hype Room upgrade types below are the
     // ones this upgrade introduced (comment/reply/mention/invite/moderation);
     // anything else would silently widen the durable notification surface.
+    // "campaign.application_status" was approved with the JHILIK ads Phase 2
+    // brand-application review flow (applicant notified on every transition).
     expect(Object.values(NOTIFICATION_TYPES).sort()).toEqual(
       [
+        "campaign.application_status",
         "dm_message",
         "dm_request",
         "dm_request_accepted",

@@ -46,6 +46,7 @@ import {
   Plus,
   QrCode,
   RefreshCw,
+  Target,
   Trash2,
 } from "lucide-react";
 import { useLocation } from "wouter";
@@ -107,7 +108,7 @@ type AppModal =
   | "studio"
   | "announcements"
   | null;
-type DrawerAction = Exclude<AppModal, null> | "profile" | "settings";
+type DrawerAction = Exclude<AppModal, null> | "profile" | "settings" | "advertise";
 
 function safeClick(action: () => void) {
   return (event: ReactMouseEvent<HTMLButtonElement>) => {
@@ -689,6 +690,12 @@ function MobileDrawer({
           label: "Business announcements",
           description: "Reach verified communities",
           icon: Megaphone,
+        },
+        {
+          section: "advertise",
+          label: "Advertise",
+          description: "Grow your brand with JHILIK",
+          icon: Target,
         },
       ],
     },
@@ -2773,6 +2780,11 @@ export default function Home() {
     if (next === "settings") {
       setMenuOpen(false);
       navigate("/settings");
+      return;
+    }
+    if (next === "advertise") {
+      setMenuOpen(false);
+      navigate("/advertise");
       return;
     }
     openModal(next);

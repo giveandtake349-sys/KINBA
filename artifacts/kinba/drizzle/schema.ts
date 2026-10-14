@@ -1935,6 +1935,7 @@ export const brandApplications = pgTable(
     startsAt: timestamp("startsAt", { withTimezone: true }),
     endsAt: timestamp("endsAt", { withTimezone: true }),
     audience: jsonb("audience"),
+    documents: jsonb("documents"),
     status: brandApplicationStatus("status").default("draft").notNull(),
     reviewedBy: integer("reviewedBy").references(() => users.id, {
       onDelete: "set null",

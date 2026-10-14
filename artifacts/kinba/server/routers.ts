@@ -2,6 +2,19 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { systemRouter } from "./_core/systemRouter";
 import {
+  adminApplicationListInput,
+  brandApplicationInput,
+  brandDocUploadInput,
+  createBrandDocUploadUrl,
+  getBrandApplicationForAdmin,
+  getBrandDocViewUrl,
+  listBrandApplicationsForAdmin,
+  listMyBrandApplications,
+  reviewApplicationInput,
+  reviewBrandApplication,
+  submitBrandApplication,
+} from "./brands";
+import {
   adminProcedure,
   protectedProcedure,
   publicProcedure,
@@ -1044,6 +1057,88 @@ export const appRouter = router({
       .mutation(({ ctx, input }) =>
         createLiveSponsor({ ...input, userId: ctx.user.id })
       ),
+  }),
+  brands: router({
+    submitApplication: protectedProcedure
+      .input(brandApplicationInput)
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await submitBrandApplication(ctx.user.id, input);
+        } catch (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Could not submit the application.",
+          });
+        }
+      }),
+    myApplications: protectedProcedure.query(({ ctx }) =>
+      listMyBrandApplications(ctx.user.id)
+    ),
+    docUploadUrl: protectedProcedure
+      .input(brandDocUploadInput)
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await createBrandDocUploadUrl(
+            ctx.user.id,
+            input.contentType,
+            input.fileName
+          );
+        } catch (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Could not create the upload URL.",
+          });
+        }
+      }),
+    admin: router({
+      list: adminProcedure
+        .input(adminApplicationListInput)
+        .query(({ input }) => listBrandApplicationsForAdmin(input)),
+      detail: adminProcedure
+        .input(z.object({ id: z.number().int().positive() }))
+        .query(async ({ input }) => {
+          try {
+            return await getBrandApplicationForAdmin(input.id);
+          } catch (error) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Application not found.",
+            });
+          }
+        }),
+      review: adminProcedure
+        .input(reviewApplicationInput)
+        .mutation(async ({ ctx, input }) => {
+          try {
+            return await reviewBrandApplication(
+              ctx.user.id,
+              input.id,
+              input.toStatus,
+              input.note
+            );
+          } catch (error) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not review the application.",
+            });
+          }
+        }),
+      docUrl: adminProcedure
+        .input(z.object({ key: z.string().min(1).max(512) }))
+        .query(({ input }) => getBrandDocViewUrl(input.key)),
+    }),
   }),
   admin: router({
     dashboard: adminProcedure.query(() => adminListDashboard()),
