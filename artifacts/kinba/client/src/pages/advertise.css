@@ -324,7 +324,7 @@
   border-radius: 999px;
   font-weight: 800;
   font-size: 14px;
-  color: var(--muted);
+  color: var(--text);
   cursor: pointer;
 }
 
