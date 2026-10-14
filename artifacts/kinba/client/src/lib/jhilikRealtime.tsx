@@ -14,7 +14,21 @@ export function JHILIKRealtimeBridge() {
   const utils = trpc.useUtils();
 
   useEffect(() => {
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const refreshFeed = () => {
+      if (refreshTimer !== null) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null;
+        void Promise.all([
+          utils.home.feed.refetch(),
+          utils.videos.list.refetch(),
+          utils.community.list.refetch(),
+          utils.community.mine.refetch(),
+        ]);
+      }, 150);
+    };
     const invalidateFeed = () => {
+      refreshFeed();
       void Promise.all([
         utils.home.feed.invalidate(),
         utils.videos.list.invalidate(),
@@ -57,12 +71,15 @@ export function JHILIKRealtimeBridge() {
     }
 
     channel.subscribe(status => {
-      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+      if (status === "SUBSCRIBED") {
+        console.info("[Realtime] JHILIK feed channel subscribed");
+      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
         console.warn("[Realtime] Feed channel unavailable; query fallback remains active");
       }
     });
 
     return () => {
+      if (refreshTimer !== null) clearTimeout(refreshTimer);
       void supabase.removeChannel(channel);
     };
   }, [auth.session, utils]);
