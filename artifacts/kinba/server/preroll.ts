@@ -474,13 +474,28 @@ export async function createAd(
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
 
+  const rawInput = input as unknown as {
+    dropId?: unknown;
+    thumbnailUrl?: unknown;
+  };
+  const thumbnailUrl =
+    typeof rawInput.thumbnailUrl === "string" && rawInput.thumbnailUrl.trim()
+      ? rawInput.thumbnailUrl.trim()
+      : null;
+
   // Drop link must exist, be owned by the advertiser, and not be archived.
   let dropId: number | null = null;
-  if (input.dropId != null) {
+  const rawDropId = rawInput.dropId;
+  if (rawDropId !== null && rawDropId !== undefined && rawDropId !== "") {
+    const parsedDropId =
+      typeof rawDropId === "number" ? rawDropId : Number(String(rawDropId).trim());
+    if (!Number.isSafeInteger(parsedDropId) || parsedDropId <= 0) {
+      throw new Error("Drop link must be a valid drop.");
+    }
     const [drop] = await db
       .select({ id: drops.id, sellerId: drops.sellerId, status: drops.status })
       .from(drops)
-      .where(eq(drops.id, input.dropId))
+      .where(eq(drops.id, parsedDropId))
       .limit(1);
     if (!drop) throw new Error("Drop not found.");
     if (drop.sellerId !== userId)
@@ -496,7 +511,7 @@ export async function createAd(
       userId,
       title: input.title,
       videoUrl: input.videoUrl,
-      thumbnailUrl: input.thumbnailUrl ?? null,
+      thumbnailUrl,
       dropId,
       status: "draft",
       budgetCents: input.budgetCents,

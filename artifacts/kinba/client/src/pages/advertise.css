@@ -676,6 +676,27 @@
   padding: 18px 16px;
   margin-bottom: 16px;
 }
+.adv-card,
+.adv-form-card,
+.adv-field,
+.an-empty,
+.an-wrap,
+.fb-card {
+  min-width: 0;
+  max-width: 100%;
+}
+.adv-field input[type="file"] {
+  min-width: 0;
+  max-width: 100%;
+}
+.adv-hint,
+.an-empty p,
+.fb-name,
+.fb-spent,
+.fb-note {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .adv-field > span {
   font-weight: 700;
   font-size: 14px;
