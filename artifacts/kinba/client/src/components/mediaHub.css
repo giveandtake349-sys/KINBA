@@ -2483,8 +2483,7 @@
 
 /* Final cascade guard: keep every media feed vertically snap-scrollable. */
 .media-hub .media-feed-scroll,
-.media-hub .long-video-grid,
-.media-hub .shorts-viewport {
+.media-hub .long-video-grid {
   display: flex !important;
   flex-direction: column;
   gap: 0 !important;
@@ -2496,8 +2495,7 @@
   scroll-snap-type: y mandatory !important;
 }
 .media-hub .media-feed-scroll > .long-video-card,
-.media-hub .long-video-grid > .long-video-card,
-.media-hub .shorts-viewport > .short-card {
+.media-hub .long-video-grid > .long-video-card {
   flex: 0 0 100dvh;
   height: 100dvh !important;
   min-height: 100dvh !important;
@@ -2508,7 +2506,7 @@
   scroll-snap-align: start !important;
 }
 .media-hub .long-video-grid > .long-video-card .media-fullscreen-frame,
-.media-hub .shorts-viewport > .short-card .media-video-frame {
+.media-hub .long-video-grid > .long-video-card .media-video-frame {
   height: 100% !important;
   min-height: 100% !important;
   max-height: none !important;
@@ -2882,20 +2880,6 @@
   }
 }
 
-@media (max-width: 760px) {
-  .media-hub .shorts-viewport {
-    height: calc(100dvh - 96px) !important;
-    min-height: calc(100dvh - 96px) !important;
-    padding-bottom: 96px !important;
-    scroll-padding-bottom: 96px !important;
-  }
-
-  .media-hub .shorts-viewport > .short-card {
-    height: calc(100dvh - 96px) !important;
-    min-height: calc(100dvh - 96px) !important;
-  }
-}
-
 /* Full-width natural-ratio media across All Feed, Spotlight, Videos, and Shorts. */
 .media-hub,
 .media-hub .media-tab-panel,
@@ -2936,8 +2920,7 @@
 .media-hub .feed-post-attachments > img,
 .media-hub .feed-post-attachments > video,
 .media-hub .feed-photo-button img,
-.media-hub .media-fullscreen-frame video,
-.media-hub .short-card .media-video-frame video {
+.media-hub .media-fullscreen-frame video {
   display: block !important;
   width: 100% !important;
   height: auto !important;
@@ -2953,7 +2936,6 @@
 .media-hub .feed-media-post,
 .media-hub .feed-text-card,
 .media-hub .long-video-card,
-.media-hub .short-card,
 .media-hub .shorts-insertion-block,
 .media-hub .media-fullscreen-frame,
 .media-hub .media-video-frame,
@@ -2986,7 +2968,7 @@
 }
 
 .media-hub .media-fullscreen-frame,
-.media-hub .short-card .media-video-frame {
+.media-hub .media-video-frame {
   height: auto !important;
   min-height: 0 !important;
   aspect-ratio: auto !important;
