@@ -1979,6 +1979,7 @@ export const campaigns = pgTable(
     title: varchar("title", { length: 200 }).notNull(),
     brief: text("brief"),
     concepts: jsonb("concepts"),
+    rules: text("rules"),
     validationQuestions: jsonb("validationQuestions"),
     startsAt: timestamp("startsAt", { withTimezone: true }),
     endsAt: timestamp("endsAt", { withTimezone: true }),
@@ -2017,6 +2018,7 @@ export const campaignInvitations = pgTable(
     // Only the invited creator ever sees this (visibility rule).
     rewardAmount: numeric("rewardAmount", { precision: 12, scale: 2 }),
     rewardCurrency: char("rewardCurrency", { length: 3 }),
+    message: text("message"),
     invitedAt: timestamp("invitedAt", { withTimezone: true })
       .defaultNow()
       .notNull(),

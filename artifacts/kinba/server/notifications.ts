@@ -61,6 +61,14 @@ export const NOTIFICATION_TYPES = {
   videoReply: "video_reply",
   /** JHILIK brand advertising — attached to application review transitions only. */
   applicationStatus: "campaign.application_status",
+  /** JHILIK brand advertising — campaign invitation sent to a creator. */
+  campaignInvitation: "campaign.invitation",
+  /** JHILIK brand advertising — creator accepted / declined (to campaign admin). */
+  campaignInvitationAccepted: "campaign.invitation_accepted",
+  campaignInvitationDeclined: "campaign.invitation_declined",
+  /** JHILIK brand advertising — campaign activated / ended (to brand owner). */
+  campaignActivated: "campaign.activated",
+  campaignEnded: "campaign.ended",
 } as const;
 
 const TYPE_MAX = 64;

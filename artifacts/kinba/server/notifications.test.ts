@@ -516,9 +516,16 @@ describe("§22 writers — flag gating + payloads", () => {
     // anything else would silently widen the durable notification surface.
     // "campaign.application_status" was approved with the JHILIK ads Phase 2
     // brand-application review flow (applicant notified on every transition).
+    // The five "campaign.*" types below were approved with the JHILIK ads
+    // Phase 3 campaign/invitation flow.
     expect(Object.values(NOTIFICATION_TYPES).sort()).toEqual(
       [
         "campaign.application_status",
+        "campaign.activated",
+        "campaign.ended",
+        "campaign.invitation",
+        "campaign.invitation_accepted",
+        "campaign.invitation_declined",
         "dm_message",
         "dm_request",
         "dm_request_accepted",

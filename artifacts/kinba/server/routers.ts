@@ -15,6 +15,27 @@ import {
   submitBrandApplication,
 } from "./brands";
 import {
+  campaignListInput,
+  createCampaign,
+  createCampaignInput,
+  getCampaignForAdmin,
+  getCampaignForBrand,
+  inviteCreator,
+  inviteCreatorInput,
+  listCampaignsForAdmin,
+  listCampaignsForBrand,
+  listMyCampaigns,
+  listMyInvitations,
+  respondInvitationInput,
+  respondToInvitation,
+  searchCreators,
+  searchCreatorsInput,
+  setCampaignStatus,
+  setCampaignStatusInput,
+  updateCampaign,
+  updateCampaignInput,
+} from "./campaigns";
+import {
   adminProcedure,
   protectedProcedure,
   publicProcedure,
@@ -1139,6 +1160,143 @@ export const appRouter = router({
       docUrl: adminProcedure
         .input(z.object({ key: z.string().min(1).max(512) }))
         .query(({ input }) => getBrandDocViewUrl(input.key)),
+    }),
+  }),
+  campaigns: router({
+    // Brand owner: own campaigns (no pool/fee split, no creator PII).
+    list: protectedProcedure
+      .input(campaignListInput)
+      .query(async ({ ctx, input }) => {
+        // Admins see everything via campaigns.admin.list; this is the
+        // brand/creator-safe projection. Admins calling here get the same
+        // brand-scoped view (their own brands, if any).
+        return listCampaignsForBrand(ctx.user.id, input);
+      }),
+    get: protectedProcedure
+      .input(z.object({ id: z.number().int().positive() }))
+      .query(async ({ ctx, input }) => {
+        try {
+          return await getCampaignForBrand(ctx.user.id, input.id);
+        } catch (error) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message:
+              error instanceof Error ? error.message : "Campaign not found.",
+          });
+        }
+      }),
+    // Creator portal: invitations + joined campaigns.
+    myInvitations: protectedProcedure.query(({ ctx }) =>
+      listMyInvitations(ctx.user.id)
+    ),
+    myCampaigns: protectedProcedure.query(({ ctx }) =>
+      listMyCampaigns(ctx.user.id)
+    ),
+    respondInvitation: protectedProcedure
+      .input(respondInvitationInput)
+      .mutation(async ({ ctx, input }) => {
+        try {
+          return await respondToInvitation(
+            ctx.user.id,
+            input.invitationId,
+            input.accept
+          );
+        } catch (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Could not respond to the invitation.",
+          });
+        }
+      }),
+    admin: router({
+      create: adminProcedure
+        .input(createCampaignInput)
+        .mutation(async ({ ctx, input }) => {
+          try {
+            return await createCampaign(ctx.user.id, input);
+          } catch (error) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not create the campaign.",
+            });
+          }
+        }),
+      update: adminProcedure
+        .input(updateCampaignInput)
+        .mutation(async ({ ctx, input }) => {
+          try {
+            return await updateCampaign(ctx.user.id, input);
+          } catch (error) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not update the campaign.",
+            });
+          }
+        }),
+      list: adminProcedure.input(campaignListInput).query(({ input }) =>
+        listCampaignsForAdmin(input)
+      ),
+      detail: adminProcedure
+        .input(z.object({ id: z.number().int().positive() }))
+        .query(async ({ input }) => {
+          try {
+            return await getCampaignForAdmin(input.id);
+          } catch (error) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Campaign not found.",
+            });
+          }
+        }),
+      setStatus: adminProcedure
+        .input(setCampaignStatusInput)
+        .mutation(async ({ ctx, input }) => {
+          try {
+            return await setCampaignStatus(
+              ctx.user.id,
+              input.id,
+              input.toStatus
+            );
+          } catch (error) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not change the campaign status.",
+            });
+          }
+        }),
+      inviteCreator: adminProcedure
+        .input(inviteCreatorInput)
+        .mutation(async ({ ctx, input }) => {
+          try {
+            return await inviteCreator(ctx.user.id, input);
+          } catch (error) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Could not invite the creator.",
+            });
+          }
+        }),
+      searchCreators: adminProcedure
+        .input(searchCreatorsInput)
+        .query(({ input }) => searchCreators(input.query, input.limit)),
     }),
   }),
   admin: router({

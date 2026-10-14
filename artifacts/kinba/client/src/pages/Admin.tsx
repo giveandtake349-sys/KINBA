@@ -15,6 +15,7 @@ import { trpc } from "@/lib/trpc";
 import { getTrpcCode } from "@/pages/HypeRooms";
 import type { FeatureFlagKey } from "@shared/featureFlags";
 import AdminBrandApplications from "./AdminBrandApplications";
+import AdminCampaigns from "./AdminCampaigns";
 
 type ReportStatusFilter = "all" | "open" | "resolved";
 type ReportTargetFilter =
@@ -472,6 +473,10 @@ export default function Admin() {
 
       <section className="admin-card" aria-label="Brand applications">
         <AdminBrandApplications />
+      </section>
+
+      <section className="admin-card" aria-label="Campaigns">
+        <AdminCampaigns />
       </section>
 
       <section className="admin-card admin-flags-section" aria-label="Feature flags">
