@@ -208,11 +208,13 @@ describe("ProfileView", () => {
     expect(screen.getByText(/Filmmaker in Dhaka\./)).toBeTruthy();
     expect(screen.getByText("Joined March 2024")).toBeTruthy();
 
-    for (const label of ["Icons", "Followers", "Following", "Pookies"]) {
+    for (const label of ["Streak", "Followers", "Following", "Pookies"]) {
       expect(screen.getByText(label)).toBeTruthy();
     }
-    expect(screen.getByText("42")).toBeTruthy();
+    expect(screen.getByText("1.3K")).toBeTruthy();
     expect(screen.getByText("309")).toBeTruthy();
+    expect(screen.getByText("18")).toBeTruthy();
+    expect(screen.queryByText("42")).toBeNull();
 
     expect(screen.getByRole("button", { name: "Edit Profile" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Follow" })).toBeNull();

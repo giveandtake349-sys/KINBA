@@ -78,11 +78,12 @@ function makeDb(selectRows: SelectRows[]) {
         leftJoin: vi.fn(() => chain),
         where: vi.fn(() => chain),
         orderBy: vi.fn(() => chain),
+        offset: vi.fn(() => chain),
         for: vi.fn((mode: string) => {
           lockCalls.push(mode);
           return chain;
         }),
-        limit: vi.fn(async () => rows),
+        limit: vi.fn(() => chain),
         then: (
           onFulfilled?: (v: unknown) => unknown,
           onRejected?: (e: unknown) => unknown

@@ -132,9 +132,10 @@ function context(activeUser: typeof user | null = user): TrpcContext {
   };
 }
 
-const now = new Date("2026-09-23T12:00:00.000Z");
-const future = new Date("2026-09-23T18:00:00.000Z");
-const past = new Date("2026-09-23T06:00:00.000Z");
+// Keep lifecycle fixtures relative to the test run so they never go stale.
+const now = new Date();
+const future = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+const past = new Date(now.getTime() - 6 * 60 * 60 * 1000);
 
 function baseRoom(overrides: Record<string, unknown> = {}) {
   return {
