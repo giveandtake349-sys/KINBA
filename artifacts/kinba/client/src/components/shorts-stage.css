@@ -29,13 +29,15 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   padding-bottom: 0 !important;
 }
 
-/* The dashboard shell normally uses a small content gutter. Shorts is a
-   viewport stage below the fixed header + feed tabs, so use the actual
-   measured chrome height instead of leaving the stage partly behind chrome. */
-body:has(.shorts-tab-panel) .app-main-content.has-feed-tabs > .home-page {
-  padding-top: var(--kinba-chrome-h, 104px) !important;
+/* TRUE FULL-SCREEN SHORTS: the fixed top navigation (app header + feed tabs)
+   is hidden while the Shorts tab is active, so the video fills the viewport
+   edge-to-edge (100dvh). No chrome offset is needed. Bottom nav / drawer
+   were already hidden above. */
+body:has(.shorts-tab-panel) .top-navigation-wrapper {
+  display: none !important;
 }
 
+body:has(.shorts-tab-panel) .app-main-content.has-feed-tabs > .home-page,
 body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .home-page {
   padding-top: 0 !important;
 }
@@ -49,20 +51,13 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
   display: flex !important;
   flex-direction: column !important;
   width: 100% !important;
-  height: calc(100dvh - var(--kinba-chrome-h, 104px)) !important;
+  height: 100dvh !important;
   min-height: 0 !important;
   max-height: none !important;
   margin: 0 !important;
   padding: 0 !important;
   overflow: hidden !important;
   background: var(--page-bg) !important;
-}
-
-@media (min-width: 761px) {
-  .shorts-tab-panel,
-  .media-hub .shorts-tab-panel {
-    height: calc(100dvh - var(--kinba-chrome-h, 116px)) !important;
-  }
 }
 
 .app-main-content.chrome-collapsed .shorts-tab-panel,
@@ -819,6 +814,9 @@ body:has(.shorts-viewer-layer) .action-modal-layer {
   gap: 12px !important;
   min-height: 54px !important;
   padding: 8px 14px !important;
+  /* Full-screen stage: video goes under the notch/status bar, so keep the
+     in-panel controls (back button, discovery) clear of it. */
+  padding-top: calc(8px + env(safe-area-inset-top, 0px)) !important;
   margin: 0 !important;
   border: 0 !important;
   background: rgba(8, 10, 15, 0.92) !important;
