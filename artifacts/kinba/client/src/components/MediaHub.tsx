@@ -3326,7 +3326,8 @@ function PhotoCarousel({
       <img
         src={resolveMediaUrl(current.url) ?? current.url}
         alt={`${video.title || "Post"} · image ${index + 1} of ${images.length}`}
-        loading="lazy"
+        loading={index === 0 ? "eager" : "lazy"}
+        fetchPriority={index === 0 ? "high" : "auto"}
         draggable={false}
         onClick={event => {
           event.stopPropagation();
@@ -4130,7 +4131,9 @@ function HomeFeedPanel({
   const followingQuery = trpc.home.feed.useQuery(
     { tab: "following" },
     {
-      enabled: useForYouPlayer && auth.isAuthenticated,
+      // Newest Updates is secondary content; keep it from competing with the
+      // critical For You request during the initial connection/wake-up.
+      enabled: useForYouPlayer && auth.isAuthenticated && query.isSuccess,
       retry: 1,
       throwOnError: false,
       refetchOnWindowFocus: false,

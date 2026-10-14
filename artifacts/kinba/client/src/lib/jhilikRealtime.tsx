@@ -14,21 +14,10 @@ export function JHILIKRealtimeBridge() {
   const utils = trpc.useUtils();
 
   useEffect(() => {
-    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-    const refreshFeed = () => {
-      if (refreshTimer !== null) clearTimeout(refreshTimer);
-      refreshTimer = setTimeout(() => {
-        refreshTimer = null;
-        void Promise.all([
-          utils.home.feed.refetch(),
-          utils.videos.list.refetch(),
-          utils.community.list.refetch(),
-          utils.community.mine.refetch(),
-        ]);
-      }, 150);
-    };
     const invalidateFeed = () => {
-      refreshFeed();
+      // React Query invalidation refetches active observers and marks inactive
+      // queries stale. This keeps new posts/reactions live without issuing
+      // background requests for tabs the user is not currently viewing.
       void Promise.all([
         utils.home.feed.invalidate(),
         utils.videos.list.invalidate(),
@@ -79,7 +68,6 @@ export function JHILIKRealtimeBridge() {
     });
 
     return () => {
-      if (refreshTimer !== null) clearTimeout(refreshTimer);
       void supabase.removeChannel(channel);
     };
   }, [auth.session, utils]);
