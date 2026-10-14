@@ -1,20 +1,26 @@
 import { useState } from "react";
 import {
   ArrowLeft,
+  BarChart3,
   CheckCircle2,
+  Image as ImageIcon,
   Loader2,
+  Lock,
   Megaphone,
   PauseCircle,
   PlayCircle,
   PlusCircle,
   Search,
   StopCircle,
+  Type as TypeIcon,
   UserPlus,
+  Video as VideoIcon,
   XCircle,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import "./advertise.css";
 import "./campaigns.css";
+import "./analytics.css";
 
 type CampaignStatus = "draft" | "active" | "paused" | "ended";
 
@@ -50,7 +56,9 @@ function linesToList(value: string): string[] {
  * Full budget breakdown is admin-only — never sent to brand/creator views.
  */
 export default function AdminCampaigns() {
-  const [view, setView] = useState<"list" | "new" | "review" | "earnings">(
+  const [view, setView] = useState<
+    "list" | "new" | "review" | "earnings" | "analytics"
+  >(
     "list"
   );
   const [statusFilter, setStatusFilter] = useState<CampaignStatus | "all">(
@@ -135,6 +143,18 @@ export default function AdminCampaigns() {
           >
             Earnings
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={view === "analytics"}
+            className={view === "analytics" ? "active" : ""}
+            onClick={() => {
+              setView("analytics");
+              setOpenId(null);
+            }}
+          >
+            <BarChart3 size={14} aria-hidden="true" /> Analytics
+          </button>
         </div>
         {view === "list" ? (
           <label className="camp-filter">
@@ -175,6 +195,8 @@ export default function AdminCampaigns() {
         <ReviewQueueTab onDone={setNotice} />
       ) : view === "earnings" ? (
         <AdminEarningsTab onDone={setNotice} />
+      ) : view === "analytics" ? (
+        <AdminAnalyticsTab />
       ) : list.isLoading ? (
         <p className="profile-loading-note">Loading campaigns…</p>
       ) : list.data && list.data.items.length > 0 ? (
@@ -1141,5 +1163,154 @@ function AdminEarningsTab({ onDone }: { onDone: (message: string) => void }) {
         </>
       )}
     </section>
+  );
+}
+
+function formatCompact(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return `${Math.round(n)}`;
+}
+
+function formatPct(value: number | null): string {
+  return value == null ? "—" : `${value}%`;
+}
+
+const TYPE_META = {
+  VIDEO: { label: "Videos", icon: VideoIcon },
+  IMAGE: { label: "Photos", icon: ImageIcon },
+  TEXT: { label: "Text posts", icon: TypeIcon },
+} as const;
+
+/**
+ * Admin analytics dashboard — platform-wide totals (last 30 days) plus a
+ * top-campaigns table. Confirmed "number 2" engagement-preview visual
+ * language: KPI cards, FB Creator Studio-style tables with status pills.
+ * Every number comes from the real DB (event tables + lazy rollup). Thin
+ * data renders an honest empty state — never invented figures.
+ */
+function AdminAnalyticsTab() {
+  const stats = trpc.analytics.adminDashboard.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+  const data = stats.data;
+
+  if (stats.isLoading) {
+    return <p className="profile-loading-note">Loading analytics…</p>;
+  }
+  if (!data || !data.hasData) {
+    return (
+      <div className="an-empty" role="status">
+        <BarChart3 size={28} aria-hidden="true" />
+        <p>
+          <strong>Not enough data yet.</strong>
+          <br />
+          Campaign activity is tracked from real events — check back after
+          campaigns go live.
+        </p>
+      </div>
+    );
+  }
+
+  const { totals, byType, campaigns } = data;
+
+  return (
+    <div className="an-wrap">
+      <div className="an-head">
+        <h3>
+          <BarChart3 size={18} aria-hidden="true" /> Platform Overview
+        </h3>
+        <span className="an-priv">
+          <Lock
+            size={12}
+            aria-hidden="true"
+            style={{ verticalAlign: "-1px", marginRight: 4 }}
+          />
+          Admin
+        </span>
+      </div>
+
+      <div className="an-kpis">
+        <div className="an-kpi">
+          <b>{formatCompact(totals.views)}</b>
+          <span>Views</span>
+        </div>
+        <div className="an-kpi">
+          <b>{formatCompact(totals.impressions)}</b>
+          <span>Impressions</span>
+        </div>
+        <div className="an-kpi">
+          <b>{formatPct(totals.avgEngagementRate)}</b>
+          <span>Avg eng.</span>
+        </div>
+      </div>
+
+      {/* TOP CAMPAIGNS — FB table style */}
+      <div className="an-card">
+        <b>Top campaigns</b>
+        <div className="an-table" role="table" aria-label="Top campaigns">
+          <div className="an-thead" role="row">
+            <span>Campaign</span>
+            <span>Impr.</span>
+            <span>CTR</span>
+            <span></span>
+          </div>
+          {campaigns.map(camp => (
+            <div className="an-trow" role="row" key={camp.campaignId}>
+              <span className="an-post">
+                <span>{camp.title}</span>
+              </span>
+              <span>{formatCompact(camp.impressions)}</span>
+              <span>{formatPct(camp.ctr)}</span>
+              <em className={`an-status ${camp.status}`}>{camp.status}</em>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* BY CONTENT TYPE */}
+      <div className="an-card">
+        <b>By content type</b>
+        <div
+          className="an-table"
+          role="table"
+          aria-label="Performance by content type"
+        >
+          <div className="an-thead" role="row">
+            <span>Type</span>
+            <span>Views</span>
+            <span>Eng.</span>
+            <span>Rate</span>
+          </div>
+          {(Object.keys(TYPE_META) as Array<keyof typeof TYPE_META>).map(
+            key => {
+              const meta = TYPE_META[key];
+              const Icon = meta.icon;
+              const row = byType[key];
+              // Facebook formula, computed from real DB numbers.
+              const rate =
+                row.reach > 0
+                  ? +((row.engagements / row.reach) * 100).toFixed(1)
+                  : null;
+              return (
+                <div className="an-trow" role="row" key={key}>
+                  <span className="an-post">
+                    <Icon size={15} aria-hidden="true" />
+                    <span>{meta.label}</span>
+                  </span>
+                  <span>{formatCompact(row.views)}</span>
+                  <span>{formatCompact(row.engagements)}</span>
+                  <b>{formatPct(rate)}</b>
+                </div>
+              );
+            }
+          )}
+        </div>
+      </div>
+
+      <p className="an-fine">
+        Real database numbers — deduplicated, bot-filtered, self-views excluded.
+      </p>
+    </div>
   );
 }

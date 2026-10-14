@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -13,6 +13,7 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { AdvertiseNav } from "@/components/ads/AdvertiseNav";
 import {
   BRAND_DOC_CONTENT_TYPES,
   MAX_BRAND_DOC_BYTES,
@@ -64,6 +65,19 @@ const FORMATS: { id: FormatId; label: string }[] = [
 
 const isSupportedDocType = (contentType: string) =>
   (BRAND_DOC_CONTENT_TYPES as readonly string[]).includes(contentType);
+
+/**
+ * No hardcoded estimate multipliers anywhere: with no real platform history
+ * the UI shows an honest "Not enough data yet" state instead of invented
+ * numbers. The review team confirms a custom estimate from real platform
+ * data after review. Always labelled "Estimated — Not Guaranteed".
+ */
+
+function formatCompact(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}K`;
+  return `${Math.round(n)}`;
+}
 
 type LinkDraft = {
   kind: "website" | "landing" | "social" | "product";
@@ -147,6 +161,13 @@ export default function BrandApply() {
   const myApps = trpc.brands.myApplications.useQuery(undefined, {
     enabled: auth.isAuthenticated,
   });
+  // Honest estimate basis from real platform data (null when the sample is
+  // too thin — the UI then shows an honest "Not enough data yet" state,
+  // never invented numbers).
+  const estimateBasis = trpc.analytics.estimateBasis.useQuery(undefined, {
+    enabled: auth.isAuthenticated,
+    refetchOnWindowFocus: false,
+  });
   const submit = trpc.brands.submitApplication.useMutation();
   const getUploadUrl = trpc.brands.docUploadUrl.useMutation();
 
@@ -155,6 +176,22 @@ export default function BrandApply() {
     id: T,
     set: (v: T[]) => void
   ) => set(list.includes(id) ? list.filter(x => x !== id) : [...list, id]);
+
+  const estimate = useMemo(() => {
+    const amount = Number(budget.replace(/,/g, ""));
+    if (!Number.isFinite(amount) || amount <= 0) return null;
+    const basis = estimateBasis.data;
+    // No real platform history yet → honest empty state, never fake numbers.
+    if (!basis) return { real: false, low: null, high: null, sampleVideos: 0 };
+    // Real platform data: impressions per unit of creator reward.
+    const perUnit = basis.impressionsPerUnit[currency];
+    return {
+      low: formatCompact(amount * perUnit * 0.7),
+      high: formatCompact(amount * perUnit * 1.3),
+      real: true,
+      sampleVideos: basis.sampleVideos,
+    };
+  }, [budget, currency, estimateBasis.data]);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -361,6 +398,8 @@ export default function BrandApply() {
         <span style={{ width: 40 }} aria-hidden="true" />
       </div>
 
+      <AdvertiseNav active="apply" />
+
       <div className="adv-form">
         {formError ? (
           <section className="adv-card" role="alert">
@@ -531,6 +570,31 @@ export default function BrandApply() {
               placeholder={currency === "USD" ? "5,000" : "50,000"}
             />
           </Field>
+          {estimate ? (
+            estimate.real ? (
+              <div className="adv-estimate" aria-label="Estimated reach">
+                <b>
+                  Estimated reach for {currency} {budget}
+                </b>
+                <div className="adv-estimate-num">
+                  ~{estimate.low} – {estimate.high} <small>impressions</small>
+                </div>
+                <span>
+                  Based on {estimate.sampleVideos} videos of real platform
+                  activity. Estimated — Not Guaranteed.
+                </span>
+              </div>
+            ) : (
+              <div className="adv-estimate" aria-label="Estimate unavailable">
+                <b>Estimate for {currency} {budget}</b>
+                <span>
+                  Not enough data yet — our team confirms a custom estimate
+                  from real platform data after review. Estimated — Not
+                  Guaranteed.
+                </span>
+              </div>
+            )
+          ) : null}
           <div className="adv-row-2">
             <Field label="Preferred start">
               <input

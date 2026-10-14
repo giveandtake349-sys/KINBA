@@ -2,6 +2,17 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { systemRouter } from "./_core/systemRouter";
 import {
+  TRACK_SOURCES,
+  checkDbRateLimit,
+  getAdminStats,
+  getBrandStats,
+  getCreatorStats,
+  getEstimateBasis,
+  recordImpressionEvent,
+  recordViewEvent,
+} from "./analytics";
+import { getClientIp } from "./rateLimiter";
+import {
   adminApplicationListInput,
   brandApplicationInput,
   brandDocUploadInput,
@@ -139,7 +150,7 @@ import {
 } from "./db";
 import { getDb } from "./db";
 import { eq, desc } from "drizzle-orm";
-import { users, profiles } from "../drizzle/schema";
+import { users, profiles, videos } from "../drizzle/schema";
 import { communityAnnouncementInput, textPostInput, videoInput } from "./mediaValidation";
 import { REACTION_INPUT_TYPES } from "@shared/reactions";
 import {
@@ -932,12 +943,43 @@ export const appRouter = router({
     ),
     view: publicProcedure
       .input(videoIdInput)
-      .mutation(({ ctx, input }) => {
-        const forwarded = ctx.req.headers["x-forwarded-for"];
-        const ip = typeof forwarded === "string"
-          ? forwarded.split(",")[0].trim()
-          : ctx.req.socket.remoteAddress ?? "unknown";
-        return recordVideoView(input.videoId, ip);
+      .mutation(async ({ ctx, input }) => {
+        // Phase 5: route through the analytics-grade pipeline (DB dedup,
+        // bot filtering, self-view exclusion, fixed getClientIp). The legacy
+        // videos.viewCount is maintained by recordViewEvent, so the client
+        // contract { viewCount, deduped } is unchanged.
+        const ip = getClientIp(ctx.req);
+        const rl = await checkDbRateLimit({
+          key: `analytics:trackView:${ip}`,
+          windowMs: 60_000,
+          max: 60,
+        });
+        if (!rl.allowed) {
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: "Too many view events. Please slow down.",
+          });
+        }
+        const result = await recordViewEvent({
+          contentId: input.videoId,
+          source: "detail",
+          userId: ctx.user?.id ?? null,
+          ip,
+          ipSalt: process.env.VIEW_SALT ?? "jhilik-view-salt",
+          userAgent: ctx.req.get("user-agent"),
+        });
+        const db = await getDb();
+        const [row] = db
+          ? await db
+              .select({ viewCount: videos.viewCount })
+              .from(videos)
+              .where(eq(videos.id, input.videoId))
+              .limit(1)
+          : [];
+        return {
+          viewCount: Number(row?.viewCount ?? 0),
+          deduped: !result.counted,
+        };
       }),
     comments: router({
       // Threaded reply batching: without `parentId` the caller gets top-level
@@ -2469,6 +2511,82 @@ export const appRouter = router({
           throw mapDMError(error, "replyToMessageRequest");
         }
       }),
+  }),
+  // JHILIK Ads Phase 5: real measurement — DB-deduped view/impression
+  // tracking (DB-backed rate limits), lazy-rollup dashboards, and an
+  // honest estimate basis derived from real platform data.
+  analytics: router({
+    // Public: record one view. Deduped per viewer+video+day; bots and
+    // creator self-views are never counted. Rate limited per IP.
+    trackView: publicProcedure
+      .input(
+        z.object({
+          contentId: z.number().int().positive(),
+          source: z.enum(TRACK_SOURCES).optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const ip = getClientIp(ctx.req);
+        const rl = await checkDbRateLimit({
+          key: `analytics:trackView:${ip}`,
+          windowMs: 60_000,
+          max: 60,
+        });
+        if (!rl.allowed) {
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: "Too many view events. Please slow down.",
+          });
+        }
+        return recordViewEvent({
+          contentId: input.contentId,
+          source: input.source ?? null,
+          userId: ctx.user?.id ?? null,
+          ip,
+          ipSalt: process.env.VIEW_SALT ?? "jhilik-view-salt",
+          userAgent: ctx.req.get("user-agent"),
+        });
+      }),
+    // Public: record one impression (card entered viewport). Same dedup,
+    // bot and self-view rules as views; no legacy counter to maintain.
+    trackImpression: publicProcedure
+      .input(z.object({ contentId: z.number().int().positive() }))
+      .mutation(async ({ ctx, input }) => {
+        const ip = getClientIp(ctx.req);
+        const rl = await checkDbRateLimit({
+          key: `analytics:trackImpression:${ip}`,
+          windowMs: 60_000,
+          max: 120,
+        });
+        if (!rl.allowed) {
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: "Too many impression events. Please slow down.",
+          });
+        }
+        return recordImpressionEvent({
+          contentId: input.contentId,
+          userId: ctx.user?.id ?? null,
+          ip,
+          ipSalt: process.env.VIEW_SALT ?? "jhilik-view-salt",
+          userAgent: ctx.req.get("user-agent"),
+        });
+      }),
+    // Creator portal: own videos only — impressions, views, engagements,
+    // CTR, 7-day series, top content. All numbers from the real DB.
+    creatorDashboard: protectedProcedure.query(({ ctx }) =>
+      getCreatorStats(ctx.user.id)
+    ),
+    // Brand portal: own campaigns only — impressions, views, clicks, CTR
+    // per campaign. Never exposes creator PII or pool/fee splits.
+    brandDashboard: protectedProcedure.query(({ ctx }) =>
+      getBrandStats(ctx.user.id)
+    ),
+    // Admin: platform-wide totals + per-campaign table. Admin only.
+    adminDashboard: adminProcedure.query(() => getAdminStats()),
+    // Public: honest estimate basis from real platform data, or null when
+    // the sample is too thin (UI shows "not enough data yet" then).
+    estimateBasis: publicProcedure.query(() => getEstimateBasis()),
   }),
 });
 export type AppRouter = typeof appRouter;

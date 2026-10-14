@@ -13,6 +13,7 @@ import {
 } from "react";
 import {
   BadgeCheck,
+  BarChart3,
   Bell,
   AtSign,
   Check,
@@ -77,9 +78,11 @@ import {
 import { resolveMediaUrl } from "@/lib/runtimeConfig";
 import type { FeedSection, VideoRecord } from "@/components/MediaHub";
 import ProfileView, { ProfileSkeleton } from "@/components/ProfileView";
+import { ContentAnalytics } from "@/components/ads/ContentAnalytics";
 import FollowListModal, { type FollowListMode } from "@/components/FollowListModal";
 import "./profile.css";
 import "./createPost.css";
+import "./analytics.css";
 
 const MediaHub = lazy(() => import("@/components/MediaHub"));
 const CommunityAnnouncements = lazy(() =>
@@ -2460,27 +2463,168 @@ function CreatorStudioModal({
   onCreate: () => void;
 }) {
   const stats = profile?.stats;
+  const [tab, setTab] = useState<StudioTab>("create");
+  // Reset to the first tab whenever the studio is opened.
+  useEffect(() => {
+    if (open) setTab("create");
+  }, [open]);
+  const tabs: Array<{ id: StudioTab; label: string; icon: typeof Plus }> = [
+    { id: "create", label: "Create", icon: Plus },
+    { id: "content", label: "Content", icon: Film },
+    { id: "analytics", label: "Analytics", icon: BarChart3 },
+    { id: "earnings", label: "Earnings", icon: WalletCards },
+  ];
   return (
-    <ActionModal title="JHILIK Studio" open={open} onClose={onClose}>
-      <p className="modal-intro">Manage your publishing momentum from one creator workspace.</p>
-      <div className="studio-stat-grid">
-        <div><strong>{stats?.followersCount ?? 0}</strong><span>Followers</span></div>
-        <div><strong>{stats?.reactionsReceived ?? 0}</strong><span>Pookies</span></div>
-        <div><strong>{stats?.iconsCount ?? 0}</strong><span>ICONS</span></div>
+    <ActionModal
+      title="JHILIK Studio"
+      open={open}
+      onClose={onClose}
+      className="studio-action-modal"
+    >
+      <div className="studio-tabs" role="tablist" aria-label="Studio sections">
+        {tabs.map(t => {
+          const Icon = t.icon;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              className={tab === t.id ? "on" : ""}
+              onClick={() => setTab(t.id)}
+            >
+              <Icon size={15} aria-hidden="true" />
+              {t.label}
+            </button>
+          );
+        })}
       </div>
-      <button
-        type="button"
-        className="primary-btn"
-        onClick={event => {
-          event.preventDefault();
-          event.stopPropagation();
-          onClose();
-          onCreate();
-        }}
-      >
-        <Plus size={18} /> Upload new video
-      </button>
+
+      {tab === "create" ? (
+        <>
+          <p className="modal-intro">Manage your publishing momentum from one creator workspace.</p>
+          <div className="studio-stat-grid">
+            <div><strong>{stats?.followersCount ?? 0}</strong><span>Followers</span></div>
+            <div><strong>{stats?.reactionsReceived ?? 0}</strong><span>Pookies</span></div>
+            <div><strong>{stats?.iconsCount ?? 0}</strong><span>ICONS</span></div>
+          </div>
+          <button
+            type="button"
+            className="primary-btn"
+            onClick={event => {
+              event.preventDefault();
+              event.stopPropagation();
+              onClose();
+              onCreate();
+            }}
+          >
+            <Plus size={18} /> Upload new video
+          </button>
+        </>
+      ) : null}
+
+      {tab === "content" ? <StudioContentTab /> : null}
+      {tab === "analytics" ? <ContentAnalytics /> : null}
+      {tab === "earnings" ? <StudioEarningsTab /> : null}
     </ActionModal>
+  );
+}
+
+type StudioTab = "create" | "content" | "analytics" | "earnings";
+
+/** Own published content — every account type. Honest empty state. */
+function StudioContentTab() {
+  const videos = trpc.profile.videos.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+  const rows = videos.data ?? [];
+  if (videos.isLoading) {
+    return <p className="profile-loading-note">Loading your content…</p>;
+  }
+  if (rows.length === 0) {
+    return (
+      <div className="an-empty" role="status">
+        <Film size={28} aria-hidden="true" />
+        <p>
+          <strong>No content yet.</strong>
+          <br />
+          Publish your first video, photo, or post to see it here.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="an-card">
+      <b>Your content</b>
+      <div className="an-table" role="table" aria-label="Your published content">
+        <div className="an-thead" role="row">
+          <span>Post</span>
+          <span>Type</span>
+          <span>Views</span>
+        </div>
+        {rows.map(v => (
+          <div className="an-trow" role="row" key={v.id}>
+            <span className="an-post">
+              <span>{v.title || `Post #${v.id}`}</span>
+            </span>
+            <span>{v.mediaType ?? "—"}</span>
+            <span>{(v.viewCount ?? 0).toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Own campaign earnings — fiat ledger, honest empty state. */
+function StudioEarningsTab() {
+  const earnings = trpc.submissions.myEarnings.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+  });
+  const rows = earnings.data ?? [];
+  if (earnings.isLoading) {
+    return <p className="profile-loading-note">Loading your earnings…</p>;
+  }
+  if (rows.length === 0) {
+    return (
+      <div className="an-empty" role="status">
+        <WalletCards size={28} aria-hidden="true" />
+        <p>
+          <strong>No earnings yet.</strong>
+          <br />
+          Approved campaign submissions show up here.
+        </p>
+      </div>
+    );
+  }
+  const symbolFor = (currency: string | null) =>
+    (currency ?? "").toUpperCase() === "BDT" ? "৳" : "$";
+  return (
+    <div className="an-card">
+      <b>Your earnings</b>
+      <div className="an-table" role="table" aria-label="Your campaign earnings">
+        <div className="an-thead" role="row">
+          <span>Campaign</span>
+          <span>Amount</span>
+          <span>Status</span>
+        </div>
+        {rows.map(row => (
+          <div className="an-trow" role="row" key={row.id}>
+            <span className="an-post">
+              <span>{row.campaignTitle}</span>
+            </span>
+            <b>
+              {symbolFor(row.currency)}
+              {Number(row.amount).toLocaleString("en-US", {
+                maximumFractionDigits: 2,
+              })}
+            </b>
+            <span className={`an-status ${row.status}`}>{row.status}</span>
+          </div>
+        ))}
+      </div>
+      <p className="an-fine">Fiat ledger — recorded when a submission is approved.</p>
+    </div>
   );
 }
 

@@ -1,0 +1,166 @@
+/* JHILIK Ads Analytics — Phase 5. Confirmed "number 2" engagement preview:
+   light professional theme, engagement HERO as dark card with bars,
+   FB Creator Studio-style data tables, chart with gridlines + day labels,
+   tabular numbers, lucide line icons in markup (no emojis). Theme-aware
+   via CSS vars; the hero cards stay intentionally dark in both themes. */
+
+.an-wrap { display: grid; gap: 14px; padding: 16px 0; }
+
+/* KPI cards — light, tabular numbers */
+.an-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.an-kpi {
+  background: var(--surface-raised, #f7f9fa);
+  border-radius: 16px;
+  padding: 16px 8px;
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  text-align: center;
+}
+.an-kpi b {
+  font-size: 22px;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.an-kpi span { font-size: 11px; color: var(--muted); font-weight: 600; }
+
+/* ENGAGEMENT HERO — dark card, unmissable */
+.an-eng {
+  background: #0f1419;
+  color: #fff;
+  border-radius: 20px;
+  padding: 20px 18px;
+  display: grid;
+  gap: 16px;
+}
+.an-eng-head { display: flex; justify-content: space-between; align-items: center; }
+.an-eng-head b { font-size: 17px; letter-spacing: -0.01em; }
+.an-eng-rate { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; color: #1d9bf0; font-variant-numeric: tabular-nums; }
+.an-eng-rate i { font-style: normal; font-size: 11px; color: #8b98a5; font-weight: 600; display: block; text-align: right; }
+.an-eng-grid { display: grid; gap: 14px; }
+.an-eng-row { display: grid; gap: 6px; }
+.an-eng-row b { font-size: 19px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.an-eng-row span { font-size: 12px; color: #8b98a5; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.an-bar { background: #2f3336; border-radius: 99px; height: 6px; overflow: hidden; }
+.an-bar div { background: #1d9bf0; height: 100%; border-radius: 99px; }
+.an-formula { font-size: 11px; color: #8b98a5; border-top: 1px solid #2f3336; padding-top: 12px; }
+
+/* Section cards + FB Creator Studio-style tables */
+.an-card { display: grid; gap: 6px; }
+.an-card > b { font-size: 16px; letter-spacing: -0.01em; padding: 0 4px; color: var(--text); }
+.an-table { display: grid; font-size: 13px; }
+.an-thead, .an-trow {
+  display: grid;
+  grid-template-columns: 1.6fr 0.8fr 0.8fr 0.8fr;
+  gap: 8px;
+  align-items: center;
+  padding: 11px 4px;
+}
+.an-thead { font-size: 11px; color: var(--muted); font-weight: 700; border-bottom: 1px solid var(--border); }
+.an-trow { border-bottom: 1px solid var(--surface-raised, #f7f9fa); font-variant-numeric: tabular-nums; color: var(--text); }
+.an-trow:last-child { border-bottom: none; }
+.an-trow b { font-weight: 800; }
+.an-trow .an-post { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.an-trow .an-post svg { flex: none; color: var(--muted); }
+.an-trow .an-post span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.an-ok { color: var(--success, #1a7f37); }
+.an-status { font-style: normal; font-size: 10px; font-weight: 800; padding: 4px 10px; border-radius: 99px; justify-self: end; }
+.an-status.active { background: var(--success-soft, #def7e5); color: var(--success, #1a7f37); }
+.an-status.paused { background: #fff3d6; color: #8a6d00; }
+.an-status.ended { background: var(--surface-elevated, #e4e6eb); color: var(--muted); }
+
+/* Chart — gridlines + bars + day labels */
+.an-chart { position: relative; padding: 8px 4px 0; }
+.an-grid { position: absolute; inset: 8px 4px 0; display: grid; align-content: space-between; }
+.an-grid i { border-top: 1px solid var(--surface-raised, #f0f2f5); display: block; }
+.an-bars { position: relative; display: flex; align-items: flex-end; gap: 12px; height: 110px; }
+.an-bars > div { flex: 1; display: flex; justify-content: center; height: 100%; align-items: flex-end; }
+.an-bars em { width: 70%; max-width: 26px; border-radius: 6px 6px 0 0; background: var(--blue, #1d9bf0); height: var(--v); display: block; }
+.an-xlabels { display: flex; gap: 12px; padding: 8px 4px 0; }
+.an-xlabels span { flex: 1; text-align: center; font-size: 11px; color: var(--muted); font-weight: 600; }
+
+/* Brand campaign HERO — dark card */
+.an-hero { background: #0f1419; color: #fff; border-radius: 20px; padding: 22px 18px; display: grid; gap: 10px; }
+.an-hero > span { font-size: 13px; color: #8b98a5; font-weight: 600; }
+.an-hero > b { font-size: 34px; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.an-hero > b small { font-size: 14px; font-weight: 600; color: #8b98a5; }
+.an-hero-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; border-top: 1px solid #2f3336; padding-top: 14px; }
+.an-hero-row div { display: grid; gap: 3px; justify-items: center; text-align: center; }
+.an-hero-row b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.an-hero-row span { font-size: 10px; color: #8b98a5; font-weight: 600; }
+.an-hero .an-table { margin-top: 4px; }
+.an-hero .an-thead { border-bottom-color: #2f3336; color: #8b98a5; }
+.an-hero .an-trow { border-bottom-color: #23272b; color: #fff; }
+.an-hero .an-trow .an-post svg { color: #8b98a5; }
+
+/* Fine print + honest empty states */
+.an-fine { text-align: center; font-size: 12px; color: var(--muted); line-height: 1.7; }
+.an-empty {
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+.an-empty svg { opacity: 0.5; }
+.an-head { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; }
+.an-head h3 { margin: 0; font-size: 20px; letter-spacing: -0.02em; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.an-live { font-size: 12px; color: var(--success, #1a7f37); font-weight: 700; display: flex; align-items: center; gap: 5px; }
+.an-live::before { content: ""; width: 7px; height: 7px; border-radius: 99px; background: currentColor; }
+.an-priv { font-size: 11px; color: var(--muted); font-weight: 600; }
+
+@media (max-width: 480px) {
+  .an-kpis { gap: 8px; }
+  .an-kpi b { font-size: 19px; }
+  .an-hero-row { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+}
+
+/* 4-column KPI variant (My Ads summary) */
+.an-kpis.cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+/* Earning status pills (campaign_earnings_status) */
+.an-status.estimated { background: #e8f0fe; color: #1a56db; }
+.an-status.approved { background: var(--success-soft, #def7e5); color: var(--success, #1a7f37); }
+.an-status.reversed { background: #fde8e8; color: #c81e1e; }
+.an-status.paid_recorded { background: #e8f0fe; color: #1a56db; }
+
+/* JHILIK Studio tab bar (Create | Content | Analytics | Earnings) */
+.studio-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--surface-elevated, #f0f2f5);
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 16px;
+}
+.studio-tabs button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 4px;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.studio-tabs button.on {
+  background: var(--text);
+  color: var(--surface, #fff);
+}
+.studio-action-modal .an-empty { margin-top: 4px; }
+
+@media (max-width: 480px) {
+  .an-kpis.cols-4 { grid-template-columns: repeat(2, 1fr); }
+  .studio-tabs button { font-size: 12px; }
+  .studio-tabs button svg { display: none; }
+}

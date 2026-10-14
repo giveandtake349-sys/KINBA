@@ -2155,9 +2155,13 @@ export const videoViewEvents = pgTable(
   "video_view_events",
   {
     id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    // NOTE: the "videos" table is the unified content table (mediaType =
+    // VIDEO | IMAGE | TEXT). videoId is therefore the content id; contentType
+    // denormalizes videos.mediaType at record time for per-type breakdowns.
     videoId: integer("videoId")
       .notNull()
       .references(() => videos.id, { onDelete: "cascade" }),
+    contentType: mediaType("contentType"),
     campaignId: integer("campaignId").references(() => campaigns.id, {
       onDelete: "set null",
     }),
@@ -2193,9 +2197,11 @@ export const videoImpressions = pgTable(
   "video_impressions",
   {
     id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    // See videoViewEvents: videos is the unified content table.
     videoId: integer("videoId")
       .notNull()
       .references(() => videos.id, { onDelete: "cascade" }),
+    contentType: mediaType("contentType"),
     campaignId: integer("campaignId").references(() => campaigns.id, {
       onDelete: "set null",
     }),
@@ -2261,9 +2267,12 @@ export const dailyContentStats = pgTable(
   "daily_content_stats",
   {
     id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    // videos is the unified content table; contentType denormalizes
+    // videos.mediaType for per-type dashboard breakdowns.
     videoId: integer("videoId")
       .notNull()
       .references(() => videos.id, { onDelete: "cascade" }),
+    contentType: mediaType("contentType"),
     day: date("day").notNull(),
     views: integer("views").default(0).notNull(),
     impressions: integer("impressions").default(0).notNull(),

@@ -29,6 +29,7 @@ const DesktopMessages = lazy(() =>
 const HashtagPage = lazy(() => import("./pages/HashtagPage"));
 const Advertise = lazy(() => import("./pages/Advertise"));
 const BrandApply = lazy(() => import("./pages/BrandApply"));
+const MyAds = lazy(() => import("./pages/MyAds"));
 const CreatorCampaigns = lazy(() => import("./pages/CreatorCampaigns"));
 
 function RouteLoading() {
@@ -48,8 +49,9 @@ function AppRoutes() {
   return (
     <Suspense fallback={<RouteLoading />}>
       <Switch>
-        {/* /advertise/apply must be registered before /advertise. */}
+        {/* /advertise/apply and /advertise/my-ads must be registered before /advertise. */}
         <Route path="/advertise/apply" component={BrandApply} />
+        <Route path="/advertise/my-ads" component={MyAds} />
         <Route path="/advertise" component={Advertise} />
         <Route path="/campaigns" component={CreatorCampaigns} />
         <Route path="/admin" component={Admin} />

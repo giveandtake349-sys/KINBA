@@ -14,7 +14,17 @@ setInterval(() => {
   }
 }, 60_000);
 
-export function getClientIp(req: Request): string {
+/**
+ * Minimal structural shape getClientIp needs. Both Express 4 and Express 5
+ * Request objects satisfy this, avoiding a hard dependency on one
+ * @types/express version (the repo has both in the tree).
+ */
+export interface ClientIpSource {
+  headers: Record<string, string | string[] | undefined>;
+  socket: { remoteAddress?: string | undefined };
+}
+
+export function getClientIp(req: ClientIpSource): string {
   const forwarded = req.headers["x-forwarded-for"];
   if (typeof forwarded === "string") {
     // Proxies APPEND to X-Forwarded-For, so only the LAST hop is trustworthy:

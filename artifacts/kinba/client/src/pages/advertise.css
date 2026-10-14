@@ -583,3 +583,37 @@
     margin-top: 16px;
   }
 }
+
+/* Advertise section nav (Advertise | My Ads | Apply) — top of section pages. */
+.adv-section-nav {
+  display: flex;
+  gap: 4px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 4px;
+  margin: 0 12px 12px;
+}
+.adv-section-nav button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 10px 4px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.adv-section-nav button.on {
+  background: var(--text);
+  color: var(--surface, #fff);
+}
+
+@media (min-width: 720px) {
+  .adv-section-nav {
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}

@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import {
   ArrowLeft,
+  BarChart3,
   CalendarDays,
   CheckCircle2,
   Inbox,
@@ -12,8 +13,10 @@ import {
   XCircle,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { ContentAnalytics } from "@/components/ads/ContentAnalytics";
 import "./advertise.css";
 import "./campaigns.css";
+import "./analytics.css";
 
 function formatMoney(amount: string | null, currency: string | null): string {
   if (!amount) return "—";
@@ -45,7 +48,7 @@ function asStringList(value: unknown): string[] {
     : [];
 }
 
-type Tab = "invitations" | "submit" | "earnings";
+type Tab = "invitations" | "submit" | "earnings" | "analytics";
 
 type InvitationRow = {
   id: number;
@@ -124,6 +127,7 @@ export default function CreatorCampaigns() {
               { id: "invitations", label: "Invitations", icon: Inbox },
               { id: "submit", label: "Submit", icon: Send },
               { id: "earnings", label: "Earnings", icon: Wallet },
+              { id: "analytics", label: "Analytics", icon: BarChart3 },
             ] as const
           ).map(({ id, label, icon: Icon }) => (
             <button
@@ -158,6 +162,7 @@ export default function CreatorCampaigns() {
           />
         ) : null}
         {tab === "earnings" ? <EarningsTab /> : null}
+        {tab === "analytics" ? <ContentAnalytics /> : null}
       </div>
     </div>
   );

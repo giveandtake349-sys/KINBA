@@ -3515,6 +3515,33 @@ function VideoCard({
       .then(result => setViews(result.viewCount))
       .catch(() => undefined);
   };
+  // Phase 5: impression tracking — fire once when the card enters the
+  // viewport. Server dedups per viewer+content+day; bots and self-views
+  // are excluded there.
+  const impressionMutation = trpc.analytics.trackImpression.useMutation();
+  const cardRef = useRef<HTMLElement | null>(null);
+  const impressionFiredRef = useRef(false);
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el || impressionFiredRef.current) return;
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0]?.isIntersecting && !impressionFiredRef.current) {
+          impressionFiredRef.current = true;
+          void impressionMutation
+            .mutateAsync({ contentId: video.id })
+            .catch(() => {
+              impressionFiredRef.current = false;
+            });
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.5 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [video.id]);
   if (deleted) return null;
   if (socialLayout) {
     const isText = video.mediaType === "TEXT";
@@ -3524,6 +3551,7 @@ function VideoCard({
     return (
       <article
         id={`feed-video-${video.id}`}
+        ref={cardRef}
         className={`k-post${isText ? " k-post--text" : ""}`}
       >
         <div className="k-post__creator">

@@ -1,5 +1,6 @@
 import { ArrowLeft, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useLocation } from "wouter";
+import { AdvertiseNav } from "@/components/ads/AdvertiseNav";
 import "./advertise.css";
 
 const FORMATS = [
@@ -50,6 +51,8 @@ export default function Advertise() {
         <span className="adv-logo">JHILIK</span>
         <span style={{ width: 40 }} aria-hidden="true" />
       </div>
+
+      <AdvertiseNav active="advertise" />
 
       <section className="adv-hero" aria-label="Advertise with JHILIK">
         <h1>
