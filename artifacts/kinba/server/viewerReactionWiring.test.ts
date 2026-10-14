@@ -139,9 +139,11 @@ import {
   communityAnnouncements,
   communityComments,
   communityReactions,
+  closeFriends,
   profiles,
   users,
   videoBookmarks,
+  videoAudienceUsers,
   videoComments,
   videoReactions,
   videoShares,
@@ -199,6 +201,8 @@ beforeAll(() => {
     users,
     profiles,
     videos,
+    videoAudienceUsers,
+    closeFriends,
     videoSources,
     videoReactions,
     videoShares,
@@ -229,10 +233,10 @@ beforeAll(() => {
 
   const insertVideo = sqlite.prepare(
     `INSERT INTO "videos"
-       ("id", "userId", "title", "description", "videoUrl", "mediaType",
+       ("id", "userId", "title", "description", "videoUrl", "audience", "mediaType",
         "kind", "durationSeconds", "width", "height", "processingStatus",
         "createdAt")
-     VALUES (?, ?, ?, ?, ?, 'VIDEO', 'LONG', 12, 640, 360, 'READY', ?)`
+     VALUES (?, ?, ?, ?, ?, 'everyone', 'VIDEO', 'LONG', 12, 640, 360, 'READY', ?)`
   );
   // 50/56 carry seeded viewer reactions; 51/56 are list-only targets and the
   // 5x series are the react-mutation targets so suites never share state.

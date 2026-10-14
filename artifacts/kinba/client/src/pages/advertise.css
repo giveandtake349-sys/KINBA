@@ -2,8 +2,10 @@
    No gradients, no emoji icons (lucide line icons in markup). */
 
 .adv-page {
+  --bg: var(--page-bg, #f0f2f5);
+  --card: var(--surface, #fff);
   min-height: 100dvh;
-  background: var(--bg, #f0f2f5);
+  background: var(--bg);
   color: var(--text);
   padding-bottom: 96px;
 }
@@ -37,6 +39,9 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
   border: none;
   background: none;
   color: var(--text);
@@ -78,7 +83,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: var(--blue);
+  background: color-mix(in srgb, var(--blue) 75%, #0f1419);
   color: #fff;
   border: none;
   border-radius: 999px;
@@ -236,6 +241,7 @@
 .adv-field select {
   border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
   border-radius: 12px;
+  min-height: 44px;
   padding: 12px 14px;
   font-size: 15px;
   background: var(--card, #fff);
@@ -289,6 +295,7 @@
   background: transparent;
   color: var(--text);
   border-radius: 999px;
+  min-height: 44px;
   padding: 9px 16px;
   font-size: 13px;
   font-weight: 600;
@@ -312,6 +319,7 @@
   flex: 1;
   border: none;
   background: transparent;
+  min-height: 44px;
   padding: 10px;
   border-radius: 999px;
   font-weight: 800;
@@ -337,7 +345,11 @@
 
 .adv-estimate > b {
   font-size: 13px;
-  color: var(--blue);
+  color: #155db3;
+}
+
+:root[data-theme="dark"] .adv-estimate > b {
+  color: #8fc2ff;
 }
 
 .adv-estimate-num {
@@ -387,6 +399,8 @@
   background: none;
   color: var(--muted);
   cursor: pointer;
+  min-width: 44px;
+  min-height: 44px;
   padding: 6px;
   display: inline-flex;
   align-items: center;
@@ -410,6 +424,7 @@
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
+  min-height: 44px;
   width: 100%;
   justify-content: center;
 }
@@ -434,12 +449,16 @@
 }
 
 .adv-doc-row .ok {
-  color: #1a7f37;
+  color: #146c2e;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   font-size: 12px;
   font-weight: 700;
+}
+
+:root[data-theme="dark"] .adv-doc-row .ok {
+  color: var(--success, #4ade80);
 }
 
 .adv-privacy-note {
@@ -522,22 +541,22 @@
 .adv-status.submitted,
 .adv-status.pending {
   background: #fff3d6;
-  color: #8a6d00;
+  color: #725500;
 }
 
 .adv-status.info_requested {
   background: #e8f5fe;
-  color: #1d9bf0;
+  color: #075985;
 }
 
 .adv-status.approved {
   background: #def7e5;
-  color: #1a7f37;
+  color: #146c2e;
 }
 
 .adv-status.rejected {
   background: #fde8e8;
-  color: #d03636;
+  color: #a61b1b;
 }
 
 .adv-status.draft {

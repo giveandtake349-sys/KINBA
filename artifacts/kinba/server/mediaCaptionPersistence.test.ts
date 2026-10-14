@@ -149,13 +149,17 @@ vi.mock("./storage", () => ({
 }));
 
 import {
+  closeFriends,
+  hashtags,
   profiles,
   users,
   videoBookmarks,
+  videoAudienceUsers,
   videoComments,
   videoReactions,
   videoShares,
   videoSources,
+  videoHashtags,
   videos,
 } from "../drizzle/schema";
 import { createPhotoPost, createVideo, listHomeFeed } from "./db";
@@ -198,6 +202,10 @@ beforeAll(() => {
     users,
     profiles,
     videos,
+    videoAudienceUsers,
+    closeFriends,
+    hashtags,
+    videoHashtags,
     videoSources,
     videoReactions,
     videoShares,
@@ -216,6 +224,8 @@ beforeAll(() => {
 beforeEach(() => {
   const sqlite = holder.sqlite!;
   for (const name of [
+    "video_hashtags",
+    "hashtags",
     "videos",
     "video_sources",
     "video_reactions",
