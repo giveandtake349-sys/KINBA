@@ -29,6 +29,17 @@ body:has(.shorts-tab-panel) .media-hub .shorts-tab-panel {
   padding-bottom: 0 !important;
 }
 
+/* The dashboard shell normally uses a small content gutter. Shorts is a
+   viewport stage below the fixed header + feed tabs, so use the actual
+   measured chrome height instead of leaving the stage partly behind chrome. */
+body:has(.shorts-tab-panel) .app-main-content.has-feed-tabs > .home-page {
+  padding-top: var(--kinba-chrome-h, 104px) !important;
+}
+
+body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .home-page {
+  padding-top: 0 !important;
+}
+
 /* ---------------------------------------------------------------------------
    2. Tab stage.
    --------------------------------------------------------------------------- */

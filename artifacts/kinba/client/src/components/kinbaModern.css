@@ -613,22 +613,6 @@ body {
     font-size: 10px !important;
   }
 
-  .media-tab-panel--wheels .home-feed-section .long-video-grid,
-  .shorts-section .shorts-viewport,
-  .media-tab-panel--wheels .home-feed-section .long-video-card,
-  .shorts-section .short-card {
-    height: calc(100dvh - 103px) !important;
-    min-height: calc(100dvh - 103px) !important;
-  }
-
-  .media-tab-panel--wheels .home-feed-section .long-video-grid,
-  .shorts-section .shorts-viewport,
-  .media-tab-panel--wheels .home-feed-section .long-video-card,
-  .shorts-section .short-card {
-    height: calc(100dvh - 103px) !important;
-    min-height: calc(100dvh - 103px) !important;
-  }
-
   .media-overlay-copy {
     min-height: 46% !important;
     padding: 80px 78px calc(18px + env(safe-area-inset-bottom)) 15px !important;
