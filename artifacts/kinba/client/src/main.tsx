@@ -46,7 +46,12 @@ const trpcClient = trpc.createClient({
   ],
 });
 
-void initializePushNotifications().catch(error => {
+void initializePushNotifications(async token => {
+  await trpcClient.notifications.registerPushToken.mutate({
+    token,
+    platform: "android",
+  });
+}).catch(error => {
   console.error("[PushNotifications] initialization failed", error);
 });
 

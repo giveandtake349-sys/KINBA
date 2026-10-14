@@ -1476,6 +1476,24 @@ export const notifications = pgTable(
   ]
 );
 
+export const pushTokens = pgTable(
+  "push_tokens",
+  {
+    id: integer("id").generatedAlwaysAsIdentity().primaryKey(),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    token: varchar("token", { length: 2048 }).notNull(),
+    platform: varchar("platform", { length: 16 }).notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  table => [
+    uniqueIndex("push_tokens_token_unique").on(table.token),
+    index("push_tokens_user_idx").on(table.userId),
+  ]
+);
+
 // ---------------------------------------------------------------------------
 // JHILIK Direct Messaging — additive schema (no destructive changes).
 // Spec: Direct Messages + Instagram-style follow-based Message Requests.

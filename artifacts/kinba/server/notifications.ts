@@ -17,6 +17,7 @@ import {
 } from "../drizzle/schema";
 import { getDb } from "./db";
 import { isFeatureFlagEnabled } from "./featureFlags";
+import { sendPushToUser } from "./pushNotifications";
 
 export type NotificationRow = typeof notifications.$inferSelect;
 
@@ -160,6 +161,17 @@ export async function insertNotification(
       readAt: null,
     })
     .returning();
+  if (inserted) {
+    void sendPushToUser({
+      userId: row.userId,
+      title: row.title,
+      body: row.body,
+      link: row.link,
+      notificationId: inserted.id,
+    }).catch(error => {
+      console.warn("[PushNotifications] delivery failed:", error);
+    });
+  }
   return inserted ?? null;
 }
 

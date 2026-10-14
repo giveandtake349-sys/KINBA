@@ -12,12 +12,19 @@ const PUSH_TOKEN_STORAGE_KEY = "kinba.push-token";
  * Web builds intentionally skip this path; browser notifications remain a
  * separate permission controlled by the web app.
  */
-export async function initializePushNotifications(): Promise<void> {
+export async function initializePushNotifications(
+  onToken?: (token: string) => Promise<void>,
+): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
 
   await PushNotifications.addListener("registration", ({ value }: Token) => {
     localStorage.setItem(PUSH_TOKEN_STORAGE_KEY, value);
     console.info("[PushNotifications] FCM token registered");
+    if (onToken) {
+      void onToken(value).catch(error => {
+        console.error("[PushNotifications] token registration failed", error);
+      });
+    }
     window.dispatchEvent(new CustomEvent("kinba:push-token", { detail: value }));
   });
 

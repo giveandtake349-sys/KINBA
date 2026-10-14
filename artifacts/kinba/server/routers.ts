@@ -199,6 +199,7 @@ import {
   notifyNewFollower,
   notifyVideoComment,
 } from "./notifications";
+import { upsertPushToken } from "./pushNotifications";
 import {
   adminArchiveHypeRoom,
   adminBanHypeRoomMember,
@@ -862,6 +863,16 @@ export const appRouter = router({
   // M7 — durable notifications (§21.1 / §22). Protected; no feature flag.
   // home.notifications remains the separate derived activity feed.
   notifications: router({
+    registerPushToken: protectedProcedure
+      .input(
+        z.object({
+          token: z.string().trim().min(20).max(2048),
+          platform: z.enum(["android", "ios"]),
+        })
+      )
+      .mutation(({ ctx, input }) =>
+        upsertPushToken({ userId: ctx.user.id, token: input.token, platform: input.platform })
+      ),
     list: protectedProcedure
       .input(notificationListInput)
       .query(({ ctx, input }) =>
