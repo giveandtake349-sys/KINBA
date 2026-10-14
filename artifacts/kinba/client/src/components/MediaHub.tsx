@@ -4603,19 +4603,19 @@ function ShortVideoCard({
             bookmarked={bookmarked}
             onBookmark={toggleBookmark}
           />
-          <button
-            type="button"
-            className="shorts-mute-btn"
-            data-short-no-swipe
-            onClick={e => {
-              e.stopPropagation();
-              setMutePreference(!shortMuted);
-            }}
-            aria-label={shortMuted ? "Unmute video" : "Mute video"}
-          >
-            {shortMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-          </button>
         </div>
+        <button
+          type="button"
+          className="shorts-mute-btn"
+          data-short-no-swipe
+          onClick={e => {
+            e.stopPropagation();
+            setMutePreference(!shortMuted);
+          }}
+          aria-label={shortMuted ? "Unmute video" : "Mute video"}
+        >
+          {shortMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+        </button>
       </div>
       <CommentDrawer
         postId={video.id}
