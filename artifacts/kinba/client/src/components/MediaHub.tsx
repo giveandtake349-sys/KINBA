@@ -1346,7 +1346,8 @@ function InlineVideoPlayer({
   const displayH = displayDims?.h ?? h;
   // Facebook-style: videos taller than 4:5 get cropped to 4:5 in feed.
   // Tap opens the fullscreen viewer showing the full video.
-  const isTallCrop = displayH / displayW > 1.25;
+  // Shorts are NEVER cropped — only regular feed videos.
+  const isTallCrop = video.kind !== "SHORT" && displayH / displayW > 1.25;
 
   const [isNearViewport, setIsNearViewport] = useState(false);
   useEffect(() => {
@@ -1663,6 +1664,10 @@ function ForYouVideoPlayer({
   const h = video.height || 9;
   const displayW = displayDims?.w ?? w;
   const displayH = displayDims?.h ?? h;
+  // Facebook-style: videos taller than 4:5 get cropped to 4:5 in feed.
+  // Tap opens the fullscreen viewer showing the full video.
+  // Shorts are NEVER cropped — only regular feed videos.
+  const isTallCrop = video.kind !== "SHORT" && displayH / displayW > 1.25;
 
   /* IntersectionObserver — viewport tracking */
   useEffect(() => {
@@ -1778,7 +1783,7 @@ function ForYouVideoPlayer({
       style={{
         position: "relative",
         width: "100%",
-        aspectRatio: `${displayW} / ${displayH}`,
+        aspectRatio: isTallCrop ? "4 / 5" : `${displayW} / ${displayH}`,
         background: "var(--page-bg)",
         overflow: "hidden",
         contain: "size layout paint style",
@@ -1811,10 +1816,33 @@ function ForYouVideoPlayer({
           display: "block",
           width: "100%",
           height: "100%",
-          objectFit: "contain",
+          objectFit: isTallCrop ? "cover" : "contain",
+          objectPosition: "center",
           background: "var(--page-bg)",
         }}
       />
+      {isTallCrop && (
+        <span
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            right: 8,
+            bottom: 8,
+            width: 30,
+            height: 30,
+            borderRadius: "50%",
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: "none",
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+          </svg>
+        </span>
+      )}
       {!playing && !error && (
         <div
           style={{
