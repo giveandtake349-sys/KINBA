@@ -744,6 +744,15 @@ body:has(.shorts-viewer-layer) .action-modal-layer {
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .shorts-playback-state {
   background: #000 !important;
 }
+.media-hub .shorts-tab-panel > .feed-skeleton,
+.media-hub .shorts-tab-panel > .feed-skeleton > span,
+.media-hub .shorts-tab-panel > .media-empty,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .feed-skeleton,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .feed-skeleton > span,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .media-empty {
+  background: #000 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
 
 .media-hub .shorts-tab-panel .shorts-viewport > .short-card .short-overlay,
 .media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card .short-overlay {
