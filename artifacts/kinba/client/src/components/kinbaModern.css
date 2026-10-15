@@ -2061,7 +2061,7 @@ body {
   }
   .media-hub .shorts-viewport > .short-card .media-engagement-actions--overlay {
     right: 12px !important;
-    bottom: 64px !important;
+    bottom: calc(90px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 

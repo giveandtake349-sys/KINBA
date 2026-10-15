@@ -700,7 +700,8 @@ body { color: var(--kinba-text); }
 .top-navigation-wrapper .home-feed-tabs button.active {
   color: var(--kinba-text) !important;
   background: transparent !important;
-  box-shadow: inset 0 -2px 0 var(--kinba-blue) !important;
+  box-shadow: none !important;
+  border-bottom-color: transparent !important;
 }
 
 .app-main-content.has-feed-tabs .home-page {
