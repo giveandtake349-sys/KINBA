@@ -901,6 +901,7 @@ export type HomeFeedTab =
   | "videos"
   | "trendy"
   | "following"
+  | "followingVideos"
   | "icons"
   | "shorts"
   | "wheels";
@@ -1562,7 +1563,11 @@ export async function suggestHashtags(prefix: string, limit = 10): Promise<{ tag
   return rows;
 }
 
-export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
+export async function listHomeFeed(
+  tab: HomeFeedTab,
+  viewerId?: number,
+  initialVideoId?: number
+) {
   if (tab === "all") return listUnifiedHomeFeed(viewerId);
   if (tab === "shorts")
     return selectVideos(
@@ -1583,24 +1588,54 @@ export async function listHomeFeed(tab: HomeFeedTab, viewerId?: number) {
       "recent"
     );
   }
-  if (tab === "following" && !viewerId) return [];
-  const db = await getDb();
-  if (!db) return [];
-  const conditions: any[] = [];
-  if (tab === "videos")
-    conditions.push(or(eq(videos.kind, "LONG"), eq(videos.kind, "SHORT")));
-  if (tab === "trendy" || tab === "following")
-    conditions.push(eq(videos.kind, "LONG"), eq(videos.mediaType, "VIDEO"));
-  if (tab === "following")
-    conditions.push(
+  if (tab === "following" || tab === "followingVideos") {
+    if (!viewerId) return [];
+    const db = await getDb();
+    if (!db) return [];
+    const conditions: any[] = [
+      or(eq(videos.kind, "LONG"), eq(videos.kind, "SHORT")),
       inArray(
         videos.userId,
         db
           .select({ followedId: follows.followedId })
           .from(follows)
-          .where(eq(follows.followerId, viewerId as number))
-      )
+          .where(eq(follows.followerId, viewerId))
+      ),
+    ];
+    if (tab === "followingVideos")
+      conditions.push(eq(videos.mediaType, "VIDEO"));
+
+    const feed = await selectVideos(conditions, viewerId, "recent");
+    if (
+      tab !== "followingVideos" ||
+      !initialVideoId ||
+      feed.some(video => video.id === initialVideoId)
+    ) {
+      return feed;
+    }
+
+    // The selected card may be older than the viewer's first page of videos
+    // when image/text posts are mixed into Following. Re-fetch that one row
+    // with the same follow, audience, readiness and VIDEO constraints before
+    // adding it to the viewer; never trust a client-provided standalone record.
+    const selected = await selectVideos(
+      [...conditions, eq(videos.id, initialVideoId)],
+      viewerId,
+      "recent"
     );
+    return [...feed, ...selected].sort(
+      (left, right) =>
+        new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+    );
+  }
+
+  const db = await getDb();
+  if (!db) return [];
+  const conditions: any[] = [];
+  if (tab === "videos")
+    conditions.push(or(eq(videos.kind, "LONG"), eq(videos.kind, "SHORT")));
+  if (tab === "trendy")
+    conditions.push(eq(videos.kind, "LONG"), eq(videos.mediaType, "VIDEO"));
   if (tab === "icons") {
     conditions.push(eq(profiles.isVerified, true));
     conditions.push(inArray(profiles.accountType, ["creator", "company"]));

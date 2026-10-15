@@ -56,6 +56,10 @@ import { toast } from "sonner";
 import Hls from "hls.js";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import {
+  setVideoMutePreference,
+  useVideoMutePreference,
+} from "@/lib/videoMutePreference";
 import { apiUrl } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import {
@@ -125,7 +129,7 @@ type HomeTab = "videos" | "trendy" | "following" | "icons" | "spotlight";
 type VideoKind = "LONG" | "SHORT" | "WHEEL";
 type Quality = "ORIGINAL" | "1080P" | "720P" | "480P" | "240P";
 type VideoSource = { quality: Quality; videoUrl: string };
-export type ShortsViewerOrigin = "videos" | "search" | "profile";
+export type ShortsViewerOrigin = "videos" | "search" | "profile" | "following";
 
 function isHlsMediaUrl(value: string) {
   return /\.m3u8(?:$|\?)/i.test(value);
@@ -244,7 +248,7 @@ const tabOptions: { id: HomeTab; label: string; caption: string }[] = [
   {
     id: "following",
     label: "Following",
-    caption: "Videos from people you follow",
+    caption: "Posts from people you follow",
   },
   {
     id: "icons",
@@ -265,22 +269,6 @@ function formatCount(value: number) {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(value);
-}
-const SHORTS_MUTE_STORAGE_KEY = "kinba.shorts.muted";
-function readShortsMutePreference() {
-  if (typeof window === "undefined") return true;
-  try {
-    return window.localStorage.getItem(SHORTS_MUTE_STORAGE_KEY) !== "false";
-  } catch {
-    return true;
-  }
-}
-function writeShortsMutePreference(muted: boolean) {
-  try {
-    window.localStorage.setItem(SHORTS_MUTE_STORAGE_KEY, String(muted));
-  } catch {
-    // Storage may be disabled; playback should still work in memory.
-  }
 }
 function relativeTime(value: Date | string) {
   const seconds = Math.max(
@@ -957,7 +945,8 @@ function QualityVideoPlayer({
   const [playing, setPlaying] = useState(false);
   const [isInView, setIsInView] = useState(false);
   const [isNearViewport, setIsNearViewport] = useState(false);
-  const [muted, setMuted] = useState(mutedProp ?? true);
+  const sharedMuted = useVideoMutePreference();
+  const muted = mutedProp ?? sharedMuted;
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
@@ -989,10 +978,6 @@ function QualityVideoPlayer({
     resolveMediaUrl(video.thumbnailUrl) ?? `/api/videos/${video.id}/thumbnail`;
 
   const shouldPlay = active && isInView;
-
-  useEffect(() => {
-    if (mutedProp !== undefined) setMuted(mutedProp);
-  }, [mutedProp]);
 
   const togglePlay = () => {
     const element = ref.current;
@@ -1253,13 +1238,11 @@ function QualityVideoPlayer({
           </button>
           <button
             type="button"
-            onClick={() =>
-              setMuted(value => {
-                const next = !value;
-                onMutedChange?.(next);
-                return next;
-              })
-            }
+            onClick={() => {
+              const next = !muted;
+              if (onMutedChange) onMutedChange(next);
+              else setVideoMutePreference(next);
+            }}
             aria-label={muted ? "Unmute video" : "Mute video"}
           >
             {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
@@ -1329,6 +1312,7 @@ function InlineVideoPlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(false);
+  const muted = useVideoMutePreference();
   const [error, setError] = useState("");
   const hlsRef = useRef<Hls | null>(null);
   const viewedRef = useRef(false);
@@ -1494,7 +1478,7 @@ function InlineVideoPlayer({
     >
       <video
         ref={videoRef}
-        muted
+        muted={muted}
         loop
         playsInline
         preload={isNearViewport ? "metadata" : "none"}
@@ -1519,6 +1503,32 @@ function InlineVideoPlayer({
           background: "var(--page-bg)",
         }}
       />
+      <button
+        type="button"
+        aria-label={muted ? "Unmute video" : "Mute video"}
+        onClick={event => {
+          event.stopPropagation();
+          setVideoMutePreference(!muted);
+        }}
+        style={{
+          position: "absolute",
+          top: 8,
+          right: 8,
+          zIndex: 3,
+          width: 44,
+          height: 44,
+          border: 0,
+          borderRadius: "50%",
+          background: "rgba(0,0,0,0.68)",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+        }}
+      >
+        {muted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+      </button>
       {autoPlayBadge && playing && !error && (
         <div className="k-autoplay-badge" aria-hidden="true">
           <span className="k-autoplay-eq">
@@ -1526,7 +1536,7 @@ function InlineVideoPlayer({
             <i />
             <i />
           </span>
-          Autoplay · muted
+          Autoplay · {muted ? "muted" : "sound on"}
         </div>
       )}
       {!playing && !error && (
@@ -1580,10 +1590,12 @@ function InlineVideoPlayer({
 function ForYouVideoPlayer({
   video,
   active = true,
+  muteControlAlwaysVisible = false,
   onFirstPlay,
 }: {
   video: VideoRecord;
   active?: boolean;
+  muteControlAlwaysVisible?: boolean;
   onFirstPlay?: () => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -1592,7 +1604,7 @@ function ForYouVideoPlayer({
   const [playing, setPlaying] = useState(false);
   const [isInView, setIsInView] = useState(false);
   const [isNearViewport, setIsNearViewport] = useState(false);
-  const [muted, setMuted] = useState(true);
+  const muted = useVideoMutePreference();
   const [error, setError] = useState<string | null>(null);
   const viewedRef = useRef(false);
   const [showOverlay, setShowOverlay] = useState(false);
@@ -1828,9 +1840,9 @@ function ForYouVideoPlayer({
           right: 8,
           display: "flex",
           gap: 6,
-          opacity: showOverlay ? 1 : 0,
+          opacity: showOverlay || muteControlAlwaysVisible ? 1 : 0,
           transition: "opacity 0.2s",
-          pointerEvents: showOverlay ? "auto" : "none",
+          pointerEvents: showOverlay || muteControlAlwaysVisible ? "auto" : "none",
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -1839,8 +1851,8 @@ function ForYouVideoPlayer({
           onClick={togglePlay}
           aria-label={playing ? "Pause" : "Play"}
           style={{
-            width: 34,
-            height: 34,
+            width: 44,
+            height: 44,
             borderRadius: "50%",
             border: "none",
             background: "rgba(0,0,0,0.6)",
@@ -1855,11 +1867,11 @@ function ForYouVideoPlayer({
         </button>
         <button
           type="button"
-          onClick={() => setMuted(v => !v)}
+          onClick={() => setVideoMutePreference(!muted)}
           aria-label={muted ? "Unmute" : "Mute"}
           style={{
-            width: 34,
-            height: 34,
+            width: 44,
+            height: 44,
             borderRadius: "50%",
             border: "none",
             background: "rgba(0,0,0,0.6)",
@@ -4118,6 +4130,7 @@ function HomeFeedPanel({
   const auth = useAuth();
   const utils = trpc.useUtils();
   const useForYouPlayer = tab === "videos";
+  const useFeedVideoPlayer = tab === "videos" || tab === "following";
   const query = trpc.home.feed.useQuery(
     { tab },
     {
@@ -4238,9 +4251,14 @@ function HomeFeedPanel({
     );
     window.dispatchEvent(new PopStateEvent("popstate"));
   };
-  const forYouVideoRenderer = useForYouPlayer
+  const feedVideoRenderer = useFeedVideoPlayer
     ? (v: VideoRecord, a: boolean, onFirstPlay: () => void) => (
-        <ForYouVideoPlayer video={v} active={a} onFirstPlay={onFirstPlay} />
+        <ForYouVideoPlayer
+          video={v}
+          active={a}
+          onFirstPlay={onFirstPlay}
+          muteControlAlwaysVisible={tab === "following"}
+        />
       )
     : undefined;
   return (
@@ -4329,8 +4347,8 @@ function HomeFeedPanel({
                 showDetailsOverlay={showDetailsOverlay}
                 socialLayout
                 renderVideo={
-                  useForYouPlayer && video.mediaType === "VIDEO"
-                    ? forYouVideoRenderer
+                  useFeedVideoPlayer && video.mediaType === "VIDEO"
+                    ? feedVideoRenderer
                     : undefined
                 }
                 onOpenViewer={
@@ -4404,7 +4422,7 @@ function ShortVideoCard({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [description, setDescription] = useState(video.description);
   const [deleted, setDeleted] = useState(false);
-  const [shortMuted, setShortMuted] = useState(readShortsMutePreference);
+  const shortMuted = useVideoMutePreference();
   const auth = useAuth();
   const utils = trpc.useUtils();
   const viewMutation = trpc.videos.view.useMutation();
@@ -4449,10 +4467,7 @@ function ShortVideoCard({
     }
   };
   const { current, react, share, pending } = useOptimisticEngagement(video);
-  const setMutePreference = (muted: boolean) => {
-    setShortMuted(muted);
-    writeShortsMutePreference(muted);
-  };
+  const setMutePreference = setVideoMutePreference;
   // Phase 6: pre-roll ad gate — every 3rd video may show a skippable ad
   // before the main video plays. While blocking, the player stays paused.
   const preRoll = usePreRoll(video.id, active);
@@ -4643,11 +4658,14 @@ export function ShortsFeed({
   initialVideoId?: number;
   viewerMode?: boolean;
   standaloneVideo?: VideoRecord;
-  source?: "videos" | "profile" | "search";
+  source?: ShortsViewerOrigin;
   onBack?: () => void;
 }) {
   const query = trpc.home.feed.useQuery(
-    { tab: "shorts" },
+    {
+      tab: source === "following" ? "followingVideos" : "shorts",
+      initialVideoId: source === "following" ? initialVideoId : undefined,
+    },
     {
       retry: 1,
       throwOnError: false,
@@ -4678,8 +4696,9 @@ export function ShortsFeed({
   const videos = useMemo(() => {
     if (!standaloneVideo || !initialVideoId) return filteredVideos;
     if (filteredVideos.some(v => v.id === initialVideoId)) return filteredVideos;
+    if (source === "following") return filteredVideos;
     return [standaloneVideo, ...filteredVideos];
-  }, [filteredVideos, standaloneVideo, initialVideoId]);
+  }, [filteredVideos, standaloneVideo, initialVideoId, source]);
   useEffect(() => {
     if (initialVideoId === undefined || !videos.length) return;
     const nextIndex = Math.max(
@@ -5975,14 +5994,19 @@ export default function MediaHub({
   showTabs = true,
   initialShortId,
   initialShortVideo,
+  initialShortSource,
   onBack,
   onOpenShort,
 }: {
   section?: FeedSection;
-  onSectionChange?: (section: FeedSection) => void;
+  onSectionChange?: (
+    section: FeedSection,
+    viewerSource?: ShortsViewerOrigin
+  ) => void;
   showTabs?: boolean;
   initialShortId?: number;
   initialShortVideo?: VideoRecord;
+  initialShortSource?: ShortsViewerOrigin;
   onBack?: () => void;
   onOpenShort?: (video: VideoRecord) => void;
 }) {
@@ -5997,10 +6021,10 @@ export default function MediaHub({
     selectedSection === "publish" || selectedSection === "search"
       ? "videos"
       : selectedSection;
-  const select = (next: FeedSection) => {
+  const select = (next: FeedSection, viewerSource?: ShortsViewerOrigin) => {
     // Update the visual state immediately, then let the parent synchronize the URL.
     setSelectedSection(next);
-    onSectionChange?.(next);
+    onSectionChange?.(next, viewerSource);
   };
   const focusHighlight = (highlight: SpotlightHighlight) => {
     select("videos");
@@ -6085,15 +6109,15 @@ export default function MediaHub({
               active
               showDetailsOverlay={false}
               showHeader={false}
-              onOpenShort={(id) => { select("shorts"); }}
+              onOpenShort={id => { select("shorts", "videos"); }}
               onOpenShortVideo={(v) => {
                 if (onOpenShort) onOpenShort(v);
-                select("shorts");
+                select("shorts", "videos");
               }}
               onOpenPhoto={setPhotoViewer}
               onOpenVideo={(v) => {
                 if (onOpenShort) onOpenShort(v);
-                select("shorts");
+                select("shorts", "videos");
               }}
             />
           </ErrorBoundary>
@@ -6111,11 +6135,11 @@ export default function MediaHub({
               onOpenPhoto={setPhotoViewer}
               onOpenVideo={video => {
                 if (onOpenShort) onOpenShort(video);
-                select("shorts");
+                select("shorts", "following");
               }}
               onOpenShortVideo={video => {
                 if (onOpenShort) onOpenShort(video);
-                select("shorts");
+                select("shorts", "following");
               }}
             />
           </ErrorBoundary>
@@ -6128,7 +6152,7 @@ export default function MediaHub({
               active
               initialVideoId={initialShortId}
               standaloneVideo={initialShortVideo}
-              source={initialShortId ? "videos" : undefined}
+              source={initialShortSource ?? "videos"}
               onBack={onBack}
             />
           </ErrorBoundary>
