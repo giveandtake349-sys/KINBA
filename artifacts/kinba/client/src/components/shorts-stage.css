@@ -147,6 +147,20 @@ body:has(.shorts-tab-panel) .app-main-content.chrome-collapsed.has-feed-tabs > .
    4. Media geometry — absolute inset-0, preserve intrinsic ratio.
    --------------------------------------------------------------------------- */
 
+/* `object-fit: contain` leaves letterbox space inside the replaced media
+   element and its player frame. The card background alone does not paint
+   those areas, so explicitly keep both surfaces black. */
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card > img,
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card > video,
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card > .media-video-frame,
+.media-hub .shorts-tab-panel .shorts-viewport > .short-card > .media-video-frame > video,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card > img,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card > video,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card > .media-video-frame,
+.media-hub .shorts-viewer-layer .shorts-detail-feed > .shorts-viewport > .short-card > .media-video-frame > video {
+  background: #000 !important;
+}
+
 .media-hub .shorts-tab-panel .shorts-viewport > .short-card > img {
   position: absolute !important;
   top: -8px !important;
