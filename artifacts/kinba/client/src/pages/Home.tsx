@@ -80,7 +80,11 @@ import {
   uploadImage,
 } from "@/lib/mediaUpload";
 import { resolveMediaUrl } from "@/lib/runtimeConfig";
-import type { FeedSection, VideoRecord } from "@/components/MediaHub";
+import type {
+  FeedSection,
+  ShortsViewerOrigin,
+  VideoRecord,
+} from "@/components/MediaHub";
 import {
   StudioContentTab,
   StudioCreateTab,
@@ -2634,6 +2638,7 @@ export default function Home() {
   const [profileOpen, setProfileOpen] = useState(() => location === "/profile");
   const [initialShortId, setInitialShortId] = useState<number | null>(null);
   const [initialShortVideo, setInitialShortVideo] = useState<VideoRecord | null>(null);
+  const [shortsSource, setShortsSource] = useState<ShortsViewerOrigin>("videos");
   const [photoViewer, setPhotoViewer] = useState<VideoRecord | null>(null);
   const profileQuery = trpc.profile.me.useQuery(undefined, {
     enabled: auth.isAuthenticated && !onPublicProfileRoute,
@@ -2706,9 +2711,12 @@ export default function Home() {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
-  // Clear initialShortId when navigating away from shorts tab
+  // Clear the selected video when navigating away from Shorts.
   useEffect(() => {
-    if (activeView !== "shorts") setInitialShortId(null);
+    if (activeView !== "shorts") {
+      setInitialShortId(null);
+      setInitialShortVideo(null);
+    }
   }, [activeView]);
 
   // The app chrome is a real fixed element; its actual height is the source of
@@ -2736,8 +2744,12 @@ export default function Home() {
     };
   }, [screen]);
 
-  const showFeed = (next: FeedSection = "videos") => {
+  const showFeed = (
+    next: FeedSection = "videos",
+    viewerSource?: ShortsViewerOrigin
+  ) => {
     setProfileOpen(false);
+    if (next === "shorts") setShortsSource(viewerSource ?? "videos");
     setActiveView(next);
     setActiveModal(null);
   };
@@ -2929,11 +2941,16 @@ export default function Home() {
                   )}
                   <MediaHub
                   section={activeView}
-                  onSectionChange={showFeed}
+                  onSectionChange={(next, viewerSource) =>
+                    showFeed(next, viewerSource)
+                  }
                   showTabs={false}
                   initialShortId={initialShortId ?? undefined}
                   initialShortVideo={initialShortVideo ?? undefined}
-                  onBack={() => setActiveView("videos")}
+                  initialShortSource={shortsSource}
+                  onBack={() =>
+                    setActiveView(shortsSource === "following" ? "following" : "videos")
+                  }
                   onOpenShort={(v) => {
                     setInitialShortId(v.id);
                     setInitialShortVideo(v);
@@ -2955,9 +2972,15 @@ export default function Home() {
               isAdmin={auth.user?.role === "admin"}
               userId={publicProfileId ?? usernameProfileData?.user.id}
               onBack={closeProfile}
-              onOpenShort={(id) => { setInitialShortId(id); setActiveView("shorts"); }}
+              onOpenShort={(id) => {
+                setShortsSource("profile");
+                setInitialShortId(id);
+                setInitialShortVideo(null);
+                setActiveView("shorts");
+              }}
               onOpenPhoto={setPhotoViewer}
               onOpenVideo={(v) => {
+                setShortsSource("profile");
                 setInitialShortId(v.id);
                 setInitialShortVideo(v);
                 setActiveView("shorts");
@@ -2996,6 +3019,7 @@ export default function Home() {
           />
         )}
         {activeModal === "search" && <SearchModal open onClose={() => setActiveModal(null)} onOpenVideo={(v) => {
+          setShortsSource("search");
           setInitialShortId(v.id);
           setInitialShortVideo(v);
           setActiveView("shorts");

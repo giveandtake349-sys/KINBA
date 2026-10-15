@@ -150,6 +150,7 @@ vi.mock("./storage", () => ({
 
 import {
   closeFriends,
+  follows,
   hashtags,
   profiles,
   users,
@@ -162,7 +163,12 @@ import {
   videoHashtags,
   videos,
 } from "../drizzle/schema";
-import { createPhotoPost, createVideo, listHomeFeed } from "./db";
+import {
+  createPhotoPost,
+  createTextPost,
+  createVideo,
+  listHomeFeed,
+} from "./db";
 
 function createTable(table: Table): string {
   const columns = Object.values(getTableColumns(table))
@@ -181,6 +187,16 @@ const author = {
   createdAt: new Date("2026-09-01T09:00:00.000Z"),
   updatedAt: new Date("2026-09-01T09:00:00.000Z"),
   lastSignedIn: new Date("2026-09-01T09:00:00.000Z"),
+};
+const followedAuthor = {
+  id: 82,
+  openId: "kinba-followed-82",
+  name: "Followed Author",
+};
+const unrelatedAuthor = {
+  id: 83,
+  openId: "kinba-unrelated-83",
+  name: "Unrelated Author",
 };
 
 /** The photo payload the unified composer publishes (title stays empty). */
@@ -201,6 +217,7 @@ beforeAll(() => {
   for (const table of [
     users,
     profiles,
+    follows,
     videos,
     videoAudienceUsers,
     closeFriends,
@@ -219,11 +236,14 @@ beforeAll(() => {
     `INSERT INTO "users" ("id", "openId", "name") VALUES (?, ?, ?)`
   );
   insertUser.run(author.id, author.openId, author.name);
+  insertUser.run(followedAuthor.id, followedAuthor.openId, followedAuthor.name);
+  insertUser.run(unrelatedAuthor.id, unrelatedAuthor.openId, unrelatedAuthor.name);
 });
 
 beforeEach(() => {
   const sqlite = holder.sqlite!;
   for (const name of [
+    "follows",
     "video_hashtags",
     "hashtags",
     "videos",
@@ -314,5 +334,86 @@ describe("image/video caption persistence", () => {
     const row = await feedRow("IMAGE");
     expect(row.description).toBe("");
     expect(row.title).toBe("Shared photo");
+  });
+});
+
+describe("Following feed media scope", () => {
+  it("returns followed video, image and text posts, while the viewer stays video-only and followee-only", async () => {
+    const sqlite = holder.sqlite!;
+    sqlite
+      .prepare(`INSERT INTO "follows" ("followerId", "followedId") VALUES (?, ?)`)
+      .run(author.id, followedAuthor.id);
+
+    await createPhotoPost(followedAuthor.id, {
+      ...photoInput,
+      title: "Followed photo",
+    });
+    await createTextPost(followedAuthor.id, { text: "Followed text update" });
+    const followedLongVideo = await createVideo(followedAuthor.id, {
+      title: "Followed long video",
+      description: "A long video from a followed creator",
+      videoUrl: "https://cdn.test/post/followed-long.mp4",
+      thumbnailUrl: null,
+      kind: "LONG",
+      durationSeconds: 42,
+      width: 720,
+      height: 1280,
+      sources: [],
+    });
+    const followedShort = await createVideo(followedAuthor.id, {
+      title: "Followed Short",
+      description: "A Short from a followed creator",
+      videoUrl: "https://cdn.test/post/followed-short.mp4",
+      thumbnailUrl: null,
+      kind: "SHORT",
+      durationSeconds: 42,
+      width: 720,
+      height: 1280,
+      sources: [],
+    });
+    const unrelatedVideo = await createVideo(unrelatedAuthor.id, {
+      title: "Unrelated video",
+      description: "This creator is not followed",
+      videoUrl: "https://cdn.test/post/unrelated.mp4",
+      thumbnailUrl: null,
+      kind: "LONG",
+      durationSeconds: 42,
+      width: 720,
+      height: 1280,
+      sources: [],
+    });
+
+    const followingPosts = await listHomeFeed("following", author.id);
+    expect(
+      followingPosts.map(post => `${post.owner.id}:${post.mediaType}`).sort()
+    ).toEqual(
+      [
+        `${followedAuthor.id}:IMAGE`,
+        `${followedAuthor.id}:TEXT`,
+        `${followedAuthor.id}:VIDEO`,
+        `${followedAuthor.id}:VIDEO`,
+      ].sort()
+    );
+
+    const followingVideos = await listHomeFeed(
+      "followingVideos",
+      author.id,
+      followedShort.id
+    );
+    expect(followingVideos.every(post => post.mediaType === "VIDEO")).toBe(true);
+    expect(followingVideos.every(post => post.owner.id === followedAuthor.id)).toBe(true);
+    expect(followingVideos.map(post => post.id)).toContain(followedLongVideo.id);
+    expect(followingVideos.map(post => post.id)).toContain(followedShort.id);
+    expect(followingVideos.map(post => post.id)).not.toContain(unrelatedVideo.id);
+
+    const rejectUnfollowedInitialVideo = await listHomeFeed(
+      "followingVideos",
+      author.id,
+      unrelatedVideo.id
+    );
+    expect(rejectUnfollowedInitialVideo.map(post => post.id)).not.toContain(
+      unrelatedVideo.id
+    );
+    expect(await listHomeFeed("followingVideos", undefined, followedShort.id)).toEqual([]);
   });
 });

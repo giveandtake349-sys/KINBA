@@ -852,13 +852,17 @@ export const appRouter = router({
             "videos",
             "trendy",
             "following",
+            "followingVideos",
             "icons",
             "shorts",
             "wheels",
           ]),
+          initialVideoId: z.number().int().positive().optional(),
         })
       )
-      .query(({ ctx, input }) => listHomeFeed(input.tab, ctx.user?.id)),
+      .query(({ ctx, input }) =>
+        listHomeFeed(input.tab, ctx.user?.id, input.initialVideoId)
+      ),
   }),
   // M7 — durable notifications (§21.1 / §22). Protected; no feature flag.
   // home.notifications remains the separate derived activity feed.
