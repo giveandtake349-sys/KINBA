@@ -577,8 +577,14 @@
   transform: scale(0.97);
 }
 .home-feed-tabs button.active {
-  background: var(--blue);
-  color: #ffffff;
+  background: transparent !important;
+  color: #e4e6eb !important;
+  border-bottom-color: transparent !important;
+  box-shadow: none !important;
+}
+.home-feed-tabs button.active::before {
+  display: none !important;
+  content: none !important;
 }
 .media-quality-control {
   align-items: center;
